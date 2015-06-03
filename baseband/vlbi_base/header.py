@@ -336,6 +336,7 @@ class VLBIHeaderBase(object):
         If any arguments are needed to initialize an empty header, those
         can be passed on in ``*args``.
         """
+        verify = kwargs.pop('verify', True)
         # Initialize an empty header.
         self = cls(None, *args, verify=False)
         # First set all keys to keyword arguments or defaults.
@@ -353,7 +354,8 @@ class VLBIHeaderBase(object):
         if kwargs:
             warnings.warn("Some keywords unused in header initialisation: {0}"
                           .format(kwargs))
-        self.verify()
+        if verify:
+            self.verify()
         return self
 
     @classmethod
