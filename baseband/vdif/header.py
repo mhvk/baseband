@@ -93,7 +93,7 @@ class VDIFHeader(VLBIHeaderBase):
             Extended data version.  If `False`, a legacy header is used.
             If `None` (default), it is determined from the header.  (Given it
             explicitly is mostly useful for a slight speed-up.)
-        verify: bool
+        verify : bool
             Whether to do basic verification of integrity.  Default: `True`.
         """
         # Assume non-legacy header to ensure those are done fastest.
@@ -192,12 +192,6 @@ class VDIFHeader(VLBIHeaderBase):
         return cls.fromvalues(edv=0xab, time=mark5b_header.time,
                               bps=bps, nchan=nchan, complex_data=False,
                               **kwargs)
-
-    def __repr__(self):
-        return ("<{0} {1}>".format(
-            self.__class__.__name__, ",\n            ".join(
-                ["{0}: {1}".format(k, (hex(self[k]) if k == 'sync_pattern' else
-                                       self[k])) for k in self.keys()])))
 
     # properties common to all VDIF headers.
     @property

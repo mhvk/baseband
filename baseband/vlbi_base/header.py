@@ -10,6 +10,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import struct
 import warnings
+import numpy as np
 
 from astropy.utils import OrderedDict
 
@@ -46,7 +47,7 @@ def make_parser(word_index, bit_index, bit_length):
     """
     if bit_length == 1:
         def parser(words):
-            return bool((words[word_index] >> bit_index) & 1)
+            return (words[word_index] & (1 << bit_index)) != 0
 
     elif bit_length == 32:
         assert bit_index == 0
@@ -100,24 +101,26 @@ def make_setter(word_index, bit_index, bit_length, default=None):
     def setter(words, value):
         if value is None and default is not None:
             value = default
-        value = int(value)
         bit_mask = (1 << bit_length) - 1
         # Check that value will fit within the bit limits.
-        if value & bit_mask != value:
+        if np.any(value & bit_mask != value):
             raise ValueError("{0} cannot be represented with {1} bits"
                              .format(value, bit_length))
         if bit_length == 64:
             word1 = value & (1 << 32) - 1
             word2 = value >> 32
-            return words[:word_index] + (word1, word2) + words[word_index+1:]
+            words[word_index:word_index+1] = word1
+            words[word_index+1:word_index+2] = word2
+            return words
 
         word = words[word_index]
         # Zero the part to be set.
         bit_mask <<= bit_index
-        word = (word | bit_mask) ^ bit_mask
+        word = ((word | bit_mask) ^ bit_mask)
         # Add the value
         word |= value << bit_index
-        return words[:word_index] + (word,) + words[word_index+1:]
+        words[word_index] = word
+        return words
 
     return setter
 
@@ -235,16 +238,17 @@ class VLBIHeaderBase(object):
 
     Parameters
     ----------
-    words : tuple of int, or None
+    words : tuple or list of int, or None
         header words (generally, 32 bit unsigned int).  If ``None``,
-        set to a tuple of zeros for later initialisation.
+        set to a list of zeros for later initialisation.  If given as a tuple,
+        the header is immutable.
     verify : bool
         Whether to do basic verification of integrity.  For the base class,
         checks that the number of words is consistent with the struct size.
     """
     def __init__(self, words, verify=True):
         if words is None:
-            self.words = (0,) * (self._struct.size // 4)
+            self.words = [0,] * (self._struct.size // 4)
         else:
             self.words = words
         if verify:
@@ -258,7 +262,15 @@ class VLBIHeaderBase(object):
         assert len(self.words) == (self._struct.size // 4)
 
     def copy(self):
-        return self.__class__(self.words, verify=False)
+        """Copy the header.
+
+        Any tuple of words is converted to a list so that they can be changed.
+        """
+        if isinstance(self.words, tuple):
+            words = list(self.words)
+        else:
+            words = self.words.copy()
+        return self.__class__(words, verify=False)
 
     def __copy__(self):
         return self.copy()
@@ -268,11 +280,39 @@ class VLBIHeaderBase(object):
         """Size of the header in bytes."""
         return self._struct.size
 
+    @property
+    def mutable(self):
+        if isinstance(self.words, tuple):
+            return False
+        word0 = self.words[0]
+        try:
+            self.words[0] = 0
+        except:
+            return False
+        else:
+            self.words[0] = word0
+            return True
+
+    @mutable.setter
+    def mutable(self, mutable):
+        if isinstance(self.words, np.ndarray):
+            self.words.flags['WRITEABLE'] = mutable
+        elif isinstance(self.words, tuple):
+            if mutable:
+                self.words = list(self.words)
+        elif isinstance(self.words, list):
+            if not mutable:
+                self.words = tuple(self.words)
+        else:
+            raise TypeError("Do not know how to set mutability of '.words' "
+                            "of class {0}".format(type(self.words)))
+
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
         """Read VLBI Header from file.
 
-        Arguments are the same as for class initialisation.
+        Arguments are the same as for class initialisation.  The header
+        constructed will be immutable.
         """
         s = fh.read(cls._struct.size)
         if len(s) != cls._struct.size:
@@ -348,10 +388,16 @@ class VLBIHeaderBase(object):
     def __setitem__(self, item, value):
         """Set the value of a particular header item in the header words."""
         try:
-            self.words = self._header_parser.setters[item](self.words, value)
+            self._header_parser.setters[item](self.words, value)
         except KeyError:
             raise KeyError("{0} header does not contain {1}"
                            .format(self.__class__.__name__, item))
+        except(TypeError, ValueError):
+            if not self.mutable:
+                raise TypeError("Header is immutable. Set '.mutable` attribute"
+                                " or make a copy.")
+            else:
+                raise
 
     def __getattr__(self, attr):
         """Get attribute, or, failing that, try to get key from header."""
@@ -373,7 +419,14 @@ class VLBIHeaderBase(object):
         return (type(self) is type(other) and
                 list(self.words) == list(other.words))
 
+    @staticmethod
+    def _repr_as_hex(key):
+        return (key.startswith('bcd') or key.startswith('crc') or
+                key == 'sync_pattern')
+
     def __repr__(self):
         name = self.__class__.__name__
         return ("<{0} {1}>".format(name, (",\n  " + len(name) * " ").join(
-            ["{0}: {1}".format(k, self[k]) for k in self.keys()])))
+            ["{0}: {1}".format(k, hex(self[k]) if self._repr_as_hex(k)
+                               else self[k])
+             for k in self.keys()])))

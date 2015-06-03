@@ -80,13 +80,6 @@ class Mark5BHeader(VLBIHeaderBase):
                 self._header_parser.defaults['sync_pattern'])
         assert self.kday is not None and (33000 < self.kday < 400000)
 
-    def __repr__(self):
-        name = self.__class__.__name__
-        return ("<{0} {1}>".format(name, (",\n  " + len(name) * " ").join(
-            ["{0}: {1}".format(k, (hex(self[k])
-                                   if k.startswith('bcd') or k.startswith('sy')
-                                   else self[k])) for k in self.keys()])))
-
     @property
     def payloadsize(self):
         """Size of the payload, in bytes."""
