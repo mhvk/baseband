@@ -29,6 +29,27 @@ FOUR_BIT_1_SIGMA = 2.95
 DTYPE_WORD = np.dtype('<u4')
 
 
+two_bit_2_sigma = 2 * TWO_BIT_1_SIGMA
+clip_low, clip_high = -1.5 * TWO_BIT_1_SIGMA, 1.5 * TWO_BIT_1_SIGMA
+
+
+def encode_2bit_real_base(values):
+    """Encode data using two bits.
+
+    Effectively, get indices such that for lv=TWO_BIT_1_SIGMA=2.1745:
+            value < -lv : 0
+      -lv < value <  0. : 1
+       0. < value < +lv : 2
+      +lv < value       : 3
+    """
+    # Optimized for speed by doing calculations in-place, and ensuring that
+    # the dtypes match.
+    values = np.clip(values, clip_low, clip_high)
+    values += two_bit_2_sigma
+    bitvalues = np.empty(values.shape, np.uint8)
+    return np.floor_divide(values, TWO_BIT_1_SIGMA, out=bitvalues)
+
+
 class VLBIPayloadBase(object):
     """Container for decoding and encoding VLBI payloads.
 
@@ -128,7 +149,8 @@ class VLBIPayloadBase(object):
     @property
     def nsample(self):
         """Number of samples in the payload."""
-        return len(self.words) * (32 // self.bps) // self.nchan
+        return (len(self.words) * (self.words.dtype.itemsize * 8) //
+                self.bps // self.nchan)
 
     @property
     def shape(self):
@@ -143,7 +165,7 @@ class VLBIPayloadBase(object):
     @property
     def size(self):
         """Size in bytes of payload."""
-        return len(self.words) * DTYPE_WORD.itemsize
+        return len(self.words) * self.words.dtype.itemsize
 
     def __eq__(self, other):
         return (type(self) is type(other) and

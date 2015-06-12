@@ -10,8 +10,8 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 
-from ..vlbi_base import (VLBIPayloadBase, OPTIMAL_2BIT_HIGH, TWO_BIT_1_SIGMA,
-                         FOUR_BIT_1_SIGMA, DTYPE_WORD)
+from ..vlbi_base import (VLBIPayloadBase, encode_2bit_real_base,
+                         OPTIMAL_2BIT_HIGH, FOUR_BIT_1_SIGMA, DTYPE_WORD)
 
 
 def init_luts():
@@ -65,25 +65,10 @@ def decode_4bit_complex(words, out=None):
 
 
 shift2bit = np.arange(0, 8, 2).astype(np.uint8)
-two_bit_2_sigma = 2 * TWO_BIT_1_SIGMA
-clip_low, clip_high = -1.5 * TWO_BIT_1_SIGMA, 1.5 * TWO_BIT_1_SIGMA
 
 
 def encode_2bit_real(values):
-    """Encode data using two bits.
-
-    Effectively, get indices such that for lv=TWO_BIT_1_SIGMA=2.1745:
-            value < -lv : 0
-      -lv < value <  0. : 1
-       0. < value <  lv : 2
-       2. < value       : 3
-    """
-    # Optimized for speed by doing most calculations in-place, and ensuring
-    # that the dtypes match.
-    values = np.clip(values.reshape(-1, 4), clip_low, clip_high)
-    values += two_bit_2_sigma
-    bitvalues = np.empty(values.shape, np.uint8)
-    bitvalues = np.floor_divide(values, TWO_BIT_1_SIGMA, out=bitvalues)
+    bitvalues = encode_2bit_real_base(values.reshape(-1, 4))
     bitvalues <<= shift2bit
     return np.bitwise_or.reduce(bitvalues, axis=-1).view(DTYPE_WORD)
 

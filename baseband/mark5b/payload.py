@@ -10,8 +10,8 @@ http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
-from ..vlbi_base import (VLBIPayloadBase, OPTIMAL_2BIT_HIGH, TWO_BIT_1_SIGMA,
-                         DTYPE_WORD)
+from ..vlbi_base import (VLBIPayloadBase, encode_2bit_real_base,
+                         OPTIMAL_2BIT_HIGH, TWO_BIT_1_SIGMA, DTYPE_WORD)
 
 
 # Some duplication with mark4.py here: lut2bit = mark4.lut2bit1
@@ -83,12 +83,7 @@ def encode_2bit_real(values):
        0. < value <  lv : 1
        2. < value       : 3
     """
-    # Optimized for speed by doing most calculations in-place, and ensuring
-    # that the dtypes match.
-    values = np.clip(values.reshape(-1, 4), -3., 3.)
-    values += 4.
-    bitvalues = np.empty(values.shape, np.uint8)
-    bitvalues = np.floor_divide(values, 2., out=bitvalues)
+    bitvalues = encode_2bit_real_base(values.reshape(-1, 4))
     # swap 1 & 2
     reorder.take(bitvalues, out=bitvalues)
     bitvalues <<= shift2bit
