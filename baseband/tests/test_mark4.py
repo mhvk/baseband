@@ -54,3 +54,34 @@ class TestMark4(object):
         assert header5.time == header.time
         header6 = mark4.Mark4Header(header.words, decade=2019)
         assert header6.time == header.time
+
+    def test_payload(self):
+        with open('sample.m4', 'rb') as fh:
+            fh.seek(0xa88)
+            header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+            payload = mark4.Mark4Payload.fromfile(fh, header)
+        assert payload.size == (20000 - 160) * 64 // 8
+        assert payload.shape == ((20000 - 160) * 4, 8)
+        assert payload.dtype == np.float32
+        assert np.all(payload.data[0].astype(int) ==
+                      np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
+        assert np.all(payload.data[1].astype(int) ==
+                      np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        with io.BytesIO() as s:
+            payload.tofile(s)
+            s.seek(0)
+            payload2 = mark4.Mark4Payload.fromfile(s, header)
+            assert payload2 == payload
+            with pytest.raises(EOFError):
+                # Too few bytes.
+                s.seek(100)
+                mark4.Mark4Payload.fromfile(s, header)
+        payload3 = mark4.Mark4Payload.fromdata(payload.data, header)
+        assert payload3 == payload
+        with pytest.raises(ValueError):
+            # Wrong number of channels.
+            mark4.Mark4Payload.fromdata(np.empty((payload.shape[0], 2)),
+                                        header)
+        with pytest.raises(ValueError):
+            # Too few data.
+            mark4.Mark4Payload.fromdata(payload.data[:100], header)

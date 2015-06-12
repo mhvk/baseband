@@ -8,4 +8,5 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 from .header import Mark4Header
+from .payload import Mark4Payload
 from .data import Mark4Data
