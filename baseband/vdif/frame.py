@@ -100,8 +100,8 @@ class VDIFFrame(VLBIFrameBase):
             (e.g., that channel information and whether or not data are complex
             are consistent between header and data).  Default: `True`.
         """
-        header = VDIFHeader.fromfile(fh, edv, verify)
-        payload = VDIFPayload.fromfile(fh, header=header)
+        header = cls._header_class.fromfile(fh, edv, verify)
+        payload = cls._payload_class.fromfile(fh, header=header)
         return cls(header, payload, verify=verify)
 
     @classmethod
@@ -120,9 +120,9 @@ class VDIFFrame(VLBIFrameBase):
             are consistent between header and data). Default: `True`.
         """
         if header is None:
-            header = VDIFHeader.fromvalues(verify=verify, **kwargs)
+            header = cls._header_class.fromvalues(verify=verify, **kwargs)
 
-        payload = VDIFPayload.fromdata(data, header=header)
+        payload = cls._payload_class.fromdata(data, header=header)
 
         return cls(header, payload, verify=True)
 
@@ -136,10 +136,10 @@ class VDIFFrame(VLBIFrameBase):
         See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
         """
         m5h, m5pl = mark5b_frame.header, mark5b_frame.payload
-        header = VDIFHeader.from_mark5b_header(
+        header = cls._header_class.from_mark5b_header(
             m5h, nchan=m5pl.nchan, bps=m5pl.bps,
             invalid_data=not mark5b_frame.valid, **kwargs)
-        payload = VDIFPayload(m5pl.words, header)
+        payload = cls._payload_class(m5pl.words, header)
         return cls(header, payload, verify)
 
 
