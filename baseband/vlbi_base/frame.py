@@ -58,7 +58,8 @@ class VLBIFrameBase(object):
         """Simple verification.  To be added to by subclasses."""
         assert isinstance(self.header, self._header_class)
         assert isinstance(self.payload, self._payload_class)
-        assert self.payloadsize // 4 == self.payload.words.size
+        assert (self.payloadsize ==
+                self.payload.words.size * self.payload.words.dtype.itemsize)
 
     @property
     def valid(self):
@@ -134,11 +135,6 @@ class VLBIFrameBase(object):
     def dtype(self):
         """Numeric type of the payload."""
         return self.payload.dtype
-
-    @property
-    def words(self):
-        """Frame encoded in unsigned 32-bit integers."""
-        return np.hstack((np.array(self.header.words), self.payload.words))
 
     @property
     def size(self):
