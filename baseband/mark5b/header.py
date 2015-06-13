@@ -10,10 +10,21 @@ http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import numpy as np
 from astropy.time import Time
 
 from ..vlbi_base import (HeaderParser, VLBIHeaderBase, four_word_struct,
-                         bcd_decode, bcd_encode)
+                         bcd_decode, bcd_encode, CRC)
+
+
+CRC16 = 0x18005
+"""CRC polynomial used for Mark 5B Headers, as a check on the time code.
+
+x^16 + x^15 + x^2 + 1, i.e., 0x18005.
+See page 11 of http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+(defined there for VLBA headers).
+"""
+crc16 = CRC(CRC16)
 
 
 class Mark5BHeader(VLBIHeaderBase):
@@ -49,7 +60,7 @@ class Mark5BHeader(VLBIHeaderBase):
          ('bcd_jday', (2, 20, 12)),
          ('bcd_seconds', (2, 0, 20)),
          ('bcd_fraction', (3, 16, 16)),
-         ('crcc', (3, 0, 16))))
+         ('crc', (3, 0, 16))))
 
     _struct = four_word_struct
 
@@ -61,7 +72,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
     def __init__(self, words, ref_mjd=None, kday=None, verify=True):
         if words is None:
-            self.words = (0, 0, 0, 0)
+            self.words = [0, 0, 0, 0]
         else:
             self.words = words
         if kday is not None:
@@ -79,6 +90,26 @@ class Mark5BHeader(VLBIHeaderBase):
         assert (self['sync_pattern'] ==
                 self._header_parser.defaults['sync_pattern'])
         assert self.kday is not None and (33000 < self.kday < 400000)
+
+    @classmethod
+    def fromvalues(cls, *args, **kwargs):
+        calculate_crc = 'crc' not in kwargs
+        if calculate_crc:
+            verify = kwargs.pop('verify', True)
+            kwargs['verify'] = False
+        self = super(Mark5BHeader, cls).fromvalues(*args, **kwargs)
+        if calculate_crc:
+            # CRC is calculated just over the time parts from words 2 & 3
+            stream = np.array([int(b) for b in
+                               '{:032b}{:016b}'.format(self.words[2],
+                                                       self.words[3] >> 16)],
+                              dtype=np.uint8)
+            crc = crc16(stream)
+            self['crc'] = int(''.join(['{:1d}'.format(c) for c in crc]),
+                              base=2)
+            if verify:
+                self.verify()
+        return self
 
     @property
     def payloadsize(self):
@@ -148,7 +179,8 @@ class Mark5BHeader(VLBIHeaderBase):
         self.kday = int(time.mjd // 1000) * 1000
         self.jday = int(time.mjd - self.kday)
         sec = (time - Time(self.kday+self.jday, format='mjd')).sec
-        self.seconds, ns = divmod(sec, 1)
+        sec, ns = divmod(sec, 1)
+        self.seconds = int(sec)
         self.ns = round(ns * 1e9)
 
     time = property(get_time, set_time)

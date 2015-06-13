@@ -40,7 +40,7 @@ from .. import mark5b
 #                    bcd_jday: 0x821,
 #                    bcd_seconds: 0x19801,
 #                    bcd_fraction: 0x0,
-#                    crcc: 38749>
+#                    crc: 0x975d>
 # fh.record_read(6).astype(int)
 # array([[-3, -1,  1, -1,  3, -3, -3,  3],
 #        [-3,  3, -1,  3, -1, -1, -1,  1],
@@ -70,11 +70,11 @@ class TestMark5B(object):
         assert header3 == header
         # Try initialising with properties instead of keywords.
         # Here, we let year, bcd_jday, bcd_seconds, and bcd_fraction be
-        # set by giving the time.
+        # set by giving the time, and let the crc be calculated from those.
         header4 = mark5b.Mark5BHeader.fromvalues(
             time=header.time,
             user=header['user'], internal_tvg=header['internal_tvg'],
-            frame_nr=header['frame_nr'], crcc=header['crcc'])
+            frame_nr=header['frame_nr'])
         assert header4 == header
         # Check ref_mjd
         header5 = mark5b.Mark5BHeader(header.words,
