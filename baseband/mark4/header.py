@@ -24,6 +24,9 @@ CRC12 = 0x180f
 
 x^12 + x^11 + x^3 + x^2 + x + 1, i.e., 0x180f.
 See page 4 of http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+
+This is also a 'standard' CRC-12 mentioned in
+https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 """
 crc12 = CRC(CRC12)
 

@@ -23,6 +23,9 @@ CRC16 = 0x18005
 x^16 + x^15 + x^2 + 1, i.e., 0x18005.
 See page 11 of http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 (defined there for VLBA headers).
+
+This is also CRC-16-IBM mentioned in
+https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 """
 crc16 = CRC(CRC16)
 
