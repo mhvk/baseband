@@ -1,4 +1,7 @@
+import warnings
+import numpy as np
 from astropy import units as u
+from astropy.utils import lazyproperty
 from .utils import get_frame_rate
 
 u_sample = u.def_unit('sample')
@@ -82,3 +85,49 @@ class VLBIStreamBase(object):
                 "samples_per_frame={s.samples_per_frame}, bps={s.bps}\n"
                 "    sample_rate={s.sample_rate}, (start) time={h.time.isot}>"
                 .format(s=self, h=self.header0))
+
+
+class VLBIStreamReaderBase(VLBIStreamBase):
+    _find_frame = None
+
+    @lazyproperty
+    def header1(self):
+        raw_offset = self.fh_raw.tell()
+        self.fh_raw.seek(-self.header0.framesize, 2)
+        header1 = self.fh_raw.find_frame(template_header=self.header0,
+                                         maximum=10*self.header0.framesize,
+                                         forward=False)
+        self.fh_raw.seek(raw_offset)
+        if header1 is None:
+            raise TypeError("Corrupt Mark 4? No frame in last {0} bytes."
+                            .format(10*self.header0.framesize))
+        return header1
+
+    @property
+    def size(self):
+        n_frames = round(
+            (self.header1.time - self.header0.time).to(u.s).value *
+            self.frames_per_second) + 1
+        return n_frames * self.samples_per_frame
+
+    def seek(self, offset, from_what=0):
+        """Like normal seek, but with the offset in samples."""
+        if from_what == 0:
+            self.offset = offset
+        elif from_what == 1:
+            self.offset += offset
+        elif from_what == 2:
+            self.offset = self.size + offset
+        return self.offset
+
+
+class VLBIStreamWriterBase(VLBIStreamBase):
+    def close(self):
+        extra = self.offset % self.samples_per_frame
+        if extra != 0:
+            warnings.warn("Closing with partial buffer remaining."
+                          "Writing padded frame, marked as invalid.")
+            self.write(np.zeros((extra, self.nthread, self.nchan)),
+                       invalid_data=True)
+            assert self.offset % self.samples_per_frame == 0
+        return super(VLBIStreamWriterBase, self).close()
