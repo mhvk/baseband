@@ -449,7 +449,8 @@ class Mark4Header(Mark4TrackHeader):
                              .format(item, type(self)))
 
         if new_words.ndim == 1:
-            return self._track_header(new_words, self.decade, verify=False)
+            return self._track_header(new_words.tolist(), self.decade,
+                                      verify=False)
         else:
             return self.__class__(new_words, self.decade, verify=False)
 
