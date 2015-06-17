@@ -240,12 +240,17 @@ class VDIFStreamReader(VDIFStreamBase):
                 raw = VDIFFileReader(raw)
         else:
             raw = VDIFFileReader(io.open(raw, mode='rb'))
-
+        # We use the very first header in the file, since in some VLBA files
+        # not all the headers have the right time.  Hopefully, the first is
+        # least likely to have problems...
+        header = VDIFHeader.fromfile(raw)
+        # Now also read the first frameset, since we need to know how many
+        # threads there are, and what the frameset size is.
+        raw.seek(0)
         self._frameset = raw.read_frameset(thread_ids)
         if thread_ids is None:
             thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
         self._framesetsize = raw.tell()
-        header = self._frameset.frames[0].header
         super(VDIFStreamReader, self).__init__(raw, header, thread_ids)
 
     @lazyproperty

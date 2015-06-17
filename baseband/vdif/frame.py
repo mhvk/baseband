@@ -118,9 +118,13 @@ class VDIFFrame(object):
 
 
 class VDIFFrameSet(object):
-    def __init__(self, frames):
+    def __init__(self, frames, header0=None):
         self.frames = frames
         self._data = None
+        if header0 is None:
+            self.header0 = self.frames[0].header
+        else:
+            self.header0 = header0
 
     @classmethod
     def frombytes(cls, raw, *args, **kwargs):
@@ -160,13 +164,13 @@ class VDIFFrameSet(object):
             Holds ''frames'' property with a possibly sorted list of frames.
             Use the ''data'' attribute to convert to an array.
         """
-        header = VDIFHeader.fromfile(fh, edv, verify)
-        edv = header.edv
-        frame_nr = header['frame_nr']
+        header0 = VDIFHeader.fromfile(fh, edv, verify)
+        edv = header0.edv
 
         frames = []
         exc = None
-        while header['frame_nr'] == frame_nr:
+        header = header0
+        while header['frame_nr'] == header0['frame_nr']:
             if thread_ids is None or header['thread_id'] in thread_ids:
                 frames.append(
                     VDIFFrame(header, VDIFPayload.fromfile(fh, header=header),
@@ -194,7 +198,7 @@ class VDIFFrameSet(object):
         if sort:
             frames.sort(key=lambda frame: frame['thread_id'])
 
-        return cls(frames)
+        return cls(frames, header0)
 
     def tofile(self, fh):
         for frame in self.frames:
@@ -259,17 +263,19 @@ class VDIFFrameSet(object):
 
     def __getitem__(self, item):
         # Header behaves as a dictionary.
-        return self.frames[0].header.__getitem__(item)
+        return self.header0.__getitem__(item)
 
     def keys(self):
-        return self.frames[0].header.keys()
+        return self.header0.keys()
 
     def __contains__(self, key):
-        return key in self.frames[0].header.keys()
+        return key in self.header[0].keys()
 
     def __getattr__(self, attr):
         try:
             return self.__getattribute__(attr)
         except AttributeError:
-            if attr in self.frames[0].header._properties:
-                return getattr(self.frames[0].header, attr)
+            if attr in self.header0._properties:
+                return getattr(self.header0, attr)
+            else:
+                raise
