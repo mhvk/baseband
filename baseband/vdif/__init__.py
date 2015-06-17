@@ -25,15 +25,15 @@ information.
 >>> fh = vdif.open('vlba.m5a', 'rs')
 >>> fh
 <VDIFStreamReader name=vlba.m5a offset=0
-    nthread=2, samples_per_frame=20000, nchan=1,
-    station=65534, (start) time=2014-06-13T05:30:00.000000000,
+    nthread=8, samples_per_frame=20000, nchan=1,
+    station=65532, (start) time=2014-06-16T05:56:07.000000000,
     bandwidth=16.0 MHz, complex_data=False, bps=2, edv=3>
 
 >>> d = fh.read(12)
 >>> d.shape
 (12, 8)
 >>> d[:, 0].astype(int)  # first thread
-array([ 3, -1,  1,  1, -3, -1,  3,  3,  1,  1,  1,  3])
+array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
 One can pick specific threads:
 >>> fh = vdif.open('vlba.m5a', 'rs', thread_ids=[2, 3])
@@ -48,25 +48,25 @@ coincidentally, what is given by the reader above suffices:
 >>> import astropy.units as u
 >>> fw = vdif.open('try.vdif', 'ws',
 ...                nthread=2, samples_per_frame=20000, nchan=1,
-...                station=65534, time=Time('2014-06-13T05:30:00.000000000'),
+...                station=65532, time=Time('2014-06-16T05:56:07.000000000'),
 ...                bandwidth=16.0*u.MHz, complex_data=False, bps=2, edv=3)
 >>> fw.write(d)
 >>> fw.close()
 >>> fh = vdif.open('try.vdif', 'rs')
->>> d2 = fh.read(20000)
+>>> d2 = fh.read(12)
 >>> np.all(d == d2)
 True
 
 
-Example to copy a VDIF file.  The data should be identical, though frames
-will be ordered by thread_id.  (This can be avoided by using ``read_frame``
- and ``write_frame``, resp., but then, of course, copying can be done easier!)
+Example to copy a VDIF file.  Here, we use the ``sort=False`` option to ensure
+the frames are written exactly in the same order, so the files should be
+identical.
 
 >>> from scintellometry.io import vdif
 >>> with vdif.open('vlba.m5a', 'rb') as fr, vdif.open('try.vdif', 'wb') as fw:
-...     while(True):
+...     while True:
 ...         try:
-...             fw.write_frameset(fr.read_frameset())
+...             fw.write_frameset(fr.read_frameset(sort=False))
 ...         except:
 ...             break
 

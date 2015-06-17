@@ -98,7 +98,8 @@ class VDIFFileReader(io.BufferedReader):
             With ''.headers'' and ''.data'' properties that return list of
             VDIFHeaders and data encoded in the frame, respectively.
         """
-        return VDIFFrameSet.fromfile(self, thread_ids)
+        return VDIFFrameSet.fromfile(self, thread_ids, sort=sort, edv=edv,
+                                     verify=verify)
 
 
 class VDIFFileWriter(io.BufferedWriter):
