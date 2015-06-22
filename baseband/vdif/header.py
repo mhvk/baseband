@@ -398,7 +398,7 @@ class VDIFBaseHeader(VDIFHeader):
 
     def __init__(self, words=None, edv=None, verify=True):
         if words is None:
-            self.words = (0, 0, 0, 0, 0, 0, 0, 0)
+            self.words = [0, 0, 0, 0, 0, 0, 0, 0]
         else:
             self.words = words
         if edv is not None:
@@ -441,10 +441,10 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
         self['sampling_unit'] = not (bandwidth.unit == u.kHz or
                                      bandwidth.to(u.MHz).value % 1 != 0)
         if self['sampling_unit']:
-            self['sample_rate'] = bandwidth.to(u.MHz).value
+            self['sample_rate'] = int(bandwidth.to(u.MHz).value)
         else:
             assert bandwidth.to(u.kHz).value % 1 == 0
-            self['sample_rate'] = bandwidth.to(u.kHz).value
+            self['sample_rate'] = int(bandwidth.to(u.kHz).value)
 
     @property
     def framerate(self):
