@@ -385,8 +385,7 @@ class VDIFHeader(object):
         assert framerate.value % 1 == 0
         self.bandwidth = framerate * self.samples_per_frame / (2 * self.nchan)
 
-    @property
-    def time(self, frame_nr=None, framerate=None):
+    def get_time(self, frame_nr=None, framerate=None):
         """
         Convert ref_epoch, seconds, and possibly frame_nr to Time object.
 
@@ -410,8 +409,7 @@ class VDIFHeader(object):
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
-    @time.setter
-    def time(self, time):
+    def set_time(self, time):
         assert time > ref_epochs[0]
         ref_index = np.searchsorted((ref_epochs - time).sec, 0) - 1
         self['ref_epoch'] = ref_index
@@ -423,3 +421,5 @@ class VDIFHeader(object):
         else:
             self['frame_nr'] = (frac_sec / self.samples_per_frame *
                                 self.bandwidth).to(u.one).value
+
+    time = property(get_time, set_time)
