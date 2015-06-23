@@ -7,57 +7,9 @@ import astropy.units as u
 
 from astropy.time import Time, TimeDelta
 
-from ..vlbi_helpers import HeaderParser, four_word_struct, eight_word_struct
-
-
-legacy_parser = HeaderParser(
-    (('invalid_data', (0, 31, 1, False)),
-     ('legacy_mode', (0, 30, 1, True)),
-     ('seconds', (0, 0, 30)),
-     ('ref_epoch', (1, 24, 6)),
-     ('frame_nr', (1, 0, 24, 0x0)),
-     ('_2_30_2', (2, 30, 2, 0x0)),
-     ('vdif_version', (2, 29, 3, 0x1)),
-     ('lg2_nchan', (2, 24, 5)),
-     ('frame_length', (2, 0, 24)),
-     ('complex_data', (3, 31, 1)),
-     ('bits_per_sample', (3, 26, 5)),
-     ('thread_id', (3, 16, 10, 0x0)),
-     ('station_id', (3, 0, 16))))
-
-base_parser = legacy_parser + HeaderParser(
-    (('legacy_mode', (0, 30, 1, True)),  # Repeat, to change default.
-     ('edv', (4, 24, 8))))
-
-header_parsers = {
-    False: legacy_parser,
-    1: base_parser + HeaderParser(
-        (('sampling_unit', (4, 23, 1)),
-         ('sample_rate', (4, 0, 23)),
-         ('sync_pattern', (5, 0, 32, 0xACABFEED)),
-         ('das_id', (6, 0, 32, 0x0)),
-         ('_7_0_32', (7, 0, 32, 0x0)))),
-    3: base_parser + HeaderParser(
-        (('frame_length', (2, 0, 24, 629)),  # Repeat, to set default.
-         ('sampling_unit', (4, 23, 1)),
-         ('sample_rate', (4, 0, 23)),
-         ('sync_pattern', (5, 0, 32, 0xACABFEED)),
-         ('loif_tuning', (6, 0, 32, 0x0)),
-         ('_7_28_4', (7, 28, 4, 0x0)),
-         ('dbe_unit', (7, 24, 4, 0x0)),
-         ('if_nr', (7, 20, 4, 0x0)),
-         ('subband', (7, 17, 3, 0x0)),
-         ('sideband', (7, 16, 1, False)),
-         ('major_rev', (7, 12, 4, 0x0)),
-         ('minor_rev', (7, 8, 4, 0x0)),
-         ('personality', (7, 0, 8)))),
-    4: base_parser + HeaderParser(
-        (('sampling_unit', (4, 23, 1)),
-         ('sample_rate', (4, 0, 23)),
-         ('sync_pattern', (5, 0, 32))))}
-
-# Also have mark5b over vdif (edv = 0xab)
-# http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
+from ..vlbi_helpers import (HeaderParser, four_word_struct, eight_word_struct,
+                            VLBIHeaderBase)
+from ..mark5b.header import Mark5BHeader
 
 
 ref_max = int(2. * (Time.now().jyear - 2000.)) + 1
@@ -67,43 +19,24 @@ ref_epochs = Time(['{y:04d}-{m:02d}-01'.format(y=2000 + ref // 2,
                   precision=9)
 
 
-class VDIFHeader(object):
+class VDIFHeader(VLBIHeaderBase):
 
     _properties = ('framesize', 'payloadsize', 'bps', 'nchan',
-                   'samples_per_frame', 'station', 'bandwidth',
-                   'framerate', 'time')
+                   'samples_per_frame', 'station', 'time')
 
-    def __init__(self, words, edv=None, verify=True):
-        """Interpret a tuple of words as a VDIF Frame Header."""
-        self.words = words
+    edv = None
+
+    def __new__(cls, words, edv=None, verify=True):
         if edv is None:
-            if base_parser.parsers['legacy_mode'](words):
-                self.edv = False
+            if is_legacy_header(words):
+                edv = False
             else:
-                self.edv = base_parser.parsers['edv'](words)
-        else:
-            self.edv = edv
+                edv = get_header_edv(words)
 
-        # If edv is not known, use base header so that the basic properties
-        # can still be gotten.
-        self._header_parser = header_parsers.get(self.edv, base_parser)
-        if verify:
-            self.verify()
-
-    def verify(self):
-        """Basic checks of header integrity."""
-        if self.edv is False:
-            assert self['legacy_mode']
-            assert len(self.words) == 4
-        else:
-            assert not self['legacy_mode']
-            assert self.edv == self['edv']
-            assert len(self.words) == 8
-            if 'sync_pattern' in self.keys():
-                assert (self['sync_pattern'] ==
-                        self._header_parser.defaults['sync_pattern'])
-            elif self.edv == 3:
-                assert self['frame_length'] == 629
+        cls = vdif_header_classes.get(edv, VDIFBaseHeader)
+        self = super(VDIFHeader, cls).__new__(cls)
+        self.edv = edv
+        return self
 
     def copy(self):
         return self.__class__(self.words, self.edv, verify=False)
@@ -135,16 +68,12 @@ class VDIFHeader(object):
             else:
                 return cls(four_word_struct.unpack(s), False, verify)
 
-    def tobytes(self):
-        if len(self.words) == 8:
-            return eight_word_struct.pack(*self.words)
-        else:
-            return four_word_struct.pack(*self.words)
-
     @classmethod
     def fromfile(cls, fh, edv=None, verify=True):
         """Read VDIF Header from file."""
         # Assume non-legacy header to ensure those are done fastest.
+        # Since a payload will follow, it is OK to read too many bytes even
+        # for a legacy header; we just rewind below.
         s = fh.read(32)
         if len(s) != 32:
             raise EOFError
@@ -158,11 +87,8 @@ class VDIFHeader(object):
 
         return self
 
-    def tofile(self, fh):
-        return fh.write(self.tobytes())
-
     @classmethod
-    def fromvalues(cls, **kwargs):
+    def fromvalues(cls, edv=False, **kwargs):
         """Initialise a header from parsed values.
 
         Here, the parsed values must be given as keyword arguments, i.e.,
@@ -195,92 +121,19 @@ class VDIFHeader(object):
         sample_rate, sample_unit : from 'bandwidth' or 'framerate'
         ref_epoch, seconds, frame_nr : from 'time'
         """
-        # Make a temporary header in which we try setting keywords
-        edv = kwargs.get('edv', False)
-        if edv is False:
-            assert kwargs.get('legacy_mode', True)
-            kwargs['legacy_mode'] = True
-            words = (0, 0, 0, 0)
-        else:
-            assert not kwargs.get('legacy_mode', False)
-            kwargs['legacy_mode'] = False
-            words = (0, 0, 0, 0, 0, 0, 0, 0)
-
-        self = cls(words, edv, verify=False)
-        # First set all keys to keyword arguments or defaults.
-        for key in self.keys():
-            if key in kwargs:
-                self[key] = kwargs.pop(key)
-            elif self._header_parser.defaults[key] is not None:
-                self[key] = self._header_parser.defaults[key]
-
-        # Next, use remaining keyword arguments to set properties.
-        # Order may be important so use list:
-        for key in self._properties:
-            if key in kwargs:
-                setattr(self, key, kwargs.pop(key))
-
-        if kwargs:
-            warnings.warn("Some keywords unused in header initialisation: {0}"
-                          .format(kwargs))
-
-        return self
+        # Some defaults that are not done by setting properties.
+        kwargs.setdefault('legacy_mode', True if edv is False else False)
+        kwargs['edv'] = edv
+        return super(VDIFHeader, cls).fromvalues(edv, **kwargs)
 
     @classmethod
     def fromkeys(cls, **kwargs):
         """Like fromvalues, but without any interpretation of keywords."""
         # Get all required values.
-        if kwargs['legacy_mode']:
-            words = (0, 0, 0, 0)
-            edv = False
-        else:
-            words = (0, 0, 0, 0, 0, 0, 0, 0)
-            edv = kwargs['edv']
+        edv = False if kwargs['legacy_mode'] else kwargs['edv']
+        return super(VDIFHeader, cls).fromkeys(edv, **kwargs)
 
-        header_parser = header_parsers[edv]
-        for key in header_parser:
-            words = header_parser.setters[key](words, kwargs.pop(key))
-
-        if kwargs:
-            warnings.warn("Some keywords unused in header initialisation: {0}"
-                          .format(kwargs))
-
-        return cls(words, edv)
-
-    def __getitem__(self, item):
-        try:
-            return self._header_parser.parsers[item](self.words)
-        except KeyError:
-            raise KeyError("VDIF Frame Header does not contain {0}"
-                           .format(item))
-
-    def __setitem__(self, item, value):
-        try:
-            self.words = self._header_parser.setters[item](self.words, value)
-        except KeyError:
-            raise KeyError("VDIF Frame Header does not contain {0}"
-                           .format(item))
-
-    def keys(self):
-        return self._header_parser.keys()
-
-    def __eq__(self, other):
-        return (type(self) is type(other) and
-                list(self.words) == list(other.words))
-
-    def __contains__(self, key):
-        return key in self.keys()
-
-    def __repr__(self):
-        return ("<{0} {1}>".format(
-            self.__class__.__name__, ",\n            ".join(
-                ["{0}: {1}".format(k, (hex(self[k]) if k == 'sync_pattern' else
-                                       self[k])) for k in self.keys()])))
-
-    @property
-    def size(self):
-        return len(self.words) * 4
-
+    # properties common to all VDIF headers.
     @property
     def framesize(self):
         return self['frame_length'] * 8
@@ -297,6 +150,12 @@ class VDIFHeader(object):
     @payloadsize.setter
     def payloadsize(self, size):
         self.framesize = size + self.size
+
+    def __repr__(self):
+        return ("<{0} {1}>".format(
+            self.__class__.__name__, ",\n            ".join(
+                ["{0}: {1}".format(k, (hex(self[k]) if k == 'sync_pattern' else
+                                       self[k])) for k in self.keys()])))
 
     @property
     def bps(self):
@@ -356,35 +215,6 @@ class VDIFHeader(object):
         assert int(station_id) == station_id
         self['station_id'] = station_id
 
-    @property
-    def bandwidth(self):
-        return u.Quantity(self['sample_rate'],
-                          u.MHz if self['sampling_unit'] else u.kHz)
-
-    @bandwidth.setter
-    def bandwidth(self, bandwidth):
-        self['sampling_unit'] = not (bandwidth.unit == u.kHz or
-                                     bandwidth.to(u.MHz).value % 1 != 0)
-        if self['sampling_unit']:
-            self['sample_rate'] = bandwidth.to(u.MHz).value
-        else:
-            assert bandwidth.to(u.kHz).value % 1 == 0
-            self['sample_rate'] = bandwidth.to(u.kHz).value
-
-    @property
-    def framerate(self):
-        # Could use self.bandwidth here, but speed up the calculation by
-        # changing to a Quantity only at the end.
-        return u.Quantity(self['sample_rate'] *
-                          (1000000 if self['sampling_unit'] else 1000) *
-                          2 * self.nchan / self.samples_per_frame, u.Hz)
-
-    @framerate.setter
-    def framerate(self, framerate):
-        framerate = framerate.to(u.Hz)
-        assert framerate.value % 1 == 0
-        self.bandwidth = framerate * self.samples_per_frame / (2 * self.nchan)
-
     def get_time(self, frame_nr=None, framerate=None):
         """
         Convert ref_epoch, seconds, and possibly frame_nr to Time object.
@@ -423,3 +253,170 @@ class VDIFHeader(object):
                                 self.bandwidth).to(u.one).value
 
     time = property(get_time, set_time)
+
+
+class VDIFLegacyHeader(VDIFHeader, VLBIHeaderBase):
+
+    _struct = four_word_struct
+
+    _header_parser = HeaderParser(
+        (('invalid_data', (0, 31, 1, False)),
+         ('legacy_mode', (0, 30, 1, True)),
+         ('seconds', (0, 0, 30)),
+         ('ref_epoch', (1, 24, 6)),
+         ('frame_nr', (1, 0, 24, 0x0)),
+         ('_2_30_2', (2, 30, 2, 0x0)),
+         ('vdif_version', (2, 29, 3, 0x1)),
+         ('lg2_nchan', (2, 24, 5)),
+         ('frame_length', (2, 0, 24)),
+         ('complex_data', (3, 31, 1)),
+         ('bits_per_sample', (3, 26, 5)),
+         ('thread_id', (3, 16, 10, 0x0)),
+         ('station_id', (3, 0, 16))))
+
+    def __init__(self, words=None, edv=False, verify=True):
+        if words is None:
+            self.words = (0, 0, 0, 0)
+        else:
+            self.words = words
+        if self.edv is not None:
+            self.edv = edv
+        if verify:
+            self.verify()
+
+    def verify(self):
+        """Basic checks of header integrity."""
+        assert self.edv is False
+        assert self['legacy_mode']
+        assert len(self.words) == 4
+
+
+class VDIFBaseHeader(VDIFHeader, VLBIHeaderBase):
+
+    _struct = eight_word_struct
+
+    _header_parser = VDIFLegacyHeader._header_parser + HeaderParser(
+        (('legacy_mode', (0, 30, 1, False)),  # Repeat, to change default.
+         ('edv', (4, 24, 8))))
+
+    def __init__(self, words=None, edv=None, verify=True):
+        if words is None:
+            self.words = (0, 0, 0, 0, 0, 0, 0, 0)
+        else:
+            self.words = words
+        if edv is not None:
+            self.edv = edv
+        if verify:
+            self.verify()
+
+    def verify(self):
+        """Basic checks of header integrity."""
+        assert not self['legacy_mode']
+        assert self.edv == self['edv']
+        assert len(self.words) == 8
+        if 'sync_pattern' in self.keys():
+            assert (self['sync_pattern'] ==
+                    self._header_parser.defaults['sync_pattern'])
+
+
+class VDIFHeader1(VDIFBaseHeader):
+
+    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
+        (('sampling_unit', (4, 23, 1)),
+         ('sample_rate', (4, 0, 23)),
+         ('sync_pattern', (5, 0, 32, 0xACABFEED)),
+         ('das_id', (6, 0, 32, 0x0)),
+         ('_7_0_32', (7, 0, 32, 0x0))))
+
+    _properties = VDIFBaseHeader._properties + ('bandwidth', 'framerate')
+
+    @property
+    def bandwidth(self):
+        return u.Quantity(self['sample_rate'],
+                          u.MHz if self['sampling_unit'] else u.kHz)
+
+    @bandwidth.setter
+    def bandwidth(self, bandwidth):
+        self['sampling_unit'] = not (bandwidth.unit == u.kHz or
+                                     bandwidth.to(u.MHz).value % 1 != 0)
+        if self['sampling_unit']:
+            self['sample_rate'] = bandwidth.to(u.MHz).value
+        else:
+            assert bandwidth.to(u.kHz).value % 1 == 0
+            self['sample_rate'] = bandwidth.to(u.kHz).value
+
+    @property
+    def framerate(self):
+        # Could use self.bandwidth here, but speed up the calculation by
+        # changing to a Quantity only at the end.
+        return u.Quantity(self['sample_rate'] *
+                          (1000000 if self['sampling_unit'] else 1000) *
+                          2 * self.nchan / self.samples_per_frame, u.Hz)
+
+    @framerate.setter
+    def framerate(self, framerate):
+        framerate = framerate.to(u.Hz)
+        assert framerate.value % 1 == 0
+        self.bandwidth = framerate * self.samples_per_frame / (2 * self.nchan)
+
+
+class VDIFHeader3(VDIFHeader1):
+
+    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
+        (('frame_length', (2, 0, 24, 629)),  # Repeat, to set default.
+         ('sampling_unit', (4, 23, 1)),
+         ('sample_rate', (4, 0, 23)),
+         ('sync_pattern', (5, 0, 32, 0xACABFEED)),
+         ('loif_tuning', (6, 0, 32, 0x0)),
+         ('_7_28_4', (7, 28, 4, 0x0)),
+         ('dbe_unit', (7, 24, 4, 0x0)),
+         ('if_nr', (7, 20, 4, 0x0)),
+         ('subband', (7, 17, 3, 0x0)),
+         ('sideband', (7, 16, 1, False)),
+         ('major_rev', (7, 12, 4, 0x0)),
+         ('minor_rev', (7, 8, 4, 0x0)),
+         ('personality', (7, 0, 8))))
+
+    def verify(self):
+        super(VDIFHeader3, self).verify()
+        assert self['frame_length'] == 629
+
+
+class VDIFHeader4(VDIFHeader1):
+
+    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
+        (('sampling_unit', (4, 23, 1)),
+         ('sample_rate', (4, 0, 23)),
+         ('sync_pattern', (5, 0, 32))))
+
+
+class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
+    """mark5b over vdif (edv = 0xab).
+
+    See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
+    """
+
+    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
+        tuple((k, (v[0]+4,) + v[1:]) for (k, v) in
+              Mark5BHeader._header_parser.items()))
+
+    def verify(self):
+        super(VDIFMark5BHeader, self).verify()
+        assert self['frame_length'] == 2508  # payload+header=10000+32 bytes
+        assert abs(self.time - Mark5BHeader.get_time(self)) < 1. * u.ns
+
+    def set_time(self, time):
+        VDIFBaseHeader.set_time(time)
+        Mark5BHeader.set_time(time)
+
+    time = property(VDIFHeader.get_time, set_time)
+
+
+vdif_header_classes = {False: VDIFLegacyHeader,
+                       1: VDIFHeader1,
+                       3: VDIFHeader3,
+                       4: VDIFHeader4,
+                       0xab: VDIFMark5BHeader}
+
+is_legacy_header = VDIFBaseHeader._header_parser.parsers['legacy_mode']
+get_header_edv = VDIFBaseHeader._header_parser.parsers['edv']

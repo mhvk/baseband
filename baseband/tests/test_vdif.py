@@ -47,6 +47,26 @@ class TestVDIF(object):
         assert header.bps == 2
         assert not header['complex_data']
 
+        header2 = vdif.VDIFHeader.frombytes(header.tobytes())
+        assert header2 == header
+        header3 = vdif.VDIFHeader.fromkeys(**header)
+        assert header3 == header
+        # Try initialising with properties instead of keywords, as much as
+        # possible.  Note that we still have to give a lots of extra, less
+        # directly useful parameters to get an *identical* header.
+        header4 = vdif.VDIFHeader.fromvalues(
+            edv=header.edv, time=header.time,
+            samples_per_frame=header.samples_per_frame,
+            station=header.station, bandwidth=header.bandwidth,
+            bps=header.bps, complex_data=header['complex_data'],
+            thread_id=header['thread_id'],
+            loif_tuning=header['loif_tuning'], dbe_unit=header['dbe_unit'],
+            if_nr=header['if_nr'], subband=header['subband'],
+            sideband=header['sideband'], major_rev=header['major_rev'],
+            minor_rev=header['minor_rev'], personality=header['personality'],
+            _7_28_4=header['_7_28_4'])
+        assert header4 == header
+
     def test_payload(self):
         with open('vlba.m5a', 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
