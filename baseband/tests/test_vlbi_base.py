@@ -1,4 +1,4 @@
-from ..vlbi_helpers import bcd_encode, bcd_decode
+from ..vlbi_base import bcd_encode, bcd_decode
 from astropy.tests.helper import pytest
 
 

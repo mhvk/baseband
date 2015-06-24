@@ -7,7 +7,7 @@ from astropy import units as u
 from astropy.time import Time
 from astropy.utils import lazyproperty
 
-from ..vlbi_helpers import VLBIStreamBase
+from ..vlbi_base import VLBIStreamBase
 from .header import Mark5BHeader
 from .frame import Mark5BFrame
 

@@ -1,11 +1,7 @@
 import numpy as np
 
-from ..vlbi_helpers import VLBIPayloadBase
-
-# the high mag value for 2-bit reconstruction
-OPTIMAL_2BIT_HIGH = 3.3359
-FOUR_BIT_1_SIGMA = 2.95
-DTYPE_WORD = np.dtype('<u4')
+from ..vlbi_base import (VLBIPayloadBase,
+                         OPTIMAL_2BIT_HIGH, FOUR_BIT_1_SIGMA, DTYPE_WORD)
 
 
 def init_luts():

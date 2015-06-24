@@ -4,7 +4,7 @@ from __future__ import (absolute_import, division, print_function,
 import io
 import numpy as np
 
-from ..vlbi_helpers import VLBIFrameBase
+from ..vlbi_base import VLBIFrameBase
 from .header import VDIFHeader
 from .payload import VDIFPayload
 

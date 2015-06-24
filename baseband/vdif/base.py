@@ -5,7 +5,7 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_helpers import VLBIStreamBase
+from ..vlbi_base import VLBIStreamBase
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 

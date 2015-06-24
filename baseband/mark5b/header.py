@@ -3,8 +3,8 @@ from __future__ import (absolute_import, division, print_function,
 
 from astropy.time import Time
 
-from ..vlbi_helpers import (HeaderParser, VLBIHeaderBase, four_word_struct,
-                            bcd_decode, bcd_encode)
+from ..vlbi_base import (HeaderParser, VLBIHeaderBase, four_word_struct,
+                         bcd_decode, bcd_encode)
 
 
 class Mark5BHeader(VLBIHeaderBase):
