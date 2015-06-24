@@ -114,7 +114,7 @@ class Mark5BHeader(VLBIHeaderBase):
         """
         return Time(self.kday + self.jday,
                     (self.seconds + 1.e-9 * self.ns) / 86400,
-                    format='mjd', scale='utc')
+                    format='mjd', scale='utc', precision=9)
 
     def set_time(self, time):
         self.kday = int(time.mjd // 1000) * 1000

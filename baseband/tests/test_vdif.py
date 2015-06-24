@@ -75,6 +75,9 @@ class TestVDIF(object):
         with open('vlba.m5a', 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
             payload = vdif.VDIFPayload.fromfile(fh, header)
+        assert payload.size == 5000
+        assert payload.shape == (20000, 1)
+        assert payload.dtype == np.float32
         assert np.all(payload.data[:12, 0].astype(int) ==
                       np.array([1, 1, 1, -3, 1, 1, -3, -3, -3, 3, 3, -1]))
         payload2 = vdif.VDIFPayload.frombytes(payload.tobytes(), header)
