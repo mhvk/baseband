@@ -1,13 +1,11 @@
 import os
 import io
-import warnings
 
 import numpy as np
 from astropy import units as u
 from astropy.time import Time
-from astropy.utils import lazyproperty
 
-from ..vlbi_base import VLBIStreamBase
+from ..vlbi_base import VLBIStreamReaderBase, VLBIStreamWriterBase
 from .header import Mark5BHeader
 from .frame import Mark5BFrame
 
@@ -52,6 +50,66 @@ class Mark5BFileReader(io.BufferedReader):
         return Mark5BFrame.fromfile(self, nchan=nchan, bps=bps,
                                     ref_mjd=ref_mjd)
 
+    def find_frame(self, kday=None, template_header=None, framesize=None,
+                   maximum=None, forward=True):
+        """Look for the first occurrence of a frame.
+
+        Search is from the current position.  If given, a template_header
+        is used to initialize the framesize, as well as kday in the header.
+        """
+        if template_header:
+            kday = template_header.kday
+            framesize = template_header.framesize
+        if maximum is None:
+            maximum = 2 * framesize
+        # Loop over chunks to try to find the frame marker.
+        file_pos = self.tell()
+        # First check whether we are right at a frame marker (usually true).
+        try:
+            header = Mark5BHeader.fromfile(self, kday=kday, verify=True)
+            self.seek(-header.size, 1)
+            return header
+        except:
+            pass
+
+        if forward:
+            iterate = range(file_pos, file_pos + maximum)
+        else:
+            iterate = range(file_pos, file_pos - maximum, -1)
+        for frame in iterate:
+            try:
+                self.seek(frame)
+                header1 = Mark5BHeader.fromfile(self, kday=kday, verify=True)
+            except AssertionError:
+                continue
+            except:
+                break
+
+            # get header from a frame further up or down and check those are
+            # consistent.
+            try:
+                self.seek(frame + (framesize if forward else -framesize))
+            except:  # we're a really short file; assume it is fine.
+                self.seek(frame)
+                return header1
+
+            try:
+                header2 = Mark5BHeader.fromfile(self, kday=kday, verify=True)
+            except AssertionError:
+                continue
+            except:
+                break
+
+            if(header2.jday == header1.jday and
+               abs(header2.seconds - header1.seconds) <= 1 and
+               abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
+                self.seek(frame)
+                return header1
+
+        # Didn't find any frame.
+        self.seek(file_pos)
+        return None
+
 
 class Mark5BFileWriter(io.BufferedWriter):
     """Simple writer for Mark 5B files.
@@ -81,13 +139,7 @@ class Mark5BFileWriter(io.BufferedWriter):
         return data.tofile(self)
 
 
-class Mark5BStreamBase(VLBIStreamBase):
-    """Mark5B file wrapper, which combines threads into streams."""
-
-    _frame_class = Mark5BFrame
-
-
-class Mark5BStreamReader(Mark5BStreamBase):
+class Mark5BStreamReader(VLBIStreamReaderBase):
     """VLBI Mark 5B format reader.
 
     This wrapper is allows one to access a Mark 5B file as a continues series
@@ -107,6 +159,9 @@ class Mark5BStreamReader(Mark5BStreamBase):
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
         If not given, it will be determined from the frame rate.
     """
+
+    _frame_class = Mark5BFrame
+
     def __init__(self, raw, nchan, bps=2, ref_mjd=None, thread_ids=None,
                  sample_rate=None):
         if not hasattr(raw, 'read'):
@@ -117,18 +172,6 @@ class Mark5BStreamReader(Mark5BStreamBase):
         self._frame_data = None
         super(Mark5BStreamReader, self).__init__(
             raw, self._frame.header, nchan, bps, thread_ids, sample_rate)
-
-    @lazyproperty
-    def header1(self):
-        raw_offset = self.fh_raw.tell()
-        self.fh_raw.seek(-self.header0.framesize, 2)
-        header1 = find_frame(self.fh_raw, template_header=self.header0,
-                             maximum=10*self.header0.framesize, forward=False)
-        self.fh_raw.seek(raw_offset)
-        if header1 is None:
-            raise TypeError("Corrupt Mark 5B? No frame in last {0} bytes."
-                            .format(10*self.header0.framesize))
-        return header1
 
     @property
     def size(self):
@@ -212,7 +255,7 @@ class Mark5BStreamReader(Mark5BStreamBase):
         return self._frame_data
 
 
-class Mark5BStreamWriter(Mark5BStreamBase):
+class Mark5BStreamWriter(VLBIStreamWriterBase):
     """VLBI VDIF format writer.
 
     Parameters
@@ -250,6 +293,9 @@ class Mark5BStreamWriter(Mark5BStreamBase):
 
     framerate : number of frames per second.
     """
+
+    _frame_class = Mark5BFrame
+
     def __init__(self, raw, nthread=1, header=None, **kwargs):
         if isinstance(raw, io.BufferedWriter):
             if not isinstance(raw, Mark5BFileWriter):
@@ -299,16 +345,6 @@ class Mark5BStreamWriter(Mark5BStreamBase):
 
             self.offset += nsample
             count -= nsample
-
-    def close(self):
-        extra = self.offset % self.samples_per_frame
-        if extra != 0:
-            warnings.warn("Closing with partial buffer remaining."
-                          "Writing padded frame, marked as invalid.")
-            self.write(np.zeros((extra, self.nthread, self.nchan)),
-                       invalid_data=True)
-            assert self.offset % self.samples_per_frame == 0
-        return super(Mark5BStreamWriter, self).close()
 
 
 def open(name, mode='rs', **kwargs):
@@ -363,66 +399,3 @@ def open(name, mode='rs', **kwargs):
     else:
         raise ValueError("Only support opening VDIF file for reading "
                          "or writing (mode='r' or 'w').")
-
-
-def find_frame(fh, template_header=None, framesize=None, maximum=None,
-               forward=True):
-    """Look for the first occurrence of a frame, from the current position.
-
-    Search for a valid header at a given position which is consistent with
-    `other_header` or with a header a framesize ahead.   Note that the latter
-    turns out to be an unexpectedly weak check on real data!
-    """
-    if template_header:
-        framesize = template_header.framesize
-
-    if maximum is None:
-        maximum = 2 * framesize
-    # Loop over chunks to try to find the frame marker.
-    file_pos = fh.tell()
-    # First check whether we are right at a frame marker (usually true).
-    if template_header:
-        try:
-            header = Mark5BHeader.fromfile(fh, verify=True)
-            if template_header.same_stream(header):
-                fh.seek(-header.size, 1)
-                return header
-        except:
-            pass
-
-    if forward:
-        iterate = range(file_pos, file_pos + maximum)
-    else:
-        iterate = range(file_pos, file_pos - maximum, -1)
-    for frame in iterate:
-        fh.seek(frame)
-        try:
-            header1 = Mark5BHeader.fromfile(fh, verify=True)
-        except(AssertionError, IOError, EOFError):
-            continue
-
-        if template_header:
-            if template_header.same_stream(header1):
-                fh.seek(frame)
-                return header1
-            continue
-
-        # if no comparison header given, get header from a frame further up or
-        # down and check those are consistent.
-        fh.seek(frame + (framesize if forward else -framesize))
-        try:
-            header2 = Mark5BHeader.fromfile(fh, verify=True)
-        except AssertionError:
-            continue
-        except:
-            break
-
-        if(header2.same_stream(header1) and
-           abs(header2.seconds - header1.seconds) <= 1 and
-           abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
-            fh.seek(frame)
-            return header1
-
-    # Didn't find any frame.
-    fh.seek(file_pos)
-    return None

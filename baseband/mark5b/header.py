@@ -92,7 +92,7 @@ class Mark5BHeader(VLBIHeaderBase):
         assert len(self.words) == 4
         assert (self['sync_pattern'] ==
                 self._header_parser.defaults['sync_pattern'])
-        assert self.kday is not None and (33000 < self.kday < 400000)
+        assert self.kday is None or (33000 < self.kday < 400000)
 
     @classmethod
     def fromvalues(cls, *args, **kwargs):

@@ -136,14 +136,25 @@ class TestMark5B(object):
 
     def test_filestreamer(self):
         with open('sample.m5b', 'rb') as fh:
-            header = mark5b.Mark5BHeader.fromfile(fh)
+            header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
 
         with mark5b.open('sample.m5b', 'rs', nchan=8, bps=2,
-                         sample_rate=16*u.MHz) as fh:
+                         sample_rate=32*u.MHz) as fh:
             assert header == fh.header0
+            assert fh.samples_per_frame == 5000
+            assert fh.frames_per_second == 6400
+            header1 = fh.header1
+            assert fh.size == 20000
             record = fh.read(12)
             assert fh.offset == 12
 
+        assert header1['frame_nr'] == 3
+        assert header1['user'] == header['user']
+        assert header1['bcd_jday'] == header['bcd_jday']
+        assert header1['bcd_seconds'] == header['bcd_seconds']
+        assert header1['bcd_fraction'] == 4
+        assert (round((1./((header1.time-header.time)/3.)).to(u.Hz).value)
+                == 6400)
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:3] ==
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
