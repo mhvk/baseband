@@ -1,97 +1,11 @@
 import numpy as np
 
+from ..vlbi_helpers import VLBIPayloadBase
 
 # the high mag value for 2-bit reconstruction
 OPTIMAL_2BIT_HIGH = 3.3359
 FOUR_BIT_1_SIGMA = 2.95
 DTYPE_WORD = np.dtype('<u4')
-
-
-class VDIFPayload(object):
-    def __init__(self, words, header=None,
-                 nchan=1, bps=2, complex_data=False):
-        """Container for decoding and encoding VDIF payloads.
-
-        Parameters
-        ----------
-        words : ndarray
-            Array containg LSB unsigned words (with the right size) that
-            encode the payload.
-        header : VDIFHeader or None
-            Information needed to interpret payload.
-
-        If ``header`` is not given, one needs to pass the following:
-
-        nchan : int
-            Number of channels in the data.  Default: 1.
-        bps : int
-            Number of bits per complete sample.  Default: 2.
-        complex_data : bool
-            Whether data is complex or float.  Default: False.
-        """
-        if header is not None:
-            nchan = header.nchan
-            bps = header.bps
-            complex_data = header['complex_data']
-
-        self.words = words
-        self.nchan = nchan
-        self.bps = bps
-        self.complex_data = complex_data
-        self.nsample = len(words) * (32 // self.bps) // self.nchan
-
-    @classmethod
-    def frombytes(cls, raw, *args, **kwargs):
-        """Set paiload by interpreting bytes."""
-        return cls(np.fromstring(raw, dtype=DTYPE_WORD), *args, **kwargs)
-
-    def tobytes(self):
-        """Convert payload to bytes."""
-        return self.words.tostring()
-
-    @classmethod
-    def fromfile(cls, fh, header):
-        """Read payload from file handle and decode it into data."""
-        self = cls.frombytes(fh.read(header.payloadsize), header)
-        if len(self.data) < header.payloadsize:
-            raise EOFError("Could not read full payload.")
-        return self
-
-    def tofile(self, fh):
-        return fh.write(self.tobytes())
-
-    @classmethod
-    def fromdata(cls, data, header=None, bps=2):
-        complex_data = data.dtype.kind == 'c'
-        if header is not None:
-            bps = header.bps
-
-        encoder = ENCODERS[bps, complex_data]
-        return cls(encoder(data.ravel()),
-                   nchan=data.shape[-1], bps=bps, complex_data=complex_data)
-
-    def todata(self, data=None):
-        """Decode the payload.
-
-        Parameters
-        ----------
-        data : ndarray or None
-            If given, used to decode the payload into.  It should have the
-            right size to store it.  Its shape is not changed.
-        """
-        decoder = DECODERS[self.bps, self.complex_data]
-        out = decoder(self.words, out=data)
-        return out.reshape(self.shape) if data is None else data
-
-    data = property(todata, doc="Decode the payload.")
-
-    @property
-    def shape(self):
-        return (self.nsample, self.nchan)
-
-    @property
-    def dtype(self):
-        return np.complex64 if self.complex_data else np.float32
 
 
 def init_luts():
@@ -116,7 +30,6 @@ def init_luts():
 lut1bit, lut2bit, lut4bit = init_luts()
 
 
-# Decoders keyed by bits_per_sample, complex_data:
 def decode_2bit_real(words, out=None):
     b = words.view(np.uint8)
     if out is None:
@@ -137,12 +50,6 @@ def decode_4bit_complex(words, out=None):
         assert outf4.base is out
         lut2bit.take(words.view(np.uint8), axis=0, out=outf4)
         return out
-
-
-DECODERS = {
-    (2, False): decode_2bit_real,
-    (4, True): decode_4bit_complex
-}
 
 
 shift2bit = np.arange(0, 8, 2).astype(np.uint8)
@@ -168,7 +75,80 @@ def encode_4bit_complex(values):
     return encode_2bit_real(values.view(values.real.dtype)).view(DTYPE_WORD)
 
 
-ENCODERS = {
-    (2, False): encode_2bit_real,
-    (4, True): encode_4bit_complex
-}
+class VDIFPayload(VLBIPayloadBase):
+    _decoders = {(2, False): decode_2bit_real,
+                 (4, True): decode_4bit_complex}
+
+    _encoders = {(2, False): encode_2bit_real,
+                 (4, True): encode_4bit_complex}
+
+    def __init__(self, words, header=None,
+                 nchan=1, bps=2, complex_data=False):
+        """Container for decoding and encoding VDIF payloads.
+
+        Parameters
+        ----------
+        words : ndarray
+            Array containg LSB unsigned words (with the right size) that
+            encode the payload.
+        header : VDIFHeader or None
+            Information needed to interpret payload.
+
+        If ``header`` is not given, one needs to pass the following:
+
+        nchan : int
+            Number of channels in the data.  Default: 1.
+        bps : int
+            Number of bits per complete sample.  Default: 2.
+        complex_data : bool
+            Whether data is complex or float.  Default: False.
+        """
+        if header is not None:
+            nchan = header.nchan
+            bps = header.bps
+            complex_data = header['complex_data']
+            self._size = header.payloadsize
+            if header.edv == 0xab:  # Mark5B payload
+                from ..mark5b import Mark5BPayload
+                self._decoders = Mark5BPayload._decoders
+                self._encoders = Mark5BPayload._encoders
+                if complex_data:
+                    raise ValueError("VDIF/Mark5B payload cannot be complex.")
+        super(VDIFPayload, self).__init__(words, nchan, bps, complex_data)
+
+    @classmethod
+    def frombytes(cls, raw, header):
+        """Set paiload by interpreting bytes."""
+        return cls(np.fromstring(raw, dtype=DTYPE_WORD), header)
+
+    @classmethod
+    def fromfile(cls, fh, header):
+        """Read payload from file handle and decode it into data.
+
+        The payloadsize, number of channels, bits per sample, and whether
+        data are complex are all taken from the header.
+        """
+        s = fh.read(header.payloadsize)
+        if len(s) < header.payloadsize:
+            raise EOFError("Could not read full payload.")
+        return cls.frombytes(s, header)
+
+    @classmethod
+    def fromdata(cls, data, header):
+        """Encode data as payload, using header information."""
+        if header.nchan != data.shape[-1]:
+            raise ValueError("Header is for {0} channels but data has {1}"
+                             .format(header.nchan, data.shape[-1]))
+        if header['complex_data'] != (data.dtype.kind == 'c'):
+            raise ValueError("Header is for {0} data but data is {1}"
+                             .format(('complex' if c else 'real') for c
+                                     in (header['complex_data'],
+                                         data.dtype.kind == 'c')))
+        if header.edv == 0xab:  # Mark5B payload
+            from ..mark5b import Mark5BPayload
+            encoder = Mark5BPayload._encoders[header.bps,
+                                              header['complex_data']]
+        else:
+            encoder = cls._encoders[header.bps, header['complex_data']]
+        words = encoder(data.ravel())
+        return cls(words, header)

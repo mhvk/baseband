@@ -4,37 +4,20 @@ from __future__ import (absolute_import, division, print_function,
 import io
 import numpy as np
 
+from ..vlbi_helpers import VLBIFrameBase
 from .header import VDIFHeader
 from .payload import VDIFPayload
 
 
-class VDIFFrame(object):
-    def __init__(self, header, payload, verify=True):
-        self.header = header
-        self.payload = payload
-        if verify:
-            self.verify()
+class VDIFFrame(VLBIFrameBase):
+
+    _header_class = VDIFHeader
+    _payload_class = VDIFPayload
 
     def verify(self):
-        assert self.payloadsize // 4 == self.payload.words.size
-
-    @classmethod
-    def frombytes(cls, raw, edv=None, verify=True):
-        # Assume non-legacy header to ensure those are done fastest.
-        header = VDIFHeader.frombytes(raw[:32], edv, verify=False)
-        if header.edv is False:
-            header.words = header.words[:4]
-            payload = raw[16:]
-        else:
-            payload = raw[32:]
-        if verify:
-            header.verify()
-
-        payload = VDIFPayload.frombytes(payload, header=header)
-        return cls(header, payload, verify)
-
-    def tobytes(self):
-        return self.header.tobytes() + self.payload.tobytes()
+        super(VDIFFrame, self).verify()
+        assert self.header['complex_data'] == (self.payload.dtype.kind == 'c')
+        assert self.header.nchan == self.payload.shape[-1]
 
     @classmethod
     def fromfile(cls, fh, edv=None, verify=True):
@@ -42,11 +25,8 @@ class VDIFFrame(object):
         payload = VDIFPayload.fromfile(fh, header=header)
         return cls(header, payload, verify)
 
-    def tofile(self, fh):
-        return fh.write(self.tobytes())
-
     @classmethod
-    def fromdata(cls, data, header, verify=True):
+    def fromdata(cls, data, header=None, verify=True, **kwargs):
         """Construct frame from data and header.
 
         Parameters
@@ -64,57 +44,20 @@ class VDIFFrame(object):
         -------
         frame : VDIFFrame instance.
         """
-        if not isinstance(header, VDIFHeader):
-            header = VDIFHeader.fromvalues(**header)
-
-        if verify:
-            assert header['complex_data'] == (data.dtype.kind == 'c')
-            assert header.nchan == data.shape[-1]
+        if header is None:
+            header = VDIFHeader.fromvalues(verify=verify, **kwargs)
 
         payload = VDIFPayload.fromdata(data, header=header)
 
         return cls(header, payload, verify)
 
-    def todata(self, data=None):
-        return self.payload.todata(data)
-
-    data = property(todata, doc="Decode the payload")
-
-    @property
-    def shape(self):
-        return self.payload.shape
-
-    @property
-    def dtype(self):
-        return self.payload.dtype
-
-    @property
-    def words(self):
-        return np.hstack((np.array(self.header.words), self.payload.words))
-
-    @property
-    def size(self):
-        return self.header.size + self.payload.size
-
-    def __array__(self):
-        return self.payload.data
-
-    def __getitem__(self, item):
-        # Header behaves as a dictionary.
-        return self.header.__getitem__(item)
-
-    def keys(self):
-        return self.header.keys()
-
-    def __contains__(self, key):
-        return key in self.header.keys()
-
-    def __getattr__(self, attr):
-        try:
-            return self.__getattribute__(attr)
-        except AttributeError:
-            if attr in self.header._properties:
-                return getattr(self.header, attr)
+    @classmethod
+    def from_mark5b_frame(cls, mark5b_frame, verify=True):
+        m5h, m5pl = mark5b_frame.header, mark5b_frame.payload
+        header = VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
+                                               bps=m5pl.bps)
+        payload = VDIFPayload(m5pl.words, header)
+        return cls(header, payload, verify)
 
 
 class VDIFFrameSet(object):

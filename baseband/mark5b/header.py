@@ -30,13 +30,17 @@ class Mark5BHeader(VLBIHeaderBase):
                    'ns', 'time')
     kday = None
 
-    def __init__(self, words, kday=None, verify=True):
+    def __init__(self, words, ref_mjd=None, kday=None, verify=True):
         if words is None:
             self.words = (0, 0, 0, 0)
         else:
             self.words = words
         if kday is not None:
-            self.kday = int(kday // 1000) * 1000
+            self.kday = kday
+        elif ref_mjd is not None:
+            ref_kday, ref_jday = divmod(ref_mjd, 1000)
+            self.kday = int(ref_kday +
+                            round((ref_jday - self.jday)/1000)) * 1000
         if verify:
             self.verify()
 

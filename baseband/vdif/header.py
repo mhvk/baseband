@@ -1,7 +1,5 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-import warnings
-
 import numpy as np
 import astropy.units as u
 
@@ -133,6 +131,16 @@ class VDIFHeader(VLBIHeaderBase):
         edv = False if kwargs['legacy_mode'] else kwargs['edv']
         return super(VDIFHeader, cls).fromkeys(edv, **kwargs)
 
+    @classmethod
+    def from_mark5b_header(cls, mark5b_header, bps, nchan):
+        kwargs = dict(mark5b_header)
+        kwargs['edv'] = 0xab
+        kwargs['time'] = mark5b_header.time
+        kwargs['bps'] = bps
+        kwargs['nchan'] = nchan
+        kwargs['complex_data'] = False
+        return cls.fromvalues(**kwargs)
+
     # properties common to all VDIF headers.
     @property
     def framesize(self):
@@ -246,7 +254,7 @@ class VDIFHeader(VLBIHeaderBase):
         seconds = (time - ref_epochs[ref_index]).to(u.s)
         int_sec, frac_sec = divmod(seconds, 1 * u.s)
         self['seconds'] = int(int_sec)
-        if abs(frac_sec) < 1. * u.ns:
+        if abs(frac_sec) < 10. * u.ns:
             self['frame_nr'] = 0
         else:
             self['frame_nr'] = (frac_sec / self.samples_per_frame *
@@ -395,19 +403,20 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
     """
-
-    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
-        tuple((k, (v[0]+4,) + v[1:]) for (k, v) in
-              Mark5BHeader._header_parser.items()))
+    # Repeat 'frame_length' to set default.
+    _header_parser = (VDIFBaseHeader._header_parser +
+                      HeaderParser((('frame_length', (2, 0, 24, 1254)),)) +
+                      HeaderParser(tuple((k, (v[0]+4,) + v[1:]) for (k, v) in
+                                         Mark5BHeader._header_parser.items())))
 
     def verify(self):
         super(VDIFMark5BHeader, self).verify()
-        assert self['frame_length'] == 2508  # payload+header=10000+32 bytes
+        assert self['frame_length'] == 1254  # payload+header=10000+32 bytes/8
         assert abs(self.time - Mark5BHeader.get_time(self)) < 1. * u.ns
 
     def set_time(self, time):
-        VDIFBaseHeader.set_time(time)
-        Mark5BHeader.set_time(time)
+        super(VDIFMark5BHeader, self).set_time(time)
+        Mark5BHeader.set_time(self, time)
 
     time = property(VDIFHeader.get_time, set_time)
 

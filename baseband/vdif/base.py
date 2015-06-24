@@ -106,9 +106,9 @@ class VDIFFileWriter(io.BufferedWriter):
     """Simple writer for VDIF files.
 
     Adds ``write_frame`` and ``write_frameset`` methods to the basic binary
-    file reader ``io.BufferedReader``.
+    file writer ``io.BufferedWriter``.
     """
-    def write_frame(self, data, header=None):
+    def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
 
         Parameters
@@ -118,14 +118,14 @@ class VDIFFileWriter(io.BufferedWriter):
             get the information needed to encode the array, and to construct
             the VDIF frame.
         header : VDIFHeader or dict
-            Ignored if payload is a VDIFFrame instance.  If a dict,
-            used to instantiate a VDIFHeader.
+            Ignored if payload is a VDIFFrame instance.  If None, an attempt is
+            made to initiate a header with **kwargs.
         """
         if not isinstance(data, VDIFFrame):
-            data = VDIFFrame.fromdata(data, header)
+            data = VDIFFrame.fromdata(data, header, **kwargs)
         return data.tofile(self)
 
-    def write_frameset(self, data, header=None):
+    def write_frameset(self, data, header=None, **kwargs):
         """Write a frame set (headers plus payloads).
 
         Parameters
@@ -138,11 +138,11 @@ class VDIFFileWriter(io.BufferedWriter):
             Ignored if payload is a VDIFFrameSet instance.  If a list, should
             have a length matching the number of threads in ``data``; if a
             single VDIFHeader, thread_ids corresponding to the number of
-            threads are generated automatically; if dict, used to instantiate
-            a VDIFHeader.
+            threads are generated automatically; if None, an attempt is made
+            to initiate a header using **kwargs.
         """
         if not isinstance(data, VDIFFrameSet):
-            data = VDIFFrameSet.fromdata(data, header)
+            data = VDIFFrameSet.fromdata(data, header, **kwargs)
         return data.tofile(self)
 
 
