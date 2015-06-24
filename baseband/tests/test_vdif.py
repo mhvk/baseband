@@ -1,8 +1,6 @@
 import numpy as np
-from astropy.time import Time
 from astropy.tests.helper import pytest
 from .. import vdif
-from .. import mark5b
 
 
 # Comparisn with m5access routines (check code on 2015-MAY-30) on vlba.m5a,
@@ -143,44 +141,3 @@ class TestVDIF(object):
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==
                       np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
-
-
-class TestVDIFMark5B(object):
-    """Test VDIF frame containing Mark5B data (EDV 0xab)."""
-
-    def test_header(self):
-        with open('sample.m5b', 'rb') as fh:
-            m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
-            m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
-        header = vdif.VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
-                                                    bps=m5pl.bps)
-        assert all(m5h[key] == header[key] for key in m5h.keys())
-        assert header.time == m5h.time
-        assert header.nchan == 8
-        assert header.bps == 2
-        assert not header['complex_data']
-        assert header.framesize == 10032
-        assert header.size == 32
-        assert header.payloadsize == m5h.payloadsize
-        assert header.samples_per_frame == 10000 * 8 // m5pl.bps // m5pl.nchan
-
-    def test_payload(self):
-        with open('sample.m5b', 'rb') as fh:
-            m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
-            m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
-        header = vdif.VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
-                                                    bps=m5pl.bps)
-        payload = vdif.VDIFPayload(m5pl.words, header)
-        assert np.all(payload.words == m5pl.words)
-        assert np.all(payload.data == m5pl.data)
-        payload2 = vdif.VDIFPayload.fromdata(m5pl.data, header)
-        assert np.all(payload2.words == m5pl.words)
-        assert np.all(payload2.data == m5pl.data)
-
-    def test_frame(self):
-        with mark5b.open('sample.m5b', 'rb') as fh:
-            m5f = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
-        frame = vdif.VDIFFrame.from_mark5b_frame(m5f)
-        assert frame.size == 10032
-        assert frame.shape == (5000, 8)
-        assert np.all(frame.data == m5f.data)

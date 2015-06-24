@@ -133,13 +133,27 @@ class VDIFHeader(VLBIHeaderBase):
 
     @classmethod
     def from_mark5b_header(cls, mark5b_header, bps, nchan):
-        kwargs = dict(mark5b_header)
-        kwargs['edv'] = 0xab
-        kwargs['time'] = mark5b_header.time
-        kwargs['bps'] = bps
-        kwargs['nchan'] = nchan
-        kwargs['complex_data'] = False
-        return cls.fromvalues(**kwargs)
+        """Construct an Mark5B over VDIF header (EDV=0xab).
+
+        See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
+
+        Note that the Mark 5B header does not encode the bits-per-sample and
+        the number of channels used in the payload, so these need to be given
+        separately.  A complete frame can be encapsulated with
+        VDIFFrame.from_mark5b_frame.
+
+        Parameters
+        ----------
+        mark5b_header : Mark5BHeader
+            Used to set time, etc.
+        bps : int
+            bits per sample.
+        nchan : int
+            Number of channels carried in the Mark 5B paylod.
+        """
+        return cls.fromvalues(edv=0xab, time=mark5b_header.time,
+                              bps=bps, nchan=nchan, complex_data=False,
+                              **mark5b_header)
 
     # properties common to all VDIF headers.
     @property
@@ -217,7 +231,7 @@ class VDIFHeader(VLBIHeaderBase):
     @station.setter
     def station(self, station):
         try:
-            station_id = ord(station[0]) << 8 + ord(station[1])
+            station_id = (ord(station[0]) << 8) + ord(station[1])
         except TypeError:
             station_id = station
         assert int(station_id) == station_id

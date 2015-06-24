@@ -8,9 +8,10 @@ class VLBIFrameBase(object):
     _header_class = None
     _payload_class = None
 
-    def __init__(self, header, payload, verify=True):
+    def __init__(self, header, payload, valid=True, verify=True):
         self.header = header
         self.payload = payload
+        self.valid = valid
         if verify:
             self.verify()
 
@@ -19,6 +20,15 @@ class VLBIFrameBase(object):
         assert isinstance(self.header, self._header_class)
         assert isinstance(self.payload, self._payload_class)
         assert self.payloadsize // 4 == self.payload.words.size
+
+    @property
+    def valid(self):
+        """Whether frame contains valid data. Can be overridden by subclass."""
+        return self._valid
+
+    @valid.setter
+    def valid(self, valid):
+        self._valid = valid
 
     @classmethod
     def frombytes(cls, raw, *args, **kwargs):
@@ -34,10 +44,11 @@ class VLBIFrameBase(object):
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
+        valid = kwargs.pop('valid', True)
         verify = kwargs.pop('verify', True)
         header = cls._header_class.fromfile(fh, verify=verify)
         payload = cls._payload_class.fromfile(fh, *args, **kwargs)
-        return cls(header, payload, verify)
+        return cls(header, payload, valid=valid, verify=verify)
 
     def tofile(self, fh):
         return fh.write(self.tobytes())
@@ -64,9 +75,10 @@ class VLBIFrameBase(object):
         -------
         frame : VLBIFrameBase instance.
         """
+        valid = kwargs.pop('valid', True)
         verify = kwargs.pop('verify', True)
         payload = cls._payload_class.fromdata(data, *args, **kwargs)
-        return cls(header, payload, verify)
+        return cls(header, payload, valid=valid, verify=verify)
 
     def todata(self, data=None):
         return self.payload.todata(data)
@@ -108,8 +120,11 @@ class VLBIFrameBase(object):
         except AttributeError:
             if attr in self.header._properties:
                 return getattr(self.header, attr)
+            else:
+                raise
 
     def __eq__(self, other):
         return (type(self) is type(other) and
+                self.valid == other.valid and
                 self.header == other.header and
                 self.payload == other.payload)

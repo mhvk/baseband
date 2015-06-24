@@ -64,7 +64,7 @@ class HeaderProperty(object):
 
     def __getattr__(self, attr):
         try:
-            return super(HeaderProperty, self).__getattr__(attr)
+            return super(HeaderProperty, self).__getattribute__(attr)
         except AttributeError:
             return getattr(self.header_parser)
 
@@ -237,7 +237,7 @@ class VLBIHeaderBase(object):
                 return self[attr]
             else:
                 raise
-            
+
     def keys(self):
         return self._header_parser.keys()
 

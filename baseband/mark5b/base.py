@@ -107,13 +107,13 @@ class Mark5BStreamReader(Mark5BStreamBase):
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
         If not given, it will be determined from the frame rate.
     """
-    def __init__(self, raw, nchan, bps=2, thread_ids=None, sample_rate=None):
-        if isinstance(raw, io.BufferedReader):
-            if not isinstance(raw, Mark5BFileReader):
-                raw = Mark5BFileReader(raw)
-        else:
-            raw = Mark5BFileReader(io.open(raw, mode='rb'))
-        self._frame = raw.read_frame(nchan, bps)
+    def __init__(self, raw, nchan, bps=2, ref_mjd=None, thread_ids=None,
+                 sample_rate=None):
+        if not isinstance(raw, io.BufferedReader):
+            raw = io.open(raw, mode='rb')
+        if not isinstance(raw, Mark5BFileReader):
+            raw = Mark5BFileReader(raw)
+        self._frame = raw.read_frame(nchan, bps, ref_mjd)
         super(Mark5BStreamReader, self).__init__(
             raw, self._frame.header, nchan, bps, thread_ids, sample_rate)
 
@@ -204,7 +204,7 @@ class Mark5BStreamReader(Mark5BStreamBase):
 
     def _read_frame(self, out=None):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
-                         self._framesize)
+                         self._frame.size)
         self._frame = self.fh_raw.read_frame(nchan=self.nchan, bps=self.bps)
         # Convert payloads to data array.
         data = self._frame.todata(data=out)

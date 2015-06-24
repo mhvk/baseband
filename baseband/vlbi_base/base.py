@@ -54,11 +54,10 @@ class VLBIStreamBase(object):
             return dt, frame_nr, extra
 
         if unit == 'time':
-            return self.header0.time() + self.tell(u.s)
+            return self.header0.time + self.tell(unit=u.s)
 
-        return (offset * u_sample).to(
-            unit, equivalencies=[(self.samples_per_frame * u.sample,
-                                  self.frames_per_second * u.Hz)])
+        return (offset * u_sample).to(unit, equivalencies=[(u.s, u.Unit(
+            self.samples_per_frame * self.frames_per_second * u_sample))])
 
     def close(self):
         return self.fh_raw.close()

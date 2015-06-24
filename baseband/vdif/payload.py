@@ -5,7 +5,13 @@ from ..vlbi_base import (VLBIPayloadBase,
 
 
 def init_luts():
-    """Set up the look-up tables for levels as a function of input byte."""
+    """Set up the look-up tables for levels as a function of input byte.
+
+    S10. in http://vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf
+    states that samples are encoded by offset-binary, such that all 0 bits is
+    lowest and all 1 bits is highest.  I.e., for 2-bit sampling, the order is
+    00, 01, 10, 11.
+    """
     lut2level = np.array([-1.0, 1.0], dtype=np.float32)
     lut4level = np.array([-OPTIMAL_2BIT_HIGH, -1.0, 1.0, OPTIMAL_2BIT_HIGH],
                          dtype=np.float32)

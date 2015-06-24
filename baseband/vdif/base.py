@@ -329,7 +329,7 @@ class VDIFStreamWriter(VDIFStreamBase):
     complex_data : whether data is complex
     bps : bits per sample
         Or 'bits_per_sample', which is bps-1.
-    station_id : 2 characters
+    station : 2 characters
         Or unsigned 2-byte integer.
     edv : 1, 3, or 4
 
@@ -343,11 +343,10 @@ class VDIFStreamWriter(VDIFStreamBase):
     framerate : number of frames per second.
     """
     def __init__(self, raw, nthread=1, header=None, **kwargs):
-        if isinstance(raw, io.BufferedWriter):
-            if not isinstance(raw, VDIFFileWriter):
-                raw = VDIFFileWriter(raw)
-        else:
-            raw = VDIFFileWriter(io.open(raw, mode='wb'))
+        if not isinstance(raw, io.BufferedWriter):
+            raw = io.open(raw, mode='wb')
+        if not isinstance(raw, VDIFFileWriter):
+            raw = VDIFFileWriter(raw)
         if header is None:
             header = VDIFHeader.fromvalues(**kwargs)
         super(VDIFStreamWriter, self).__init__(raw, header, range(nthread))
@@ -403,7 +402,7 @@ class VDIFStreamWriter(VDIFStreamBase):
         return super(VDIFStreamWriter, self).close()
 
 
-def open(name, mode='rs', **kwargs):
+def open(name, mode='rs', *args, **kwargs):
     """Open VLBI VDIF format file for reading or writing.
 
     Opened as a binary file, one gets a standard file handle, but with
@@ -418,7 +417,7 @@ def open(name, mode='rs', **kwargs):
         Whether to open for reading or writing, and as a regular binary file
         or as a stream (stream is default).
 
-    Additional keywords when opening the file as a stream:
+    Additional arguments when opening the file as a stream:
 
     For reading
     -----------
@@ -444,10 +443,10 @@ def open(name, mode='rs', **kwargs):
     """
     if 'w' in mode:
         fh = VDIFFileWriter(io.open(name, 'wb'))
-        return fh if 'b' in mode else VDIFStreamWriter(fh, **kwargs)
+        return fh if 'b' in mode else VDIFStreamWriter(fh, *args, **kwargs)
     elif 'r' in mode:
         fh = VDIFFileReader(io.open(name, 'rb'))
-        return fh if 'b' in mode else VDIFStreamReader(fh, **kwargs)
+        return fh if 'b' in mode else VDIFStreamReader(fh, *args, **kwargs)
     else:
         raise ValueError("Only support opening VDIF file for reading "
                          "or writing (mode='r' or 'w').")

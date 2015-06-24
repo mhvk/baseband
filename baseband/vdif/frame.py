@@ -14,16 +14,21 @@ class VDIFFrame(VLBIFrameBase):
     _header_class = VDIFHeader
     _payload_class = VDIFPayload
 
+    def __init__(self, header, payload, verify=True):
+        super(VDIFFrame, self).__init__(header, payload, valid=header.valid,
+                                        verify=verify)
+
     def verify(self):
         super(VDIFFrame, self).verify()
         assert self.header['complex_data'] == (self.payload.dtype.kind == 'c')
         assert self.header.nchan == self.payload.shape[-1]
+        assert self.valid is self.header.valid
 
     @classmethod
     def fromfile(cls, fh, edv=None, verify=True):
         header = VDIFHeader.fromfile(fh, edv, verify)
         payload = VDIFPayload.fromfile(fh, header=header)
-        return cls(header, payload, verify)
+        return cls(header, payload, verify=verify)
 
     @classmethod
     def fromdata(cls, data, header=None, verify=True, **kwargs):
@@ -33,10 +38,10 @@ class VDIFFrame(VLBIFrameBase):
         ----------
         data : ndarray
             Array holding complex or real data to be encoded.
-        header : VDIFHeader or dict
-            Header or dict with relevant keywords to construct one.
+        header : VDIFHeader or None
+            If `None`, it will be attemtped to create one using the keywords.
         verify : bool
-            Whether or not to do basic assertions that check the integrety
+            Whether or not to do basic assertions that check the integrity
             (e.g., that channel information and whether or not data are complex
             are consistent between header and data).
 
@@ -49,13 +54,18 @@ class VDIFFrame(VLBIFrameBase):
 
         payload = VDIFPayload.fromdata(data, header=header)
 
-        return cls(header, payload, verify)
+        return cls(header, payload, verify=True)
 
     @classmethod
     def from_mark5b_frame(cls, mark5b_frame, verify=True):
+        """Construct an Mark5B over VDIF frame (EDV=0xab).
+
+        See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
+        """
         m5h, m5pl = mark5b_frame.header, mark5b_frame.payload
         header = VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
-                                               bps=m5pl.bps)
+                                               bps=m5pl.bps,
+                                               valid=mark5b_frame.valid)
         payload = VDIFPayload(m5pl.words, header)
         return cls(header, payload, verify)
 

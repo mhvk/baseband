@@ -5,17 +5,38 @@ from ..vlbi_base import VLBIPayloadBase, OPTIMAL_2BIT_HIGH, DTYPE_WORD
 # Some duplication with mark4.py here: lut2bit = mark4.lut2bit1
 # Though lut1bit = -mark4.lut1bit, so perhaps not worth combining.
 def init_luts():
-    """Set up the look-up tables for levels as a function of input byte."""
+    """Set up the look-up tables for levels as a function of input byte.
+
+    For 1-bit mode, one has just the sign bit:
+      s value
+      0  -1
+      1  +1
+
+    For 2-bit mode, there is a sign and a magnitude, which encode:
+      m s value
+      0 0 -Hi
+      0 1  +1
+      1 0  -1
+      1 1 +Hi
+    (table 13 in
+    https://science.nrao.edu/facilities/vlba/publications/memos/upgrade/sensimemo13.pdf)
+
+    http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+    Appendix A: sign always on even bit stream (0, 2, 4, ...), and magnitude
+    on adjacent odd stream (1, 3, 5, ...).
+    """
     lut2level = np.array([-1.0, 1.0], dtype=np.float32)
     lut4level = np.array([-OPTIMAL_2BIT_HIGH, 1.0, -1.0, OPTIMAL_2BIT_HIGH],
                          dtype=np.float32)
     b = np.arange(256)[:, np.newaxis]
-    # 1-bit mode
     l = np.arange(8)
     lut1bit = lut2level[(b >> l) & 1]
-    # 2-bit mode
-    s = np.arange(0, 8, 2)
-    lut2bit = lut4level[(b >> s) & 3]
+    # 2-bit mode: sign bit in lower position thatn magnitude bit
+    # ms=00,01,10,11 = -Hi, 1, -1, Hi (lut
+    s = np.arange(0, 8, 2)  # 0, 2, 4, 6
+    m = s+1                 # 1, 3, 5, 7
+    l = ((b >> s) & 1) + (((b >> m) & 1) << 1)
+    lut2bit = lut4level[l]
     return lut1bit, lut2bit
 
 lut1bit, lut2bit = init_luts()
