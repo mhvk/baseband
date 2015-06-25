@@ -1,3 +1,4 @@
+import io
 import numpy as np
 from astropy import units as u
 from astropy.time import Time
@@ -58,7 +59,7 @@ class TestMark5BToVDIF3(object):
             edv=3, bps=m5pl.bps, nchan=1, station='WB', time=m5h.time,
             bandwidth=16.*u.MHz, complex_data=False)
         assert header.time == m5h.time
-        
+
     def test_stream(self):
         with mark5b.open('sample.m5b', 'rs', nchan=8, bps=2, ref_mjd=57000,
                          sample_rate=32.*u.MHz) as fr:
@@ -67,18 +68,18 @@ class TestMark5BToVDIF3(object):
                 edv=3, bps=fr.bps, nchan=1, station='WB', time=m5h.time,
                 bandwidth=16.*u.MHz, complex_data=False)
             data = fr.read(20000)  # enough to fill one EDV3 frame.
-            
-        with vdif.open('try.vdif', 'ws', nthread=data.shape[1],
-                       header=header) as fw:
-            fw.write(data)
 
-        with mark5b.open('sample.m5b', 'rs', nchan=8, bps=2, ref_mjd=57000,
-                         sample_rate=32.*u.MHz) as fm, vdif.open(
-                             'try.vdif', 'rs') as fv:
-            assert fm.header0.time == fv.header0.time
-            dm = fm.read(20000)
-            dv = fv.read(20000)
-            assert np.all(dm == dv)
-            assert fm.offset == fv.offset
-            assert fm.tell(unit='time') == fv.tell(unit='time')
-                             
+        with io.BytesIO() as s, vdif.open(s, 'ws', nthread=data.shape[1],
+                                          header=header) as fw:
+            fw.write(data)
+            fw.fh_raw.flush()
+            s.seek(0)
+            with mark5b.open('sample.m5b', 'rs', nchan=8, bps=2, ref_mjd=57000,
+                             sample_rate=32.*u.MHz) as fm, vdif.open(
+                                 s, 'rs') as fv:
+                assert fm.header0.time == fv.header0.time
+                dm = fm.read(20000)
+                dv = fv.read(20000)
+                assert np.all(dm == dv)
+                assert fm.offset == fv.offset
+                assert fm.tell(unit='time') == fv.tell(unit='time')

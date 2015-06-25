@@ -124,9 +124,9 @@ class VDIFFrame(VLBIFrameBase):
         See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
         """
         m5h, m5pl = mark5b_frame.header, mark5b_frame.payload
-        header = VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
-                                               bps=m5pl.bps,
-                                               valid=mark5b_frame.valid)
+        header = VDIFHeader.from_mark5b_header(
+            m5h, nchan=m5pl.nchan, bps=m5pl.bps,
+            invalid_data=not mark5b_frame.valid)
         payload = VDIFPayload(m5pl.words, header)
         return cls(header, payload, verify)
 

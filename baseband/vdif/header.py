@@ -121,7 +121,7 @@ class VDIFHeader(VLBIHeaderBase):
         return super(VDIFHeader, cls).fromkeys(edv, **kwargs)
 
     @classmethod
-    def from_mark5b_header(cls, mark5b_header, bps, nchan):
+    def from_mark5b_header(cls, mark5b_header, bps, nchan, **kwargs):
         """Construct an Mark5B over VDIF header (EDV=0xab).
 
         See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
@@ -139,10 +139,14 @@ class VDIFHeader(VLBIHeaderBase):
             bits per sample.
         nchan : int
             Number of channels carried in the Mark 5B paylod.
+
+        Further arguments are not necessary to create a valid VDIF header,
+        but can be given (e.g., ``invalid_data``, etc.)
         """
+        kwargs.update(mark5b_header)
         return cls.fromvalues(edv=0xab, time=mark5b_header.time,
                               bps=bps, nchan=nchan, complex_data=False,
-                              **mark5b_header)
+                              **kwargs)
 
     # properties common to all VDIF headers.
     @property

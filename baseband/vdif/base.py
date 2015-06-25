@@ -186,11 +186,10 @@ class VDIFStreamReader(VDIFStreamBase):
         Specific threads to read.  By default, all threads are read.
     """
     def __init__(self, raw, thread_ids=None, nthread=None):
-        if isinstance(raw, io.BufferedReader):
-            if not isinstance(raw, VDIFFileReader):
-                raw = VDIFFileReader(raw)
-        else:
-            raw = VDIFFileReader(io.open(raw, mode='rb'))
+        if not hasattr(raw, 'read'):
+            raw = io.open(raw, mode='rb')
+        if not isinstance(raw, VDIFFileReader):
+            raw = VDIFFileReader(raw)
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
@@ -339,7 +338,7 @@ class VDIFStreamWriter(VDIFStreamBase):
     framerate : number of frames per second.
     """
     def __init__(self, raw, nthread=1, header=None, **kwargs):
-        if not isinstance(raw, io.BufferedWriter):
+        if not hasattr(raw, 'write'):
             raw = io.open(raw, mode='wb')
         if not isinstance(raw, VDIFFileWriter):
             raw = VDIFFileWriter(raw)
@@ -438,10 +437,14 @@ def open(name, mode='rs', *args, **kwargs):
     ValueError if an unsupported mode is chosen.
     """
     if 'w' in mode:
-        fh = VDIFFileWriter(io.open(name, 'wb'))
+        if not hasattr(name, 'write'):
+            name = io.open(name, 'wb')
+        fh = VDIFFileWriter(name)
         return fh if 'b' in mode else VDIFStreamWriter(fh, *args, **kwargs)
     elif 'r' in mode:
-        fh = VDIFFileReader(io.open(name, 'rb'))
+        if not hasattr(name, 'read'):
+            name = io.open(name, 'rb')
+        fh = VDIFFileReader(name)
         return fh if 'b' in mode else VDIFStreamReader(fh, *args, **kwargs)
     else:
         raise ValueError("Only support opening VDIF file for reading "

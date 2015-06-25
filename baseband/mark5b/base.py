@@ -109,11 +109,12 @@ class Mark5BStreamReader(Mark5BStreamBase):
     """
     def __init__(self, raw, nchan, bps=2, ref_mjd=None, thread_ids=None,
                  sample_rate=None):
-        if not isinstance(raw, io.BufferedReader):
+        if not hasattr(raw, 'read'):
             raw = io.open(raw, mode='rb')
         if not isinstance(raw, Mark5BFileReader):
             raw = Mark5BFileReader(raw)
         self._frame = raw.read_frame(nchan, bps, ref_mjd)
+        self._frame_data = None
         super(Mark5BStreamReader, self).__init__(
             raw, self._frame.header, nchan, bps, thread_ids, sample_rate)
 
@@ -185,7 +186,7 @@ class Mark5BStreamReader(Mark5BStreamBase):
             if(dt != self._frame.seconds - self.header0.seconds or
                frame_nr != self._frame['frame_nr']):
                 # Read relevant frame, reusing data array from previous frame.
-                self._read_frame(out=self._frame._data, fill_value=fill_value)
+                self._read_frame(out=self._frame_data)
                 assert dt == (self._frame.seconds - self.header0.seconds)
                 assert frame_nr == self._frame['frame_nr']
 
@@ -202,12 +203,13 @@ class Mark5BStreamReader(Mark5BStreamBase):
 
         return out.squeeze() if squeeze else out
 
-    def _read_frame(self, out=None, fill_value=0.):
+    def _read_frame(self, out=None):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
         self._frame = self.fh_raw.read_frame(nchan=self.nchan, bps=self.bps)
         # Convert payloads to data array.
-        return self._frame.todata(data=out, invalid_data_value=fill_value)
+        self._frame_data = self._frame.todata(data=out)
+        return self._frame_data
 
 
 class Mark5BStreamWriter(Mark5BStreamBase):
@@ -349,10 +351,14 @@ def open(name, mode='rs', **kwargs):
     ValueError if an unsupported mode is chosen.
     """
     if 'w' in mode:
-        fh = Mark5BFileWriter(io.open(name, 'wb'))
+        if not hasattr(name, 'write'):
+            name = io.open(name, 'wb')
+        fh = Mark5BFileWriter(name)
         return fh if 'b' in mode else Mark5BStreamWriter(fh, **kwargs)
     elif 'r' in mode:
-        fh = Mark5BFileReader(io.open(name, 'rb'))
+        if not hasattr(name, 'read'):
+            name = io.open(name, 'rb')
+        fh = Mark5BFileReader(name)
         return fh if 'b' in mode else Mark5BStreamReader(fh, **kwargs)
     else:
         raise ValueError("Only support opening VDIF file for reading "
