@@ -141,17 +141,6 @@ class VLBIHeaderBase(object):
         return self._struct.size
 
     @classmethod
-    def frombytes(cls, s, *args, **kwargs):
-        """Read VLBI Header from bytes.
-
-        Arguments are the same as for class initialisation.
-        """
-        return cls(cls._struct.unpack(s), *args, **kwargs)
-
-    def tobytes(self):
-        return self._struct.pack(*self.words)
-
-    @classmethod
     def fromfile(cls, fh, *args, **kwargs):
         """Read VLBI Header from file.
 
@@ -161,11 +150,11 @@ class VLBIHeaderBase(object):
         s = fh.read(size)
         if len(s) != size:
             raise EOFError
-        return cls.frombytes(s, *args, **kwargs)
+        return cls(cls._struct.unpack(s), *args, **kwargs)
 
     def tofile(self, fh):
         """Write VLBI Frame header to filehandle."""
-        return fh.write(self.tobytes())
+        return fh.write(self._struct.pack(*self.words))
 
     @classmethod
     def fromvalues(cls, *args, **kwargs):
@@ -231,7 +220,7 @@ class VLBIHeaderBase(object):
 
     def __getattr__(self, attr):
         try:
-            return super(VLBIHeaderBase, self).__getattr__(attr)
+            return super(VLBIHeaderBase, self).__getattribute__(attr)
         except AttributeError:
             if attr in self.keys():
                 return self[attr]

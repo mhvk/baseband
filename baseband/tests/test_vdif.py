@@ -1,3 +1,4 @@
+import io
 import numpy as np
 from astropy.tests.helper import pytest
 from .. import vdif
@@ -48,8 +49,10 @@ class TestVDIF(object):
         assert header.nchan == 1
         assert header.bps == 2
         assert not header['complex_data']
-
-        header2 = vdif.VDIFHeader.frombytes(header.tobytes())
+        with io.BytesIO() as s:
+            header.tofile(s)
+            s.seek(0)
+            header2 = vdif.VDIFHeader.fromfile(s)
         assert header2 == header
         header3 = vdif.VDIFHeader.fromkeys(**header)
         assert header3 == header
@@ -78,19 +81,23 @@ class TestVDIF(object):
         assert payload.dtype == np.float32
         assert np.all(payload.data[:12, 0].astype(int) ==
                       np.array([1, 1, 1, -3, 1, 1, -3, -3, -3, 3, 3, -1]))
-        payload2 = vdif.VDIFPayload.frombytes(payload.tobytes(), header)
-        assert payload2 == payload
+        with io.BytesIO() as s:
+            payload.tofile(s)
+            s.seek(0)
+            payload2 = vdif.VDIFPayload.fromfile(s, header)
+            assert payload2 == payload
+            with pytest.raises(EOFError):
+                # Too few bytes.
+                s.seek(100)
+                vdif.VDIFPayload.fromfile(s, header)
         payload3 = vdif.VDIFPayload.fromdata(payload.data, header)
         assert payload3 == payload
         with pytest.raises(ValueError):
-            # Too few bytes.
-            vdif.VDIFPayload.frombytes(payload.tobytes()[:100], header)
-        with pytest.raises(ValueError):
             # Wrong number of channels.
-            vdif.VDIFPayload.frombytes(payload.data[:, :4], header)
+            vdif.VDIFPayload.fromdata(np.empty((payload.shape[0], 2)), header)
         with pytest.raises(ValueError):
             # Too few data.
-            vdif.VDIFPayload.frombytes(payload.data[:100], header)
+            vdif.VDIFPayload.fromdata(payload.data[:100], header)
 
     def test_frame(self):
         with vdif.open('vlba.m5a', 'rb') as fh:
@@ -104,7 +111,10 @@ class TestVDIF(object):
         assert frame == vdif.VDIFFrame(header, payload)
         assert np.all(frame.data[:12, 0].astype(int) ==
                       np.array([1, 1, 1, -3, 1, 1, -3, -3, -3, 3, 3, -1]))
-        frame2 = vdif.VDIFFrame.frombytes(frame.tobytes())
+        with io.BytesIO() as s:
+            frame.tofile(s)
+            s.seek(0)
+            frame2 = vdif.VDIFFrame.fromfile(s)
         assert frame2 == frame
         frame3 = vdif.VDIFFrame.fromdata(frame.data, frame.header)
         assert frame3 == frame

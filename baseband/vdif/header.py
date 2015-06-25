@@ -56,17 +56,6 @@ class VDIFHeader(VLBIHeaderBase):
             return True
 
     @classmethod
-    def frombytes(cls, s, edv=None, verify=True):
-        """Read VDIF Header from bytes."""
-        try:
-            return cls(eight_word_struct.unpack(s), edv, verify)
-        except:
-            if edv:
-                raise
-            else:
-                return cls(four_word_struct.unpack(s), False, verify)
-
-    @classmethod
     def fromfile(cls, fh, edv=None, verify=True):
         """Read VDIF Header from file."""
         # Assume non-legacy header to ensure those are done fastest.

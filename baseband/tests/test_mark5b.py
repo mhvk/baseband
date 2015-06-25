@@ -1,3 +1,4 @@
+import io
 import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
@@ -60,8 +61,10 @@ class TestMark5B(object):
         assert header.payloadsize == 10000
         assert header.framesize == 10016
         assert header['frame_nr'] == 0
-
-        header2 = mark5b.Mark5BHeader.frombytes(header.tobytes(), header.kday)
+        with io.BytesIO() as s:
+            header.tofile(s)
+            s.seek(0)
+            header2 = mark5b.Mark5BHeader.fromfile(s, header.kday)
         assert header2 == header
         header3 = mark5b.Mark5BHeader.fromkeys(header.kday, **header)
         assert header3 == header
@@ -93,15 +96,19 @@ class TestMark5B(object):
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
                                 [-3, +3, -1, +3, -1, -1, -1, +1],
                                 [+3, -1, +3, +3, +1, -1, +3, -1]]))
-        payload2 = mark5b.Mark5BPayload.frombytes(payload.tobytes(),
-                                                  payload.nchan, payload.bps)
-        assert payload2 == payload
+        with io.BytesIO() as s:
+            payload.tofile(s)
+            s.seek(0)
+            payload2 = mark5b.Mark5BPayload.fromfile(s, payload.nchan,
+                                                     payload.bps)
+            assert payload2 == payload
+            with pytest.raises(EOFError):
+                # Too few bytes.
+                s.seek(100)
+                mark5b.Mark5BPayload.fromfile(s, payload.nchan, payload.bps)
+
         payload3 = mark5b.Mark5BPayload.fromdata(payload.data, bps=payload.bps)
         assert payload3 == payload
-        with pytest.raises(ValueError):
-            # Too few bytes.
-            mark5b.Mark5BPayload.frombytes(payload.tobytes()[:100],
-                                           payload.nchan, payload.bps)
 
     def test_frame(self):
         with mark5b.open('sample.m5b', 'rb') as fh:
@@ -117,9 +124,12 @@ class TestMark5B(object):
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
                                 [-3, +3, -1, +3, -1, -1, -1, +1],
                                 [+3, -1, +3, +3, +1, -1, +3, -1]]))
-        frame2 = mark5b.Mark5BFrame.frombytes(frame.tobytes(), ref_mjd=57000.,
-                                              nchan=frame.shape[1],
-                                              bps=frame.payload.bps)
+        with io.BytesIO() as s:
+            frame.tofile(s)
+            s.seek(0)
+            frame2 = mark5b.Mark5BFrame.fromfile(s, ref_mjd=57000.,
+                                                 nchan=frame.shape[1],
+                                                 bps=frame.payload.bps)
         assert frame2 == frame
         frame3 = mark5b.Mark5BFrame.fromdata(frame.data, frame.header, bps=2)
         assert frame3 == frame

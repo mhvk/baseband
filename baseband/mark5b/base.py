@@ -185,7 +185,7 @@ class Mark5BStreamReader(Mark5BStreamBase):
             if(dt != self._frame.seconds - self.header0.seconds or
                frame_nr != self._frame['frame_nr']):
                 # Read relevant frame, reusing data array from previous frame.
-                self._read_frame(out=self._frame._data)
+                self._read_frame(out=self._frame._data, fill_value=fill_value)
                 assert dt == (self._frame.seconds - self.header0.seconds)
                 assert frame_nr == self._frame['frame_nr']
 
@@ -202,13 +202,12 @@ class Mark5BStreamReader(Mark5BStreamBase):
 
         return out.squeeze() if squeeze else out
 
-    def _read_frame(self, out=None):
+    def _read_frame(self, out=None, fill_value=0.):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
         self._frame = self.fh_raw.read_frame(nchan=self.nchan, bps=self.bps)
         # Convert payloads to data array.
-        data = self._frame.todata(data=out)
-        return data
+        return self._frame.todata(data=out, invalid_data_value=fill_value)
 
 
 class Mark5BStreamWriter(Mark5BStreamBase):

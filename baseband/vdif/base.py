@@ -297,11 +297,7 @@ class VDIFStreamReader(VDIFStreamBase):
         self._frameset = self.fh_raw.read_frameset(self.thread_ids,
                                                    edv=self.header0.edv)
         # Convert payloads to data array.
-        data = self._frameset.todata(data=out)
-        for frame, datum in zip(self._frameset.frames, data):
-            if frame['invalid_data']:
-                datum[...] = fill_value
-        return data
+        return self._frameset.todata(data=out, invalid_data_value=fill_value)
 
 
 class VDIFStreamWriter(VDIFStreamBase):
