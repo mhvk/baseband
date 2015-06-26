@@ -366,9 +366,9 @@ class VDIFLegacyHeader(VDIFHeader):
         (('invalid_data', (0, 31, 1, False)),
          ('legacy_mode', (0, 30, 1, True)),
          ('seconds', (0, 0, 30)),
+         ('_1_30_2', (1, 30, 2, 0x0)),
          ('ref_epoch', (1, 24, 6)),
          ('frame_nr', (1, 0, 24, 0x0)),
-         ('_2_30_2', (2, 30, 2, 0x0)),
          ('vdif_version', (2, 29, 3, 0x1)),
          ('lg2_nchan', (2, 24, 5)),
          ('frame_length', (2, 0, 24)),
@@ -499,6 +499,27 @@ class VDIFHeader4(VDIFSampleRateHeader):
     pass
 
 
+class VDIFHeader2(VDIFBaseHeader):
+
+    # http://www.vlbi.org/vdif/docs/alma-vdif-edv.pdf
+    # Note that this may need to have subclasses, based on possible different
+    # sync values.
+    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
+        (('complex_data', (3, 31, 1, 0x0)),  # Repeat, to set default.
+         ('bits_per_sample', (3, 26, 5, 0x1)),  # Repeat, to set default.
+         ('pol', (4, 0, 1)),
+         ('BL_quadrant', (4, 1, 2)),
+         ('BL_correlator', (4, 3, 1)),
+         ('sync_pattern', (4, 4, 20, 0xa5ea5)),
+         ('PIC_status', (5, 0, 32)),
+         ('PSN', (6, 0, 64))))
+
+    def verify(self):
+        super(VDIFHeader2, self).verify()
+        assert self['frame_length'] == 629 or self['frame_length'] == 1004
+        assert self.bps == 2 and not self['complex_data']
+
+
 class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
     """Mark 5B over VDIF (EDV=0xab).
 
@@ -524,6 +545,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
 
 vdif_header_classes = {False: VDIFLegacyHeader,
                        1: VDIFHeader1,
+                       2: VDIFHeader2,
                        3: VDIFHeader3,
                        4: VDIFHeader4,
                        0xab: VDIFMark5BHeader}
