@@ -1,5 +1,17 @@
+"""
+Definitions for VLBI Mark 5B payloads.
+
+Implements a Mark5BPayload class used to store payload words, and decode to
+or encode from a data array.
+
+For the specification, see
+http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+"""
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 import numpy as np
-from ..vlbi_base import VLBIPayloadBase, OPTIMAL_2BIT_HIGH, DTYPE_WORD
+from ..vlbi_base import (VLBIPayloadBase, OPTIMAL_2BIT_HIGH, TWO_BIT_1_SIGMA,
+                         DTYPE_WORD)
 
 
 # Some duplication with mark4.py here: lut2bit = mark4.lut2bit1
@@ -63,11 +75,14 @@ reorder = np.array([0, 2, 1, 3], dtype=np.uint8)
 
 
 def encode_2bit_real(values):
-    # Effectively, get indices such that:
-    #       value < -2. : 0
-    # -2. < value <  0. : 2
-    #  0. < value <  2. : 1
-    #  2. < value       : 3
+    """Encode data using two bits.
+
+    Effectively, get indices such that for lv=TWO_BIT_1_SIGMA=2.1745:
+            value < -lv : 0
+      -lv < value <  0. : 2
+       0. < value <  lv : 1
+       2. < value       : 3
+    """
     # Optimized for speed by doing most calculations in-place, and ensuring
     # that the dtypes match.
     values = np.clip(values.reshape(-1, 4), -3., 3.)
@@ -81,24 +96,24 @@ def encode_2bit_real(values):
 
 
 class Mark5BPayload(VLBIPayloadBase):
+    """Container for decoding and encoding VDIF payloads.
+
+    Parameters
+    ----------
+    words : ndarray
+        Array containg LSB unsigned words (with the right size) that
+        encode the payload.
+    nchan : int
+        Number of channels in the data.  Default: 1.
+    bps : int
+        Number of bits per complete sample.  Default: 2.
+    """
 
     _size = 2500 * 4
     _encoders = {(2, False): encode_2bit_real}
     _decoders = {(2, False): decode_2bit_real}
 
     def __init__(self, words, nchan=1, bps=2):
-        """Container for decoding and encoding VDIF payloads.
-
-        Parameters
-        ----------
-        words : ndarray
-            Array containg LSB unsigned words (with the right size) that
-            encode the payload.
-        nchan : int
-            Number of channels in the data.  Default: 1.
-        bps : int
-            Number of bits per complete sample.  Default: 2.
-        """
         super(Mark5BPayload, self).__init__(words, nchan, bps,
                                             complex_data=False)
 

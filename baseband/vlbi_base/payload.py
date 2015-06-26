@@ -1,50 +1,67 @@
-# Helper functions for VLBI readers (VDIF, Mark5B).
+"""
+Base definitions for VLBI payloads, used for VDIF and Mark 5B.
+
+Defines a payload class VLBIPayloadBase that can be used to hold the words
+corresponding to a frame payload, providing access to the values encoded in
+it as a numpy array.
+"""
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 import numpy as np
 
 # the high mag value for 2-bit reconstruction
 OPTIMAL_2BIT_HIGH = 3.3359
+"""Optimal high value for a 2-bit digitizer for which the low value is 1.
+
+It is chosen such that for a normal distribution in which 68.269% of all values
+are at the low level, this is the mean of the others, i.e.,
+
+               int_1^inf (x * exp(-x^2/2)) dx / int_1^inf exp(-x^2/2) dx
+optimal_high = --------------------------------------------------------
+                 int_0^1 (x * exp(-x^2/2)) dx / int_0^1 exp(-x^2/2) dx
+
+Note that for this value, the standard deviation is 2.1745.
+"""
+TWO_BIT_1_SIGMA = 2.1745
+"""Optimal level between low and high for the above OPTIMAL_2BIT_HIGH.
+"""
 FOUR_BIT_1_SIGMA = 2.95
 DTYPE_WORD = np.dtype('<u4')
 
 
 class VLBIPayloadBase(object):
+    """Container for decoding and encoding VLBI payloads.
 
+    Any subclass should define dictionaries ``_decoders`` and ``_encoders``,
+    which hold functions that decode/encode the payload words to/from ndarray.
+    These dictionaries are assumed to be indexed by ``(bps, complex_data)``.
+
+    Parameters
+    ----------
+    words : ndarray
+        Array containg LSB unsigned words (with the right size) that
+        encode the payload.
+    nchan : int
+        Number of channels in the data.  Default: 1.
+    bps : int
+        Number of bits per complete sample.  Default: 2.
+    complex_data : bool
+        Whether data is complex or float.  Default: False.
+    """
+    # Possible fixed payload size.
     _size = None
+    # To be defined by subclasses.
     _encoders = {}
     _decoders = {}
 
     def __init__(self, words, nchan=1, bps=2, complex_data=False):
-        """Container for decoding and encoding VDIF payloads.
-
-        Parameters
-        ----------
-        words : ndarray
-            Array containg LSB unsigned words (with the right size) that
-            encode the payload.
-        nchan : int
-            Number of channels in the data.  Default: 1.
-        bps : int
-            Number of bits per complete sample.  Default: 2.
-        complex_data : bool
-            Whether data is complex or float.  Default: False.
-        """
         self.words = words
         self.nchan = nchan
         self.bps = bps
         self.complex_data = complex_data
-        self.nsample = len(words) * (32 // self.bps) // self.nchan
         if self._size is not None and self._size != self.size:
             raise ValueError("Encoded data should have length {0}"
                              .format(self._size))
-
-    @classmethod
-    def frombytes(cls, raw, *args, **kwargs):
-        """Set paiload by interpreting bytes."""
-        return cls(np.fromstring(raw, dtype=DTYPE_WORD), *args, **kwargs)
-
-    def tobytes(self):
-        """Convert payload to bytes."""
-        return self.words.tostring()
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
@@ -55,7 +72,7 @@ class VLBIPayloadBase(object):
         fh : filehandle
             Handle to the file from which data is read
         payloadsize : int
-            Number of bytes to read (default: as given in ``cls._payloadsize``.
+            Number of bytes to read (default: as given in ``cls._size``.
 
         Any other (keyword) arguments are passed on to the class initialiser.
         """
@@ -66,18 +83,28 @@ class VLBIPayloadBase(object):
         s = fh.read(payloadsize)
         if len(s) < payloadsize:
             raise EOFError("Could not read full payload.")
-        return cls.frombytes(s, *args, **kwargs)
+        return cls(np.fromstring(s, dtype=DTYPE_WORD), *args, **kwargs)
 
     def tofile(self, fh):
-        return fh.write(self.tobytes())
+        """Write VLBI payload to filehandle."""
+        return fh.write(self.words.tostring())
 
     @classmethod
-    def fromdata(cls, data, bps=2):
-        """Encode data as payload, using a given bits per second.
+    def fromdata(cls, data, bps=None):
+        """Encode data as a VLBI payload.
 
-        It is assumed that the last dimension is the number of channels.
+        Parameters
+        ----------
+        data : ndarray
+            Data to be encoded. The last dimension is taken as the number of
+            channels.
+        bps : int
+            Number of bits per sample to use (for complex data, for real and
+            imaginary part together; default: 2 for real, 4 for complex).
         """
         complex_data = data.dtype.kind == 'c'
+        if bps is None:
+            bps = 4 if complex_data else 2
         encoder = cls._encoders[bps, complex_data]
         words = encoder(data.ravel())
         return cls(words, nchan=data.shape[-1], bps=bps,
@@ -99,11 +126,18 @@ class VLBIPayloadBase(object):
     data = property(todata, doc="Decode the payload.")
 
     @property
+    def nsample(self):
+        """Number of samples in the payload."""
+        return len(self.words) * (32 // self.bps) // self.nchan
+
+    @property
     def shape(self):
+        """Shape of the decoded data array (nsample, nchan)."""
         return (self.nsample, self.nchan)
 
     @property
     def dtype(self):
+        """Type of the decoded data array."""
         return np.dtype(np.complex64 if self.complex_data else np.float32)
 
     @property
