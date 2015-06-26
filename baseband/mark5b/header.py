@@ -1,3 +1,12 @@
+"""
+Definitions for VLBI Mark5B Headers.
+
+Implements a Mark5BHeader class used to store header words, and decode/encode
+the information therein.
+
+For the specification, see
+http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+"""
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -8,10 +17,28 @@ from ..vlbi_base import (HeaderParser, VLBIHeaderBase, four_word_struct,
 
 
 class Mark5BHeader(VLBIHeaderBase):
-    """Interpret a tuple of words as a Mark5B Frame Header.
+    """Decoder/encoder of a Mark5B Frame Header.
 
     See page 15 of
     http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+
+    Parameters
+    ----------
+    words : tuple of int, or None
+        Eight (or four for legacy VDIF) 32-bit unsigned int header words.
+        If ``None``, set to a tuple of zeros for later initialisation.
+    ref_mjd : float, or None
+        MJD within 500 days of the observation time, used to infer the
+        full MJD from the time information in the header (which only has
+        last 3 digits of the MJD).
+    kday : int, or None
+        Explicit thousands of MJD.
+    verify : bool
+        Whether to do basic verification of integrity.  Default: `True`.
+
+    Returns
+    -------
+    header : Mark5BHeader instance.
     """
 
     _header_parser = HeaderParser(
@@ -28,6 +55,8 @@ class Mark5BHeader(VLBIHeaderBase):
 
     _properties = ('payloadsize', 'framesize', 'kday', 'jday', 'seconds',
                    'ns', 'time')
+    """Properties accessible/usable in initialisation."""
+
     kday = None
 
     def __init__(self, words, ref_mjd=None, kday=None, verify=True):
@@ -49,9 +78,18 @@ class Mark5BHeader(VLBIHeaderBase):
         assert len(self.words) == 4
         assert (self['sync_pattern'] ==
                 self._header_parser.defaults['sync_pattern'])
+        assert self.kday is not None and (33000 < self.kday < 400000)
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return ("<{0} {1}>".format(name, (",\n  " + len(name) * " ").join(
+            ["{0}: {1}".format(k, (hex(self[k])
+                                   if k.startswith('bcd') or k.startswith('sy')
+                                   else self[k])) for k in self.keys()])))
 
     @property
     def payloadsize(self):
+        """Size of the payload, in bytes."""
         return 10000  # 2500 words
 
     @payloadsize.setter
@@ -62,6 +100,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @property
     def framesize(self):
+        """Size of a frame, in bytes."""
         return self.size + self.payloadsize
 
     @framesize.setter
@@ -70,15 +109,9 @@ class Mark5BHeader(VLBIHeaderBase):
             raise ValueError("Mark5B frame has a fixed size of 10016 bytes "
                              "(4 header words plus 2500 payload words).")
 
-    def __repr__(self):
-        name = self.__class__.__name__
-        return ("<{0} {1}>".format(name, (",\n  " + len(name) * " ").join(
-            ["{0}: {1}".format(k, (hex(self[k])
-                                   if k.startswith('bcd') or k.startswith('sy')
-                                   else self[k])) for k in self.keys()])))
-
     @property
     def jday(self):
+        """Last three digits of MJD (decoded from 'bcd_jday')."""
         return bcd_decode(self['bcd_jday'])
 
     @jday.setter
@@ -87,6 +120,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @property
     def seconds(self):
+        """Integer seconds on day (decoded from 'bcd_seconds')."""
         return bcd_decode(self['bcd_seconds'])
 
     @seconds.setter
@@ -95,6 +129,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @property
     def ns(self):
+        """Fractional seconds (in ns; decoded from 'bcd_fraction')."""
         ns = bcd_decode(self['bcd_fraction']) * 100000
         # "unround" the nanoseconds
         return 156250 * ((ns+156249) // 156250)
@@ -108,9 +143,9 @@ class Mark5BHeader(VLBIHeaderBase):
         """
         Convert year, BCD time code to Time object.
 
-        Uses 'year', which stores the number of years since 2000, and
-        the VLBA BCD Time Code in 'bcd_time1', 'bcd_time2'.
-        See http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+        Uses bcd-encoded 'jday', 'seconds', and 'frac_sec', plus ``kday``
+        from the initialisation to calculate the time.  See
+        http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
         """
         return Time(self.kday + self.jday,
                     (self.seconds + 1.e-9 * self.ns) / 86400,

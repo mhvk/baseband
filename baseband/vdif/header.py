@@ -1,3 +1,11 @@
+"""
+Definitions for VLBI VDIF Headers.
+
+Implements a VDIFHeader class used to store header words, and decode/encode
+the information therein.
+
+For the VDIF specification, see http://www.vlbi.org/vdif
+"""
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
@@ -18,13 +26,37 @@ ref_epochs = Time(['{y:04d}-{m:02d}-01'.format(y=2000 + ref // 2,
 
 
 class VDIFHeader(VLBIHeaderBase):
+    """VDIF Header, supporting different Extended Data Versions.
+
+    Will initialize a header instance appropriate for a given EDV.
+    See http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf
+
+    Parameters
+    ----------
+    words : tuple of int, or None
+        Eight (or four for legacy VDIF) 32-bit unsigned int header words.
+        If ``None``, set to a tuple of zeros for later initialisation.
+    edv : int, False, or None
+        Extended data version.  If `False`, a legacy header is used.
+        If `None` (default), it is determined from the header.  (Given it
+        explicitly is mostly useful for a slight speed-up.)
+    verify : bool
+        Whether to do basic verification of integrity.  Default: `True`.
+
+    Returns
+    -------
+    header : VDIFHeader subclass appropriate for the extended data version.
+    """
 
     _properties = ('framesize', 'payloadsize', 'bps', 'nchan',
                    'samples_per_frame', 'station', 'time')
+    """Properties accessible/usable in initialisation for all VDIF headers."""
 
     edv = None
 
     def __new__(cls, words, edv=None, verify=True):
+        # is_legacy_header, get_header_edv, and vdif_header_classes are
+        # defined at the end of the file.
         if edv is None:
             if is_legacy_header(words):
                 edv = False
@@ -34,6 +66,7 @@ class VDIFHeader(VLBIHeaderBase):
         cls = vdif_header_classes.get(edv, VDIFBaseHeader)
         self = super(VDIFHeader, cls).__new__(cls)
         self.edv = edv
+        # We intialise VDIFHeader subclasses, so their __init__ will be called.
         return self
 
     def copy(self):
@@ -41,23 +74,28 @@ class VDIFHeader(VLBIHeaderBase):
 
     def same_stream(self, other):
         """Whether header is consistent with being from the same stream."""
-        # Words 2 and 3 should be invariant, and edv should be the same.
-        if not (self.edv == other.edv and
+        # EDV and most parts of words 2 and 3 should be invariant.
+        return (self.edv == other.edv and
                 all(self[key] == other[key]
                     for key in ('ref_epoch', 'vdif_version', 'frame_length',
                                 'complex_data', 'bits_per_sample',
-                                'station_id'))):
-            return False
-
-        if self.edv:
-            # For any edv, word 4 should be invariant.
-            return self.words[4] == other.words[4]
-        else:
-            return True
+                                'station_id')))
 
     @classmethod
     def fromfile(cls, fh, edv=None, verify=True):
-        """Read VDIF Header from file."""
+        """Read VDIF Header from file.
+
+        Parameters
+        ----------
+        fh : filehandle
+            To read data from.
+        edv : int, False, or None
+            Extended data version.  If `False`, a legacy header is used.
+            If `None` (default), it is determined from the header.  (Given it
+            explicitly is mostly useful for a slight speed-up.)
+        verify: bool
+            Whether to do basic verification of integrity.  Default: `True`.
+        """
         # Assume non-legacy header to ensure those are done fastest.
         # Since a payload will follow, it is OK to read too many bytes even
         # for a legacy header; we just rewind below.
@@ -92,21 +130,21 @@ class VDIFHeader(VLBIHeaderBase):
         thread_id: 0
         frame_nr: 0
 
-        Defaults inferred from other keyword arguments (if present):
+        Values set by other keyword arguments (if present):
 
         bits_per_sample : from 'bps'
         frame_length : from 'framesize' (or 'payloadsize' and 'legacy_mode')
         lg2_nchan : from 'nchan'
+        ref_epoch, seconds, frame_nr : from 'time' (may require bandwidth).
 
         Given defaults for edv 1 and 3:
 
-        sync_pattern: 0xACABFEED (for edv = 1 and 3)
+        sync_pattern: 0xACABFEED.
 
         Defaults inferred from other keyword arguments for all edv:
 
         station_id : from 'station'
         sample_rate, sample_unit : from 'bandwidth' or 'framerate'
-        ref_epoch, seconds, frame_nr : from 'time'
         """
         # Some defaults that are not done by setting properties.
         kwargs.setdefault('legacy_mode', True if edv is False else False)
@@ -115,7 +153,14 @@ class VDIFHeader(VLBIHeaderBase):
 
     @classmethod
     def fromkeys(cls, **kwargs):
-        """Like fromvalues, but without any interpretation of keywords."""
+        """Initialise a header from parsed values.
+
+        Like fromvalues, but without any interpretation of keywords.
+
+        Raises
+        ------
+        KeyError : if not all keys required are present in ``kwargs``
+        """
         # Get all required values.
         edv = False if kwargs['legacy_mode'] else kwargs['edv']
         return super(VDIFHeader, cls).fromkeys(edv, **kwargs)
@@ -140,17 +185,24 @@ class VDIFHeader(VLBIHeaderBase):
         nchan : int
             Number of channels carried in the Mark 5B paylod.
 
-        Further arguments are not necessary to create a valid VDIF header,
-        but can be given (e.g., ``invalid_data``, etc.)
+        Further arguments are not strictly necessary to create a valid VDIF
+        header, but can be given (e.g., ``invalid_data``, etc.)
         """
         kwargs.update(mark5b_header)
         return cls.fromvalues(edv=0xab, time=mark5b_header.time,
                               bps=bps, nchan=nchan, complex_data=False,
                               **kwargs)
 
+    def __repr__(self):
+        return ("<{0} {1}>".format(
+            self.__class__.__name__, ",\n            ".join(
+                ["{0}: {1}".format(k, (hex(self[k]) if k == 'sync_pattern' else
+                                       self[k])) for k in self.keys()])))
+
     # properties common to all VDIF headers.
     @property
     def framesize(self):
+        """Size of a frame, in bytes."""
         return self['frame_length'] * 8
 
     @framesize.setter
@@ -160,20 +212,16 @@ class VDIFHeader(VLBIHeaderBase):
 
     @property
     def payloadsize(self):
+        """Size of the payload, in bytes."""
         return self.framesize - self.size
 
     @payloadsize.setter
     def payloadsize(self, size):
         self.framesize = size + self.size
 
-    def __repr__(self):
-        return ("<{0} {1}>".format(
-            self.__class__.__name__, ",\n            ".join(
-                ["{0}: {1}".format(k, (hex(self[k]) if k == 'sync_pattern' else
-                                       self[k])) for k in self.keys()])))
-
     @property
     def bps(self):
+        """Bits per sample (adding bits for imaginary and real for complex)."""
         bps = self['bits_per_sample'] + 1
         if self['complex_data']:
             bps *= 2
@@ -188,6 +236,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     @property
     def nchan(self):
+        """Number of channels in frame."""
         return 2**self['lg2_nchan']
 
     @nchan.setter
@@ -198,6 +247,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     @property
     def samples_per_frame(self):
+        """Number of samples encoded in frame."""
         # Values are not split over word boundaries.
         values_per_word = 32 // self.bps
         # samples are not split over payload boundaries.
@@ -215,6 +265,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     @property
     def station(self):
+        """Station ID: two ASCII characters, or 16-bit int."""
         msb = self['station_id'] >> 8
         if 48 <= msb < 128:
             return chr(msb) + chr(self['station_id'] & 0xff)
@@ -230,17 +281,26 @@ class VDIFHeader(VLBIHeaderBase):
         assert int(station_id) == station_id
         self['station_id'] = station_id
 
-    def get_time(self, frame_nr=None, framerate=None):
+    def get_time(self, framerate=None, frame_nr=None):
         """
-        Convert ref_epoch, seconds, and possibly frame_nr to Time object.
+        Convert ref_epoch, seconds, and frame_nr to Time object.
 
         Uses 'ref_epoch', which stores the number of half-years from 2000,
         and 'seconds'.  By default, it also calculates the offset using
         the current frame number.  For non-zero frame_nr, this requires the
-        framerate, which is calculated from the header.  It can be passed on
+        frame rate, which is calculated from the header.  It can be passed on
         if this is not available (e.g., for a legacy VDIF header).
 
         Set frame_nr=0 to just get the header time from ref_epoch and seconds.
+
+        Parameters
+        ----------
+        framerate : Quantity with frequency units, or None
+            For calculating the offset corresponding to non-zero ``frame_nr``.
+            If not given, will try to calculate it from the sampling rate
+            given in the header (but not all EDV contain this).
+        frame_nr : int or None
+            If `None`, uses ``frame_nr`` for this header.
         """
         if frame_nr is None:
             frame_nr = self['frame_nr']
@@ -249,31 +309,59 @@ class VDIFHeader(VLBIHeaderBase):
             offset = 0.
         else:
             if framerate is None:
-                framerate = self.framerate
+                try:
+                    framerate = self.framerate
+                except AttributeError:
+                    raise ValueError("Cannot calculate frame rate for this "
+                                     "header. Pass it in explicitly.")
             offset = (frame_nr / framerate).to(u.s).value
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
-    def set_time(self, time):
+    def set_time(self, time, framerate=None):
+        """
+        Convert Time object to ref_epoch, seconds, and frame_nr.
+
+        For non-integer seconds, the frame_nr will be calculated. This requires
+        the frame rate, which is calculated from the header.  It can be passed
+        on if this is not available (e.g., for a legacy VDIF header).
+
+        Parameters
+        ----------
+        time : Time instance
+            The time to use for this header.
+        framerate : Quantity with frequency units, or None
+            For calculating the ``frame_nr`` from the fractional seconds.
+            If not given, will try to calculate it from the sampling rate
+            given in the header (but not all EDV contain this).
+        """
         assert time > ref_epochs[0]
         ref_index = np.searchsorted((ref_epochs - time).sec, 0) - 1
         self['ref_epoch'] = ref_index
-        seconds = (time - ref_epochs[ref_index]).to(u.s)
-        int_sec, frac_sec = divmod(seconds, 1 * u.s)
-        self['seconds'] = int(int_sec)
-        if abs(frac_sec) < 10. * u.ns:
+        seconds = time - ref_epochs[ref_index]
+        int_sec = int(seconds.sec)
+        self['seconds'] = int_sec
+        frac_sec = seconds - int_sec * u.s
+        if abs(frac_sec) < 2. * u.ns:
             self['frame_nr'] = 0
         else:
-            self['frame_nr'] = (frac_sec / self.samples_per_frame *
-                                self.bandwidth).to(u.one).value
+            if framerate is None:
+                try:
+                    framerate = self.framerate
+                except AttributeError:
+                    raise ValueError("Cannot calculate frame rate for this "
+                                     "header. Pass it in explicitly.")
+            self['frame_nr'] = round((frac_sec * framerate).to(u.one).value)
 
     time = property(get_time, set_time)
 
 
-class VDIFLegacyHeader(VDIFHeader, VLBIHeaderBase):
+class VDIFLegacyHeader(VDIFHeader):
 
     _struct = four_word_struct
 
+    # See Section 6 of
+    # http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf
     _header_parser = HeaderParser(
         (('invalid_data', (0, 31, 1, False)),
          ('legacy_mode', (0, 30, 1, True)),
@@ -306,7 +394,7 @@ class VDIFLegacyHeader(VDIFHeader, VLBIHeaderBase):
         assert len(self.words) == 4
 
 
-class VDIFBaseHeader(VDIFHeader, VLBIHeaderBase):
+class VDIFBaseHeader(VDIFHeader):
 
     _struct = eight_word_struct
 
@@ -334,16 +422,20 @@ class VDIFBaseHeader(VDIFHeader, VLBIHeaderBase):
                     self._header_parser.defaults['sync_pattern'])
 
 
-class VDIFHeader1(VDIFBaseHeader):
+class VDIFSampleRateHeader(VDIFBaseHeader):
 
+    # For EDV 1, 3, 4.
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
         (('sampling_unit', (4, 23, 1)),
          ('sample_rate', (4, 0, 23)),
-         ('sync_pattern', (5, 0, 32, 0xACABFEED)),
-         ('das_id', (6, 0, 32, 0x0)),
-         ('_7_0_32', (7, 0, 32, 0x0))))
+         ('sync_pattern', (5, 0, 32, 0xACABFEED))))
 
     _properties = VDIFBaseHeader._properties + ('bandwidth', 'framerate')
+
+    def same_stream(self, other):
+        return (super(VDIFSampleRateHeader, self).same_stream(other) and
+                self.words[4] == other.words[4] and
+                self.words[5] == other.words[5])
 
     @property
     def bandwidth(self):
@@ -375,13 +467,18 @@ class VDIFHeader1(VDIFBaseHeader):
         self.bandwidth = framerate * self.samples_per_frame / (2 * self.nchan)
 
 
-class VDIFHeader3(VDIFHeader1):
+class VDIFHeader1(VDIFSampleRateHeader):
 
-    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
+    # http://www.vlbi.org/vdif/docs/vdif_extension_0x01.pdf
+    _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
+        (('das_id', (6, 0, 64, 0x0)),))
+
+
+class VDIFHeader3(VDIFSampleRateHeader):
+
+    # http://www.vlbi.org/vdif/docs/vdif_extension_0x03.pdf
+    _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('frame_length', (2, 0, 24, 629)),  # Repeat, to set default.
-         ('sampling_unit', (4, 23, 1)),
-         ('sample_rate', (4, 0, 23)),
-         ('sync_pattern', (5, 0, 32, 0xACABFEED)),
          ('loif_tuning', (6, 0, 32, 0x0)),
          ('_7_28_4', (7, 28, 4, 0x0)),
          ('dbe_unit', (7, 24, 4, 0x0)),
@@ -397,16 +494,13 @@ class VDIFHeader3(VDIFHeader1):
         assert self['frame_length'] == 629
 
 
-class VDIFHeader4(VDIFHeader1):
-
-    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
-        (('sampling_unit', (4, 23, 1)),
-         ('sample_rate', (4, 0, 23)),
-         ('sync_pattern', (5, 0, 32))))
+class VDIFHeader4(VDIFSampleRateHeader):
+    # Used for MWA according to Franz.  No extra header info?
+    pass
 
 
 class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
-    """mark5b over vdif (edv = 0xab).
+    """Mark 5B over VDIF (EDV=0xab).
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
     """

@@ -27,7 +27,8 @@ def make_parser(word_index, bit_index, bit_length):
     The parameters are those that define header keywords, and all parsers do
     ``(words[word_index] >> bit_index) & ((1 << bit_length) - 1)``, except that
     that they have been optimized for the specific cases of single bits,
-    full words, and items starting at bit 0.
+    full words, and items starting at bit 0.  As a special case, bit_length=64
+    allows one to extract two words as a single (long) integer.
 
     Parameters
     ----------
@@ -52,6 +53,12 @@ def make_parser(word_index, bit_index, bit_length):
 
         def parser(words):
             return words[word_index]
+
+    elif bit_length == 64:
+        assert bit_index == 0
+
+        def parser(words):
+            return words[word_index] + words[word_index+1] * (1 << 32)
 
     else:
         bit_mask = (1 << bit_length) - 1  # e.g., bit_length=8 -> 0xff
@@ -94,12 +101,17 @@ def make_setter(word_index, bit_index, bit_length, default=None):
         if value is None and default is not None:
             value = default
         value = int(value)
-        word = words[word_index]
         bit_mask = (1 << bit_length) - 1
         # Check that value will fit within the bit limits.
         if value & bit_mask != value:
             raise ValueError("{0} cannot be represented with {1} bits"
                              .format(value, bit_length))
+        if bit_length == 64:
+            word1 = value & (1 << 32) - 1
+            word2 = value >> 32
+            return words[:word_index] + (word1, word2) + words[word_index+1:]
+
+        word = words[word_index]
         # Zero the part to be set.
         bit_mask <<= bit_index
         word = (word | bit_mask) ^ bit_mask
@@ -168,8 +180,10 @@ class HeaderParser(OrderedDict):
     the fly, we precalculate the parsers to speed up header keyword access.
     """
     def __init__(self, *args, **kwargs):
-        super(HeaderParser, self).__init__(*args, **kwargs)
         # Use a dict rather than OrderedDict for the parsers for better speed.
+        # Note that this gets filled by calls to __setitem__.
+        self.parsers = {}
+        super(HeaderParser, self).__init__(*args, **kwargs)
         self.parsers = {k: make_parser(*v[:3]) for k, v in self.items()}
 
     def __add__(self, other):
@@ -246,7 +260,8 @@ class VLBIHeaderBase(object):
     def copy(self):
         return self.__class__(self.words, verify=False)
 
-    __copy__ = copy
+    def __copy__(self):
+        return self.copy()
 
     @property
     def size(self):
