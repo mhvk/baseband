@@ -1,4 +1,13 @@
-# Helper functions for VLBI readers (VDIF, Mark5B).
+"""
+Base definitions for VLBI Headers, used for VDIF and Mark 5B.
+
+Defines a header class VLBIHeaderBase that can be used to hold the words
+corresponding to a frame header, providing access to the values encoded in
+via a dict-like interface.  Definitions for headers are constructed using
+the HeaderParser class.
+"""
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 import struct
 import warnings
 
@@ -10,21 +19,77 @@ four_word_struct = struct.Struct('<4I')
 
 
 def make_parser(word_index, bit_index, bit_length):
-    """Convert specific bits from a header word to a bool or integer."""
+    """Construct a function that converts specific bits from a header.
+
+    The function acts on a tuple/array of 32-bit words, extracting given bits
+    from a specific word and convert them to bool (for single bit) or integer.
+
+    The parameters are those that define header keywords, and all parsers do
+    ``(words[word_index] >> bit_index) & ((1 << bit_length) - 1)``, except that
+    that they have been optimized for the specific cases of single bits,
+    full words, and items starting at bit 0.
+
+    Parameters
+    ----------
+    word_index : int
+        Index into the tuple of words passed to the function.
+    bit_index : int
+        Index to the starting bit of the part to be extracted.
+    bit_length : int
+        Number of bits to be extracted.
+
+    Returns
+    -------
+    parser : function
+        To be used as ``parser(words)``.
+    """
     if bit_length == 1:
-        return lambda words: bool((words[word_index] >> bit_index) & 1)
+        def parser(words):
+            return bool((words[word_index] >> bit_index) & 1)
+
     elif bit_length == 32:
         assert bit_index == 0
-        return lambda words: words[word_index]
+
+        def parser(words):
+            return words[word_index]
+
     else:
-        mask = (1 << bit_length) - 1  # e.g., bit_length=8 -> 0xff
+        bit_mask = (1 << bit_length) - 1  # e.g., bit_length=8 -> 0xff
         if bit_index == 0:
-            return lambda words: words[word_index] & mask
+            def parser(words):
+                return words[word_index] & bit_mask
+
         else:
-            return lambda words: (words[word_index] >> bit_index) & mask
+            def parser(words):
+                return (words[word_index] >> bit_index) & bit_mask
+
+    return parser
 
 
 def make_setter(word_index, bit_index, bit_length, default=None):
+    """Construct a function that uses a value to set specific bits in a header.
+
+    The function will act on a tuple/array of words, setting given bits
+    from a given word using a value.
+
+    The parameters are just those that define header keywords.
+
+    Parameters
+    ----------
+    word_index : int
+        Index into the tuple of words passed to the function.
+    bit_index : int
+        Index to the starting bit of the part to be extracted.
+    bit_length : int
+        Number of bits to be extracted.
+    default : int or bool or None
+        Possible default value to use in function if no default is passed on.
+
+    Returns
+    -------
+    setter : function
+        To be used as ``setter(words, value)``.
+    """
     def setter(words, value):
         if value is None and default is not None:
             value = default
@@ -41,19 +106,22 @@ def make_setter(word_index, bit_index, bit_length, default=None):
         # Add the value
         word |= value << bit_index
         return words[:word_index] + (word,) + words[word_index+1:]
+
     return setter
 
 
-class HeaderPropertyGetter(object):
-    def __init__(self, getter):
-        self.getter = getter
-
-    def __get__(self, instance, owner_cls):
-        return HeaderProperty(instance, self.getter)
-
-
 class HeaderProperty(object):
-    """Mimic a dictionary, calculating entries from header words."""
+    """Mimic a dictionary, calculating entries from header words.
+
+    Used below to calculate setter functions and extract default values.
+
+    Parameters
+    ----------
+    header_parser : HeaderParser instance
+        An dict with header encoding information.
+    getter : function
+        Function that uses the encoding information to calculate a result.
+    """
     def __init__(self, header_parser, getter):
         self.header_parser = header_parser
         self.getter = getter
@@ -62,19 +130,46 @@ class HeaderProperty(object):
         definition = self.header_parser[item]
         return self.getter(definition)
 
-    def __getattr__(self, attr):
-        try:
-            return super(HeaderProperty, self).__getattribute__(attr)
-        except AttributeError:
-            return getattr(self.header_parser)
+
+class HeaderPropertyGetter(object):
+    """Special property for attaching HeaderProperty."""
+    def __init__(self, getter, doc=None):
+        self.getter = getter
+        if doc is None and getter.__doc__ is not None:
+            doc = getter.__doc__
+        self.__doc__ = doc
+
+    def __get__(self, instance, owner_cls=None):
+        return HeaderProperty(instance, self.getter)
 
 
 class HeaderParser(OrderedDict):
+    """Parser & setter for VLBI header keywords.
+
+    An ordered dict of header keywords, with values that describe how they are
+    encoded in a given VLBI header.  Initialisation is as a normal OrderedDict,
+    with a key, value pairs.  The value should be a tuple containing:
+
+    word_index : int
+        Index into the header words for this key.
+    bit_index : int
+        Index to the starting bit of the part used for this key.
+    bit_length : int
+        Number of bits.
+    default : int or bool or None
+        Possible default value to use in initialisation (e.g., a sync pattern).
+
+    The class provides dict-like properties ``parsers``, ``setters``, and
+    ``defaults``, which return functions that get a given keyword from header
+    words, set the corresponding part of the header words to a value, or
+    return the default value (if defined).
+
+    Note that while in principle, parsers and setters could be calculated on
+    the fly, we precalculate the parsers to speed up header keyword access.
+    """
     def __init__(self, *args, **kwargs):
         super(HeaderParser, self).__init__(*args, **kwargs)
-        # In principle, we could calculate the parsers on the fly,
-        # like we do for the setters, but this would be needlessly slow,
-        # so we precalculate all of them, using a dict for even better speed.
+        # Use a dict rather than OrderedDict for the parsers for better speed.
         self.parsers = {k: make_parser(*v[:3]) for k, v in self.items()}
 
     def __add__(self, other):
@@ -84,11 +179,17 @@ class HeaderParser(OrderedDict):
         result.update(other)
         return result
 
+    def __setitem__(self, item, value):
+        self.parsers[item] = make_parser(*value[:3])
+        super(HeaderParser, self).__setitem__(item, value)
+
     defaults = HeaderPropertyGetter(
-        lambda definition: definition[3] if len(definition) > 3 else None)
+        lambda definition: definition[3] if len(definition) > 3 else None,
+        doc="Dict-like allowing access to default header values by keyword.")
 
     setters = HeaderPropertyGetter(
-        lambda definition: make_setter(*definition))
+        lambda definition: make_setter(*definition),
+        doc="Dict-like returning function to set header keyword to a value")
 
     def update(self, other):
         if not isinstance(other, HeaderParser):
@@ -105,7 +206,8 @@ class VLBIHeaderBase(object):
 
     Generally, the actual class should define:
 
-      _struct: HeaderParser instance corresponding to this class.
+      _struct: `~struct.Struct` instance that can pack/unpack header words.
+
       _header_parser: HeaderParser instance corresponding to this class.
 
     It also should define properties (getters *and* setters):
@@ -116,8 +218,16 @@ class VLBIHeaderBase(object):
 
       get_time, set_time, and a corresponding time property:
            time at start of payload
-    """
 
+    Parameters
+    ----------
+    words : tuple of int, or None
+        header words (generally, 32 bit unsigned int).  If ``None``,
+        set to a tuple of zeros for later initialisation.
+    verify : bool
+        Whether to do basic verification of integrity.  For the base class,
+        checks that the number of words is consistent with the struct size.
+    """
     def __init__(self, words, verify=True):
         if words is None:
             self.words = (0,) * (self._struct.size // 4)
@@ -136,8 +246,11 @@ class VLBIHeaderBase(object):
     def copy(self):
         return self.__class__(self.words, verify=False)
 
+    __copy__ = copy
+
     @property
     def size(self):
+        """Size of the header in bytes."""
         return self._struct.size
 
     @classmethod
@@ -146,14 +259,13 @@ class VLBIHeaderBase(object):
 
         Arguments are the same as for class initialisation.
         """
-        size = cls._struct.size
-        s = fh.read(size)
-        if len(s) != size:
+        s = fh.read(cls._struct.size)
+        if len(s) != cls._struct.size:
             raise EOFError
         return cls(cls._struct.unpack(s), *args, **kwargs)
 
     def tofile(self, fh):
-        """Write VLBI Frame header to filehandle."""
+        """Write VLBI frame header to filehandle."""
         return fh.write(self._struct.pack(*self.words))
 
     @classmethod
@@ -161,7 +273,7 @@ class VLBIHeaderBase(object):
         """Initialise a header from parsed values.
 
         Here, the parsed values must be given as keyword arguments, i.e.,
-        for any header = cls(<somedata>), cls.fromvalues(**header) == header.
+        for any header = cls(<somewords>), cls.fromvalues(**header) == header.
 
         However, unlike for the 'fromkeys' class method, data can also be set
         using arguments named after header methods such 'time'.
@@ -173,10 +285,9 @@ class VLBIHeaderBase(object):
         self = cls(None, *args, verify=False)
         # First set all keys to keyword arguments or defaults.
         for key in self.keys():
-            if key in kwargs:
-                self[key] = kwargs.pop(key)
-            elif self._header_parser.defaults[key] is not None:
-                self[key] = self._header_parser.defaults[key]
+            value = kwargs.pop(key, self._header_parser.defaults[key])
+            if value is not None:
+                self[key] = value
 
         # Next, use remaining keyword arguments to set properties.
         # Order may be important so use list:
@@ -192,7 +303,14 @@ class VLBIHeaderBase(object):
 
     @classmethod
     def fromkeys(cls, *args, **kwargs):
-        """Like fromvalues, but without any interpretation of keywords."""
+        """Initialise a header from parsed values.
+
+        Like fromvalues, but without any interpretation of keywords.
+
+        Raises
+        ------
+        KeyError : if not all keys required are present in ``kwargs``
+        """
         self = cls(None, *args, verify=False)
         for key in self.keys():
             self.words = self._header_parser.setters[key](
@@ -205,6 +323,7 @@ class VLBIHeaderBase(object):
         return self
 
     def __getitem__(self, item):
+        """Get the value a particular header item from the header words."""
         try:
             return self._header_parser.parsers[item](self.words)
         except KeyError:
@@ -212,6 +331,7 @@ class VLBIHeaderBase(object):
                            .format(self.__class__.__name__, item))
 
     def __setitem__(self, item, value):
+        """Set the value of a particular header item in the header words."""
         try:
             self.words = self._header_parser.setters[item](self.words, value)
         except KeyError:
@@ -219,6 +339,7 @@ class VLBIHeaderBase(object):
                            .format(self.__class__.__name__, item))
 
     def __getattr__(self, attr):
+        """Get attribute, or, failing that, try to get key from header."""
         try:
             return super(VLBIHeaderBase, self).__getattribute__(attr)
         except AttributeError:
@@ -230,12 +351,12 @@ class VLBIHeaderBase(object):
     def keys(self):
         return self._header_parser.keys()
 
+    def __contains__(self, key):
+        return key in self.keys()
+
     def __eq__(self, other):
         return (type(self) is type(other) and
                 list(self.words) == list(other.words))
-
-    def __contains__(self, key):
-        return key in self.keys()
 
     def __repr__(self):
         name = self.__class__.__name__
