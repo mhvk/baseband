@@ -1,4 +1,12 @@
+"""
+Base definitions for VLBI frames, used for VDIF and Mark 5B.
+
+Defines a frame class VLBIFrameBase that can be used to hold a header and a
+payload, providing access to the values encoded in both.
+"""
 # Helper functions for VLBI readers (VDIF, Mark5B).
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 import numpy as np
 
 
@@ -32,8 +40,8 @@ class VLBIFrameBase(object):
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, ``words`` the full encoded frame, and ``size``
     the frame size in bytes.  Furthermore, the frame acts as a dictionary, with
-    keys those of the header, and any attribute that is not defined on the
-    frame itself, such as ``.time`` will be looked up on the header.
+    keys those of the header. Any attribute that is not defined on the frame
+    itself, such as ``.time`` will be looked up on the header as well.
     """
 
     _header_class = None

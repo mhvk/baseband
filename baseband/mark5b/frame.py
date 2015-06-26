@@ -1,3 +1,12 @@
+"""
+Definitions for VLBI Mark 5B frames.
+
+Implements a Mark5BFrame class that can be used to hold a header and a
+payload, providing access to the values encoded in both.
+
+For the specification, see
+http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+"""
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -91,6 +100,9 @@ class Mark5BFrame(VLBIFrameBase):
             If `None`, it will be attemtped to create one using the keywords.
         bps : int
             Number of bits per sample to use in payload encoding (default: 2).
+        valid : bool
+            Whether the data are valid (default: `True`).  If not, the payload
+            will be set to a fill pattern.
         verify : bool
             Whether to do basic checks of frame integrity (default: `True`).
         """

@@ -1,3 +1,12 @@
+"""
+Definitions for VLBI VDIF frames and frame sets.
+
+Implements a VDIFFrame class  that can be used to hold a header and a
+payload, providing access to the values encoded in both.  Also, define
+a VDIFFrameSet class that combines a set of frames from different threads.
+
+For the VDIF specification, see http://www.vlbi.org/vdif
+"""
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -118,22 +127,52 @@ class VDIFFrame(VLBIFrameBase):
         return cls(header, payload, verify=True)
 
     @classmethod
-    def from_mark5b_frame(cls, mark5b_frame, verify=True):
+    def from_mark5b_frame(cls, mark5b_frame, verify=True, **kwargs):
         """Construct an Mark5B over VDIF frame (EDV=0xab).
+
+        Any additional keywords can be used to set VDIF header properties
+        not found in the Mark 5B header (such as station).
 
         See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
         """
         m5h, m5pl = mark5b_frame.header, mark5b_frame.payload
         header = VDIFHeader.from_mark5b_header(
             m5h, nchan=m5pl.nchan, bps=m5pl.bps,
-            invalid_data=not mark5b_frame.valid)
+            invalid_data=not mark5b_frame.valid, **kwargs)
         payload = VDIFPayload(m5pl.words, header)
         return cls(header, payload, verify)
 
 
 class VDIFFrameSet(object):
+    """Representation of a set of VDIF frames, combining different threads.
+
+    Parameters
+    ----------
+    frames : list of VDIFFrame instances
+        Should all cover the same time span.
+
+    The FrameSet can also be read instantiated using class methods:
+
+      fromfile : read frames from a filehandle, optionally selecting threads.
+
+      fromdata : encode data as a set of frames
+
+    It also has methods to do the opposite:
+
+      tofile : write frames to filehandle
+
+      todata : decode frame payloads to data
+
+    A number of properties are defined: ``shape`` and ``dtype`` are the shape
+    and type of the data array, and ``size`` the total size in bytes.  Like a
+    VDIFFrame, the frame set acts as a dictionary, with keys those of the
+    header of the first frame (available via ``.header0``).  Any attribute that
+    is not defined on the frame set itself, such as ``.time`` will also be
+    looked up on the header.
+    """
     def __init__(self, frames, header0=None):
         self.frames = frames
+        # Used in .todata below to decode data only once.
         self._data = None
         if header0 is None:
             self.header0 = self.frames[0].header
@@ -150,9 +189,14 @@ class VDIFFrameSet(object):
             Handle to the VDIF file.  Should be at the location where the
             frames are read from.
         thread_ids : list or None
-            The thread ids that should be read.  If `None`, read all threads.
+            The thread ids that should be read.  If `None`, continue reading
+            threads as long as the frame number does not increase.
         sort : bool
             Whether to sort the frames by thread_id.  Default: True.
+            Note that this does not influence the header used to look up
+            attributes (it is always the header of the first frame read).
+            It does, however, influence the order in which decoded data is
+            returned.
         edv : int or None
             The expected extended data version for the VDIF Header.  If not
             given, use that of the first frame.  (Passing it in slightly
@@ -203,11 +247,12 @@ class VDIFFrameSet(object):
         return cls(frames, header0)
 
     def tofile(self, fh):
+        """Write all encoded frames to filehandle."""
         for frame in self.frames:
             frame.tofile(fh)
 
     @classmethod
-    def fromdata(cls, data, headers, verify=True):
+    def fromdata(cls, data, headers, verify=True, **kwargs):
         """Construct a set of frames from data and headers.
 
         Parameters
@@ -215,9 +260,10 @@ class VDIFFrameSet(object):
         data : ndarray
             Array holding complex or real data to be encoded.  Dimensions
             should be (nthread, nsample, nchan).
-        headers : list of VDIFHeader instances, VDIFHeader or dict
-            If a single header (or dict with relevant keywords), a list with
-            increasing ``thread_id`` is generated.
+        headers : list of VDIFHeader instances, VDIFHeader or None
+            If a single header, a list with increasing ``thread_id`` is
+            generated. If `None`, it is attempted to generate a header from
+            the keyword arguments.
         verify : bool
             Whether or not to do basic assertions that check the integrety
             (e.g., that channel information and whether or not data are complex
@@ -228,10 +274,13 @@ class VDIFFrameSet(object):
         frameset : VDIFFrameSet instance.
         """
         if not isinstance(headers, (list, tuple)):
-            header = (headers if isinstance(headers, VDIFHeader)
-                      else VDIFHeader.fromvalues(**headers))
-            headers = []
-            for thread_id in range(len(data)):
+            if headers is None:
+                kwargs.set_default('thread_id', 0)
+                header = VDIFHeader.fromvalues(verify=verify, **kwargs)
+            else:
+                header = headers
+            headers = [header]
+            for thread_id in range(1, len(data)):
                 header = header.copy()
                 header['thread_id'] = thread_id
                 headers.append(header)
@@ -264,6 +313,10 @@ class VDIFFrameSet(object):
         return data
 
     data = property(todata, doc="Decode the payloads in all frames.")
+
+    @property
+    def size(self):
+        return len(self.frames) * self.frames[0].size
 
     @property
     def shape(self):
