@@ -1,7 +1,9 @@
-# Licensed under a 3-clause BSD style license - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE.rst
 
 """
-This is an Astropy affiliated package.
+Reading and writing VLBI and other radio baseband files.
+
+It relies on numpy and astropy.
 """
 
 # Affiliated packages may add whatever they like to this file, but

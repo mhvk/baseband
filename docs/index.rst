@@ -1,13 +1,13 @@
 Documentation
 =============
 
-This is an affiliated package for the AstroPy package. The documentation for
-this package is here:
+This is a package for reading and writing VLBI and other radio baseband
+files. It relies on numpy and astropy.:
 
 .. toctree::
   :maxdepth: 2
 
-  packagename/index.rst
+  baseband/index.rst
 
 .. note:: The layout of this directory is simply a suggestion.  To follow
           traditional practice, do *not* edit this page, but instead place

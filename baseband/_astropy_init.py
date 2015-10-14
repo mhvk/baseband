@@ -1,4 +1,4 @@
-# Licensed under a 3-clause BSD style license - see LICENSE.rst
+# Licensed under a 3-clause BSD style license - see astropy/LICENSE.rst
 
 __all__ = ['__version__', '__githash__', 'test']
 
