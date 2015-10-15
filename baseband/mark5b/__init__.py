@@ -9,4 +9,3 @@ from .base import open
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 from .frame import Mark5BFrame
-from .data import Mark5BData

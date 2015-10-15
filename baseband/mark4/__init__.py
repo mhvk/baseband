@@ -11,4 +11,3 @@ from .base import open
 from .header import Mark4Header
 from .payload import Mark4Payload
 from .frame import Mark4Frame
-from .data import Mark4Data

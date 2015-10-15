@@ -84,4 +84,3 @@ from .base import open
 from .header import VDIFHeader
 from .payload import VDIFPayload
 from .frame import VDIFFrame, VDIFFrameSet
-from .data import VDIFData
