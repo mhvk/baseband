@@ -70,7 +70,7 @@ class VDIFHeader(VLBIHeaderBase):
         return self
 
     def copy(self):
-        return self.__class__(self.words, self.edv, verify=False)
+        return super(VDIFHeader, self).copy(edv=self.edv)
 
     def same_stream(self, other):
         """Whether header is consistent with being from the same stream."""

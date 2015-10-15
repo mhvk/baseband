@@ -8,11 +8,13 @@ def bcd_decode(value):
     try:
         # Far faster than my routine for scalars
         return int('{:x}'.format(value))
-    except ValueError:
-        raise ValueError("Invalid BCD encoded value {0}={1}."
-                         .format(value, hex(value)))
-    except TypeError:  # Presumably an array
-        pass
+    except ValueError:  # Might be an array (older python versions)
+        if not isinstance(value, np.ndarray):
+            raise ValueError("Invalid BCD encoded value {0}={1}."
+                             .format(value, hex(value)))
+    except:  # Might still be an array (newer python versions)
+        if not isinstance(value, np.ndarray):
+            raise
 
     bcd = value
     factor = 1
@@ -34,8 +36,9 @@ def bcd_encode(value):
     try:
         # Far faster than my routine for scalars
         return int('{:d}'.format(value), base=16)
-    except TypeError:  # Presumably an array
-        pass
+    except:  # Maybe an array?
+        if not isinstance(value, np.ndarray):
+            raise
 
     result = np.zeros_like(value)
     result = 0

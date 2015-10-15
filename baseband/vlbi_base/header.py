@@ -261,16 +261,15 @@ class VLBIHeaderBase(object):
         """
         assert len(self.words) == (self._struct.size // 4)
 
-    def copy(self):
-        """Copy the header.
+    def copy(self, **kwargs):
+        """Return a mutable copy of the header
 
-        Any tuple of words is converted to a list so that they can be changed.
+        Keyword arguments can be passed on as needed by possible subclasses.
         """
-        if isinstance(self.words, tuple):
-            words = list(self.words)
-        else:
-            words = self.words.copy()
-        return self.__class__(words, verify=False)
+        kwargs.setdefault('verify', False)
+        copy = self.__class__(self.words, **kwargs)
+        copy.mutable = True
+        return copy
 
     def __copy__(self):
         return self.copy()

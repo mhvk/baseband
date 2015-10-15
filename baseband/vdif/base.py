@@ -206,13 +206,25 @@ class VDIFStreamReader(VDIFStreamBase):
     @lazyproperty
     def header1(self):
         raw_offset = self.fh_raw.tell()
-        self.fh_raw.seek(-self.header0.framesize, 2)
-        header1 = find_frame(self.fh_raw, template_header=self.header0,
-                             maximum=10*self.header0.framesize, forward=False)
+        # Go to end of file.
+        self.fh_raw.seek(0, 2)
+        raw_size = self.fh_raw.tell()
+        # Find first header with same thread_id going backward.
+        found = False
+        while not found:
+            self.fh_raw.seek(-self.header0.framesize, 1)
+            header1 = find_frame(self.fh_raw, template_header=self.header0,
+                                 maximum=10*self.header0.framesize,
+                                 forward=False)
+            if header1 is None:
+                raise TypeError("Corrupt VDIF? No thread_id={0} frame in last "
+                                "{1} bytes."
+                                .format(self.header0['thread_id'],
+                                        raw_size - self.fh_raw.tell()))
+
+            found = header1['thread_id'] == self.header0['thread_id']
+
         self.fh_raw.seek(raw_offset)
-        if header1 is None:
-            raise TypeError("Corrupt VDIF? No frame in last {0} bytes."
-                            .format(10*self.header0.framesize))
         return header1
 
     @property

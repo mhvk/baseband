@@ -163,7 +163,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @ns.setter
     def ns(self, ns):
-        fraction = round(ns / 100000)
+        fraction = int(round(ns / 100000))
         self['bcd_fraction'] = bcd_encode(fraction)
 
     def get_time(self):

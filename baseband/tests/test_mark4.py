@@ -1,13 +1,17 @@
 import io
+import os
 import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
 from .. import mark4
 
 
+SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m4')
+
+
 class TestMark4(object):
     def test_header_stream(self):
-        with open('sample.m4', 'rb') as fh:
+        with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             stream = np.fromfile(fh, dtype=np.uint64, count=5 * 32)
         # check sync words in right place
@@ -18,7 +22,7 @@ class TestMark4(object):
         assert np.all(mark4.header.words2stream(words) == stream)
 
     def test_header(self):
-        with open('sample.m4', 'rb') as fh:
+        with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
         assert header.size == 160 * 64 // 8
@@ -55,7 +59,7 @@ class TestMark4(object):
         assert header6.time == header.time
 
     def test_payload(self):
-        with open('sample.m4', 'rb') as fh:
+        with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
             payload = mark4.Mark4Payload.fromfile(fh, header)
@@ -86,7 +90,7 @@ class TestMark4(object):
             mark4.Mark4Payload.fromdata(payload.data[:100], header)
 
     def test_frame(self):
-        with mark4.open('sample.m4', 'rb') as fh:
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
             payload = mark4.Mark4Payload.fromfile(fh, header)
@@ -110,11 +114,11 @@ class TestMark4(object):
         assert frame3 == frame
 
     def test_filestreamer(self):
-        with mark4.open('sample.m4', 'rb') as fh:
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
 
-        with mark4.open('sample.m4', 'rs', ntrack=64, decade=2010,
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz) as fh:
             assert header == fh.header0
             record = fh.read(642)

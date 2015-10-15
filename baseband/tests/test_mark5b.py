@@ -1,9 +1,14 @@
 import io
+import os
 import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
 from astropy.time import Time
 from .. import mark5b
+
+
+SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m5b')
+
 
 # Check code on 2015-MAY-08.
 # m5d /raw/mhvk/scintillometry/gp052d_wb_no0001 Mark5B-512-8-2 10
@@ -49,7 +54,7 @@ from .. import mark5b
 
 class TestMark5B(object):
     def test_header(self):
-        with open('sample.m5b', 'rb') as fh:
+        with open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(
                 fh, ref_mjd=Time('2014-06-01').mjd)
         assert header.size == 16
@@ -85,7 +90,7 @@ class TestMark5B(object):
         assert header6.time == header.time
 
     def test_payload(self):
-        with open('sample.m5b', 'rb') as fh:
+        with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(16)  # skip header
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
         assert payload._size == 10000
@@ -111,7 +116,7 @@ class TestMark5B(object):
         assert payload3 == payload
 
     def test_frame(self):
-        with mark5b.open('sample.m5b', 'rb') as fh:
+        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
             fh.seek(0)
@@ -135,10 +140,10 @@ class TestMark5B(object):
         assert frame3 == frame
 
     def test_filestreamer(self):
-        with open('sample.m5b', 'rb') as fh:
+        with open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
 
-        with mark5b.open('sample.m5b', 'rs', nchan=8, bps=2,
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz) as fh:
             assert header == fh.header0
             assert fh.samples_per_frame == 5000

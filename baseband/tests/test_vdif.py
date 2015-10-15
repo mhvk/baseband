@@ -1,7 +1,11 @@
 import io
+import os
 import numpy as np
 from astropy.tests.helper import pytest
 from .. import vdif
+
+
+SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.vdif')
 
 
 # Comparisn with m5access routines (check code on 2015-MAY-30) on vlba.m5a,
@@ -34,7 +38,7 @@ from .. import vdif
 
 class TestVDIF(object):
     def test_header(self):
-        with open('vlba.m5a', 'rb') as fh:
+        with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
         assert header.size == 32
         assert header.edv == 3
@@ -49,13 +53,16 @@ class TestVDIF(object):
         assert header.nchan == 1
         assert header.bps == 2
         assert not header['complex_data']
+        assert header.mutable is False
         with io.BytesIO() as s:
             header.tofile(s)
             s.seek(0)
             header2 = vdif.VDIFHeader.fromfile(s)
         assert header2 == header
+        assert header2.mutable is False
         header3 = vdif.VDIFHeader.fromkeys(**header)
         assert header3 == header
+        assert header3.mutable is True
         # Try initialising with properties instead of keywords, as much as
         # possible.  Note that we still have to give a lots of extra, less
         # directly useful parameters to get an *identical* header.
@@ -71,9 +78,18 @@ class TestVDIF(object):
             minor_rev=header['minor_rev'], personality=header['personality'],
             _7_28_4=header['_7_28_4'])
         assert header4 == header
+        assert header4.mutable is True
+        header5 = header.copy()
+        assert header5 == header
+        assert header5.mutable is True
+        header5['thread_id'] = header['thread_id'] + 1
+        assert header5['thread_id'] == header['thread_id'] + 1
+        assert header5 != header
+        with pytest.raises(TypeError):
+            header['thread_id'] = 0
 
     def test_payload(self):
-        with open('vlba.m5a', 'rb') as fh:
+        with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
             payload = vdif.VDIFPayload.fromfile(fh, header)
         assert payload.size == 5000
@@ -100,7 +116,7 @@ class TestVDIF(object):
             vdif.VDIFPayload.fromdata(payload.data[:100], header)
 
     def test_frame(self):
-        with vdif.open('vlba.m5a', 'rb') as fh:
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
             payload = vdif.VDIFPayload.fromfile(fh, header)
             fh.seek(0)
@@ -120,7 +136,7 @@ class TestVDIF(object):
         assert frame3 == frame
 
     def test_frameset(self):
-        with vdif.open('vlba.m5a', 'rb') as fh:
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
             fh.seek(0)
             frameset = fh.read_frameset()
@@ -140,10 +156,10 @@ class TestVDIF(object):
                       np.array([-1, 1, -1, 1, -3, -1, 3, -1, 3, -3, 1, 3]))
 
     def test_filestreamer(self):
-        with open('vlba.m5a', 'rb') as fh:
+        with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
 
-        with vdif.open('vlba.m5a', 'rs') as fh:
+        with vdif.open(SAMPLE_FILE, 'rs') as fh:
             assert header == fh.header0
             record = fh.read(12)
             assert fh.offset == 12
