@@ -1,11 +1,11 @@
 import io
-import warnings
 
 import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base import VLBIStreamBase
+from ..vlbi_base import (VLBIStreamBase, VLBIStreamReaderBase,
+                         VLBIStreamWriterBase)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 
@@ -171,7 +171,7 @@ class VDIFStreamBase(VLBIStreamBase):
                         c=self.header0['complex_data']))
 
 
-class VDIFStreamReader(VDIFStreamBase):
+class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     """VLBI VDIF format reader.
 
     This wrapper is allows one to access a VDIF file as a continues series of
@@ -226,23 +226,6 @@ class VDIFStreamReader(VDIFStreamBase):
 
         self.fh_raw.seek(raw_offset)
         return header1
-
-    @property
-    def size(self):
-        n_frames = round(
-            (self.header1.time - self.header0.time).to(u.s).value *
-            self.frames_per_second) + 1
-        return n_frames * self.samples_per_frame
-
-    def seek(self, offset, from_what=0):
-        """Like normal seek, but with the offset in samples."""
-        if from_what == 0:
-            self.offset = offset
-        elif from_what == 1:
-            self.offset += offset
-        elif from_what == 2:
-            self.offset = self.size + offset
-        return self.offset
 
     def read(self, count=None, fill_value=0., squeeze=True, out=None):
         """Read count samples.
@@ -311,7 +294,7 @@ class VDIFStreamReader(VDIFStreamBase):
         return self._frameset.todata(data=out, invalid_data_value=fill_value)
 
 
-class VDIFStreamWriter(VDIFStreamBase):
+class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
     """VLBI VDIF format writer.
 
     Parameters
@@ -397,16 +380,6 @@ class VDIFStreamWriter(VDIFStreamBase):
 
             self.offset += nsample
             count -= nsample
-
-    def close(self):
-        extra = self.offset % self.samples_per_frame
-        if extra != 0:
-            warnings.warn("Closing with partial buffer remaining."
-                          "Writing padded frame, marked as invalid.")
-            self.write(np.zeros((extra, self.nthread, self.nchan)),
-                       invalid_data=True)
-            assert self.offset % self.samples_per_frame == 0
-        return super(VDIFStreamWriter, self).close()
 
 
 def open(name, mode='rs', *args, **kwargs):

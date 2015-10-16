@@ -146,6 +146,10 @@ class VLBIPayloadBase(object):
 
     data = property(todata, doc="Decode the payload.")
 
+    def __array__(self):
+        """Interface to arrays."""
+        return self.data
+
     @property
     def nsample(self):
         """Number of samples in the payload."""

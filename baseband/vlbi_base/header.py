@@ -8,6 +8,7 @@ the HeaderParser class.
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
+from copy import copy
 import struct
 import warnings
 import numpy as np
@@ -109,8 +110,8 @@ def make_setter(word_index, bit_index, bit_length, default=None):
         if bit_length == 64:
             word1 = value & (1 << 32) - 1
             word2 = value >> 32
-            words[word_index:word_index+1] = word1
-            words[word_index+1:word_index+2] = word2
+            words[word_index] = word1
+            words[word_index+1] = word2
             return words
 
         word = words[word_index]
@@ -227,6 +228,8 @@ class VLBIHeaderBase(object):
 
       _header_parser: HeaderParser instance corresponding to this class.
 
+      _properties: tuple of properties accessible/usable in initialisation
+
     It also should define properties (getters *and* setters):
 
       payloadsize: number of bytes used by payload
@@ -246,6 +249,10 @@ class VLBIHeaderBase(object):
         Whether to do basic verification of integrity.  For the base class,
         checks that the number of words is consistent with the struct size.
     """
+
+    _properties = ('payloadsize', 'framesize', 'time')
+    """Properties accessible/usable in initialisation for all headers."""
+
     def __init__(self, words, verify=True):
         if words is None:
             self.words = [0,] * (self._struct.size // 4)
@@ -267,9 +274,9 @@ class VLBIHeaderBase(object):
         Keyword arguments can be passed on as needed by possible subclasses.
         """
         kwargs.setdefault('verify', False)
-        copy = self.__class__(self.words, **kwargs)
-        copy.mutable = True
-        return copy
+        new = self.__class__(copy(self.words), **kwargs)
+        new.mutable = True
+        return new
 
     def __copy__(self):
         return self.copy()
@@ -418,7 +425,8 @@ class VLBIHeaderBase(object):
 
     def __eq__(self, other):
         return (type(self) is type(other) and
-                list(self.words) == list(other.words))
+                np.all(np.array(self.words, copy=False) ==
+                       np.array(other.words, copy=False)))
 
     @staticmethod
     def _repr_as_hex(key):

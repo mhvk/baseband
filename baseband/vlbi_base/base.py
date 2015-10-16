@@ -99,7 +99,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                                          forward=False)
         self.fh_raw.seek(raw_offset)
         if header1 is None:
-            raise TypeError("Corrupt Mark 4? No frame in last {0} bytes."
+            raise TypeError("Corrupt VLBI frame? No frame in last {0} bytes."
                             .format(10*self.header0.framesize))
         return header1
 

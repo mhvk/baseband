@@ -33,15 +33,18 @@ class TestMark4(object):
         assert header.time.isot == '2014-06-16T07:38:12.47500'
         assert header.framesize == 20000 * 64 // 8
         assert header.payloadsize == header.framesize - header.size
+        assert header.mutable is False
         with io.BytesIO() as s:
             header.tofile(s)
             s.seek(0)
             header2 = mark4.Mark4Header.fromfile(s, header.ntrack,
                                                  header.decade)
         assert header2 == header
+        assert header2.mutable is False
         header3 = mark4.Mark4Header.fromkeys(header.ntrack, header.decade,
                                              **header)
         assert header3 == header
+        assert header3.mutable is True
         # Try initialising with properties instead of keywords.
         # Here, we let time imply the decade, bcd_unit_year, bcd_day, bcd_hour,
         # bcd_minute, bcd_second, bcd_fraction;
@@ -52,11 +55,24 @@ class TestMark4(object):
             bcd_headstack1=0x3344, bcd_headstack2=0x1122,
             lsb_output=True, system_id=108)
         assert header4 == header
+        assert header4.mutable is True
         # Check decade.
         header5 = mark4.Mark4Header(header.words, decade=2015)
         assert header5.time == header.time
         header6 = mark4.Mark4Header(header.words, decade=2019)
         assert header6.time == header.time
+        header7 = header.copy()
+        assert header7 == header
+        assert header7.mutable is True
+        header7['bcd_headstack1'] = 0x5566
+        assert np.all(header7['bcd_headstack1'] == 0x5566)
+        assert header7 != header
+        header7['bcd_headstack1'] = np.hstack((0x7788,
+                                               header7['bcd_headstack1'][1:]))
+        assert header7['bcd_headstack1'][0] == 0x7788
+        assert np.all(header7['bcd_headstack1'][1:] == 0x5566)
+        with pytest.raises(TypeError):
+            header['bcd_headstack1'] = 0
 
     def test_payload(self):
         with open(SAMPLE_FILE, 'rb') as fh:

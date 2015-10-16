@@ -160,9 +160,20 @@ class TestVDIF(object):
             header = vdif.VDIFHeader.fromfile(fh)
 
         with vdif.open(SAMPLE_FILE, 'rs') as fh:
+            assert fh.readable() is True
+            assert fh.writable() is False
+            assert fh.seekable() is True
+            assert fh.closed is False
+            assert repr(fh).startswith('<VDIFStreamReader')
+            assert fh.tell() == 0
             assert header == fh.header0
             record = fh.read(12)
-            assert fh.offset == 12
+            assert fh.tell() == 12
+            assert fh.tell(unit='frame_info') == (0, 0, 12)
+            fh.seek(10, 1)
+            assert fh.tell(unit='frame_info') == (0, 0, 22)
+            fh.seek(0)
+            assert fh.tell() == 0
 
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==

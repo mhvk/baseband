@@ -121,7 +121,7 @@ class VLBIFrameBase(object):
         """
         out = self.payload.todata(data)
         if not self.valid:
-            out[...] = self._invalid_data_value
+            out[...] = invalid_data_value
         return out
 
     data = property(todata, doc="Decode the payload, zeroing it if not valid.")
@@ -153,7 +153,7 @@ class VLBIFrameBase(object):
         return self.header.keys()
 
     def __contains__(self, key):
-        return key in self.header.keys()
+        return key in self.keys()
 
     # Try to get any attribute not on the frame from the header properties.
     def __getattr__(self, attr):

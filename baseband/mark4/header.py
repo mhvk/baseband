@@ -296,7 +296,9 @@ class Mark4Header(Mark4TrackHeader):
 
         words = stream2words(stream,
                              track=np.arange(ntrack, dtype=stream.dtype))
-        return cls(words, decade=decade, verify=verify)
+        self = cls(words, decade=decade, verify=verify)
+        self.mutable = False
+        return self
 
     def tofile(self, fh):
         stream = words2stream(self.words)
