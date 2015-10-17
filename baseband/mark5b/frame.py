@@ -15,6 +15,9 @@ from .header import Mark5BHeader
 from .payload import Mark5BPayload
 
 
+__all__ = ['Mark5BFrame']
+
+
 class Mark5BFrame(VLBIFrameBase):
     """Representation of a Mark 5B frame, consisting of a header and payload.
 

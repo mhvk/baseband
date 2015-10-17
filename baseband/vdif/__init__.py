@@ -1,15 +1,18 @@
-"""__      __  _____    _   _____
- \ \    / / | ___ \  | | |   __|
-  \ \  / /  | |  | | | | |  |_
-   \ \/ /   | |  | | | | |   _]
-    \  /    | |__| | | | |  |
-     \/     |_____/  |_| |__|
+# Licensed under the GPLv3 - see LICENSE.rst
+#
+# __      __  _____    _   _____
+# \ \    / / | ___ \  | | |   __|
+#  \ \  / /  | |  | | | | |  |_
+#   \ \/ /   | |  | | | | |   _]
+#    \  /    | |__| | | | |  |
+#     \/     |_____/  |_| |__|
+#
+#
+"""VDIF VLBI format readers, providing both low-level and higher-level access.
 
-VDIF VLBI format readers, providing both low-level and higher-level access.
-
-All files should be opened using ``vdif.open``.  Opening in binary mode
-provides a normal file reader but extended with methods to read a VDIF frame
-(or sets of frames):
+All files should be opened using :func:`~baseband.vdif.open`.  Opening in
+binary mode provides a normal file reader but extended with methods to read a
+:class:`~baseband.vdif.VDIFFrame` (or :class:`~baseband.vdif.FrameSet`):
 
 >>> from baseband import vdif
 >>> sample_file = vdif.__file__.replace('vdif/__init__.py', 'tests/sample.vdif')
@@ -29,7 +32,6 @@ information.
     nthread=8, samples_per_frame=20000, nchan=1,
     station=65532, (start) time=2014-06-16T05:56:07.000000000,
     bandwidth=16.0 MHz, complex_data=False, bps=2, edv=3>
-
 >>> d = fh.read(12)
 >>> d.shape
 (12, 8)
@@ -37,6 +39,7 @@ information.
 array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
 One can pick specific threads:
+
 >>> fh = vdif.open(sample_file, 'rs', thread_ids=[2, 3])
 >>> d = fh.read(20000)
 >>> d.shape
@@ -71,6 +74,7 @@ identical.
 ...             break
 
 For small files, one could just do:
+
 >>> with vdif.open(sample_file, 'rs') as fr, vdif.open(
 ...         'try.vdif', 'ws', header=fr.header0, nthread=fr.nthread) as fw:
 ...     fw.write(fr.read())

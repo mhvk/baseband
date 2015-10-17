@@ -11,7 +11,11 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 from ..vlbi_base import (VLBIPayloadBase, encode_2bit_real_base,
-                         OPTIMAL_2BIT_HIGH, TWO_BIT_1_SIGMA, DTYPE_WORD)
+                         OPTIMAL_2BIT_HIGH, DTYPE_WORD)
+
+
+__all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
+           'Mark5BPayload']
 
 
 # Some duplication with mark4.py here: lut2bit = mark4.lut2bit1
@@ -30,9 +34,10 @@ def init_luts():
       0 1  +1
       1 0  -1
       1 1 +Hi
-    (table 13 in
-    https://science.nrao.edu/facilities/vlba/publications/memos/upgrade/sensimemo13.pdf)
 
+    See table 13 in
+    https://science.nrao.edu/facilities/vlba/publications/memos/upgrade/sensimemo13.pdf
+    and
     http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
     Appendix A: sign always on even bit stream (0, 2, 4, ...), and magnitude
     on adjacent odd stream (1, 3, 5, ...).
@@ -75,19 +80,13 @@ reorder = np.array([0, 2, 1, 3], dtype=np.uint8)
 
 
 def encode_2bit_real(values):
-    """Encode data using two bits.
-
-    Effectively, get indices such that for lv=TWO_BIT_1_SIGMA=2.1745:
-            value < -lv : 0
-      -lv < value <  0. : 2
-       0. < value <  lv : 1
-       2. < value       : 3
-    """
     bitvalues = encode_2bit_real_base(values.reshape(-1, 4))
     # swap 1 & 2
     reorder.take(bitvalues, out=bitvalues)
     bitvalues <<= shift2bit
     return np.bitwise_or.reduce(bitvalues, axis=-1).view(DTYPE_WORD)
+
+encode_2bit_real.__doc__ = encode_2bit_real_base.__doc__
 
 
 class Mark5BPayload(VLBIPayloadBase):

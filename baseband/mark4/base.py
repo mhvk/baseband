@@ -9,6 +9,9 @@ from .header import Mark4Header
 from .frame import Mark4Frame
 
 
+__all__ = ['Mark4FileReader', 'Mark4FileWriter', 'Mark4StreamReader',
+           'Mark4StreamWriter', 'open']
+
 # Look-up table for the number of bits in a byte.
 nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
          .sum(1).astype(np.int16))
@@ -17,8 +20,8 @@ nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
 class Mark4FileReader(io.BufferedReader):
     """Simple reader for Mark 4 files.
 
-    Adds ``read_frame`` method to the basic binary file reader
-    ``io.BufferedReader``.
+    Adds ``read_frame`` and ``find_frame`` methods to the basic binary file
+    reader :class:`~io.BufferedReader`.
     """
 
     def read_frame(self, ntrack, decade=None):
@@ -28,15 +31,17 @@ class Mark4FileReader(io.BufferedReader):
         ----------
         ntrack : int
             Number of Mark 4 bitstreams.
-        decade : int, or None
+        decade : int, optional
             Decade the observations were taken (needed to remove ambiguity in
-            the Mark 4 time stamp).
+            the Mark 4 time stamp).  If not given, it is inferred from the
+            decade of the file's creation time.
 
         Returns
         -------
-        frame : Mark4Frame
-            With ''.header'' and ''.data'' properties that return the
-            Mark4Header and data encoded in the frame, respectively.
+        frame : :class:`~baseband.mark4.Mark4Frame`
+            With ``.header`` and ``.data`` properties that return the
+            :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
+            respectively.
         """
         if decade is None:
             if not hasattr(self, '_creation_time_isot'):
@@ -57,15 +62,13 @@ class Mark4FileReader(io.BufferedReader):
         * 32*tracks bits set at offset+2500*tracks bytes
         * 1*tracks bits unset before offset+2500*tracks bytes
 
-        Only the currently opened file will be searched.
-
         Parameters
         ----------
-        maximum : int or None
+        maximum : int, optional
             Maximum number of bytes forward to search through.
             Default is the framesize (20000 * ntrack // 8).
-        forward : bool
-            Whether to search forwards or backwards.
+        forward : bool, optional
+            Whether to search forwards or backwards.  Default is forwards.
 
         Returns
         -------
@@ -117,20 +120,22 @@ class Mark4FileWriter(io.BufferedWriter):
     """Simple writer for Mark 4 files.
 
     Adds ``write_frame`` method to the basic binary file writer
-    ``io.BufferedWriter``.
+    :class:`~io.BufferedWriter`.
     """
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
 
         Parameters
         ----------
-        data : array or Mark4Frame
+        data : array or :class:`~baseband.mark4.Mark4Frame`
             If an array, a header should be given, which will be used to
             get the information needed to encode the array, and to construct
-            the VDIF frame.
-        header : Mark4Header
-            Ignored if payload is a Mark4Frame instance.  If None, an attempt
-            is made to initiate a header with **kwargs.
+            the Mark 4 frame.
+        header : `~baseband.mark4.Mark4Header`
+            Ignored if payload is a :class:`~baseband.mark4.Mark4Frame`
+            instance.
+        **kwargs :
+            If no header is given, these are used to initialize one.
         """
         if not isinstance(data, Mark4Frame):
             if header is None:
@@ -152,9 +157,9 @@ class Mark4StreamReader(VLBIStreamReaderBase):
         file name
     ntrack : int
         Number of tracks used to store the data.
-    thread_ids: list of int
+    thread_ids: list of int, optional
         Specific threads/channels to read.  By default, all are read.
-    sample_rate : Quantity, or None
+    sample_rate : :class:`~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
         If not given, it will be determined from the frame rate.
     """
@@ -242,16 +247,14 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
 
 class Mark4StreamWriter(VLBIStreamWriterBase):
-    """VLBI VDIF format writer.
+    """VLBI Mark 4 format writer.
 
     Parameters
     ----------
     raw : filehandle, or name.
-        Should be a VDIFFileWriter or BufferedWriter instance.
-        If a name, will get opened for writing binary data.
-    nthread : int
-        number of threads the VLBI data has (e.g., 2 for 2 polarisations)
-    header : VDIFHeader
+        Should be a :class:`Mark4FileWriter` or :class:`~io.BufferedWriter`
+        instance. If a name, will get opened for writing binary data.
+    header : :class:`~baseband.mark4.Mark4Header`
         Header for the first frame, holding time information, etc.
 
     If no header is give, an attempt is made to construct the header from the
@@ -325,7 +328,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
 
 
 def open(name, mode='rs', **kwargs):
-    """Open VLBI VDIF format file for reading or writing.
+    """Open VLBI Mark 4 format file for reading or writing.
 
     Opened as a binary file, one gets a standard file handle, but with
     methods to read/write a frame.  Opened as a stream, the file handler
@@ -335,33 +338,36 @@ def open(name, mode='rs', **kwargs):
     ----------
     name : str
         File name
-    mode : str ('rb', 'wb', 'rs', or 'ws')
+    mode : {'rb', 'wb', 'rs', or 'ws'}, optional
         Whether to open for reading or writing, and as a regular binary file
-        or as a stream (stream is default).
+        or as a stream (default is reading a stream).
+    **kwargs
+        Additional arguments when opening the file as a stream
 
-    Additional keywords when opening the file as a stream:
+    --- For reading a stream : (see :class:`Mark4StreamReader`)
 
-    For reading
-    -----------
-    thread_ids: list of int
-        Specific threads to read.  By default, all threads are read.
+    ntrack : int
+        Number of tracks used to store the data.
+    thread_ids: list of int, optional
+        Specific threads/channels to read.  By default, all are read.
+    sample_rate : :class:`~astropy.units.Quantity`, optional
+        Rate at which each thread is sampled (bandwidth * 2; frequency units).
+        If not given, it will be determined from the frame rate.
 
-    For writing
-    -----------
-    nthread : int
-        number of threads the VLBI data has (e.g., 2 for 2 polarisations)
-    header : VDIFHeader
+    --- For writing a stream : (see :class:`Mark4StreamWriter`)
+
+    header : :class:`~baseband.mark4.Mark4Header`
         Header for the first frame, holding time information, etc.
-        (or keywords that can be used to construct a header).
+    **kwargs
+        If the header is not given, an attempt will be made to construct one
+        with any further keyword arguments.  See :class:`Mark4StreamWriter`.
 
     Returns
     -------
-    Filehandler : VDIFFileReader or VDIFFileWriter instance (binary) or
-       VDIFStreamReader or VDIFStreamWriter instance (stream)
-
-    Raises
-    ------
-    ValueError if an unsupported mode is chosen.
+    Filehandle
+        :class:`Mark4FileReader` or :class:`Mark4FileWriter` instance (binary)
+        or :class:Mark4StreamReader` or :class:`Mark4StreamWriter` instance
+        (stream)
     """
     if 'w' in mode:
         if not hasattr(name, 'write'):
@@ -374,5 +380,5 @@ def open(name, mode='rs', **kwargs):
         fh = Mark4FileReader(name)
         return fh if 'b' in mode else Mark4StreamReader(fh, **kwargs)
     else:
-        raise ValueError("Only support opening VDIF file for reading "
+        raise ValueError("Only support opening Mark 4 file for reading "
                          "or writing (mode='r' or 'w').")

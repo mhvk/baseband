@@ -15,19 +15,25 @@ from ..vlbi_base import (VLBIPayloadBase, encode_2bit_real_base,
                          OPTIMAL_2BIT_HIGH)
 
 
+__all__ = ['reorder32', 'reorder64', 'init_luts', 'decode_8chan_2bit_fanout4',
+           'encode_8chan_2bit_fanout4', 'Mark4Payload']
+
 #  2bit/fanout4 use the following in decoding 32 and 64 track data:
 if sys.byteorder == 'big':
     def reorder32(x):
+        """Reorder 32-track bits to bring signs & magnitudes together."""
         return (((x & 0x55AA55AA)) |
                 ((x & 0xAA00AA00) >> 9) |
                 ((x & 0x00550055) << 9))
 
     def reorder64(x):
+        """Reorder 64-track bits to bring signs & magnitudes together."""
         return (((x & 0x55AA55AA55AA55AA)) |
                 ((x & 0xAA00AA00AA00AA00) >> 9) |
                 ((x & 0x0055005500550055) << 9))
 else:
     def reorder32(x):
+        """Reorder 32-track bits to bring signs & magnitudes together."""
         return (((x & 0xAA55AA55)) |
                 ((x & 0x55005500) >> 7) |
                 ((x & 0x00AA00AA) << 7))
@@ -35,6 +41,7 @@ else:
     # can speed this up from 140 to 132 us by predefining bit patterns as
     # array scalars.  Inplace calculations do not seem to help much.
     def reorder64(x):
+        """Reorder 64-track bits to bring signs & magnitudes together."""
         return (((x & 0xAA55AA55AA55AA55)) |
                 ((x & 0x5500550055005500) >> 7) |
                 ((x & 0x00AA00AA00AA00AA) << 7))
@@ -92,7 +99,7 @@ nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
 
 
 def decode_8chan_2bit_fanout4(frame, out=None):
-    """Decode frame for 8 channels using 2 bits, fan-out 4 (64 tracks)."""
+    """Decode payload for 8 channels using 2 bits, fan-out 4 (64 tracks)."""
     # Bitwise reordering of tracks, to align sign and magnitude bits,
     # reshaping to get VLBI channels in sequential, but wrong order.
     frame = reorder64(frame).view(np.uint8).reshape(-1, 8)
@@ -114,7 +121,7 @@ def decode_8chan_2bit_fanout4(frame, out=None):
 
 
 def encode_8chan_2bit_fanout4(values):
-    """Decode frame using 8 channels, 2 bits, fan-out 4."""
+    """Encode payload for 8 channels using 2 bits, fan-out 4 (64 tracks)."""
     reorder_channels = np.array([0, 2, 1, 3, 4, 6, 5, 7])
     values = values[:, reorder_channels].reshape(-1, 4, 8).transpose(0, 2, 1)
     bitvalues = encode_2bit_real_base(values)
@@ -126,21 +133,23 @@ def encode_8chan_2bit_fanout4(values):
 
 
 class Mark4Payload(VLBIPayloadBase):
-    """Container for decoding and encoding VDIF payloads.
+    """Container for decoding and encoding Mark 4 payloads.
 
     Parameters
     ----------
     words : ndarray
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    nchan : int
+    nchan : int, optional
         Number of channels in the data.  Default: 1.
-    bps : int
+    bps : int, optional
         Number of bits per complete sample.  Default: 2.
-    fanout : int
-        Number of tracks every bit stream is spread over.
+    fanout : int, optional
+        Number of tracks every bit stream is spread over.  Default: 1.
 
-    The number of tracks is nchan * bps * fanout.
+    Notes
+    -----
+    The total number of tracks is `nchan` * `bps` * `fanout`.
     """
 
     # Decoders keyed by (nchan, nbit, fanout).
@@ -193,4 +202,4 @@ class Mark4Payload(VLBIPayloadBase):
         decoder = self._decoders[self.nchan, self.bps, self.fanout]
         return decoder(self.words, out=data)
 
-    data = property(todata, doc="Decode the payload.")
+    data = property(todata, doc="Decoded payload.")

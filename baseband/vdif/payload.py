@@ -14,6 +14,10 @@ from ..vlbi_base import (VLBIPayloadBase, encode_2bit_real_base,
                          OPTIMAL_2BIT_HIGH, FOUR_BIT_1_SIGMA, DTYPE_WORD)
 
 
+__all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
+           'decode_4bit_complex', 'encode_4bit_complex', 'VDIFPayload']
+
+
 def init_luts():
     """Set up the look-up tables for levels as a function of input byte.
 
@@ -85,17 +89,18 @@ class VDIFPayload(VLBIPayloadBase):
     words : ndarray
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    header : VDIFHeader or None
-        Information needed to interpret payload.
+    header : `~baseband.vdif.VDIFHeader`, optional
+        Information needed to interpret payload.  If not given, the
+        following keywords need to be set.
 
-    If ``header`` is not given, one needs to pass the following:
+    --- If no `header is given :
 
-    nchan : int
-        Number of channels in the data.  Default: 1.
-    bps : int
-        Number of bits per complete sample.  Default: 2.
+    nchan : int, optional
+        Number of channels.  Default: 1.
+    bps : int, optional
+        Bits per complete sample.  Default: 2.
     complex_data : bool
-        Whether data is complex or float.  Default: False.
+        Complex or float data.  Default: `False`.
     """
     _decoders = {(2, False): decode_2bit_real,
                  (4, True): decode_4bit_complex}
@@ -122,8 +127,13 @@ class VDIFPayload(VLBIPayloadBase):
     def fromfile(cls, fh, header):
         """Read payload from file handle and decode it into data.
 
-        The payloadsize, number of channels, bits per sample, and whether
-        data are complex are all taken from the header.
+        Parameters
+        ----------
+        fh : filehandle
+            To read data from.
+        header : `~baseband.vdif.VDIFHeader`
+            Used to infer the payloadsize, number of channels, bits per sample,
+            and whether the data is complex.
         """
         s = fh.read(header.payloadsize)
         if len(s) < header.payloadsize:
@@ -132,7 +142,16 @@ class VDIFPayload(VLBIPayloadBase):
 
     @classmethod
     def fromdata(cls, data, header):
-        """Encode data as payload, using header information."""
+        """Encode data as payload, using header information.
+
+        Parameters
+        ----------
+        data : ndarray
+            Values to be encoded.
+        header : `~baseband.vdif.VDIFHeader`
+            Used to infer the encoding, and to verify the number of channels
+            and whether the data is complex.
+        """
         if header.nchan != data.shape[-1]:
             raise ValueError("Header is for {0} channels but data has {1}"
                              .format(header.nchan, data.shape[-1]))

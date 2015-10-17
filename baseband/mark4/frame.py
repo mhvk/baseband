@@ -16,6 +16,9 @@ from ..vlbi_base import VLBIFrameBase
 from .header import Mark4Header, PAYLOADSIZE
 from .payload import Mark4Payload
 
+
+__all__ = ['Mark4Frame']
+
 VALIDSTART = 160
 
 
@@ -143,10 +146,9 @@ class Mark4Frame(VLBIFrameBase):
         return data
 
     data = property(todata, doc="Decode the payload.")
-    
+
     @property
     def shape(self):
         """Shape of the data held in the payload (samples_per_frame, nchan)."""
         return (self.payload.shape[0] * PAYLOADSIZE //
                 (PAYLOADSIZE - VALIDSTART), self.payload.shape[1])
-    

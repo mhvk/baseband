@@ -4,7 +4,11 @@ from astropy import units as u
 from astropy.utils import lazyproperty
 from .utils import get_frame_rate
 
-u_sample = u.def_unit('sample')
+
+__all__ = ['u_sample', 'VLBIStreamBase', 'VLBIStreamReaderBase',
+           'VLBIStreamWriterBase']
+
+u_sample = u.def_unit('sample', doc='One sample from a data stream')
 
 
 class VLBIStreamBase(object):

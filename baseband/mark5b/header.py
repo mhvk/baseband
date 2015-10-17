@@ -17,6 +17,8 @@ from ..vlbi_base import (HeaderParser, VLBIHeaderBase, four_word_struct,
                          bcd_decode, bcd_encode, CRC)
 
 
+__all__ = ['CRC16', 'crc16', 'Mark5BHeader']
+
 CRC16 = 0x18005
 """CRC polynomial used for Mark 5B Headers, as a check on the time code.
 

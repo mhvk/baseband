@@ -9,6 +9,10 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 
+
+__all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
+           'DTYPE_WORD', 'encode_2bit_real_base', 'VLBIPayloadBase']
+
 # the high mag value for 2-bit reconstruction
 OPTIMAL_2BIT_HIGH = 3.3359
 """Optimal high value for a 2-bit digitizer for which the low value is 1.
@@ -23,10 +27,11 @@ optimal_high = --------------------------------------------------------
 Note that for this value, the standard deviation is 2.1745.
 """
 TWO_BIT_1_SIGMA = 2.1745
-"""Optimal level between low and high for the above OPTIMAL_2BIT_HIGH.
-"""
+"""Optimal level between low and high for the above OPTIMAL_2BIT_HIGH."""
 FOUR_BIT_1_SIGMA = 2.95
+"""Level for four-bit encoding."""
 DTYPE_WORD = np.dtype('<u4')
+"""Dtype for 32-bit unsigned integers, with least signicant byte first."""
 
 
 two_bit_2_sigma = 2 * TWO_BIT_1_SIGMA
@@ -36,11 +41,15 @@ clip_low, clip_high = -1.5 * TWO_BIT_1_SIGMA, 1.5 * TWO_BIT_1_SIGMA
 def encode_2bit_real_base(values):
     """Encode data using two bits.
 
-    Effectively, get indices such that for lv=TWO_BIT_1_SIGMA=2.1745:
-            value < -lv : 0
-      -lv < value <  0. : 1
-       0. < value < +lv : 2
-      +lv < value       : 3
+    Effectively, get indices such that for ``lv=TWO_BIT_1_SIGMA=2.1745``:
+      ================= ======
+      Input range       Output
+      ================= ======
+            value < -lv   0
+      -lv < value <  0.   2
+       0. < value <  lv   1
+       lv < value         3
+      ================= ======
     """
     # Optimized for speed by doing calculations in-place, and ensuring that
     # the dtypes match.
@@ -144,7 +153,7 @@ class VLBIPayloadBase(object):
         out = decoder(self.words, out=data)
         return out.reshape(self.shape) if data is None else data
 
-    data = property(todata, doc="Decode the payload.")
+    data = property(todata, doc="Decoded payload.")
 
     def __array__(self):
         """Interface to arrays."""

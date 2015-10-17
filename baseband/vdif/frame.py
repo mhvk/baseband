@@ -17,6 +17,9 @@ from .header import VDIFHeader
 from .payload import VDIFPayload
 
 
+__all__ = ['VDIFFrame', 'VDIFFrameSet']
+
+
 class VDIFFrame(VLBIFrameBase):
     """Representation of a VDIF data frame, consisting of a header and payload.
 
@@ -293,6 +296,7 @@ class VDIFFrameSet(object):
         """Decode the payload.
 
         Parameters
+        ----------
         data : None or ndarray
             If given, the data is decoded into the array (which should have
             the correct shape).  By default, a new array is created, which is

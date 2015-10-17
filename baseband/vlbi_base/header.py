@@ -15,9 +15,16 @@ import numpy as np
 
 from astropy.utils import OrderedDict
 
-OPTIMAL_2BIT_HIGH = 3.3359
-eight_word_struct = struct.Struct('<8I')
+
+__all__ = ['four_word_struct', 'eight_word_struct',
+           'make_parser', 'make_setter',
+           'HeaderProperty', 'HeaderPropertyGetter',
+           'HeaderParser', 'VLBIHeaderBase']
+
 four_word_struct = struct.Struct('<4I')
+"""Struct instance that packs/unpacks 4 unsigned 32-bit integers."""
+eight_word_struct = struct.Struct('<8I')
+"""Struct instance that packs/unpacks 8 unsigned 32-bit integers."""
 
 
 def make_parser(word_index, bit_index, bit_length):
@@ -333,14 +340,18 @@ class VLBIHeaderBase(object):
     def fromvalues(cls, *args, **kwargs):
         """Initialise a header from parsed values.
 
-        Here, the parsed values must be given as keyword arguments, i.e.,
-        for any header = cls(<somewords>), cls.fromvalues(**header) == header.
+        Here, the parsed values must be given as keyword arguments, i.e., for
+        any ``header = cls(<words>)``, ``cls.fromvalues(**header) == header``.
 
-        However, unlike for the 'fromkeys' class method, data can also be set
-        using arguments named after header methods such 'time'.
+        However, unlike for the ``fromkeys`` class method, data can also be set
+        using arguments named after header methods such as ``time``.
 
-        If any arguments are needed to initialize an empty header, those
-        can be passed on in ``*args``.
+        Parameters
+        ----------
+        *args :
+            Possible arguments required to initialize an empty header.
+        **kwargs :
+            Values used to initialize header keys or methods.
         """
         verify = kwargs.pop('verify', True)
         # Initialize an empty header.
