@@ -29,7 +29,6 @@ information.
     nthread=8, samples_per_frame=20000, nchan=1,
     station=65532, (start) time=2014-06-16T05:56:07.000000000,
     bandwidth=16.0 MHz, complex_data=False, bps=2, edv=3>
-
 >>> d = fh.read(12)
 >>> d.shape
 (12, 8)
@@ -37,6 +36,7 @@ information.
 array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
 One can pick specific threads:
+
 >>> fh = vdif.open(sample_file, 'rs', thread_ids=[2, 3])
 >>> d = fh.read(20000)
 >>> d.shape
@@ -71,6 +71,7 @@ identical.
 ...             break
 
 For small files, one could just do:
+
 >>> with vdif.open(sample_file, 'rs') as fr, vdif.open(
 ...         'try.vdif', 'ws', header=fr.header0, nthread=fr.nthread) as fw:
 ...     fw.write(fr.read())
