@@ -1,15 +1,18 @@
-"""__      __  _____    _   _____
- \ \    / / | ___ \  | | |   __|
-  \ \  / /  | |  | | | | |  |_
-   \ \/ /   | |  | | | | |   _]
-    \  /    | |__| | | | |  |
-     \/     |_____/  |_| |__|
+# Licensed under the GPLv3 - see LICENSE.rst
+#
+# __      __  _____    _   _____
+# \ \    / / | ___ \  | | |   __|
+#  \ \  / /  | |  | | | | |  |_
+#   \ \/ /   | |  | | | | |   _]
+#    \  /    | |__| | | | |  |
+#     \/     |_____/  |_| |__|
+#
+#
+"""VDIF VLBI format readers, providing both low-level and higher-level access.
 
-VDIF VLBI format readers, providing both low-level and higher-level access.
-
-All files should be opened using ``vdif.open``.  Opening in binary mode
-provides a normal file reader but extended with methods to read a VDIF frame
-(or sets of frames):
+All files should be opened using :func:`~baseband.vdif.open`.  Opening in
+binary mode provides a normal file reader but extended with methods to read a
+:class:`~baseband.vdif.VDIFFrame` (or :class:`~baseband.vdif.FrameSet`):
 
 >>> from baseband import vdif
 >>> sample_file = vdif.__file__.replace('vdif/__init__.py', 'tests/sample.vdif')

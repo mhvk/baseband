@@ -10,14 +10,15 @@ from .header import Mark5BHeader
 from .frame import Mark5BFrame
 
 
-u_sample = u.def_unit('sample')
+__all__ = ['Mark5BFileReader', 'Mark5BFileWriter', 'Mark5BStreamReader',
+           'Mark5BStreamWriter', 'open']
 
 
 class Mark5BFileReader(io.BufferedReader):
     """Simple reader for Mark 5B files.
 
     Adds ``read_frame`` method to the basic binary file reader
-    ``io.BufferedReader``.
+    :class:`~io.BufferedReader`.
     """
 
     def read_frame(self, nchan, bps=2, ref_mjd=None):
@@ -115,22 +116,24 @@ class Mark5BFileWriter(io.BufferedWriter):
     """Simple writer for Mark 5B files.
 
     Adds ``write_frame`` method to the basic binary file writer
-    ``io.BufferedWriter``.
+    :class:`~io.BufferedWriter`.
     """
     def write_frame(self, data, header=None, bps=2, **kwargs):
         """Write a single frame (header plus payload).
 
         Parameters
         ----------
-        data : array or Mark5BFrame
-            If an array, a header should be given, which will be used to
+        data : array or :class:`~baseband.mark5b.Mark5BFrame`
+            If an array, a `header` should be given, which will be used to
             get the information needed to encode the array, and to construct
-            the VDIF frame.
-        header : Mark5BHeader
-            Ignored if payload is a Mark5BFrame instance.  If None, an attempt
-            is made to initiate a header with **kwargs.
-        bps : int
-            Ignored if payload is a Mark5BFrame instance.  Default: 2.
+            the Mark 5B frame.
+        header : :class:`~baseband.mark5b.Mark5BHeader`, optional
+            Ignored if `data` is a Mark5B frame.
+        bps : int, optional
+            Ignored if `data` is a Mark5B frame.  Default: 2.
+        **kwargs
+            If no `header` is given, an attempt is made to initialize one
+            using keywords arguments.
         """
         if not isinstance(data, Mark5BFrame):
             if header is None:
@@ -151,11 +154,11 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
         file name
     nchan : int
         Number of threads stored in the file.
-    bps : int
+    bps : int, optional
         Bits per sample.  Default: 2.
-    thread_ids: list of int
+    thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
-    sample_rate : Quantity, or None
+    sample_rate : :class`~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
         If not given, it will be determined from the frame rate.
     """
@@ -256,16 +259,17 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
 
 
 class Mark5BStreamWriter(VLBIStreamWriterBase):
-    """VLBI VDIF format writer.
+    """VLBI Mark 5B format writer.
 
     Parameters
     ----------
     raw : filehandle, or name.
-        Should be a VDIFFileWriter or BufferedWriter instance.
-        If a name, will get opened for writing binary data.
-    nthread : int
-        number of threads the VLBI data has (e.g., 2 for 2 polarisations)
-    header : VDIFHeader
+        Should be a :class:`Mark5BFileWriter` or :class:`~io.BufferedWriter`
+        instance. If a name, will get opened for writing binary data.
+    nthread : int, optional
+        Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
+        Default is 1.
+    header : :class:`~baseband.mark5b.Mark5BHeader`, optional
         Header for the first frame, holding time information, etc.
 
     If no header is give, an attempt is made to construct the header from the
@@ -348,7 +352,7 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
 
 
 def open(name, mode='rs', **kwargs):
-    """Open VLBI VDIF format file for reading or writing.
+    """Open VLBI Mark 5B format file for reading or writing.
 
     Opened as a binary file, one gets a standard file handle, but with
     methods to read/write a frame.  Opened as a stream, the file handler
@@ -358,33 +362,41 @@ def open(name, mode='rs', **kwargs):
     ----------
     name : str
         File name
-    mode : str ('rb', 'wb', 'rs', or 'ws')
+    mode : {'rb', 'wb', 'rs', or 'ws'}, optional
         Whether to open for reading or writing, and as a regular binary file
-        or as a stream (stream is default).
+        or as a stream (default is reading a stream).
+    **kwargs
+        Additional arguments when opening the file as a stream
 
-    Additional keywords when opening the file as a stream:
+    --- For reading a stream : (see :class:`Mark5BStreamReader`)
 
-    For reading
-    -----------
-    thread_ids: list of int
+    nchan : int
+        Number of threads stored in the file.
+    bps : int, optional
+        Bits per sample.  Default: 2.
+    thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
+    sample_rate : :class`~astropy.units.Quantity`, optional
+        Rate at which each thread is sampled (bandwidth * 2; frequency units).
+        If not given, it will be determined from the frame rate.
 
-    For writing
-    -----------
-    nthread : int
-        number of threads the VLBI data has (e.g., 2 for 2 polarisations)
-    header : VDIFHeader
+    --- For writing a stream : (see :class:`Mark5BStreamWriter`)
+
+    nthread : int, optional
+        Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
+        Default is 1.
+    header : :class:`~baseband.mark5b.Mark5BHeader`, optional
         Header for the first frame, holding time information, etc.
-        (or keywords that can be used to construct a header).
+    **kwargs
+        If the header is not given, an attempt will be made to construct one
+        with any further keyword arguments.  See :class:`Mark5BStreamWriter`.
 
     Returns
     -------
-    Filehandler : VDIFFileReader or VDIFFileWriter instance (binary) or
-       VDIFStreamReader or VDIFStreamWriter instance (stream)
-
-    Raises
-    ------
-    ValueError if an unsupported mode is chosen.
+    Filehandle
+        :class:`Mark5BFileReader` or :class:`Mark5BFileWriter` instance
+        (binary), or :class:`Mark5BStreamReader` or
+        :class:`Mark5BStreamWriter` instance (stream).
     """
     if 'w' in mode:
         if not hasattr(name, 'write'):
@@ -397,5 +409,5 @@ def open(name, mode='rs', **kwargs):
         fh = Mark5BFileReader(name)
         return fh if 'b' in mode else Mark5BStreamReader(fh, **kwargs)
     else:
-        raise ValueError("Only support opening VDIF file for reading "
+        raise ValueError("Only support opening Mark 5B file for reading "
                          "or writing (mode='r' or 'w').")

@@ -18,6 +18,9 @@ from ..vlbi_base import (HeaderParser, four_word_struct, eight_word_struct,
 from ..mark5b.header import Mark5BHeader
 
 
+__all__ = ['VDIFHeader', 'VDIFBaseHeader', 'VDIFSampleRateHeader']
+# This gets updated with all EDV headers at the end.
+
 ref_max = int(2. * (Time.now().jyear - 2000.)) + 1
 ref_epochs = Time(['{y:04d}-{m:02d}-01'.format(y=2000 + ref // 2,
                                                m=1 if ref % 2 == 0 else 7)
@@ -45,7 +48,8 @@ class VDIFHeader(VLBIHeaderBase):
 
     Returns
     -------
-    header : VDIFHeader subclass appropriate for the extended data version.
+    header : `VDIFHeader` subclass
+        As appropriate for the extended data version.
     """
 
     _properties = ('framesize', 'payloadsize', 'bps', 'nchan',
@@ -89,7 +93,7 @@ class VDIFHeader(VLBIHeaderBase):
         ----------
         fh : filehandle
             To read data from.
-        edv : int, False, or None
+        edv : int, `False`, or `None`
             Extended data version.  If `False`, a legacy header is used.
             If `None` (default), it is determined from the header.  (Given it
             explicitly is mostly useful for a slight speed-up.)
@@ -116,35 +120,36 @@ class VDIFHeader(VLBIHeaderBase):
     def fromvalues(cls, edv=False, **kwargs):
         """Initialise a header from parsed values.
 
-        Here, the parsed values must be given as keyword arguments, i.e.,
-        for any header = cls(<somedata>), cls.fromvalues(**header) == header.
+        Here, the parsed values must be given as keyword arguments, i.e., for
+        any ``header = cls(<data>)``, ``cls.fromvalues(**header) == header``.
 
-        However, unlike for the 'fromkeys' class method, data can also be set
-        using arguments named after header methods such as 'bps' and 'time'.
+        However, unlike for the :meth:`VDIFHeader.fromkeys` class method, data
+        can also be set using arguments named after methods such as ``bps`` and
+        ``time``.
 
         Given defaults for standard header keywords:
 
         invalid_data : `False`
         legacy_mode : `False`
         vdif_version : 1
-        thread_id: 0
-        frame_nr: 0
+        thread_id : 0
+        frame_nr : 0
 
         Values set by other keyword arguments (if present):
 
-        bits_per_sample : from 'bps'
-        frame_length : from 'framesize' (or 'payloadsize' and 'legacy_mode')
-        lg2_nchan : from 'nchan'
-        ref_epoch, seconds, frame_nr : from 'time' (may require bandwidth).
+        bits_per_sample : from ``bps``
+        frame_length : from ``framesize`` (or ``payloadsize``, ``legacy_mode``)
+        lg2_nchan : from ``nchan``
+        ref_epoch, seconds, frame_nr : from ``time`` (may need ``bandwidth``)
 
         Given defaults for edv 1 and 3:
 
-        sync_pattern: 0xACABFEED.
+        sync_pattern : 0xACABFEED
 
         Defaults inferred from other keyword arguments for all edv:
 
-        station_id : from 'station'
-        sample_rate, sample_unit : from 'bandwidth' or 'framerate'
+        station_id : from ``station``
+        sample_rate, sample_unit : from ``bandwidth`` or ``framerate``
         """
         # Some defaults that are not done by setting properties.
         kwargs.setdefault('legacy_mode', True if edv is False else False)
@@ -155,11 +160,12 @@ class VDIFHeader(VLBIHeaderBase):
     def fromkeys(cls, **kwargs):
         """Initialise a header from parsed values.
 
-        Like fromvalues, but without any interpretation of keywords.
+        Like :meth:`VDIFHeader.fromvalues`, but without any interpretation of
+        keywords.
 
         Raises
         ------
-        KeyError : if not all keys required are present in ``kwargs``
+        KeyError : if not all keys required are pass in.
         """
         # Get all required values.
         edv = False if kwargs['legacy_mode'] else kwargs['edv']
@@ -184,9 +190,10 @@ class VDIFHeader(VLBIHeaderBase):
             bits per sample.
         nchan : int
             Number of channels carried in the Mark 5B paylod.
-
-        Further arguments are not strictly necessary to create a valid VDIF
-        header, but can be given (e.g., ``invalid_data``, etc.)
+        **kwargs
+            Any further arguments.  Strictly, none are necessary to create a
+            valid VDIF header, but this can be used to pass on, e.g.,
+            ``invalid_data``.
         """
         kwargs.update(mark5b_header)
         return cls.fromvalues(edv=0xab, time=mark5b_header.time,
@@ -289,12 +296,18 @@ class VDIFHeader(VLBIHeaderBase):
 
         Parameters
         ----------
-        framerate : Quantity with frequency units, or None
-            For calculating the offset corresponding to non-zero ``frame_nr``.
-            If not given, will try to calculate it from the sampling rate
-            given in the header (but not all EDV contain this).
-        frame_nr : int or None
-            If `None`, uses ``frame_nr`` for this header.
+        framerate : `~astropy.units.Quantity`, optional
+            For non-zero `frame_nr`, this is used to calculate the
+            corresponding offset.  If not given, it will be attempted to
+            calculate it from the sampling rate given in the header (but not
+            all EDV contain this).
+        frame_nr : int, optional
+            Can be used to override the ``frame_nr`` from the header.  If 0,
+            the routine simply returns the time in the header
+
+        Returns
+        -------
+        `~astropy.time.Time`
         """
         if frame_nr is None:
             frame_nr = self['frame_nr']
@@ -324,7 +337,7 @@ class VDIFHeader(VLBIHeaderBase):
         ----------
         time : Time instance
             The time to use for this header.
-        framerate : Quantity with frequency units, or None
+        framerate : `~astropy.units.Quantity` with frequency units, optional
             For calculating the ``frame_nr`` from the fractional seconds.
             If not given, will try to calculate it from the sampling rate
             given in the header (but not all EDV contain this).
@@ -351,11 +364,13 @@ class VDIFHeader(VLBIHeaderBase):
 
 
 class VDIFLegacyHeader(VDIFHeader):
+    """Legacy VDIF header that uses only 4 32-bit words.
 
+    See Section 6 of
+    http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf
+    """
     _struct = four_word_struct
 
-    # See Section 6 of
-    # http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf
     _header_parser = HeaderParser(
         (('invalid_data', (0, 31, 1, False)),
          ('legacy_mode', (0, 30, 1, True)),
@@ -389,7 +404,7 @@ class VDIFLegacyHeader(VDIFHeader):
 
 
 class VDIFBaseHeader(VDIFHeader):
-
+    """Base for non-legacy VDIF headers that use 8 32-bit words."""
     _struct = eight_word_struct
 
     _header_parser = VDIFLegacyHeader._header_parser + HeaderParser(
@@ -417,8 +432,7 @@ class VDIFBaseHeader(VDIFHeader):
 
 
 class VDIFSampleRateHeader(VDIFBaseHeader):
-
-    # For EDV 1, 3, 4.
+    """Base for VDIF headers that include the sample rate (EDV= 1, 3, 4)."""
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
         (('sampling_unit', (4, 23, 1)),
          ('sample_rate', (4, 0, 23)),
@@ -462,15 +476,19 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
 
 
 class VDIFHeader1(VDIFSampleRateHeader):
+    """VDIF Header for EDV=1.
 
-    # http://www.vlbi.org/vdif/docs/vdif_extension_0x01.pdf
+    See http://www.vlbi.org/vdif/docs/vdif_extension_0x01.pdf
+    """
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('das_id', (6, 0, 64, 0x0)),))
 
 
 class VDIFHeader3(VDIFSampleRateHeader):
+    """VDIF Header for EDV=3.
 
-    # http://www.vlbi.org/vdif/docs/vdif_extension_0x03.pdf
+    See http://www.vlbi.org/vdif/docs/vdif_extension_0x03.pdf
+    """
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('frame_length', (2, 0, 24, 629)),  # Repeat, to set default.
          ('loif_tuning', (6, 0, 32, 0x0)),
@@ -489,15 +507,23 @@ class VDIFHeader3(VDIFSampleRateHeader):
 
 
 class VDIFHeader4(VDIFSampleRateHeader):
-    # Used for MWA according to Franz.  No extra header info?
+    """VDIF Header for EDV=4.
+
+    This is used for MWA according to Franz.  No extra header info?
+    """
     pass
 
 
 class VDIFHeader2(VDIFBaseHeader):
+    """VDIF Header for EDV=2.
 
-    # http://www.vlbi.org/vdif/docs/alma-vdif-edv.pdf
-    # Note that this may need to have subclasses, based on possible different
-    # sync values.
+    See http://www.vlbi.org/vdif/docs/alma-vdif-edv.pdf
+
+    Notes
+    -----
+    This header is untested.  It may need to have subclasses, based on possible
+    differentsync values.
+    """
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
         (('complex_data', (3, 31, 1, 0x0)),  # Repeat, to set default.
          ('bits_per_sample', (3, 26, 5, 0x1)),  # Repeat, to set default.
@@ -537,6 +563,9 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
     time = property(VDIFHeader.get_time, set_time)
 
 
+is_legacy_header = VDIFBaseHeader._header_parser.parsers['legacy_mode']
+get_header_edv = VDIFBaseHeader._header_parser.parsers['edv']
+
 vdif_header_classes = {False: VDIFLegacyHeader,
                        1: VDIFHeader1,
                        2: VDIFHeader2,
@@ -544,5 +573,4 @@ vdif_header_classes = {False: VDIFLegacyHeader,
                        4: VDIFHeader4,
                        0xab: VDIFMark5BHeader}
 
-is_legacy_header = VDIFBaseHeader._header_parser.parsers['legacy_mode']
-get_header_edv = VDIFBaseHeader._header_parser.parsers['edv']
+__all__ += [cls.__name__ for cls in vdif_header_classes.values()]

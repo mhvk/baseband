@@ -7,7 +7,9 @@ payload, providing access to the values encoded in both.
 # Helper functions for VLBI readers (VDIF, Mark5B).
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-import numpy as np
+
+
+__all__ = ['VLBIFrameBase']
 
 
 class VLBIFrameBase(object):
@@ -24,6 +26,9 @@ class VLBIFrameBase(object):
         Whether this frame contains valid data (default: True).
     verify : bool
         Whether to do basic verification of integrity (default: True)
+
+    Notes
+    -----
 
     The Frame can also be read instantiated using class methods:
 
@@ -99,10 +104,10 @@ class VLBIFrameBase(object):
             Array holding data to be encoded.
         header : VLBIHeaderBase
             Header for the frame.
-
-        Any arguments beyond the filehandle are used to help initialize the
-        payload, except for ``valid`` and ``verify``, which are passed on to
-        the header and class initializers.
+        *args, **kwargs :
+            Any arguments beyond the filehandle are used to help initialize the
+            payload, except for ``valid`` and ``verify``, which are passed on
+            to the header and class initializers.
         """
         valid = kwargs.pop('valid', True)
         verify = kwargs.pop('verify', True)
@@ -113,6 +118,7 @@ class VLBIFrameBase(object):
         """Decode the payload.
 
         Parameters
+        ----------
         data : None or ndarray
             If given, the data is decoded into the array (which should have
             the correct shape).  By default, a new array is created.

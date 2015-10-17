@@ -55,15 +55,15 @@ class CRC(object):
 
     See https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 
+    Once initialised, the instance can be used as a function that calculates
+    the CRC, or one can use the `.check` method to check that the CRC at the
+    end of a stream is correct.
+
     Parameters
     ----------
     polynomial : int
         Binary encoded CRC divisor. For instance, that used by Mark 4 headers
         is 0x180f, or x^12 + x^11 + x^3 + x^2 + x + 1.
-
-    Once initialised, the instance can be used as a function that calculates
-    the CRC, or one can use the `.check` method to check that the CRC at the
-    end of a stream is correct.
     """
     def __init__(self, polynomial):
         self.polynomial = polynomial

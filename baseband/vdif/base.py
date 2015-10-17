@@ -1,7 +1,6 @@
 import io
 
 import numpy as np
-import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..vlbi_base import (VLBIStreamBase, VLBIStreamReaderBase,
@@ -10,7 +9,9 @@ from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 
 
-u_sample = u.def_unit('sample')
+__all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
+           'VDIFStreamReader', 'VDIFStreamWriter', 'open',
+           'find_frame']
 
 # Check code on 2015-MAY-30
 # 00000000  77 2c db 00 00 00 00 1c  75 02 00 20 fc ff 01 04  # header 0 - 3
@@ -63,16 +64,17 @@ class VDIFFileReader(io.BufferedReader):
     """Simple reader for VDIF files.
 
     Adds ``read_frame`` and ``read_frameset`` methods to the basic binary
-    file reader ``io.BufferedReader``.
+    file reader :class:`~io.BufferedReader`.
     """
     def read_frame(self):
         """Read a single frame (header plus payload).
 
         Returns
         -------
-        frame : VDIFFrame
-            With ''.header'' and ''.data'' properties that return the
-            VDIFHeader and data encoded in the frame, respectively.
+        frame : `~baseband.vdif.VDIFFrame`
+            With ``.header`` and ``.data`` properties that return the
+            :class:`~baseband.vdif.VDIFHeader` and data encoded in the frame,
+            respectively.
         """
         return VDIFFrame.fromfile(self)
 
@@ -81,22 +83,23 @@ class VDIFFileReader(io.BufferedReader):
 
         Parameters
         ----------
-        thread_ids : list or None
-            The thread ids that should be read.  If `None`, read all threads.
-        sort : bool
+        thread_ids : list, optional
+            The thread ids that should be read.  By default, read all threads.
+        sort : bool, optional
             Whether to sort the frames by thread_id.  Default: True.
-        edv : int or None
+        edv : int, optional
             The expected extended data version for the VDIF Header.  If not
             given, use that of the first frame.  (Passing it in slightly
             improves file integrity checking.)
-        verify : bool
+        verify : bool, optional
             Whether to do (light) sanity checks on the header. Default: True.
 
         Returns
         -------
-        frameset : VDIFFrameSet
-            With ''.headers'' and ''.data'' properties that return list of
-            VDIFHeaders and data encoded in the frame, respectively.
+        frameset : :class:`~baseband.vdif.VDIFFrameSet`
+            With ``.headers`` and ``.data`` properties that return a list of
+            :class:`~baseband.vdif.VDIFHeaders` and the data encoded in the
+            frame set, respectively.
         """
         return VDIFFrameSet.fromfile(self, thread_ids, sort=sort, edv=edv,
                                      verify=verify)
@@ -106,20 +109,22 @@ class VDIFFileWriter(io.BufferedWriter):
     """Simple writer for VDIF files.
 
     Adds ``write_frame`` and ``write_frameset`` methods to the basic binary
-    file writer ``io.BufferedWriter``.
+    file writer :class:`~io.BufferedWriter`.
     """
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
 
         Parameters
         ----------
-        data : array or VDIFFrame
-            If an array, a header should be given, which will be used to
+        data : array or `~baseband.vdif.VDIFFrame`
+            If an array, a `header` should be given, which will be used to
             get the information needed to encode the array, and to construct
             the VDIF frame.
-        header : VDIFHeader or dict
-            Ignored if payload is a VDIFFrame instance.  If None, an attempt is
-            made to initiate a header with **kwargs.
+        header : `~baseband.vdif.VDIFHeader`, optional
+            Ignored if `data` is a VDIF Frame.
+        **kwargs
+            If no `header` is given, an attempt is made to initialize one
+            using keywords arguments.
         """
         if not isinstance(data, VDIFFrame):
             data = VDIFFrame.fromdata(data, header, **kwargs)
@@ -130,16 +135,18 @@ class VDIFFileWriter(io.BufferedWriter):
 
         Parameters
         ----------
-        data : array or VDIFFrameSet
+        data : array or :class:`~baseband.vdif.VDIFFrameSet`
             If an array, a header should be given, which will be used to
             get the information needed to encode the array, and to construct
-            the VDIF frame.
-        header : list of VDIFHeader, VDIFHeader, or dict.
-            Ignored if payload is a VDIFFrameSet instance.  If a list, should
-            have a length matching the number of threads in ``data``; if a
-            single VDIFHeader, thread_ids corresponding to the number of
-            threads are generated automatically; if None, an attempt is made
-            to initiate a header using **kwargs.
+            the VDIF frame set.
+        header : :class:`~baseband.vdif.VDIFHeader`, list of same, optional
+            Ignored if `data` is a :class:`~baseband.vdif.VDIFFrameSet`
+            instance.  If a list, should have a length matching the number of
+            threads in `data`; if a single header, ``thread_ids`` corresponding
+            to the number of threads are generated automatically.
+        **kwargs
+            If no `header` is given, remaining keywords are used to attempt
+            to initiate a single header.
         """
         if not isinstance(data, VDIFFrameSet):
             data = VDIFFrameSet.fromdata(data, header, **kwargs)
@@ -180,9 +187,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
     Parameters
     ----------
-    name : str
+    name : str or filehandle
         file name
-    thread_ids: list of int
+    thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
     """
     def __init__(self, raw, thread_ids=None, nthread=None):
@@ -205,6 +212,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
     @lazyproperty
     def header1(self):
+        """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         # Go to end of file.
         self.fh_raw.seek(0, 2)
@@ -303,34 +311,36 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
         Should be a VDIFFileWriter or BufferedWriter instance.
         If a name, will get opened for writing binary data.
     nthread : int
-        number of threads the VLBI data has (e.g., 2 for 2 polarisations)
-    header : VDIFHeader
+        Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
+        Default is 1.
+    header : :class:`~baseband.vdif.VDIFHeader`, optional
         Header for the first frame, holding time information, etc.
+    **kwargs
+        If no header is give, an attempt is made to construct the header from
+        these.  For a standard header, this would include the following.
 
-    If no header is give, an attempt is made to construct the header from the
-    remaining keyword arguments.  For a standard header, this would include:
+    --- Header keywords : (see :meth:`~baseband.vdif.VDIFHeader.fromvalues`)
 
-    time : `~astropy.time.Time` instance
-        Or 'ref_epoch' + 'seconds'
-    nchan : number of FFT channels within stream (default 1).
+    time : `~astropy.time.Time`
+        As an alternative, one can pass on ``ref_epoch`` and ``seconds``.
+    nchan : int, optional
+        Number of FFT channels within stream (default 1).
         Note: that different # of channels per thread is not supported.
-    frame_length : number of long words for header plus payload
+    frame_length : int
+        Number of long words for header plus payload.
         For some edv, this is fixed (e.g., 629 for edv=3).
-    complex_data : whether data is complex
-    bps : bits per sample
-        Or 'bits_per_sample', which is bps-1.
+    complex_data : bool
+        Whether data is complex
+    bps : int
+        Bits per sample.
     station : 2 characters
         Or unsigned 2-byte integer.
-    edv : 1, 3, or 4
-
-    For edv = 1, 3, or 4, in addition, a required keyword is
-
-    bandwidth : Quantity in Hz
-        Or 'sampling_unit' + 'sample_rate'.
-
-    For other edv, one requires
-
-    framerate : number of frames per second.
+    edv : {`False`, 1, 3, 4, 0xab}
+        Extended Data Version.
+    bandwidth : `~astropy.units.Quantity`
+        In frequency units.  Sufficient for `edv` 1, 3, or 4.
+    framerate : int
+        Required for other `edv`.
     """
     def __init__(self, raw, nthread=1, header=None, **kwargs):
         if not hasattr(raw, 'write'):
@@ -393,33 +403,33 @@ def open(name, mode='rs', *args, **kwargs):
     ----------
     name : str
         File name
-    mode : str ('rb', 'wb', 'rs', or 'ws')
+    mode : {'rb', 'wb', 'rs', or 'ws'}, optional
         Whether to open for reading or writing, and as a regular binary file
-        or as a stream (stream is default).
+        or as a stream (default is reading a stream).
+    **kwargs :
+        Additional arguments when opening the file as a stream
 
-    Additional arguments when opening the file as a stream:
+    --- For reading : (see :class:`VDIFStreamReader`)
 
-    For reading
-    -----------
-    thread_ids: list of int
-        Specific threads to read.  By default, all threads are read.
+    thread_ids : list of int, optional
+       Specific threads to read.  By default, all threads are read.
 
-    For writing
-    -----------
+    --- For writing : (see :class:`VDIFStreamWriter`)
+
     nthread : int
-        number of threads the VLBI data has (e.g., 2 for 2 polarisations)
-    header : VDIFHeader
+        Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
+    header : `~baseband.vdif.VDIFHeader`, optional
         Header for the first frame, holding time information, etc.
-        (or keywords that can be used to construct a header).
+    **kwargs
+        If the header is not given, an attempt will be made to construct one
+        with any further keyword arguments.  See :class:`VDIFStreamWriter`.
 
     Returns
     -------
-    Filehandler : VDIFFileReader or VDIFFileWriter instance (binary) or
-       VDIFStreamReader or VDIFStreamWriter instance (stream)
-
-    Raises
-    ------
-    ValueError if an unsupported mode is chosen.
+    Filehandle
+        A :class:`VDIFFileReader` or :class:`VDIFFileWriter` instance (binary),
+        or a :class:`VDIFStreamReader` or :class:`VDIFStreamWriter` instance
+        (stream).
     """
     if 'w' in mode:
         if not hasattr(name, 'write'):
@@ -441,7 +451,7 @@ def find_frame(fh, template_header=None, framesize=None, maximum=None,
     """Look for the first occurrence of a frame, from the current position.
 
     Search for a valid header at a given position which is consistent with
-    `other_header` or with a header a framesize ahead.   Note that the latter
+    ``other_header`` or with a header a framesize ahead.   Note that the latter
     turns out to be an unexpectedly weak check on real data!
     """
     if template_header:
@@ -497,24 +507,3 @@ def find_frame(fh, template_header=None, framesize=None, maximum=None,
     # Didn't find any frame.
     fh.seek(file_pos)
     return None
-
-
-# NOT USED ANY MORE
-def get_thread_ids(infile, framesize, searchsize=None):
-    """
-    Get the number of threads and their ID's in a vdif file.
-    """
-    if searchsize is None:
-        searchsize = 1024 * framesize
-
-    n_total = searchsize // framesize
-
-    thread_ids = set()
-    for n in range(n_total):
-        infile.seek(n * framesize)
-        try:
-            thread_ids.add(VDIFHeader.fromfile(infile)['thread_id'])
-        except:
-            break
-
-    return thread_ids
