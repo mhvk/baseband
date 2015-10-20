@@ -3,8 +3,8 @@ import io
 import numpy as np
 from astropy.utils import lazyproperty
 
-from ..vlbi_base import (VLBIStreamBase, VLBIStreamReaderBase,
-                         VLBIStreamWriterBase)
+from ..vlbi_base.base import (VLBIStreamBase, VLBIStreamReaderBase,
+                              VLBIStreamWriterBase)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 

@@ -12,7 +12,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import numpy as np
 
-from ..vlbi_base import VLBIFrameBase
+from ..vlbi_base.frame import VLBIFrameBase
 from .header import VDIFHeader
 from .payload import VDIFPayload
 

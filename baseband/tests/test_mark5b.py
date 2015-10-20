@@ -4,7 +4,7 @@ import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
 from astropy.time import Time
-from .. import mark5b
+from .. import mark5b, vlbi_base
 
 
 SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m5b')
@@ -12,7 +12,7 @@ SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m5b')
 
 # Check code on 2015-MAY-08.
 # m5d /raw/mhvk/scintillometry/gp052d_wb_no0001 Mark5B-512-8-2 10
-#---->first 10016*4 bytes -> sample.m5b
+# ----> first 10016*4 bytes -> sample.m5b
 # Mark5 stream: 0x256d140
 #   stream = File-1/1=gp052a_wb_no0001
 #   format = Mark5B-512-8-2 = 2
@@ -88,6 +88,19 @@ class TestMark5B(object):
         header6 = mark5b.Mark5BHeader(header.words,
                                       ref_mjd=(header.time.mjd + 499.))
         assert header6.time == header.time
+
+    def test_decoding(self):
+        """Check that look-up levels are consistent with mark5access."""
+        o2h = vlbi_base.payload.OPTIMAL_2BIT_HIGH
+        assert np.all(mark5b.payload.lut1bit[0] == -1.)
+        assert np.all(mark5b.payload.lut1bit[0xff] == 1.)
+        assert np.all(mark5b.payload.lut1bit.astype(int) ==
+                      ((np.arange(256)[:, np.newaxis] >>
+                        np.arange(8)) & 1) * 2 - 1)
+        assert np.all(mark5b.payload.lut2bit[0] == -o2h)
+        assert np.all(mark5b.payload.lut2bit[0x55] == 1.)
+        assert np.all(mark5b.payload.lut2bit[0xaa] == -1.)
+        assert np.all(mark5b.payload.lut2bit[0xff] == o2h)
 
     def test_payload(self):
         with open(SAMPLE_FILE, 'rb') as fh:

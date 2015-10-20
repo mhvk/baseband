@@ -10,8 +10,8 @@ http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
-from ..vlbi_base import (VLBIPayloadBase, encode_2bit_real_base,
-                         OPTIMAL_2BIT_HIGH, DTYPE_WORD)
+from ..vlbi_base.payload import (VLBIPayloadBase, encode_2bit_real_base,
+                                 decoder_levels, DTYPE_WORD)
 
 
 __all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
@@ -24,16 +24,22 @@ def init_luts():
     """Set up the look-up tables for levels as a function of input byte.
 
     For 1-bit mode, one has just the sign bit:
-      s value
-      0  -1
-      1  +1
+      === =====
+       s  value
+      === =====
+       0  -1
+       1  +1
+      === =====
 
     For 2-bit mode, there is a sign and a magnitude, which encode:
-      m s value
-      0 0 -Hi
-      0 1  +1
-      1 0  -1
-      1 1 +Hi
+     === === ===== =====
+      m   s  value s*2+m
+     === === ===== =====
+      0   0  -Hi    0
+      0   1  +1     2
+      1   0  -1     1
+      1   1  +Hi    3
+     === === ===== =====
 
     See table 13 in
     https://science.nrao.edu/facilities/vlba/publications/memos/upgrade/sensimemo13.pdf
@@ -41,19 +47,19 @@ def init_luts():
     http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
     Appendix A: sign always on even bit stream (0, 2, 4, ...), and magnitude
     on adjacent odd stream (1, 3, 5, ...).
+
+    In the above table, the last column is the index in the linearly increasing
+    table of levels (``decoder_levels[2]``).
     """
-    lut2level = np.array([-1.0, 1.0], dtype=np.float32)
-    lut4level = np.array([-OPTIMAL_2BIT_HIGH, 1.0, -1.0, OPTIMAL_2BIT_HIGH],
-                         dtype=np.float32)
     b = np.arange(256)[:, np.newaxis]
     l = np.arange(8)
-    lut1bit = lut2level[(b >> l) & 1]
+    lut1bit = decoder_levels[1][((b >> l) & 1)]
     # 2-bit mode: sign bit in lower position thatn magnitude bit
     # ms=00,01,10,11 = -Hi, 1, -1, Hi (lut
     s = np.arange(0, 8, 2)  # 0, 2, 4, 6
     m = s+1                 # 1, 3, 5, 7
-    l = ((b >> s) & 1) + (((b >> m) & 1) << 1)
-    lut2bit = lut4level[l]
+    l = (((b >> s) & 1) << 1) + ((b >> m) & 1)
+    lut2bit = decoder_levels[2][l]
     return lut1bit, lut2bit
 
 lut1bit, lut2bit = init_luts()
@@ -113,7 +119,7 @@ class Mark5BPayload(VLBIPayloadBase):
 
     @classmethod
     def fromdata(cls, data, bps=2):
-        """Encode data as payload, using a given bits per second.
+        """Encode data as payload, using a given number of bits per sample.
 
         It is assumed that the last dimension is the number of channels.
         """

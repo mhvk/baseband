@@ -5,7 +5,7 @@ import numpy as np
 from astropy import units as u
 from astropy.time import Time
 
-from ..vlbi_base import VLBIStreamReaderBase, VLBIStreamWriterBase
+from ..vlbi_base.base import VLBIStreamReaderBase, VLBIStreamWriterBase
 from .header import Mark5BHeader
 from .frame import Mark5BFrame
 

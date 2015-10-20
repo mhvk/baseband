@@ -2,7 +2,7 @@ import io
 import os
 import numpy as np
 from astropy.tests.helper import pytest
-from .. import vdif
+from .. import vdif, vlbi_base
 
 
 SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.vdif')
@@ -87,6 +87,24 @@ class TestVDIF(object):
         assert header5 != header
         with pytest.raises(TypeError):
             header['thread_id'] = 0
+
+    def test_decoding(self):
+        """Check that look-up levels are consistent with mark5access."""
+        o2h = vlbi_base.payload.OPTIMAL_2BIT_HIGH
+        assert np.all(vdif.payload.lut1bit[0] == -1.)
+        assert np.all(vdif.payload.lut1bit[0xff] == 1.)
+        assert np.all(vdif.payload.lut1bit.astype(int) ==
+                      ((np.arange(256)[:, np.newaxis] >>
+                        np.arange(8)) & 1) * 2 - 1)
+        assert np.all(vdif.payload.lut2bit[0] == -o2h)
+        assert np.all(vdif.payload.lut2bit[0x55] == -1.)
+        assert np.all(vdif.payload.lut2bit[0xaa] == 1.)
+        assert np.all(vdif.payload.lut2bit[0xff] == o2h)
+        assert np.all(vdif.payload.lut4bit[0] * 2.95 == -8.)
+        assert np.all(vdif.payload.lut4bit[0x88] == 0.)
+        assert np.all(vdif.payload.lut4bit[0xff] * 2.95 == 7)
+        assert np.all(-vdif.payload.lut4bit[0x11] ==
+                      vdif.payload.lut4bit[0xff])
 
     def test_payload(self):
         with open(SAMPLE_FILE, 'rb') as fh:

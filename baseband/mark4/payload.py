@@ -11,8 +11,8 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import sys
 import numpy as np
-from ..vlbi_base import (VLBIPayloadBase, encode_2bit_real_base,
-                         OPTIMAL_2BIT_HIGH)
+from ..vlbi_base.payload import (VLBIPayloadBase, encode_2bit_real_base,
+                                 decoder_levels)
 
 
 __all__ = ['reorder32', 'reorder64', 'init_luts', 'decode_8chan_2bit_fanout4',
@@ -65,30 +65,28 @@ else:
 
 def init_luts():
     """Set up the look-up tables for levels as a function of input byte."""
-    lut2level = np.array([1.0, -1.0], dtype=np.float32)
-    lut4level = np.array([-OPTIMAL_2BIT_HIGH, 1.0, -1.0, OPTIMAL_2BIT_HIGH],
-                         dtype=np.float32)
+    # Organisation by bits is quite odd for Mark 4.
     b = np.arange(256)[:, np.newaxis]
     # lut1bit
     i = np.arange(8)
-    # For all 1-bit modes
-    lut1bit = lut2level[(b >> i) & 1]
+    # For all 1-bit modes; if set, sign=-1, so need to get item 0.
+    lut1bit = decoder_levels[1][((b >> i) & 1) ^ 1]
     i = np.arange(4)
     # fanout 1 @ 8/16t, fanout 4 @ 32/64t
-    s = i*2
-    m = s+1
-    lut2bit1 = lut4level[(b >> s & 1) +
-                         (b >> m & 1) * 2]
+    s = i*2  # 0, 2, 4, 6
+    m = s+1  # 1, 3, 5, 7
+    lut2bit1 = decoder_levels[2][(b >> s & 1) * 2 +
+                                 (b >> m & 1)]
     # fanout 2 @ 8/16t, fanout 1 @ 32/64t
     s = i + (i//2)*2  # 0, 1, 4, 5
     m = s + 2         # 2, 3, 6, 7
-    lut2bit2 = lut4level[(b >> s & 1) +
-                         (b >> m & 1) * 2]
+    lut2bit2 = decoder_levels[2][(b >> s & 1) * 2 +
+                                 (b >> m & 1)]
     # fanout 4 @ 8/16t, fanout 2 @ 32/64t
     s = i    # 0, 1, 2, 3
     m = s+4  # 4, 5, 6, 7
-    lut2bit3 = lut4level[(b >> s & 1) +
-                         (b >> m & 1) * 2]
+    lut2bit3 = decoder_levels[2][(b >> s & 1) * 2 +
+                                 (b >> m & 1)]
     return lut1bit, lut2bit1, lut2bit2, lut2bit3
 
 lut1bit, lut2bit1, lut2bit2, lut2bit3 = init_luts()
