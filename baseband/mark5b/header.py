@@ -13,8 +13,8 @@ from __future__ import (absolute_import, division, print_function,
 import numpy as np
 from astropy.time import Time
 
-from ..vlbi_base import (HeaderParser, VLBIHeaderBase, four_word_struct,
-                         bcd_decode, bcd_encode, CRC)
+from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, four_word_struct
+from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
 
 
 __all__ = ['CRC16', 'crc16', 'Mark5BHeader']

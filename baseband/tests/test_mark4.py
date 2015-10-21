@@ -3,7 +3,7 @@ import os
 import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
-from .. import mark4
+from .. import mark4, vlbi_base
 
 
 SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m4')
@@ -73,6 +73,27 @@ class TestMark4(object):
         assert np.all(header7['bcd_headstack1'][1:] == 0x5566)
         with pytest.raises(TypeError):
             header['bcd_headstack1'] = 0
+
+    def test_decoding(self):
+        """Check that look-up levels are consistent with mark5access."""
+        o2h = vlbi_base.payload.OPTIMAL_2BIT_HIGH
+        assert np.all(mark4.payload.lut1bit[0] == 1.)
+        assert np.all(mark4.payload.lut1bit[0xff] == -1.)
+        assert np.all(mark4.payload.lut1bit.astype(int) ==
+                      1 - 2 * ((np.arange(256)[:, np.newaxis] >>
+                                np.arange(8)) & 1))
+        assert np.all(mark4.payload.lut2bit1[0] == -o2h)
+        assert np.all(mark4.payload.lut2bit1[0x55] == 1.)
+        assert np.all(mark4.payload.lut2bit1[0xaa] == -1.)
+        assert np.all(mark4.payload.lut2bit1[0xff] == o2h)
+        assert np.all(mark4.payload.lut2bit2[0] == -o2h)
+        assert np.all(mark4.payload.lut2bit2[0xcc] == -1.)
+        assert np.all(mark4.payload.lut2bit2[0x33] == 1.)
+        assert np.all(mark4.payload.lut2bit2[0xff] == o2h)
+        assert np.all(mark4.payload.lut2bit3[0] == -o2h)
+        assert np.all(mark4.payload.lut2bit3[0xf0] == -1.)
+        assert np.all(mark4.payload.lut2bit3[0x0f] == 1.)
+        assert np.all(mark4.payload.lut2bit3[0xff] == o2h)
 
     def test_payload(self):
         with open(SAMPLE_FILE, 'rb') as fh:

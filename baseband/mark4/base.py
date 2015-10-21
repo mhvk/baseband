@@ -4,7 +4,7 @@ import io
 import numpy as np
 from astropy.time import Time
 
-from ..vlbi_base import VLBIStreamReaderBase, VLBIStreamWriterBase
+from ..vlbi_base.base import VLBIStreamReaderBase, VLBIStreamWriterBase
 from .header import Mark4Header
 from .frame import Mark4Frame
 

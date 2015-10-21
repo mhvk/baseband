@@ -10,7 +10,7 @@ http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from ..vlbi_base import VLBIFrameBase
+from ..vlbi_base.frame import VLBIFrameBase
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 

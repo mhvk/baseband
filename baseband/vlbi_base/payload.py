@@ -11,18 +11,22 @@ import numpy as np
 
 
 __all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
-           'DTYPE_WORD', 'encode_2bit_real_base', 'VLBIPayloadBase']
+           'DTYPE_WORD', 'decoder_levels', 'encode_2bit_real_base',
+           'VLBIPayloadBase']
 
 # the high mag value for 2-bit reconstruction
 OPTIMAL_2BIT_HIGH = 3.3359
-"""Optimal high value for a 2-bit digitizer for which the low value is 1.
+r"""Optimal high value for a 2-bit digitizer for which the low value is 1.
 
 It is chosen such that for a normal distribution in which 68.269% of all values
 are at the low level, this is the mean of the others, i.e.,
 
-               int_1^inf (x * exp(-x^2/2)) dx / int_1^inf exp(-x^2/2) dx
-optimal_high = --------------------------------------------------------
-                 int_0^1 (x * exp(-x^2/2)) dx / int_0^1 exp(-x^2/2) dx
+.. math::
+
+     l = \frac{\int_1^\infty x \exp(-\frac12x^2) dx}
+              {\int_0^1 x \exp(-\frac12x^2) dx} \times
+         \frac{\int_0^1 \exp(-\frac12x^2)dx}
+              {\int_1^\infty \exp(-\frac12x^2) dx}
 
 Note that for this value, the standard deviation is 2.1745.
 """
@@ -33,6 +37,13 @@ FOUR_BIT_1_SIGMA = 2.95
 DTYPE_WORD = np.dtype('<u4')
 """Dtype for 32-bit unsigned integers, with least signicant byte first."""
 
+
+decoder_levels = {
+    1: np.array([-1.0, 1.0], dtype=np.float32),
+    2: np.array([-OPTIMAL_2BIT_HIGH, -1.0, 1.0, OPTIMAL_2BIT_HIGH],
+                dtype=np.float32),
+    4: (np.arange(16) - 8.)/FOUR_BIT_1_SIGMA}
+"""Levels for data encoded with different numbers of bits.."""
 
 two_bit_2_sigma = 2 * TWO_BIT_1_SIGMA
 clip_low, clip_high = -1.5 * TWO_BIT_1_SIGMA, 1.5 * TWO_BIT_1_SIGMA

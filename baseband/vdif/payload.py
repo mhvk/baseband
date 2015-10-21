@@ -10,8 +10,8 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 
-from ..vlbi_base import (VLBIPayloadBase, encode_2bit_real_base,
-                         OPTIMAL_2BIT_HIGH, FOUR_BIT_1_SIGMA, DTYPE_WORD)
+from ..vlbi_base.payload import (VLBIPayloadBase, encode_2bit_real_base,
+                                 decoder_levels, DTYPE_WORD)
 
 
 __all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
@@ -26,21 +26,16 @@ def init_luts():
     lowest and all 1 bits is highest.  I.e., for 2-bit sampling, the order is
     00, 01, 10, 11.
     """
-    lut2level = np.array([-1.0, 1.0], dtype=np.float32)
-    lut4level = np.array([-OPTIMAL_2BIT_HIGH, -1.0, 1.0, OPTIMAL_2BIT_HIGH],
-                         dtype=np.float32)
-    lut16level = (np.arange(16) - 8.)/FOUR_BIT_1_SIGMA
-
     b = np.arange(256)[:, np.newaxis]
     # 1-bit mode
     i = np.arange(8)
-    lut1bit = lut2level[(b >> i) & 1]
+    lut1bit = decoder_levels[1][(b >> i) & 1]
     # 2-bit mode
     i = np.arange(0, 8, 2)
-    lut2bit = lut4level[(b >> i) & 3]
+    lut2bit = decoder_levels[2][(b >> i) & 3]
     # 4-bit mode
     i = np.arange(0, 8, 4)
-    lut4bit = lut16level[(b >> i) & 0xf]
+    lut4bit = decoder_levels[4][(b >> i) & 0xf]
     return lut1bit, lut2bit, lut4bit
 
 lut1bit, lut2bit, lut4bit = init_luts()

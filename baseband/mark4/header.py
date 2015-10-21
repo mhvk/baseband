@@ -14,8 +14,8 @@ import numpy as np
 from astropy.time import Time
 from astropy.extern import six
 
-from ..vlbi_base import (HeaderParser, VLBIHeaderBase,
-                         bcd_decode, bcd_encode, CRC)
+from ..vlbi_base.header import HeaderParser, VLBIHeaderBase
+from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
 
 __all__ = ['stream2words', 'words2stream', 'Mark4TrackHeader', 'Mark4Header']
 

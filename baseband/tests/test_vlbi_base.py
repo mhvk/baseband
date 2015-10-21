@@ -1,6 +1,8 @@
-from ..vlbi_base import (bcd_encode, bcd_decode, CRC, HeaderParser,
-                         VLBIHeaderBase, VLBIPayloadBase, VLBIFrameBase,
-                         four_word_struct, DTYPE_WORD)
+from ..vlbi_base.utils import bcd_encode, bcd_decode, CRC
+from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, four_word_struct
+from ..vlbi_base.payload import VLBIPayloadBase, DTYPE_WORD
+from ..vlbi_base.frame import VLBIFrameBase
+
 
 from copy import copy
 import io
