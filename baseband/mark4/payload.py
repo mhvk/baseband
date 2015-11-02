@@ -141,7 +141,7 @@ class Mark4Payload(VLBIPayloadBase):
     nchan : int, optional
         Number of channels in the data.  Default: 1.
     bps : int, optional
-        Number of bits per complete sample.  Default: 2.
+        Number of bits per sample.  Default: 2.
     fanout : int, optional
         Number of tracks every bit stream is spread over.  Default: 1.
 

@@ -223,15 +223,10 @@ class VDIFHeader(VLBIHeaderBase):
     @property
     def bps(self):
         """Bits per sample (adding bits for imaginary and real for complex)."""
-        bps = self['bits_per_sample'] + 1
-        if self['complex_data']:
-            bps *= 2
-        return bps
+        return self['bits_per_sample'] + 1
 
     @bps.setter
     def bps(self, bps):
-        if self['complex_data']:
-            bps /= 2
         assert bps % 1 == 0
         self['bits_per_sample'] = int(bps) - 1
 
@@ -250,15 +245,16 @@ class VDIFHeader(VLBIHeaderBase):
     def samples_per_frame(self):
         """Number of samples encoded in frame."""
         # Values are not split over word boundaries.
-        values_per_word = 32 // self.bps
+        values_per_word = 32 // self.bps // (2 if self['complex_data'] else 1)
         # samples are not split over payload boundaries.
         return self.payloadsize // 4 * values_per_word // self.nchan
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
-        values_per_long = (32 // self.bps) * 2
-        longs, extra = divmod(samples_per_frame * self.nchan,
-                              values_per_long)
+        values_per_word = 32 // self.bps // (2 if self['complex_data'] else 1)
+        # units of frame length are 8 bytes, i.e., 2 words.
+        values_per_long = values_per_word * 2
+        longs, extra = divmod(samples_per_frame * self.nchan, values_per_long)
         if extra:
             longs += 1
 

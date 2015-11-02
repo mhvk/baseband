@@ -15,7 +15,7 @@ from ..vlbi_base.payload import (VLBIPayloadBase, encode_2bit_real_base,
 
 
 __all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
-           'decode_4bit_complex', 'encode_4bit_complex', 'VDIFPayload']
+           'decode_2bit_complex', 'encode_2bit_complex', 'VDIFPayload']
 
 
 def init_luts():
@@ -52,7 +52,7 @@ def decode_2bit_real(words, out=None):
         return out
 
 
-def decode_4bit_complex(words, out=None):
+def decode_2bit_complex(words, out=None):
     b = words.view(np.uint8)
     if out is None:
         return lut2bit.take(b, axis=0).ravel().view(np.complex64)
@@ -72,7 +72,7 @@ def encode_2bit_real(values):
     return np.bitwise_or.reduce(bitvalues, axis=-1).view(DTYPE_WORD)
 
 
-def encode_4bit_complex(values):
+def encode_2bit_complex(values):
     return encode_2bit_real(values.view(values.real.dtype))
 
 
@@ -93,15 +93,15 @@ class VDIFPayload(VLBIPayloadBase):
     nchan : int, optional
         Number of channels.  Default: 1.
     bps : int, optional
-        Bits per complete sample.  Default: 2.
+        Bits per sample (or real, imaginary component).  Default: 2.
     complex_data : bool
         Complex or float data.  Default: `False`.
     """
     _decoders = {(2, False): decode_2bit_real,
-                 (4, True): decode_4bit_complex}
+                 (2, True): decode_2bit_complex}
 
     _encoders = {(2, False): encode_2bit_real,
-                 (4, True): encode_4bit_complex}
+                 (2, True): encode_2bit_complex}
 
     def __init__(self, words, header=None,
                  nchan=1, bps=2, complex_data=False):
