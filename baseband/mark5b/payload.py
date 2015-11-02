@@ -106,7 +106,7 @@ class Mark5BPayload(VLBIPayloadBase):
     nchan : int
         Number of channels in the data.  Default: 1.
     bps : int
-        Number of bits per complete sample.  Default: 2.
+        Number of bits per sample.  Default: 2.
     """
 
     _size = 2500 * 4

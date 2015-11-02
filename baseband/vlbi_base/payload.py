@@ -85,7 +85,7 @@ class VLBIPayloadBase(object):
     nchan : int
         Number of channels in the data.  Default: 1.
     bps : int
-        Number of bits per complete sample.  Default: 2.
+        Number of bits per sample (or real/imaginary component).  Default: 2.
     complex_data : bool
         Whether data is complex or float.  Default: False.
     """
@@ -131,7 +131,7 @@ class VLBIPayloadBase(object):
         return fh.write(self.words.tostring())
 
     @classmethod
-    def fromdata(cls, data, bps=None):
+    def fromdata(cls, data, bps=2):
         """Encode data as a VLBI payload.
 
         Parameters
@@ -141,11 +141,9 @@ class VLBIPayloadBase(object):
             channels.
         bps : int
             Number of bits per sample to use (for complex data, for real and
-            imaginary part together; default: 2 for real, 4 for complex).
+            imaginary part separately; default: 2).
         """
         complex_data = data.dtype.kind == 'c'
-        if bps is None:
-            bps = 4 if complex_data else 2
         encoder = cls._encoders[bps, complex_data]
         words = encoder(data.ravel())
         return cls(words, nchan=data.shape[-1], bps=bps,
@@ -174,7 +172,7 @@ class VLBIPayloadBase(object):
     def nsample(self):
         """Number of samples in the payload."""
         return (len(self.words) * (self.words.dtype.itemsize * 8) //
-                self.bps // self.nchan)
+                self.bps // (2 if self.complex_data else 1) // self.nchan)
 
     @property
     def shape(self):

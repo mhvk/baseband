@@ -332,7 +332,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
     complex_data : bool
         Whether data is complex
     bps : int
-        Bits per sample.
+        Bits per sample (or real, imaginary component).
     station : 2 characters
         Or unsigned 2-byte integer.
     edv : {`False`, 1, 3, 4, 0xab}

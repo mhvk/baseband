@@ -157,7 +157,7 @@ class TestMark5B(object):
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
 
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
-                         sample_rate=32*u.MHz) as fh:
+                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
             assert header == fh.header0
             assert fh.samples_per_frame == 5000
             assert fh.frames_per_second == 6400
