@@ -17,23 +17,27 @@ class VLBIStreamBase(object):
     _frame_class = None
 
     def __init__(self, fh_raw, header0, nchan, bps, thread_ids,
-                 sample_rate=None):
+                 samples_per_frame=None, sample_rate=None):
         self.fh_raw = fh_raw
         self.header0 = header0
         self.nchan = nchan
         self.bps = bps
         self.thread_ids = thread_ids
         self.nthread = nchan if thread_ids is None else len(thread_ids)
-        self.samples_per_frame = header0.payloadsize * 8 // bps // nchan
+        if samples_per_frame is None:
+            samples_per_frame = header0.payloadsize * 8 // bps // nchan
+
         if sample_rate is None:
             fh_raw.seek(0)
             self.frames_per_second = get_frame_rate(fh_raw, type(header0))
             fh_raw.seek(self._frame.size)
             sample_rate = (self.frames_per_second *
-                           self.samples_per_frame).to(u.MHz)
+                           samples_per_frame).to(u.MHz)
         else:
             self.frames_per_second = (sample_rate /
-                                      self.samples_per_frame).to(u.Hz).value
+                                      samples_per_frame).to(u.Hz).value
+
+        self.samples_per_frame = samples_per_frame
         self.sample_rate = sample_rate
         self.offset = 0
 
