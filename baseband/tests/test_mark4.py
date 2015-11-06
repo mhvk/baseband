@@ -7,6 +7,41 @@ from .. import mark4, vlbi_base
 
 
 SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m4')
+"""Mark 4 sample.
+
+Created from one of our EVN PSR B1957+20 observations using
+dd if=gp052d_ar_no0021 of=sample.m4 bs=128000 count=3
+"""
+
+
+# Results from mark5access on 2015-JAN-22.
+# m5d evn/Ar/gp052d_ar_no0021 MKIV1_4-512-8-2 1000
+# Mark5 stream: 0x1a54140
+#   stream = File-1/1=evn/gp052d_ar_no0021
+#   format = MKIV1_4-512-8-2/1 = 1
+#   start mjd/sec = 53171 27492.475000000
+#   frame duration = 2500000.00 ns
+#   framenum = 0
+#   sample rate = 32000000 Hz
+#   offset = 3208
+#   framebytes = 160000 bytes
+#   datasize = 160000 bytes
+#   sample granularity = 4
+#   frame granularity = 1
+#   gframens = 2500000
+#   payload offset = -512
+#   read position = 0
+#   data window size = 1048576 bytes
+#   ...
+# data at 17, nonzero at line 657 -> item 640.
+# Initially this seemed strange, since PAYLOADSIZE=20000 leads to 80000
+# elements, so one would have expected VALIDSTART*4=96*4=384.
+# But the mark5 code has PAYLOAD_OFFSET=(VALIDEND-20000)*f->ntrack/8 = 64*8
+# Since each sample takes 2 bytes, one thus expects 384+64*8/2=640. OK.
+# So, lines 639--641:
+#  0  0  0  0  0  0  0  0
+# -1  1  1 -3 -3 -3  1 -1
+#  1  1 -3  1  1 -3 -1 -1
 
 
 class TestMark4(object):
@@ -158,8 +193,16 @@ class TestMark4(object):
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz) as fh:
             assert header == fh.header0
+            # Raw file should be just after frame 0.
+            assert fh.fh_raw.tell() == 0xa88 + fh.header0.framesize
             record = fh.read(642)
-            assert fh.offset == 642
+            assert fh.tell() == 642
+            # regression test against #4, of incorrect frame offsets.
+            fh.seek(80000 + 639)
+            record2 = fh.read(2)
+            assert fh.tell() == 80641
+            # Raw file should be just after frame 1.
+            assert fh.fh_raw.tell() == 0xa88 + 2 * fh.header0.framesize
 
         assert record.shape == (642, 8)
         assert np.all(record[:640] == 0.)
@@ -167,3 +210,6 @@ class TestMark4(object):
                       np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
         assert np.all(record.astype(int)[641] ==
                       np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        assert record2.shape == (2, 8)
+        assert np.all(record2[0] == 0.)
+        assert not np.any(record2[1] == 0.)
