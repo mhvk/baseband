@@ -138,7 +138,7 @@ class VDIFHeader(VLBIHeaderBase):
         Values set by other keyword arguments (if present):
 
         bits_per_sample : from ``bps``
-        frame_length : from ``framesize`` (or ``payloadsize``, ``legacy_mode``)
+        frame_length : from ``samples_per_frame`` or ``framesize``
         lg2_nchan : from ``nchan``
         ref_epoch, seconds, frame_nr : from ``time`` (may need ``bandwidth``)
 

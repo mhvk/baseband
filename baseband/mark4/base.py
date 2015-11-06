@@ -261,21 +261,21 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
         instance. If a name, will get opened for writing binary data.
     header : :class:`~baseband.mark4.Mark4Header`
         Header for the first frame, holding time information, etc.
+    **kwargs
+        If no header is give, an attempt is made to construct the header from
+        these.  For a standard header, this would include the following.
 
-    If no header is give, an attempt is made to construct the header from the
-    remaining keyword arguments.  For a standard header, this would include:
+    --- Header keywords : (see :meth:`~baseband.mark4.Mark4Header.fromvalues`)
 
     time : `~astropy.time.Time` instance
-        Or 'ref_epoch' + 'seconds'
-    nchan : number of FFT channels within stream (default 1).
-        Note: that different # of channels per thread is not supported.
-    frame_length : number of long words for header plus payload
-        For some edv, this is fixed (e.g., 629 for edv=3).
-    complex_data : whether data is complex
-    bps : bits per sample
-        Or 'bits_per_sample', which is bps-1.
-    station_id : 2 characters
-        Or unsigned 2-byte integer.
+        Sets bcd-encoded unit year, day, hour, minute, second.
+    ntrack : int
+        Number of Mark 4 bitstreams (equal to number of channels times
+        ``fanout`` times ``bps``)
+    bps : int
+        Bits per sample.
+    fanout : int
+        Number of tracks over which a given channel is spread out.
     """
 
     _frame_class = Mark4Frame
