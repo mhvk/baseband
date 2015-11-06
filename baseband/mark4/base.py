@@ -176,9 +176,14 @@ class Mark4StreamReader(VLBIStreamReaderBase):
         self._frame = raw.read_frame(ntrack, decade)
         self._frame_data = None
         self._frame_nr = None
+        header = self._frame.header
+        bps = header.bps
+        nchan = header.nchan
         super(Mark4StreamReader, self).__init__(
-            raw, self._frame.header, self._frame.header.nchan,
-            self._frame.header.bps, thread_ids, sample_rate)
+            fh_raw=raw, header0=header, nchan=nchan, bps=bps,
+            thread_ids=thread_ids,
+            samples_per_frame=header.framesize * 8 // bps // nchan,
+            sample_rate=sample_rate)
 
     def read(self, count=None, fill_value=0., squeeze=True, out=None):
         """Read count samples.
@@ -283,8 +288,11 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
             raw = Mark4FileWriter(io.open(raw, mode='wb'))
         if header is None:
             header = Mark4Header.fromvalues(**kwargs)
-        super(Mark4StreamWriter, self).__init__(raw, header,
-                                                range(header.nchan))
+        super(Mark4StreamWriter, self).__init__(
+            fh_raw=raw, header0=header, thread_ids=range(header.nchan),
+            samples_per_frame=(header.framesize * 8 // header.bps //
+                               header.nchan))
+
         self._data = np.zeros(
             (self.nthread, self.samples_per_frame, self.nchan),
             np.complex64 if header['complex_data'] else np.float32)

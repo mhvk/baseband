@@ -174,7 +174,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
         self._frame = raw.read_frame(nchan, bps, ref_mjd)
         self._frame_data = None
         super(Mark5BStreamReader, self).__init__(
-            raw, self._frame.header, nchan, bps, thread_ids, sample_rate)
+            raw, header0=self._frame.header, nchan=nchan, bps=bps,
+            thread_ids=thread_ids, sample_rate=sample_rate)
 
     @property
     def size(self):
