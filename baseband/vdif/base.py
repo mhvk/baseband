@@ -271,7 +271,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
         offset0 = self.offset
         while count > 0:
-            dt, frame_nr, sample_offset = self.tell(unit='frame_info')
+            dt, frame_nr, sample_offset = self._frame_info()
             if(dt != self._frameset['seconds'] - self.header0['seconds'] or
                frame_nr != self._frameset['frame_nr']):
                 # Read relevant frame (possibly reusing data array from
@@ -373,7 +373,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
         offset0 = self.offset
         frame = self._data.transpose(1, 0, 2)
         while count > 0:
-            dt, frame_nr, sample_offset = self.tell(unit='frame_info')
+            dt, frame_nr, sample_offset = self._frame_info()
             if sample_offset == 0:
                 # set up header for new frame.
                 self._header = self.header0.copy()

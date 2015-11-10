@@ -241,7 +241,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
 
         offset0 = self.offset
         while count > 0:
-            dt, frame_nr, sample_offset = self.tell(unit='frame_info')
+            dt, frame_nr, sample_offset = self._frame_info()
             if(dt != self._frame.seconds - self.header0.seconds or
                frame_nr != self._frame['frame_nr']):
                 # Read relevant frame, reusing data array from previous frame.
@@ -330,7 +330,7 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
         offset0 = self.offset
         frame = self._data
         while count > 0:
-            dt, frame_nr, sample_offset = self.tell(unit='frame_info')
+            dt, frame_nr, sample_offset = self._frame_info()
             if sample_offset == 0:
                 # set up header for new frame.
                 self._header = self.header0.copy()

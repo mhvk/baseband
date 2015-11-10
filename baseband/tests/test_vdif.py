@@ -187,9 +187,8 @@ class TestVDIF(object):
             assert header == fh.header0
             record = fh.read(12)
             assert fh.tell() == 12
-            assert fh.tell(unit='frame_info') == (0, 0, 12)
             fh.seek(10, 1)
-            assert fh.tell(unit='frame_info') == (0, 0, 22)
+            fh.tell() == 22
             fh.seek(0)
             assert fh.tell() == 0
 
