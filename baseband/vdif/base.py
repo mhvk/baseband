@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE.rst
 import io
 
 import numpy as np

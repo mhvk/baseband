@@ -213,3 +213,24 @@ class TestMark4(object):
         assert record2.shape == (2, 8)
         assert np.all(record2[0] == 0.)
         assert not np.any(record2[1] == 0.)
+
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
+                        sample_rate=32*u.MHz) as fh:
+            time0 = fh.tell(unit='time')
+            record = fh.read(160000)
+            time1 = fh.tell(unit='time')
+
+        with io.BytesIO() as s, mark4.open(s, 'ws', sample_rate=32*u.MHz,
+                                           time=time0, ntrack=64, bps=2,
+                                           fanout=4) as fw:
+            fw.write(record)
+            assert fw.tell(unit='time') == time1
+            fw.fh_raw.flush()
+
+            s.seek(0)
+            fh = mark4.open(s, 'rs', ntrack=64, decade=2010,
+                            sample_rate=32*u.MHz)
+            assert fh.tell(unit='time') == time0
+            record2 = fh.read(160000)
+            assert fh.tell(unit='time') == time1
+            assert np.all(record2 == record)
