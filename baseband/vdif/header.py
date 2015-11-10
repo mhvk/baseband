@@ -434,7 +434,10 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
          ('sample_rate', (4, 0, 23)),
          ('sync_pattern', (5, 0, 32, 0xACABFEED))))
 
-    _properties = VDIFBaseHeader._properties + ('bandwidth', 'framerate')
+    # Add extra properties, ensuring 'time' comes after 'framerate', since
+    # time setting requires the frame rate.
+    _properties = (VDIFBaseHeader._properties[:-1] +
+                   ('bandwidth', 'framerate', 'time'))
 
     def same_stream(self, other):
         return (super(VDIFSampleRateHeader, self).same_stream(other) and
