@@ -354,7 +354,8 @@ class VDIFHeader(VLBIHeaderBase):
                 except AttributeError:
                     raise ValueError("Cannot calculate frame rate for this "
                                      "header. Pass it in explicitly.")
-            self['frame_nr'] = round((frac_sec * framerate).to(u.one).value)
+            self['frame_nr'] = int(round((frac_sec * framerate)
+                                         .to(u.one).value))
 
     time = property(get_time, set_time)
 
