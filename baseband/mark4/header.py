@@ -20,7 +20,6 @@ from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
 __all__ = ['stream2words', 'words2stream', 'Mark4TrackHeader', 'Mark4Header']
 
 
-
 PAYLOADSIZE = 20000
 """Number of bits per track per frame."""
 
@@ -309,18 +308,43 @@ class Mark4Header(Mark4TrackHeader):
         fh.write(stream.tostring())
 
     @classmethod
-    def fromvalues(cls, *args, **kwargs):
+    def fromvalues(cls, ntrack, decade=None, **kwargs):
+        """Initialise a header from parsed values.
+
+        Here, the parsed values must be given as keyword arguments, i.e., for
+        any ``header = cls(<words>)``, ``cls.fromvalues(**header) == header``.
+
+        However, unlike for the ``fromkeys`` class method, data can also be set
+        using arguments named after header methods such as ``time``.
+
+        Parameters
+        ----------
+        ntrack : int
+            Number of Mark 4 bitstreams.
+        decade : int, or None
+            Decade the observations were taken (needed to remove ambiguity in
+            the Mark 4 time stamp).
+        **kwargs :
+            Values used to initialize header keys or methods.
+
+        --- Header keywords : (minimum for a complete header)
+
+        time : `~astropy.time.Time` instance
+            Sets bcd-encoded unit year, day, hour, minute, second.
+        bps : int
+            Bits per sample.
+        fanout : int
+            Number of tracks over which a given channel is spread out. Together
+            with ``ntrack`` and ``bps``, this defines ``headstack_id``,
+            ``track_id``, ``fan_out``, ``magnitude_bit``, and ``converter_id``.
+        """
         calculate_crc = 'crc' not in kwargs
         if calculate_crc:
             verify = kwargs.pop('verify', True)
             kwargs['verify'] = False
-        # Need to pass on ntrack both as argument and keyword, since the
-        # setter is useful.
-        if len(args):
-            kwargs['ntrack'] = args[0]
-        else:
-            args = (kwargs['ntrack'],)
-        self = super(Mark4Header, cls).fromvalues(*args, **kwargs)
+        # Need to pass on ntrack also as keyword, since the setter is useful.
+        kwargs['ntrack'] = ntrack
+        self = super(Mark4Header, cls).fromvalues(ntrack, decade, **kwargs)
         if calculate_crc:
             stream = words2stream(self.words)
             stream[-12:] = crc12(stream[:-12])

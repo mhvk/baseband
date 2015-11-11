@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE.rst
 import io
 
 import numpy as np
@@ -187,12 +188,12 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
     Parameters
     ----------
-    name : str or filehandle
-        file name
+    raw : str or filehandle
+        file name or handle of the raw VDIF stream
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
     """
-    def __init__(self, raw, thread_ids=None, nthread=None):
+    def __init__(self, raw, thread_ids=None):
         if not hasattr(raw, 'read'):
             raw = io.open(raw, mode='rb')
         if not isinstance(raw, VDIFFileReader):
@@ -270,7 +271,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
         offset0 = self.offset
         while count > 0:
-            dt, frame_nr, sample_offset = self.tell(unit='frame_info')
+            dt, frame_nr, sample_offset = self._frame_info()
             if(dt != self._frameset['seconds'] - self.header0['seconds'] or
                frame_nr != self._frameset['frame_nr']):
                 # Read relevant frame (possibly reusing data array from
@@ -326,13 +327,15 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
     nchan : int, optional
         Number of FFT channels within stream (default 1).
         Note: that different # of channels per thread is not supported.
-    frame_length : int
-        Number of long words for header plus payload.
-        For some edv, this is fixed (e.g., 629 for edv=3).
     complex_data : bool
         Whether data is complex
     bps : int
         Bits per sample (or real, imaginary component).
+    samples_per_frame : int
+        Number of complete samples in a given frame.  As an alternative, use
+        ``frame_length``, the number  of long words for header plus payload.
+        For some edv, this number is fixed (e.g., ``frame_length=629`` for
+        edv=3, which corresponds to 20000 real 2-bit samples per frame).
     station : 2 characters
         Or unsigned 2-byte integer.
     edv : {`False`, 1, 3, 4, 0xab}
@@ -370,7 +373,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
         offset0 = self.offset
         frame = self._data.transpose(1, 0, 2)
         while count > 0:
-            dt, frame_nr, sample_offset = self.tell(unit='frame_info')
+            dt, frame_nr, sample_offset = self._frame_info()
             if sample_offset == 0:
                 # set up header for new frame.
                 self._header = self.header0.copy()

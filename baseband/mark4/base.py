@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE.rst
 import os
 import io
 
@@ -38,7 +39,7 @@ class Mark4FileReader(io.BufferedReader):
 
         Returns
         -------
-        frame : :class:`~baseband.mark4.Mark4Frame`
+        frame : `~baseband.mark4.Mark4Frame`
             With ``.header`` and ``.data`` properties that return the
             :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
             respectively.
@@ -127,7 +128,7 @@ class Mark4FileWriter(io.BufferedWriter):
 
         Parameters
         ----------
-        data : array or :class:`~baseband.mark4.Mark4Frame`
+        data : array or `~baseband.mark4.Mark4Frame`
             If an array, a header should be given, which will be used to
             get the information needed to encode the array, and to construct
             the Mark 4 frame.
@@ -153,13 +154,16 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
     Parameters
     ----------
-    name : str
-        file name
+    raw : str, filehandle, or `~baseband.mark4.Mark4FileReader`
+        file name, or file handle to raw data file.
     ntrack : int
         Number of tracks used to store the data.
+    decade : int, or `~astropy.time.Time`
+        Year rounded to decade, to remove ambiguities in the time stamps.
+        By default, it will be inferred from the file creation date.
     thread_ids: list of int, optional
         Specific threads/channels to read.  By default, all are read.
-    sample_rate : :class:`~astropy.units.Quantity`, optional
+    sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
         If not given, it will be determined from the frame rate.
     """
@@ -195,7 +199,7 @@ class Mark4StreamReader(VLBIStreamReaderBase):
         count : int
             Number of samples to read.  If omitted or negative, the whole
             file is read.
-        fill_value : float or complex
+        fill_value : float
             Value to use for invalid or missing data.
         squeeze : bool
             If `True` (default), remove channel and thread dimensions if unity.
@@ -205,7 +209,7 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
         Returns
         -------
-        out : array of float or complex
+        out : array of float
             Dimensions are (sample-time, vlbi-thread, channel).
         """
         if out is None:
@@ -259,28 +263,31 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
     raw : filehandle, or name.
         Should be a :class:`Mark4FileWriter` or :class:`~io.BufferedWriter`
         instance. If a name, will get opened for writing binary data.
-    header : :class:`~baseband.mark4.Mark4Header`
-        Header for the first frame, holding time information, etc.
+    sample_rate : `~astropy.units.Quantity`
+        Rate at which each thread is sampled (bandwidth * 2; frequency units).
+        This is needed to calculate time stamps.
+    header : `~baseband.mark4.Mark4Header`
+        Header for the first frame, holding start time information, etc.
+    **kwargs
+        If no header is give, an attempt is made to construct the header from
+        these.  For a standard header, this would include the following.
 
-    If no header is give, an attempt is made to construct the header from the
-    remaining keyword arguments.  For a standard header, this would include:
+    --- Header keywords : (see :meth:`~baseband.mark4.Mark4Header.fromvalues`)
 
-    time : `~astropy.time.Time` instance
-        Or 'ref_epoch' + 'seconds'
-    nchan : number of FFT channels within stream (default 1).
-        Note: that different # of channels per thread is not supported.
-    frame_length : number of long words for header plus payload
-        For some edv, this is fixed (e.g., 629 for edv=3).
-    complex_data : whether data is complex
-    bps : bits per sample
-        Or 'bits_per_sample', which is bps-1.
-    station_id : 2 characters
-        Or unsigned 2-byte integer.
+    time : `~astropy.time.Time`
+        Sets bcd-encoded unit year, day, hour, minute, second.
+    ntrack : int
+        Number of Mark 4 bitstreams (equal to number of channels times
+        ``fanout`` times ``bps``)
+    bps : int
+        Bits per sample.
+    fanout : int
+        Number of tracks over which a given channel is spread out.
     """
 
     _frame_class = Mark4Frame
 
-    def __init__(self, raw, header=None, **kwargs):
+    def __init__(self, raw, sample_rate, header=None, **kwargs):
         if isinstance(raw, io.BufferedWriter):
             if not isinstance(raw, Mark4FileWriter):
                 raw = Mark4FileWriter(raw)
@@ -290,39 +297,35 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
             header = Mark4Header.fromvalues(**kwargs)
         super(Mark4StreamWriter, self).__init__(
             fh_raw=raw, header0=header, thread_ids=range(header.nchan),
+            bps=header.bps, nchan=header.nchan,
             samples_per_frame=(header.framesize * 8 // header.bps //
-                               header.nchan))
+                               header.nchan),
+            sample_rate=sample_rate)
 
-        self._data = np.zeros(
-            (self.nthread, self.samples_per_frame, self.nchan),
-            np.complex64 if header['complex_data'] else np.float32)
+        self._data = np.zeros((self.samples_per_frame, self.nchan), np.float32)
 
     def write(self, data, squeezed=True, invalid_data=False):
         """Write data, buffering by frames as needed."""
-        if squeezed and data.ndim < 3:
-            if self.nthread == 1:
-                data = np.expand_dims(data, axis=1)
-            if self.nchan == 1:
-                data = np.expand_dims(data, axis=-1)
+        if squeezed and data.ndim < 2:
+            data = np.expand_dims(data, axis=1 if self.nthread == 1 else 0)
 
         assert data.shape[1] == self.nthread
-        assert data.shape[2] == self.nchan
 
         count = data.shape[0]
         sample = 0
         offset0 = self.offset
-        frame = self._data.transpose(1, 0, 2)
+        frame = self._data
         while count > 0:
-            dt, frame_nr, sample_offset = self.tell(unit='frame_info')
+            frame_nr, sample_offset = divmod(self.tell(),
+                                             self.samples_per_frame)
             if sample_offset == 0:
                 # set up header for new frame.
                 self._header = self.header0.copy()
-                self._header['seconds'] = self.header0['seconds'] + dt
-                self._header['frame_nr'] = frame_nr
+                self._header.time = self.tell(unit='time')
 
             if invalid_data:
                 # Mark whole frame as invalid data.
-                self._header['invalid_data'] = invalid_data
+                self._header['communication_error'] = True
 
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample_end = sample_offset + nsample
@@ -352,30 +355,35 @@ def open(name, mode='rs', **kwargs):
     **kwargs
         Additional arguments when opening the file as a stream
 
-    --- For reading a stream : (see :class:`Mark4StreamReader`)
+    --- For reading a stream : (see `~baseband.mark4.base.Mark4StreamReader`)
 
     ntrack : int
         Number of tracks used to store the data.
     thread_ids: list of int, optional
         Specific threads/channels to read.  By default, all are read.
-    sample_rate : :class:`~astropy.units.Quantity`, optional
+    sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
         If not given, it will be determined from the frame rate.
 
-    --- For writing a stream : (see :class:`Mark4StreamWriter`)
+    --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
 
-    header : :class:`~baseband.mark4.Mark4Header`
+    sample_rate : `~astropy.units.Quantity`
+        Rate at which each thread is sampled (bandwidth * 2; frequency units).
+        This is needed to calculate time stamps.
+    header : `~baseband.mark4.Mark4Header`
         Header for the first frame, holding time information, etc.
     **kwargs
         If the header is not given, an attempt will be made to construct one
-        with any further keyword arguments.  See :class:`Mark4StreamWriter`.
+        with any further keyword arguments.  See
+        :class:`~baseband.mark4.base.Mark4StreamWriter`.
 
     Returns
     -------
     Filehandle
-        :class:`Mark4FileReader` or :class:`Mark4FileWriter` instance (binary)
-        or :class:Mark4StreamReader` or :class:`Mark4StreamWriter` instance
-        (stream)
+        :class:`~baseband.mark4.base.Mark4FileReader` or
+        :class:`~baseband.mark4.base.Mark4FileWriter` instance (binary), or
+        :class:`~baseband.mark4.base.Mark4StreamReader` or
+        :class:`~baseband.mark4.base.Mark4StreamWriter` instance (stream)
     """
     if 'w' in mode:
         if not hasattr(name, 'write'):

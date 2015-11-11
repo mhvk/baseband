@@ -159,22 +159,52 @@ class TestMark5B(object):
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, ref_mjd=57000) as fh:
             assert header == fh.header0
+            assert fh.fh_raw.tell() == header.framesize
             assert fh.samples_per_frame == 5000
             assert fh.frames_per_second == 6400
             header1 = fh.header1
             assert fh.size == 20000
             record = fh.read(12)
-            assert fh.offset == 12
+            assert fh.tell() == 12
+            fh.seek(10000)
+            record2 = fh.read(2)
+            assert fh.tell() == 10002
+            assert fh.fh_raw.tell() == 3.*header.framesize
 
         assert header1['frame_nr'] == 3
         assert header1['user'] == header['user']
         assert header1['bcd_jday'] == header['bcd_jday']
         assert header1['bcd_seconds'] == header['bcd_seconds']
         assert header1['bcd_fraction'] == 4
-        assert (round((1./((header1.time-header.time)/3.)).to(u.Hz).value)
-                == 6400)
+        assert (round((1./((header1.time-header.time)/3.)).to(u.Hz).value) ==
+                6400)
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:3] ==
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
                                 [-3, +3, -1, +3, -1, -1, -1, +1],
                                 [+3, -1, +3, +3, +1, -1, +3, -1]]))
+        assert record2.shape == (2, 8)
+        assert np.all(record2.astype(int) ==
+                      np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
+                                [-1, +1, -3, +3, -3, +1, +3, +1]]))
+
+        # Read all data and check that it can be written out.
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
+            time0 = fh.tell(unit='time')
+            record = fh.read(20000)
+            time1 = fh.tell(unit='time')
+
+        with io.BytesIO() as s, mark5b.open(s, 'ws', time=time0, nchan=8,
+                                            bps=2, sample_rate=32*u.MHz) as fw:
+            fw.write(record)
+            assert fw.tell(unit='time') == time1
+            fw.fh_raw.flush()
+
+            s.seek(0)
+            fh = mark5b.open(s, 'rs', nchan=8, bps=2, sample_rate=32*u.MHz,
+                             ref_mjd=57000)
+            assert fh.tell(unit='time') == time0
+            record2 = fh.read(20000)
+            assert fh.tell(unit='time') == time1
+            assert np.all(record2 == record)

@@ -138,7 +138,7 @@ class VDIFHeader(VLBIHeaderBase):
         Values set by other keyword arguments (if present):
 
         bits_per_sample : from ``bps``
-        frame_length : from ``framesize`` (or ``payloadsize``, ``legacy_mode``)
+        frame_length : from ``samples_per_frame`` or ``framesize``
         lg2_nchan : from ``nchan``
         ref_epoch, seconds, frame_nr : from ``time`` (may need ``bandwidth``)
 
@@ -354,7 +354,8 @@ class VDIFHeader(VLBIHeaderBase):
                 except AttributeError:
                     raise ValueError("Cannot calculate frame rate for this "
                                      "header. Pass it in explicitly.")
-            self['frame_nr'] = round((frac_sec * framerate).to(u.one).value)
+            self['frame_nr'] = int(round((frac_sec * framerate)
+                                         .to(u.one).value))
 
     time = property(get_time, set_time)
 
@@ -434,7 +435,10 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
          ('sample_rate', (4, 0, 23)),
          ('sync_pattern', (5, 0, 32, 0xACABFEED))))
 
-    _properties = VDIFBaseHeader._properties + ('bandwidth', 'framerate')
+    # Add extra properties, ensuring 'time' comes after 'framerate', since
+    # time setting requires the frame rate.
+    _properties = (VDIFBaseHeader._properties[:-1] +
+                   ('bandwidth', 'framerate', 'time'))
 
     def same_stream(self, other):
         return (super(VDIFSampleRateHeader, self).same_stream(other) and

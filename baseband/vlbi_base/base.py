@@ -59,16 +59,18 @@ class VLBIStreamBase(object):
         if unit is None:
             return offset
 
-        if unit == 'frame_info':
-            full_frame_nr, extra = divmod(offset, self.samples_per_frame)
-            dt, frame_nr = divmod(full_frame_nr, self.frames_per_second)
-            return int(dt), int(frame_nr), extra
-
         if unit == 'time':
             return self.header0.time + self.tell(unit=u.s)
 
         return (offset * u_sample).to(unit, equivalencies=[(u.s, u.Unit(
             self.samples_per_frame * self.frames_per_second * u_sample))])
+
+    def _frame_info(self):
+        offset = (self.offset +
+                  self.header0['frame_nr'] * self.samples_per_frame)
+        full_frame_nr, extra = divmod(offset, self.samples_per_frame)
+        dt, frame_nr = divmod(full_frame_nr, self.frames_per_second)
+        return int(dt), int(frame_nr), extra
 
     def close(self):
         return self.fh_raw.close()
