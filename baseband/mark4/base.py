@@ -325,7 +325,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
 
             if invalid_data:
                 # Mark whole frame as invalid data.
-                self._header['communication_error'] = True
+                self._header.val['communication_error'] = True
 
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample_end = sample_offset + nsample

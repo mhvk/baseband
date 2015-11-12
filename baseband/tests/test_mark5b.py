@@ -88,6 +88,13 @@ class TestMark5B(object):
         header6 = mark5b.Mark5BHeader(header.words,
                                       ref_mjd=(header.time.mjd + 499.))
         assert header6.time == header.time
+        # check payload and framesize setters
+        header6.payload = 10000
+        header6.framesize = 10016
+        with pytest.raises(ValueError):
+            header6.payloadsize = 9999
+        with pytest.raises(ValueError):
+            header6.framesize = 20
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
@@ -127,6 +134,9 @@ class TestMark5B(object):
 
         payload3 = mark5b.Mark5BPayload.fromdata(payload.data, bps=payload.bps)
         assert payload3 == payload
+        with pytest.raises(ValueError):
+            mark5b.Mark5BPayload.fromdata(np.zeros((5000, 8), np.complex64),
+                                          bps=2)
 
     def test_frame(self):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
@@ -149,8 +159,20 @@ class TestMark5B(object):
                                                  nchan=frame.shape[1],
                                                  bps=frame.payload.bps)
         assert frame2 == frame
-        frame3 = mark5b.Mark5BFrame.fromdata(frame.data, frame.header, bps=2)
+        frame3 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2)
         assert frame3 == frame
+        frame4 = mark5b.Mark5BFrame.fromdata(payload.data, bps=2,
+                                             ref_mjd=57000, **header)
+        assert frame4 == frame
+        frame5 = mark5b.Mark5BFrame(header, payload, valid=False)
+        assert frame5.valid is False
+        assert np.all(frame5.data == 0.)
+        frame5.valid = True
+        assert frame5 == frame
+        frame6 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2,
+                                             valid=False)
+        assert frame6.valid is False
+        assert np.all(frame6.payload.words == 0x11223344)
 
     def test_header_times(self):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:

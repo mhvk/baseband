@@ -30,6 +30,9 @@ class VDIFFrame(VLBIFrameBase):
         header information.
     payload : VDIFPayload
         Wrapper around the payload, provding mechanisms to decode it.
+    valid : bool or `None`
+        Whether the data is valid.  If `None` (default), inferred from header.
+        Note that header is changed in-place if `True` or `False`.
     verify : bool
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and whether or not data are complex
@@ -57,9 +60,11 @@ class VDIFFrame(VLBIFrameBase):
     _header_class = VDIFHeader
     _payload_class = VDIFPayload
 
-    def __init__(self, header, payload, verify=True):
+    def __init__(self, header, payload, valid=None, verify=True):
         self.header = header
         self.payload = payload
+        if valid is not None:
+            self.valid = valid
         if verify:
             self.verify()
 
@@ -217,7 +222,6 @@ class VDIFFrameSet(object):
         edv = header0.edv
 
         frames = []
-        exc = None
         header = header0
         while header['frame_nr'] == header0['frame_nr']:
             if thread_ids is None or header['thread_id'] in thread_ids:
@@ -229,9 +233,11 @@ class VDIFFrameSet(object):
 
             try:
                 header = VDIFHeader.fromfile(fh, edv, verify)
-            except EOFError as exc:
-                fh.seek(0, 2)
-                break
+            except EOFError:
+                if thread_ids is None or len(frames) == len(thread_ids):
+                    break
+                else:
+                    raise
         else:  # Move back to before header that had incorrect frame_nr.
             fh.seek(-header.size, 1)
 
@@ -239,10 +245,7 @@ class VDIFFrameSet(object):
             thread_ids = range(min(len(frames), 1))
 
         if len(frames) < len(thread_ids):
-            if exc is not None:
-                raise
-            else:
-                raise IOError("Could not find all requested frames.")
+            raise IOError("Could not find all requested frames.")
 
         if sort:
             frames.sort(key=lambda frame: frame['thread_id'])
@@ -255,7 +258,7 @@ class VDIFFrameSet(object):
             frame.tofile(fh)
 
     @classmethod
-    def fromdata(cls, data, headers, verify=True, **kwargs):
+    def fromdata(cls, data, headers=None, verify=True, **kwargs):
         """Construct a set of frames from data and headers.
 
         Parameters
@@ -278,10 +281,11 @@ class VDIFFrameSet(object):
         """
         if not isinstance(headers, (list, tuple)):
             if headers is None:
-                kwargs.set_default('thread_id', 0)
+                kwargs.setdefault('thread_id', 0)
                 header = VDIFHeader.fromvalues(verify=verify, **kwargs)
             else:
-                header = headers
+                header = headers.copy()
+            header['thread_id'] = 0
             headers = [header]
             for thread_id in range(1, len(data)):
                 header = header.copy()
@@ -338,7 +342,7 @@ class VDIFFrameSet(object):
         return self.header0.keys()
 
     def __contains__(self, key):
-        return key in self.header[0].keys()
+        return key in self.header0
 
     def __getattr__(self, attr):
         try:
@@ -348,3 +352,10 @@ class VDIFFrameSet(object):
                 return getattr(self.header0, attr)
             else:
                 raise
+
+    # For tests, it is useful to define equality.
+    def __eq__(self, other):
+        return (type(self) is type(other) and
+                len(self.frames) == len(other.frames) and
+                self.header0 == other.header0 and
+                all(f1 == f2 for f1, f2 in zip(self.frames, other.frames)))

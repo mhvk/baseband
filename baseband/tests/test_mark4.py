@@ -4,7 +4,7 @@ import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
 from .. import mark4, vlbi_base
-
+from ..mark4.payload import reorder32, reorder64
 
 SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m4')
 """Mark 4 sample.
@@ -130,6 +130,14 @@ class TestMark4(object):
         assert np.all(mark4.payload.lut2bit3[0x0f] == 1.)
         assert np.all(mark4.payload.lut2bit3[0xff] == o2h)
 
+    def test_payload_reorder(self):
+        """Test that bit reordering is consistent with mark5access."""
+        check = np.array([738811025863578102], dtype=np.uint64)
+        expected = np.array([118, 209, 53, 244, 148, 217, 64, 10], np.uint8)
+        assert np.all(reorder64(check).view(np.uint8) == expected)
+        assert np.all(reorder32(check.view(np.uint32)).view(np.uint8) ==
+                      expected)
+
     def test_payload(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
@@ -138,10 +146,16 @@ class TestMark4(object):
         assert payload.size == (20000 - 160) * 64 // 8
         assert payload.shape == ((20000 - 160) * 4, 8)
         assert payload.dtype == np.float32
-        assert np.all(payload.data[0].astype(int) ==
+        data = payload.data
+        assert np.all(data[0].astype(int) ==
                       np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(payload.data[1].astype(int) ==
+        assert np.all(data[1].astype(int) ==
                       np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        in_place = np.zeros_like(data)
+        payload.todata(data=in_place)
+        assert in_place is not data
+        assert np.all(in_place == data)
+
         with io.BytesIO() as s:
             payload.tofile(s)
             s.seek(0)
@@ -161,6 +175,11 @@ class TestMark4(object):
             # Too few data.
             mark4.Mark4Payload.fromdata(payload.data[:100], header)
 
+        with pytest.raises(ValueError):
+            # Wrong data type
+            mark4.Mark4Payload.fromdata(np.zeros((5000, 8), np.complex64),
+                                        header)
+
     def test_frame(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
@@ -171,6 +190,7 @@ class TestMark4(object):
 
         assert frame.header == header
         assert frame.payload == payload
+        assert frame.valid is True
         assert frame == mark4.Mark4Frame(header, payload)
         assert np.all(frame.data[:640] == 0.)
         assert np.all(frame.data[640].astype(int) ==
@@ -182,8 +202,19 @@ class TestMark4(object):
             s.seek(0)
             frame2 = mark4.Mark4Frame.fromfile(s, ntrack=64, decade=2010)
         assert frame2 == frame
-        frame3 = mark4.Mark4Frame.fromdata(frame.data, frame.header)
+        # Need frame.data here, since payload.data does not contain pieces
+        # overwritten by header.
+        frame3 = mark4.Mark4Frame.fromdata(frame.data, header)
         assert frame3 == frame
+        frame4 = mark4.Mark4Frame.fromdata(frame.data, ntrack=64,
+                                           decade=2010, **header)
+        assert frame4 == frame
+        header5 = header.copy()
+        frame5 = mark4.Mark4Frame(header5, payload, valid=False)
+        assert frame5.valid is False
+        assert np.all(frame5.data == 0.)
+        frame5.valid = True
+        assert frame5 == frame
 
     def test_header_times(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
