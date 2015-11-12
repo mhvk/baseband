@@ -96,25 +96,41 @@ class Mark5BHeader(VLBIHeaderBase):
                 self._header_parser.defaults['sync_pattern'])
         assert self.kday is None or (33000 < self.kday < 400000)
 
-    @classmethod
-    def fromvalues(cls, *args, **kwargs):
-        calculate_crc = 'crc' not in kwargs
+    def update(self, **kwargs):
+        """Update the header by setting keywords or properties.
+
+        Here, any keywords matching header keys are applied first, and any
+        remaining ones are used to set header properties, in the order set
+        by the class (in ``_properties``).
+
+        Parameters
+        ----------
+        crc : int or `None`, optional
+            If `None` (default), recalculate the CRC after updating.
+        verify : bool, optional
+            If `True` (default), verify integrity after updating.
+        **kwargs
+            Arguments used to set keywords and properties.
+        """
+        calculate_crc = kwargs.get('crc', None) is None
         if calculate_crc:
+            kwargs.pop('crc', None)
             verify = kwargs.pop('verify', True)
             kwargs['verify'] = False
-        self = super(Mark5BHeader, cls).fromvalues(*args, **kwargs)
+
+        super(Mark5BHeader, self).update(**kwargs)
         if calculate_crc:
-            # CRC is calculated just over the time parts from words 2 & 3
-            stream = np.array([int(b) for b in
-                               '{:032b}{:016b}'.format(self.words[2],
-                                                       self.words[3] >> 16)],
-                              dtype=np.uint8)
+            # Do not use words 2 & 3 directly, so that this works also if part
+            # of a VDIF header, where the time information is in words 7 & 8.
+            stream = '{:012b}{:020b}{:016b}'.format(self['bcd_jday'],
+                                                    self['bcd_seconds'],
+                                                    self['bcd_fraction'])
+            stream = np.array([int(b) for b in stream], dtype=np.uint8)
             crc = crc16(stream)
             self['crc'] = int(''.join(['{:1d}'.format(c) for c in crc]),
                               base=2)
             if verify:
                 self.verify()
-        return self
 
     @property
     def payloadsize(self):
@@ -165,7 +181,9 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @ns.setter
     def ns(self, ns):
-        fraction = int(round(ns / 100000))
+        # From inspecting sample files, the fraction appears to be truncated,
+        # not rounded.
+        fraction = int(ns / 100000)
         self['bcd_fraction'] = bcd_encode(fraction)
 
     def get_time(self):

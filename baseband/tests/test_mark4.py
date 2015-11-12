@@ -185,6 +185,25 @@ class TestMark4(object):
         frame3 = mark4.Mark4Frame.fromdata(frame.data, frame.header)
         assert frame3 == frame
 
+    def test_header_times(self):
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            header0 = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+            time0 = header0.time
+            # use framesize, since header adds to payload.
+            samples_per_frame = header0.framesize * 8 // 2 // 8
+            frame_rate = 32. * u.MHz / samples_per_frame
+            frame_duration = 1./frame_rate
+            fh.seek(0xa88)
+            for frame_nr in range(100):
+                try:
+                    frame = fh.read_frame(ntrack=64, decade=2010)
+                except EOFError:
+                    break
+                header_time = frame.header.time
+                expected = time0 + frame_nr * frame_duration
+                assert abs(header_time - expected) < 1. * u.ns
+
     def test_filestreamer(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
@@ -218,6 +237,7 @@ class TestMark4(object):
                         sample_rate=32*u.MHz) as fh:
             time0 = fh.tell(unit='time')
             record = fh.read(160000)
+            fh_raw_tell1 = fh.fh_raw.tell()
             time1 = fh.tell(unit='time')
 
         with io.BytesIO() as s, mark4.open(s, 'ws', sample_rate=32*u.MHz,
@@ -234,3 +254,20 @@ class TestMark4(object):
             record2 = fh.read(160000)
             assert fh.tell(unit='time') == time1
             assert np.all(record2 == record)
+
+        # Check files can be made byte-for-byte identical.  Here, we use the
+        # original header so we set stuff like head_stack, etc.
+        with io.BytesIO() as s, mark4.open(s, 'ws', header=header,
+                                           sample_rate=32*u.MHz) as fw:
+
+            fw.write(record)
+            fw.fh_raw.flush()
+            number_of_bytes = s.tell()
+            assert number_of_bytes == fh_raw_tell1 - 0xa88
+
+            s.seek(0)
+            with open(SAMPLE_FILE, 'rb') as fr:
+                fr.seek(0xa88)
+                orig_bytes = fr.read(number_of_bytes)
+                conv_bytes = s.read()
+                assert conv_bytes == orig_bytes

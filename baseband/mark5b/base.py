@@ -334,8 +334,8 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
             if sample_offset == 0:
                 # set up header for new frame.
                 self._header = self.header0.copy()
-                self._header.time = self.tell(unit='time')
-                self._header['frame_nr'] = frame_nr
+                self._header.update(time=self.tell(unit='time'),
+                                    frame_nr=frame_nr)
 
             if invalid_data:
                 # Mark whole frame as invalid data.

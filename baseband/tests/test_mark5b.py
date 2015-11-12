@@ -133,7 +133,7 @@ class TestMark5B(object):
             header = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
             fh.seek(0)
-            frame = fh.read_frame(nchan=8, bps=2)
+            frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
 
         assert frame.header == header
         assert frame.payload == payload
@@ -151,6 +151,23 @@ class TestMark5B(object):
         assert frame2 == frame
         frame3 = mark5b.Mark5BFrame.fromdata(frame.data, frame.header, bps=2)
         assert frame3 == frame
+
+    def test_header_times(self):
+        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
+            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
+            time0 = header0.time
+            samples_per_frame = header0.payloadsize * 8 // 2 // 8
+            frame_rate = 32. * u.MHz / samples_per_frame
+            frame_duration = 1./frame_rate
+            fh.seek(0)
+            while True:
+                try:
+                    frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
+                except EOFError:
+                    break
+                header_time = frame.header.time
+                expected = time0 + frame.header['frame_nr'] * frame_duration
+                assert abs(header_time - expected) < 1. * u.ns
 
     def test_filestreamer(self):
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -208,3 +225,16 @@ class TestMark5B(object):
             record2 = fh.read(20000)
             assert fh.tell(unit='time') == time1
             assert np.all(record2 == record)
+
+        # Check files can be made byte-for-byte identical.
+        with io.BytesIO() as s, mark5b.open(
+                s, 'ws', time=time0, nchan=8, bps=2, sample_rate=32*u.MHz,
+                user=header['user'], internal_tvg=header['internal_tvg'],
+                frame_nr=header['frame_nr']) as fw:
+
+            fw.write(record)
+            s.seek(0)
+            with open(SAMPLE_FILE, 'rb') as fr:
+                orig_bytes = fr.read()
+                conv_bytes = s.read()
+                assert conv_bytes == orig_bytes

@@ -338,20 +338,39 @@ class Mark4Header(Mark4TrackHeader):
             with ``ntrack`` and ``bps``, this defines ``headstack_id``,
             ``track_id``, ``fan_out``, ``magnitude_bit``, and ``converter_id``.
         """
-        calculate_crc = 'crc' not in kwargs
-        if calculate_crc:
-            verify = kwargs.pop('verify', True)
-            kwargs['verify'] = False
         # Need to pass on ntrack also as keyword, since the setter is useful.
         kwargs['ntrack'] = ntrack
-        self = super(Mark4Header, cls).fromvalues(ntrack, decade, **kwargs)
+        return super(Mark4Header, cls).fromvalues(ntrack, decade, **kwargs)
+
+    def update(self, *args, **kwargs):
+        """Update the header by setting keywords or properties.
+
+        Here, any keywords matching header keys are applied first, and any
+        remaining ones are used to set header properties, in the order set
+        by the class (in ``_properties``).
+
+        Parameters
+        ----------
+        crc : int or `None`, optional
+            If `None` (default), recalculate the CRC after updating.
+        verify : bool, optional
+            If `True` (default), verify integrity after updating.
+        **kwargs
+            Arguments used to set keywords and properties.
+        """
+        calculate_crc = kwargs.get('crc', None) is None
+        if calculate_crc:
+            kwargs.pop('crc', None)
+            verify = kwargs.pop('verify', True)
+            kwargs['verify'] = False
+
+        super(Mark4Header, self).update(**kwargs)
         if calculate_crc:
             stream = words2stream(self.words)
             stream[-12:] = crc12(stream[:-12])
             self.words = stream2words(stream)
             if verify:
                 self.verify()
-        return self
 
     @property
     def ntrack(self):
