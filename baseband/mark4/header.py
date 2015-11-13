@@ -172,7 +172,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
 
     @ms.setter
     def ms(self, ms):
-        if np.any(np.round(ms / 1.25) % 1 > 1e-6):
+        if np.any(np.abs((ms / 1.25) - np.round(ms / 1.25)) > 1e-6):
             raise ValueError("{0} ms is not a multiple of 1.25 ms"
                              .format(ms))
         self['bcd_fraction'] = bcd_encode(np.floor(ms + 1e-6)
@@ -264,12 +264,7 @@ class Mark4Header(Mark4TrackHeader):
 
     @classmethod
     def _stream_dtype(cls, ntrack):
-        try:
-            dtype = cls._dtypes[ntrack]
-        except KeyError:
-            raise ValueError("Do not know how to reach {0}-track "
-                             "Mark 4 header.".format(ntrack))
-        return np.dtype(dtype)
+        return np.dtype(cls._dtypes[ntrack])
 
     @property
     def stream_dtype(self):
@@ -293,8 +288,10 @@ class Mark4Header(Mark4TrackHeader):
         """
         dtype = cls._stream_dtype(ntrack)
         size = ntrack * 5 * 32 // 8
-        stream = np.fromstring(fh.read(size), dtype=dtype)
-        if len(stream) * dtype.itemsize != size:
+        try:
+            stream = np.fromstring(fh.read(size), dtype=dtype)
+            assert len(stream) * dtype.itemsize == size
+        except (ValueError, AssertionError):
             raise EOFError("Could not read full Mark 4 Header.")
 
         words = stream2words(stream,
@@ -494,12 +491,12 @@ class Mark4Header(Mark4TrackHeader):
         except IndexError:
             raise IndexError("Index {item} is out of bounds.")
 
-        if not(new_words.shape and new_words.shape[0] == 5):
+        if not(1 <= new_words.ndim <= 2 and new_words.shape[0] == 5):
             raise ValueError("Cannot extract {0} from {1} instance."
                              .format(item, type(self)))
 
         if new_words.ndim == 1:
-            return self._track_header(new_words.tolist(), self.decade,
+            return self._track_header(new_words, self.decade,
                                       verify=False)
         else:
             return self.__class__(new_words, self.decade, verify=False)
@@ -509,7 +506,7 @@ class Mark4Header(Mark4TrackHeader):
                 np.all(self.words == other.words))
 
     def __repr__(self):
-        if getattr(self.words, 'ndim', 1) == 1:
+        if getattr(self.words, 'size', 5) == 5:
             return super(Mark4Header, self).__repr__()
 
         name = self.__class__.__name__

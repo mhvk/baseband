@@ -152,9 +152,9 @@ class VDIFPayload(VLBIPayloadBase):
                              .format(header.nchan, data.shape[-1]))
         if header['complex_data'] != (data.dtype.kind == 'c'):
             raise ValueError("Header is for {0} data but data is {1}"
-                             .format(('complex' if c else 'real') for c
-                                     in (header['complex_data'],
-                                         data.dtype.kind == 'c')))
+                             .format(*(('complex' if c else 'real') for c
+                                       in (header['complex_data'],
+                                           data.dtype.kind == 'c'))))
         if header.edv == 0xab:  # Mark5B payload
             from ..mark5b import Mark5BPayload
             encoder = Mark5BPayload._encoders[header.bps,

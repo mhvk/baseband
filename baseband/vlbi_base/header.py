@@ -363,7 +363,7 @@ class VLBIHeaderBase(object):
             if default is not None:
                 kwargs[key] = default
 
-        self.update(use_defaults=True, **kwargs)
+        self.update(**kwargs)
         return self
 
     @classmethod

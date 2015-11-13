@@ -138,6 +138,26 @@ class TestVDIF(object):
         with pytest.raises(ValueError):
             # Too few data.
             vdif.VDIFPayload.fromdata(payload.data[:100], header)
+        # check if it works with complex data
+        payload4 = vdif.VDIFPayload(payload.words, nchan=1, bps=2,
+                                    complex_data=True)
+        assert payload4.complex_data is True
+        assert payload4.size == 5000
+        assert payload4.shape == (10000, 1)
+        assert payload4.dtype == np.complex64
+        assert np.all(payload4.data ==
+                      payload.data[::2] + 1j * payload.data[1::2])
+        # check in-place decoding
+        in_place = np.zeros(payload4.shape, payload4.dtype)
+        payload4.todata(data=in_place)
+        assert in_place is not payload4.data
+        assert np.all(in_place == payload4.data)
+        with pytest.raises(ValueError):
+            vdif.VDIFPayload.fromdata(in_place, header)
+        header5 = header.copy()
+        header5['complex_data'] = True
+        payload5 = vdif.VDIFPayload.fromdata(in_place, header5)
+        assert payload5 == payload4
 
     def test_frame(self):
         with vdif.open(SAMPLE_FILE, 'rb') as fh:

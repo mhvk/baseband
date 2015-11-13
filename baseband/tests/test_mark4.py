@@ -4,7 +4,9 @@ import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
 from .. import mark4, vlbi_base
+from ..mark4.header import Mark4TrackHeader
 from ..mark4.payload import reorder32, reorder64
+
 
 SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m4')
 """Mark 4 sample.
@@ -60,15 +62,23 @@ class TestMark4(object):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+            fh.seek(-10, 2)
+            with pytest.raises(EOFError):
+                mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+
+        assert len(header) == 64
+        assert header.track_id[0] == 2 and header.track_id[-1] == 33
         assert header.size == 160 * 64 // 8
         assert header.fanout == 4
         assert header.bps == 2
+        assert not np.all(~header['magnitude_bit'])
         assert header.nchan == 8
         assert int(header.time.mjd) == 56824
         assert header.time.isot == '2014-06-16T07:38:12.47500'
         assert header.framesize == 20000 * 64 // 8
         assert header.payloadsize == header.framesize - header.size
         assert header.mutable is False
+        assert repr(header).startswith('<Mark4Header bcd_headstack1: [0')
         with io.BytesIO() as s:
             header.tofile(s)
             s.seek(0)
@@ -96,6 +106,7 @@ class TestMark4(object):
         assert header5.time == header.time
         header6 = mark4.Mark4Header(header.words, decade=2019)
         assert header6.time == header.time
+        # Check changing properties.
         header7 = header.copy()
         assert header7 == header
         assert header7.mutable is True
@@ -106,8 +117,57 @@ class TestMark4(object):
                                                header7['bcd_headstack1'][1:]))
         assert header7['bcd_headstack1'][0] == 0x7788
         assert np.all(header7['bcd_headstack1'][1:] == 0x5566)
+        # Check it doesn't work on non-mutable header
         with pytest.raises(TypeError):
             header['bcd_headstack1'] = 0
+        # Check time assignment
+        with pytest.raises(ValueError):
+            header7.time = header.time + 0.1 * u.ms
+        header7.bps = 1
+        assert np.all(~header7['magnitude_bit'])
+        header7.bps = 2
+        assert not np.all(~header7['magnitude_bit'])
+        with pytest.raises(ValueError):
+            header7.bps = 4
+        with pytest.raises(Exception):
+            header7.ntrack = 51
+        with pytest.raises(AssertionError):
+            header7.framesize = header.framesize - 1
+        with pytest.raises(AssertionError):
+            header7.payloadsize = header.payloadsize - 1
+        with pytest.raises(Exception):
+            header7.framesize = header.framesize * 2  # implied ntrack=128
+        header7.nchan = 16
+        assert header7.nchan == 16 and header7.bps == 1
+        # OK, this is silly, but why not...
+        header7.time = header.time + np.arange(64) * 125 * u.ms
+        assert len(header7.time) == 64
+        assert np.all(abs(header7.time - header.time -
+                          np.arange(64) * 125 * u.ms) < 1.*u.ns)
+        with pytest.raises(ValueError):
+            header7.time = header.time + np.arange(64) * u.year
+        # Check slicing.
+        header8 = header[:2]
+        assert type(header8) is mark4.Mark4Header
+        assert len(header8) == 2
+        header9 = header[10]
+        assert type(header9) is Mark4TrackHeader
+        assert repr(header9).startswith('<Mark4TrackHeader bcd_headstack1: 0')
+        assert repr(header[:1]).startswith('<Mark4Header bcd_headstack1: 0')
+        header10 = Mark4TrackHeader(header9.words, decade=2010)
+        assert header10 == header9
+        header11 = Mark4TrackHeader.fromvalues(decade=2010, **header9)
+        assert header11 == header9
+        with pytest.raises(AssertionError):  # missing decade
+            Mark4TrackHeader.fromvalues(**header9)
+        with pytest.raises(IndexError):
+            header[65]
+        with pytest.raises(ValueError):
+            header[np.array([[0, 1], [2, 3]])]
+        header12 = mark4.Mark4Header(None, ntrack=53, decade=2010,
+                                     verify=False)
+        with pytest.raises(ValueError):
+            header12.ntrack = 53
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""

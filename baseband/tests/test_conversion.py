@@ -3,6 +3,7 @@ import os
 import numpy as np
 from astropy import units as u
 from astropy.time import Time
+from astropy.tests.helper import pytest
 from .. import vdif
 from .. import mark4
 from .. import mark5b
@@ -44,6 +45,10 @@ class TestVDIFMark5B(object):
         payload2 = vdif.VDIFPayload.fromdata(m5pl.data, header)
         assert np.all(payload2.words == m5pl.words)
         assert np.all(payload2.data == m5pl.data)
+        header2 = header.copy()
+        header2['complex_data'] = True
+        with pytest.raises(ValueError):
+            vdif.VDIFPayload(m5pl.words, header2)
 
     def test_frame(self):
         with mark5b.open(SAMPLE_M5B, 'rb') as fh:
