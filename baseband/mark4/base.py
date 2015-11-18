@@ -1,9 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE.rst
-import os
 import io
 
 import numpy as np
-from astropy.time import Time
 
 from ..vlbi_base.base import VLBIStreamReaderBase, VLBIStreamWriterBase
 from .header import Mark4Header
@@ -25,17 +23,16 @@ class Mark4FileReader(io.BufferedReader):
     reader :class:`~io.BufferedReader`.
     """
 
-    def read_frame(self, ntrack, decade=None):
+    def read_frame(self, ntrack, decade):
         """Read a single frame (header plus payload).
 
         Parameters
         ----------
         ntrack : int
             Number of Mark 4 bitstreams.
-        decade : int, optional
+        decade : int
             Decade the observations were taken (needed to remove ambiguity in
-            the Mark 4 time stamp).  If not given, it is inferred from the
-            decade of the file's creation time.
+            the Mark 4 time stamp).
 
         Returns
         -------
@@ -44,13 +41,6 @@ class Mark4FileReader(io.BufferedReader):
             :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
             respectively.
         """
-        if decade is None:
-            if not hasattr(self, '_creation_time_isot'):
-                self._creation_time_isot = Time(os.path.getctime(self.name),
-                                                format='unix').isot
-            decade = int(self._creation_time.isot[:3]) * 10
-        elif isinstance(decade, Time):
-            decade = int(decade.isot[:3]) * 10
         return Mark4Frame.fromfile(self, ntrack=ntrack, decade=decade)
 
     def find_frame(self, ntrack=None, template_header=None,
@@ -92,7 +82,11 @@ class Mark4FileReader(io.BufferedReader):
             iterate = range(file_pos - b - step - len(nset),
                             file_pos - b - step - len(nset) - maximum, -step)
         for frame in iterate:
-            self.seek(frame)
+            try:
+                self.seek(frame)
+            except OSError:
+                break
+
             data = np.fromstring(self.read(b+step+len(nset)),
                                  dtype=np.uint8)
             if len(data) < b + step + len(nset):
@@ -139,9 +133,7 @@ class Mark4FileWriter(io.BufferedWriter):
             If no header is given, these are used to initialize one.
         """
         if not isinstance(data, Mark4Frame):
-            if header is None:
-                header = Mark4Header.fromvalues(**kwargs)
-            data = Mark4Frame.fromdata(data, header)
+            data = Mark4Frame.fromdata(data, header, **kwargs)
         return data.tofile(self)
 
 
@@ -154,8 +146,8 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
     Parameters
     ----------
-    raw : str, filehandle, or `~baseband.mark4.Mark4FileReader`
-        file name, or file handle to raw data file.
+    raw : `~baseband.mark4.Mark4FileReader`
+        file handle to the raw Mark 4 data stream.
     ntrack : int
         Number of tracks used to store the data.
     decade : int, or `~astropy.time.Time`
@@ -172,10 +164,6 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
     def __init__(self, raw, ntrack, decade=None, thread_ids=None,
                  sample_rate=None):
-        if not hasattr(raw, 'read'):
-            raw = io.open(raw, mode='rb')
-        if not isinstance(raw, Mark4FileReader):
-            raw = Mark4FileReader(raw)
         self.offset0 = raw.find_frame(ntrack=ntrack)
         self._frame = raw.read_frame(ntrack, decade)
         self._frame_data = None
@@ -260,9 +248,8 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
 
     Parameters
     ----------
-    raw : filehandle, or name.
-        Should be a :class:`Mark4FileWriter` or :class:`~io.BufferedWriter`
-        instance. If a name, will get opened for writing binary data.
+    raw : `~baseband.mark4.Mark4FileWriter`
+        Which will write filled sets of frames to storage.
     sample_rate : `~astropy.units.Quantity`
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
         This is needed to calculate time stamps.
@@ -288,11 +275,6 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
     _frame_class = Mark4Frame
 
     def __init__(self, raw, sample_rate, header=None, **kwargs):
-        if isinstance(raw, io.BufferedWriter):
-            if not isinstance(raw, Mark4FileWriter):
-                raw = Mark4FileWriter(raw)
-        else:
-            raw = Mark4FileWriter(io.open(raw, mode='wb'))
         if header is None:
             header = Mark4Header.fromvalues(**kwargs)
         super(Mark4StreamWriter, self).__init__(
