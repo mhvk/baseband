@@ -133,6 +133,10 @@ def make_setter(word_index, bit_index, bit_length, default=None):
     return setter
 
 
+def get_default(word_index, bit_index, bit_length, default=None):
+    return default
+
+
 class HeaderProperty(object):
     """Mimic a dictionary, calculating entries from header words.
 
@@ -151,16 +155,14 @@ class HeaderProperty(object):
 
     def __getitem__(self, item):
         definition = self.header_parser[item]
-        return self.getter(definition)
+        return self.getter(*definition)
 
 
 class HeaderPropertyGetter(object):
     """Special property for attaching HeaderProperty."""
     def __init__(self, getter, doc=None):
         self.getter = getter
-        if doc is None and getter.__doc__ is not None:
-            doc = getter.__doc__
-        self.__doc__ = doc
+        self.__doc__ = doc or getter.__doc__
 
     def __get__(self, instance, owner_cls=None):
         return HeaderProperty(instance, self.getter)
@@ -209,11 +211,11 @@ class HeaderParser(OrderedDict):
         super(HeaderParser, self).__setitem__(item, value)
 
     defaults = HeaderPropertyGetter(
-        lambda definition: definition[3] if len(definition) > 3 else None,
+        get_default,
         doc="Dict-like allowing access to default header values by keyword.")
 
     setters = HeaderPropertyGetter(
-        lambda definition: make_setter(*definition),
+        make_setter,
         doc="Dict-like returning function to set header keyword to a value")
 
     def update(self, other):
@@ -276,7 +278,7 @@ class VLBIHeaderBase(object):
         assert len(self.words) == (self._struct.size // 4)
 
     def copy(self, **kwargs):
-        """Return a mutable copy of the header
+        """Return a mutable copy of the header.
 
         Keyword arguments can be passed on as needed by possible subclasses.
         """
@@ -353,26 +355,15 @@ class VLBIHeaderBase(object):
         **kwargs :
             Values used to initialize header keys or methods.
         """
-        verify = kwargs.pop('verify', True)
-        # Initialize an empty header.
+        # Initialize an empty header, and update it with the keyword arguments.
         self = cls(None, *args, verify=False)
-        # First set all keys to keyword arguments or defaults.
-        for key in self.keys():
-            value = kwargs.pop(key, self._header_parser.defaults[key])
-            if value is not None:
-                self[key] = value
+        # Set defaults in keyword arguments.
+        for key in set(self.keys()).difference(kwargs.keys()):
+            default = self._header_parser.defaults[key]
+            if default is not None:
+                kwargs[key] = default
 
-        # Next, use remaining keyword arguments to set properties.
-        # Order may be important so use list:
-        for key in self._properties:
-            if key in kwargs:
-                setattr(self, key, kwargs.pop(key))
-
-        if kwargs:
-            warnings.warn("Some keywords unused in header initialisation: {0}"
-                          .format(kwargs))
-        if verify:
-            self.verify()
+        self.update(**kwargs)
         return self
 
     @classmethod
@@ -386,15 +377,55 @@ class VLBIHeaderBase(object):
         KeyError : if not all keys required are present in ``kwargs``
         """
         self = cls(None, *args, verify=False)
-        for key in self.keys():
-            self.words = self._header_parser.setters[key](
-                self.words, kwargs.pop(key))
+        not_in_both = (set(self.keys()).symmetric_difference(kwargs) -
+                       {'verify'})
+        if not_in_both:
+            not_in_kwarg = set(self.keys()).difference(kwargs)
+            not_in_self = set(kwargs).difference(self.keys()) - {'verify'}
+            msg_parts = []
+            for item, msg in ((not_in_kwarg, "is missing keywords ({0})"),
+                              (not_in_self, "contains extra keywords ({0})")):
+                if item:
+                    msg_parts.append(msg.format(item))
 
-        if kwargs:
-            warnings.warn("Some keywords unused in header initialisation: {0}"
-                          .format(kwargs))
-        self.verify()
+            raise KeyError("Input list " + " and ".join(msg_parts))
+
+        self.update(**kwargs)
         return self
+
+    def update(self, **kwargs):
+        """Update the header by setting keywords or properties.
+
+        Here, any keywords matching header keys are applied first, and any
+        remaining ones are used to set header properties, in the order set
+        by the class (in ``_properties``).
+
+        Parameters
+        ----------
+        verify : bool, optional
+            If `True` (default), verify integrity after updating.
+        **kwargs
+            Arguments used to set keywords and properties.
+        """
+        verify = kwargs.pop('verify', True)
+
+        # First use keywords which are also keys into self.
+        for key in set(kwargs.keys()).intersection(self.keys()):
+            self[key] = kwargs.pop(key)
+
+        # Next, use remaining keyword arguments to set properties.
+        # Order is important, so we cannot use an intersection as above.
+        if kwargs:
+            for key in self._properties:
+                if key in kwargs:
+                    setattr(self, key, kwargs.pop(key))
+
+            if kwargs:
+                warnings.warn("Some keywords unused in header update: {0}"
+                              .format(kwargs))
+
+        if verify:
+            self.verify()
 
     def __getitem__(self, item):
         """Get the value a particular header item from the header words."""

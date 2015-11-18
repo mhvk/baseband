@@ -88,6 +88,13 @@ class TestMark5B(object):
         header6 = mark5b.Mark5BHeader(header.words,
                                       ref_mjd=(header.time.mjd + 499.))
         assert header6.time == header.time
+        # check payload and framesize setters
+        header6.payload = 10000
+        header6.framesize = 10016
+        with pytest.raises(ValueError):
+            header6.payloadsize = 9999
+        with pytest.raises(ValueError):
+            header6.framesize = 20
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
@@ -127,13 +134,16 @@ class TestMark5B(object):
 
         payload3 = mark5b.Mark5BPayload.fromdata(payload.data, bps=payload.bps)
         assert payload3 == payload
+        with pytest.raises(ValueError):
+            mark5b.Mark5BPayload.fromdata(np.zeros((5000, 8), np.complex64),
+                                          bps=2)
 
     def test_frame(self):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
             fh.seek(0)
-            frame = fh.read_frame(nchan=8, bps=2)
+            frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
 
         assert frame.header == header
         assert frame.payload == payload
@@ -149,8 +159,37 @@ class TestMark5B(object):
                                                  nchan=frame.shape[1],
                                                  bps=frame.payload.bps)
         assert frame2 == frame
-        frame3 = mark5b.Mark5BFrame.fromdata(frame.data, frame.header, bps=2)
+        frame3 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2)
         assert frame3 == frame
+        frame4 = mark5b.Mark5BFrame.fromdata(payload.data, bps=2,
+                                             ref_mjd=57000, **header)
+        assert frame4 == frame
+        frame5 = mark5b.Mark5BFrame(header, payload, valid=False)
+        assert frame5.valid is False
+        assert np.all(frame5.data == 0.)
+        frame5.valid = True
+        assert frame5 == frame
+        frame6 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2,
+                                             valid=False)
+        assert frame6.valid is False
+        assert np.all(frame6.payload.words == 0x11223344)
+
+    def test_header_times(self):
+        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
+            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
+            time0 = header0.time
+            samples_per_frame = header0.payloadsize * 8 // 2 // 8
+            frame_rate = 32. * u.MHz / samples_per_frame
+            frame_duration = 1./frame_rate
+            fh.seek(0)
+            while True:
+                try:
+                    frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
+                except EOFError:
+                    break
+                header_time = frame.header.time
+                expected = time0 + frame.header['frame_nr'] * frame_duration
+                assert abs(header_time - expected) < 1. * u.ns
 
     def test_filestreamer(self):
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -208,3 +247,16 @@ class TestMark5B(object):
             record2 = fh.read(20000)
             assert fh.tell(unit='time') == time1
             assert np.all(record2 == record)
+
+        # Check files can be made byte-for-byte identical.
+        with io.BytesIO() as s, mark5b.open(
+                s, 'ws', time=time0, nchan=8, bps=2, sample_rate=32*u.MHz,
+                user=header['user'], internal_tvg=header['internal_tvg'],
+                frame_nr=header['frame_nr']) as fw:
+
+            fw.write(record)
+            s.seek(0)
+            with open(SAMPLE_FILE, 'rb') as fr:
+                orig_bytes = fr.read()
+                conv_bytes = s.read()
+                assert conv_bytes == orig_bytes

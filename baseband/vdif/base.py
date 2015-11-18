@@ -188,16 +188,12 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
     Parameters
     ----------
-    raw : str or filehandle
-        file name or handle of the raw VDIF stream
+    raw : `~baseband.vdif.VDIFFileReader` instance
+        file handle of the raw VDIF stream
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
     """
     def __init__(self, raw, thread_ids=None):
-        if not hasattr(raw, 'read'):
-            raw = io.open(raw, mode='rb')
-        if not isinstance(raw, VDIFFileReader):
-            raw = VDIFFileReader(raw)
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
@@ -308,9 +304,8 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
 
     Parameters
     ----------
-    raw : filehandle, or name.
-        Should be a VDIFFileWriter or BufferedWriter instance.
-        If a name, will get opened for writing binary data.
+    raw : `~baseband.vdif.VDIFFileWriter`
+        Which will write filled sets of frames to storage.
     nthread : int
         Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
         Default is 1.
@@ -346,10 +341,6 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
         Required for other `edv`.
     """
     def __init__(self, raw, nthread=1, header=None, **kwargs):
-        if not hasattr(raw, 'write'):
-            raw = io.open(raw, mode='wb')
-        if not isinstance(raw, VDIFFileWriter):
-            raw = VDIFFileWriter(raw)
         if header is None:
             header = VDIFHeader.fromvalues(**kwargs)
         super(VDIFStreamWriter, self).__init__(raw, header, range(nthread))

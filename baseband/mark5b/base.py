@@ -1,9 +1,7 @@
-import os
 import io
 
 import numpy as np
 from astropy import units as u
-from astropy.time import Time
 
 from ..vlbi_base.base import VLBIStreamReaderBase, VLBIStreamWriterBase
 from .header import Mark5BHeader
@@ -21,20 +19,18 @@ class Mark5BFileReader(io.BufferedReader):
     reader :class:`~io.BufferedReader`.
     """
 
-    def read_frame(self, nchan, bps=2, ref_mjd=None):
+    def read_frame(self, ref_mjd, nchan, bps=2):
         """Read a single frame (header plus payload).
 
         Parameters
         ----------
+        ref_time : int
+            Used to determine the thousands in the Mark 5B header time.
+            Thus, should be within 500 days of the actual observing time.
         nchan : int
             Number of channels encoded in the payload.
         bps : int
             Bits per sample (default=2).
-        ref_time : int or `~astropy.time.Time` instance
-            Used to determine the thousands in the Mark 5B header time.
-            Thus, should be within 500 days of the actual observing time.
-            By default, the file creation time is used; it gets remembered
-            between invocations.
 
         Returns
         -------
@@ -42,16 +38,6 @@ class Mark5BFileReader(io.BufferedReader):
             With ``header`` and ``data`` properties that return the
             Mark5BHeader and data encoded in the frame, respectively.
         """
-        if ref_mjd is None:
-            try:
-                ref_mjd = self._ref_mjd
-            except AttributeError:
-                self._ref_mjd = ref_mjd = Time(os.path.getctime(self.name),
-                                               format='unix').mjd
-        else:
-            if isinstance(ref_mjd, Time):
-                ref_mjd = ref_mjd.mjd
-            self._ref_mjd = ref_mjd
         return Mark5BFrame.fromfile(self, nchan=nchan, bps=bps,
                                     ref_mjd=ref_mjd)
 
@@ -145,9 +131,8 @@ class Mark5BFileWriter(io.BufferedWriter):
             using keywords arguments.
         """
         if not isinstance(data, Mark5BFrame):
-            if header is None:
-                header = Mark5BHeader.fromvalues(**kwargs)
-            data = Mark5BFrame.fromdata(data, header, bps=bps, valid=valid)
+            data = Mark5BFrame.fromdata(data, header, bps=bps, valid=valid,
+                                        **kwargs)
         return data.tofile(self)
 
 
@@ -159,8 +144,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
 
     Parameters
     ----------
-    raw : str, filehandle, or `~baseband.mark5b.base.Mark5BFileReader` instance
-        file name, or file handle to raw data file.
+    raw : `~baseband.mark5b.base.Mark5BFileReader` instance
+        file handle of the raw Mark 5B stream
     nchan : int
         Number of threads/channels stored in the file.
     bps : int, optional
@@ -179,11 +164,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
 
     def __init__(self, raw, nchan, bps=2, ref_mjd=None, thread_ids=None,
                  sample_rate=None):
-        if not hasattr(raw, 'read'):
-            raw = io.open(raw, mode='rb')
-        if not isinstance(raw, Mark5BFileReader):
-            raw = Mark5BFileReader(raw)
-        self._frame = raw.read_frame(nchan=nchan, bps=bps, ref_mjd=ref_mjd)
+        self._frame = raw.read_frame(ref_mjd=ref_mjd, nchan=nchan, bps=bps)
         self._frame_data = None
         super(Mark5BStreamReader, self).__init__(
             raw, header0=self._frame.header, nchan=nchan, bps=bps,
@@ -265,7 +246,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
     def _read_frame(self, out=None):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
-        self._frame = self.fh_raw.read_frame(nchan=self.nchan, bps=self.bps)
+        self._frame = self.fh_raw.read_frame(ref_mjd=self.header0.kday,
+                                             nchan=self.nchan, bps=self.bps)
         # Convert payloads to data array.
         self._frame_data = self._frame.todata(data=out)
         return self._frame_data
@@ -276,10 +258,8 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
 
     Parameters
     ----------
-    raw : filehandle, or name.
-        Should be a `~baseband.mark5b.base.Mark5BFileWriter` or
-        `~io.BufferedWriter` instance. If a name, will get opened for
-        writing binary data.
+    raw : `~baseband.mark5b.base.Mark5BFileWriter` instance.
+        Which will write filled sets of frames to storage.
     sample_rate : `~astropy.units.Quantity`
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
         This is needed to calculate time stamps.
@@ -305,11 +285,6 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
 
     def __init__(self, raw, sample_rate, nchan=1, bps=2, header=None,
                  **kwargs):
-        if isinstance(raw, io.BufferedWriter):
-            if not isinstance(raw, Mark5BFileWriter):
-                raw = Mark5BFileWriter(raw)
-        else:
-            raw = Mark5BFileWriter(io.open(raw, mode='wb'))
         if header is None:
             header = Mark5BHeader.fromvalues(**kwargs)
         super(Mark5BStreamWriter, self).__init__(
@@ -334,8 +309,8 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
             if sample_offset == 0:
                 # set up header for new frame.
                 self._header = self.header0.copy()
-                self._header.time = self.tell(unit='time')
-                self._header['frame_nr'] = frame_nr
+                self._header.update(time=self.tell(unit='time'),
+                                    frame_nr=frame_nr)
 
             if invalid_data:
                 # Mark whole frame as invalid data.

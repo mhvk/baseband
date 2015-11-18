@@ -78,6 +78,18 @@ class TestVLBIBase(object):
         self.Frame = Frame
         self.frame = Frame(self.header, self.payload)
 
+    def test_header_parser_update(self):
+        extra = HeaderParser((('x4_0_32', (4, 0, 32)),))
+        new = self.header_parser + extra
+        assert len(new.keys()) == 5
+        new = self.header_parser.copy()
+        new.update(extra)
+        assert len(new.keys()) == 5
+        with pytest.raises(TypeError):
+            self.header_parser + {'x4_0_32': (4, 0, 32)}
+        with pytest.raises(TypeError):
+            self.header_parser.copy().update(('x4_0_32', (4, 0, 32)))
+
     def test_header_basics(self):
         header = self.Header(None)
         assert header.words == [0,] * 4
@@ -94,6 +106,11 @@ class TestVLBIBase(object):
         assert type(header.words) is list
         header.mutable = False
         assert type(header.words) is tuple
+        header = self.Header(0, verify=False)
+        with pytest.raises(Exception):
+            header.verify()
+        with pytest.raises(TypeError):
+            header.mutable = True
 
     def test_header_fromfile(self):
         with io.BytesIO() as s:

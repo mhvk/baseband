@@ -3,6 +3,7 @@ import os
 import numpy as np
 from astropy import units as u
 from astropy.time import Time
+from astropy.tests.helper import pytest
 from .. import vdif
 from .. import mark4
 from .. import mark5b
@@ -44,6 +45,10 @@ class TestVDIFMark5B(object):
         payload2 = vdif.VDIFPayload.fromdata(m5pl.data, header)
         assert np.all(payload2.words == m5pl.words)
         assert np.all(payload2.data == m5pl.data)
+        header2 = header.copy()
+        header2['complex_data'] = True
+        with pytest.raises(ValueError):
+            vdif.VDIFPayload(m5pl.words, header2)
 
     def test_frame(self):
         with mark5b.open(SAMPLE_M5B, 'rb') as fh:
@@ -55,7 +60,7 @@ class TestVDIFMark5B(object):
 
 
 class TestMark5BToVDIF3(object):
-    """Real conversion: Mark5B to VDIF EDV 3."""
+    """Real conversion: Mark5B to VDIF EDV 3, and back to Mark5B"""
 
     def test_header(self):
         with open(SAMPLE_M5B, 'rb') as fh:
@@ -94,6 +99,23 @@ class TestMark5BToVDIF3(object):
                 assert fm.offset == fv.offset
                 assert fm.tell(unit='time') == fv.tell(unit='time')
 
+                # Convert VDIF file back to Mark 5B, and check byte-for-byte.
+                hv = fv.header0
+                hm = fm.header0
+                with io.BytesIO() as s2, mark5b.open(
+                        s2, 'ws', nchan=dv.shape[1], bps=hv.bps, time=hv.time,
+                        sample_rate=hv.bandwidth*2, user=hm['user'],
+                        internal_tvg=hm['internal_tvg']) as fw:
+                    fw.write(dv)
+                    number_of_bytes = s2.tell()
+                    fm_raw = fm.fh_raw
+                    assert number_of_bytes == fm_raw.tell()
+                    s2.seek(0)
+                    fm_raw.seek(0)
+                    orig_bytes = fm_raw.read(number_of_bytes)
+                    conv_bytes = s2.read(number_of_bytes)
+                    assert orig_bytes == conv_bytes
+
 
 class TestVDIF3ToMark5B(object):
     """Real conversion: VDIF EDV 3 to Mark5B."""
@@ -128,7 +150,7 @@ class TestVDIF3ToMark5B(object):
 
 
 class TestMark4ToVDIF1(object):
-    """Real conversion: Mark5B to VDIF EDV 1.
+    """Real conversion: Mark 4 to VDIF EDV 1, and back to Mark 4.
 
     Here, need to use a VDIF format with a flexible size, since we want
     to create invalid frames corresponding to the pieces of data overwritten
@@ -176,3 +198,20 @@ class TestMark4ToVDIF1(object):
                 assert fm.offset == fv.offset
                 assert (abs(fm.tell(unit='time') - fv.tell(unit='time')) <
                         2.*u.ns)
+
+                # Convert VDIF file back to Mark 4, and check byte-for-byte.
+                hv = fv.header0
+                with io.BytesIO() as s2, mark4.open(
+                        s2, 'ws', sample_rate=hv.bandwidth*2,
+                        time=hv.time, ntrack=64, bps=2, fanout=4,
+                        bcd_headstack1=0x3344, bcd_headstack2=0x1122,
+                        lsb_output=True, system_id=108) as fw:
+                    fw.write(dv)
+                    number_of_bytes = s2.tell()
+                    fm_raw = fm.fh_raw
+                    assert number_of_bytes == fm_raw.tell() - 0xa88
+                    s2.seek(0)
+                    fm_raw.seek(0xa88)
+                    orig_bytes = fm_raw.read(number_of_bytes)
+                    conv_bytes = s2.read(number_of_bytes)
+                    assert orig_bytes == conv_bytes

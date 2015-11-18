@@ -63,6 +63,12 @@ class TestVDIF(object):
         header3 = vdif.VDIFHeader.fromkeys(**header)
         assert header3 == header
         assert header3.mutable is True
+        with pytest.raises(KeyError):
+            vdif.VDIFHeader.fromkeys(extra=1, **header)
+        with pytest.raises(KeyError):
+            kwargs = dict(header)
+            kwargs.pop('thread_id')
+            vdif.VDIFHeader.fromkeys(**kwargs)
         # Try initialising with properties instead of keywords, as much as
         # possible.  Note that we still have to give a lots of extra, less
         # directly useful parameters to get an *identical* header.
@@ -132,6 +138,26 @@ class TestVDIF(object):
         with pytest.raises(ValueError):
             # Too few data.
             vdif.VDIFPayload.fromdata(payload.data[:100], header)
+        # check if it works with complex data
+        payload4 = vdif.VDIFPayload(payload.words, nchan=1, bps=2,
+                                    complex_data=True)
+        assert payload4.complex_data is True
+        assert payload4.size == 5000
+        assert payload4.shape == (10000, 1)
+        assert payload4.dtype == np.complex64
+        assert np.all(payload4.data ==
+                      payload.data[::2] + 1j * payload.data[1::2])
+        # check in-place decoding
+        in_place = np.zeros(payload4.shape, payload4.dtype)
+        payload4.todata(data=in_place)
+        assert in_place is not payload4.data
+        assert np.all(in_place == payload4.data)
+        with pytest.raises(ValueError):
+            vdif.VDIFPayload.fromdata(in_place, header)
+        header5 = header.copy()
+        header5['complex_data'] = True
+        payload5 = vdif.VDIFPayload.fromdata(in_place, header5)
+        assert payload5 == payload4
 
     def test_frame(self):
         with vdif.open(SAMPLE_FILE, 'rb') as fh:
@@ -150,18 +176,36 @@ class TestVDIF(object):
             s.seek(0)
             frame2 = vdif.VDIFFrame.fromfile(s)
         assert frame2 == frame
-        frame3 = vdif.VDIFFrame.fromdata(frame.data, frame.header)
+        frame3 = vdif.VDIFFrame.fromdata(payload.data, header)
         assert frame3 == frame
+        frame4 = vdif.VDIFFrame.fromdata(payload.data, **header)
+        assert frame4 == frame
+        header5 = header.copy()
+        frame5 = vdif.VDIFFrame(header5, payload, valid=False)
+        assert frame5.valid is False
+        assert np.all(frame5.data == 0.)
+        frame5.valid = True
+        assert frame5 == frame
 
     def test_frameset(self):
         with vdif.open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
             fh.seek(0)
             frameset = fh.read_frameset()
+
         assert len(frameset.frames) == 8
         assert frameset.samples_per_frame == 20000
         assert frameset.nchan == 1
         assert frameset.shape == (8, 20000, 1)
+        assert frameset.size == 8 * frameset.frames[0].size
+        assert 'edv' in frameset
+        assert 'edv' in frameset.keys()
+        assert frameset['edv'] == 3
+        # Properties from headers are passed on if they are settable.
+        assert frameset.time == frameset.header0.time
+        with pytest.raises(AttributeError):
+            # But not all.
+            frameset.update(1)
         assert ([fr.header['thread_id'] for fr in frameset.frames] ==
                 list(range(8)))
         first_frame = frameset.frames[header['thread_id']]
@@ -172,6 +216,40 @@ class TestVDIF(object):
                       np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
         assert np.all(frameset.frames[3].data[:12, 0].astype(int) ==
                       np.array([-1, 1, -1, 1, -3, -1, 3, -1, 3, -3, 1, 3]))
+
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
+            frameset2 = fh.read_frameset(thread_ids=[2, 3])
+        assert frameset2.shape == (2, 20000, 1)
+        assert np.all(frameset2.data == frameset.data[2:4])
+
+        frameset3 = vdif.VDIFFrameSet(frameset.frames, frameset.header0)
+        assert frameset3 == frameset
+        frameset4 = vdif.VDIFFrameSet.fromdata(frameset.data, frameset.header0)
+        assert np.all(frameset4.data == frameset.data)
+        assert frameset4.time == frameset.time
+        # the following check cannot be done with frameset itself, since
+        # the times in four of the eight headers are wrong.
+        frameset5 = vdif.VDIFFrameSet.fromdata(frameset.data,
+                                               frameset4.header0)
+        assert frameset5 == frameset4
+        frameset6 = vdif.VDIFFrameSet.fromdata(frameset.data,
+                                               **frameset4.header0)
+        assert frameset6 == frameset4
+
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0)
+            # try reading just a few threads
+            frameset4 = fh.read_frameset(thread_ids=[2, 3])
+            assert frameset4.header0.time == frameset.header0.time
+            assert np.all(frameset.data[2:4] == frameset4.data)
+            # Read beyond end
+            fh.seek(-10064, 2)
+            with pytest.raises(EOFError):
+                fh.read_frameset(thread_ids=list(range(8)))
+            # Give non-existent thread_id
+            fh.seek(0)
+            with pytest.raises(IOError):
+                fh.read_frameset(thread_ids=[1, 9])
 
     def test_filestreamer(self):
         with open(SAMPLE_FILE, 'rb') as fh:

@@ -4,6 +4,8 @@ import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
 from .. import mark4, vlbi_base
+from ..mark4.header import Mark4TrackHeader
+from ..mark4.payload import reorder32, reorder64
 
 
 SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m4')
@@ -60,15 +62,23 @@ class TestMark4(object):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+            fh.seek(-10, 2)
+            with pytest.raises(EOFError):
+                mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+
+        assert len(header) == 64
+        assert header.track_id[0] == 2 and header.track_id[-1] == 33
         assert header.size == 160 * 64 // 8
         assert header.fanout == 4
         assert header.bps == 2
+        assert not np.all(~header['magnitude_bit'])
         assert header.nchan == 8
         assert int(header.time.mjd) == 56824
         assert header.time.isot == '2014-06-16T07:38:12.47500'
         assert header.framesize == 20000 * 64 // 8
         assert header.payloadsize == header.framesize - header.size
         assert header.mutable is False
+        assert repr(header).startswith('<Mark4Header bcd_headstack1: [0')
         with io.BytesIO() as s:
             header.tofile(s)
             s.seek(0)
@@ -96,6 +106,7 @@ class TestMark4(object):
         assert header5.time == header.time
         header6 = mark4.Mark4Header(header.words, decade=2019)
         assert header6.time == header.time
+        # Check changing properties.
         header7 = header.copy()
         assert header7 == header
         assert header7.mutable is True
@@ -106,8 +117,57 @@ class TestMark4(object):
                                                header7['bcd_headstack1'][1:]))
         assert header7['bcd_headstack1'][0] == 0x7788
         assert np.all(header7['bcd_headstack1'][1:] == 0x5566)
+        # Check it doesn't work on non-mutable header
         with pytest.raises(TypeError):
             header['bcd_headstack1'] = 0
+        # Check time assignment
+        with pytest.raises(ValueError):
+            header7.time = header.time + 0.1 * u.ms
+        header7.bps = 1
+        assert np.all(~header7['magnitude_bit'])
+        header7.bps = 2
+        assert not np.all(~header7['magnitude_bit'])
+        with pytest.raises(ValueError):
+            header7.bps = 4
+        with pytest.raises(Exception):
+            header7.ntrack = 51
+        with pytest.raises(AssertionError):
+            header7.framesize = header.framesize - 1
+        with pytest.raises(AssertionError):
+            header7.payloadsize = header.payloadsize - 1
+        with pytest.raises(Exception):
+            header7.framesize = header.framesize * 2  # implied ntrack=128
+        header7.nchan = 16
+        assert header7.nchan == 16 and header7.bps == 1
+        # OK, this is silly, but why not...
+        header7.time = header.time + np.arange(64) * 125 * u.ms
+        assert len(header7.time) == 64
+        assert np.all(abs(header7.time - header.time -
+                          np.arange(64) * 125 * u.ms) < 1.*u.ns)
+        with pytest.raises(ValueError):
+            header7.time = header.time + np.arange(64) * u.year
+        # Check slicing.
+        header8 = header[:2]
+        assert type(header8) is mark4.Mark4Header
+        assert len(header8) == 2
+        header9 = header[10]
+        assert type(header9) is Mark4TrackHeader
+        assert repr(header9).startswith('<Mark4TrackHeader bcd_headstack1: 0')
+        assert repr(header[:1]).startswith('<Mark4Header bcd_headstack1: 0')
+        header10 = Mark4TrackHeader(header9.words, decade=2010)
+        assert header10 == header9
+        header11 = Mark4TrackHeader.fromvalues(decade=2010, **header9)
+        assert header11 == header9
+        with pytest.raises(AssertionError):  # missing decade
+            Mark4TrackHeader.fromvalues(**header9)
+        with pytest.raises(IndexError):
+            header[65]
+        with pytest.raises(ValueError):
+            header[np.array([[0, 1], [2, 3]])]
+        header12 = mark4.Mark4Header(None, ntrack=53, decade=2010,
+                                     verify=False)
+        with pytest.raises(ValueError):
+            header12.ntrack = 53
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
@@ -130,6 +190,14 @@ class TestMark4(object):
         assert np.all(mark4.payload.lut2bit3[0x0f] == 1.)
         assert np.all(mark4.payload.lut2bit3[0xff] == o2h)
 
+    def test_payload_reorder(self):
+        """Test that bit reordering is consistent with mark5access."""
+        check = np.array([738811025863578102], dtype=np.uint64)
+        expected = np.array([118, 209, 53, 244, 148, 217, 64, 10], np.uint8)
+        assert np.all(reorder64(check).view(np.uint8) == expected)
+        assert np.all(reorder32(check.view(np.uint32)).view(np.uint8) ==
+                      expected)
+
     def test_payload(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
@@ -138,10 +206,16 @@ class TestMark4(object):
         assert payload.size == (20000 - 160) * 64 // 8
         assert payload.shape == ((20000 - 160) * 4, 8)
         assert payload.dtype == np.float32
-        assert np.all(payload.data[0].astype(int) ==
+        data = payload.data
+        assert np.all(data[0].astype(int) ==
                       np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(payload.data[1].astype(int) ==
+        assert np.all(data[1].astype(int) ==
                       np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        in_place = np.zeros_like(data)
+        payload.todata(data=in_place)
+        assert in_place is not data
+        assert np.all(in_place == data)
+
         with io.BytesIO() as s:
             payload.tofile(s)
             s.seek(0)
@@ -161,6 +235,11 @@ class TestMark4(object):
             # Too few data.
             mark4.Mark4Payload.fromdata(payload.data[:100], header)
 
+        with pytest.raises(ValueError):
+            # Wrong data type
+            mark4.Mark4Payload.fromdata(np.zeros((5000, 8), np.complex64),
+                                        header)
+
     def test_frame(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
@@ -171,6 +250,7 @@ class TestMark4(object):
 
         assert frame.header == header
         assert frame.payload == payload
+        assert frame.valid is True
         assert frame == mark4.Mark4Frame(header, payload)
         assert np.all(frame.data[:640] == 0.)
         assert np.all(frame.data[640].astype(int) ==
@@ -182,8 +262,38 @@ class TestMark4(object):
             s.seek(0)
             frame2 = mark4.Mark4Frame.fromfile(s, ntrack=64, decade=2010)
         assert frame2 == frame
-        frame3 = mark4.Mark4Frame.fromdata(frame.data, frame.header)
+        # Need frame.data here, since payload.data does not contain pieces
+        # overwritten by header.
+        frame3 = mark4.Mark4Frame.fromdata(frame.data, header)
         assert frame3 == frame
+        frame4 = mark4.Mark4Frame.fromdata(frame.data, ntrack=64,
+                                           decade=2010, **header)
+        assert frame4 == frame
+        header5 = header.copy()
+        frame5 = mark4.Mark4Frame(header5, payload, valid=False)
+        assert frame5.valid is False
+        assert np.all(frame5.data == 0.)
+        frame5.valid = True
+        assert frame5 == frame
+
+    def test_header_times(self):
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            header0 = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+            time0 = header0.time
+            # use framesize, since header adds to payload.
+            samples_per_frame = header0.framesize * 8 // 2 // 8
+            frame_rate = 32. * u.MHz / samples_per_frame
+            frame_duration = 1./frame_rate
+            fh.seek(0xa88)
+            for frame_nr in range(100):
+                try:
+                    frame = fh.read_frame(ntrack=64, decade=2010)
+                except EOFError:
+                    break
+                header_time = frame.header.time
+                expected = time0 + frame_nr * frame_duration
+                assert abs(header_time - expected) < 1. * u.ns
 
     def test_filestreamer(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
@@ -218,6 +328,7 @@ class TestMark4(object):
                         sample_rate=32*u.MHz) as fh:
             time0 = fh.tell(unit='time')
             record = fh.read(160000)
+            fh_raw_tell1 = fh.fh_raw.tell()
             time1 = fh.tell(unit='time')
 
         with io.BytesIO() as s, mark4.open(s, 'ws', sample_rate=32*u.MHz,
@@ -234,3 +345,20 @@ class TestMark4(object):
             record2 = fh.read(160000)
             assert fh.tell(unit='time') == time1
             assert np.all(record2 == record)
+
+        # Check files can be made byte-for-byte identical.  Here, we use the
+        # original header so we set stuff like head_stack, etc.
+        with io.BytesIO() as s, mark4.open(s, 'ws', header=header,
+                                           sample_rate=32*u.MHz) as fw:
+
+            fw.write(record)
+            fw.fh_raw.flush()
+            number_of_bytes = s.tell()
+            assert number_of_bytes == fh_raw_tell1 - 0xa88
+
+            s.seek(0)
+            with open(SAMPLE_FILE, 'rb') as fr:
+                fr.seek(0xa88)
+                orig_bytes = fr.read(number_of_bytes)
+                conv_bytes = s.read()
+                assert conv_bytes == orig_bytes

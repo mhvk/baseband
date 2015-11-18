@@ -32,6 +32,9 @@ class Mark4Frame(VLBIFrameBase):
         header information.
     payload : Mark4Payload
         Wrapper around the payload, provding mechanisms to decode it.
+    valid : bool or `None`
+        Whether the data is valid.  If `None` (default), inferred from header.
+        Note that the header is updated in-place if `True` or `False`.
     verify : bool
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and number of tracks are consistent
@@ -59,9 +62,11 @@ class Mark4Frame(VLBIFrameBase):
     _header_class = Mark4Header
     _payload_class = Mark4Payload
 
-    def __init__(self, header, payload, verify=True):
+    def __init__(self, header, payload, valid=None, verify=True):
         self.header = header
         self.payload = payload
+        if valid is not None:
+            self.valid = valid
         if verify:
             self.verify()
 
@@ -78,7 +83,13 @@ class Mark4Frame(VLBIFrameBase):
 
     @valid.setter
     def valid(self, valid):
-        self.header['communication_error'] = ~valid
+        if valid:
+            self.header['time_sync_error'] = False
+            self.header['internal_clock_error'] = False
+            self.header['processor_time_out_error'] = False
+            self.header['communication_error'] = False
+        else:
+            self.header['communication_error'] = True
 
     @classmethod
     def fromfile(cls, fh, ntrack, decade=None, verify=True):
