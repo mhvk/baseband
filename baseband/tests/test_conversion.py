@@ -1,5 +1,6 @@
 import io
 import os
+
 import numpy as np
 from astropy import units as u
 from astropy.time import Time
@@ -12,19 +13,25 @@ from .. import mark5b
 SAMPLE_M4 = os.path.join(os.path.dirname(__file__), 'sample.m4')
 SAMPLE_M5B = os.path.join(os.path.dirname(__file__), 'sample.m5b')
 SAMPLE_VDIF = os.path.join(os.path.dirname(__file__), 'sample.vdif')
+SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m5b')
+# this sets the input file
 
 
 class TestVDIFMark5B(object):
     """Simplest conversion: VDIF frame containing Mark5B data (EDV 0xab)."""
-
-    def test_header(self):
-        with open(SAMPLE_M5B, 'rb') as fh:
-            m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
+    def test_header(self):  # transfer header properties from mark5b to vdif
+        with open(SAMPLE_FILE, 'rb') as fh:
+            m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd) 
+            # read header info with a starting time set by hand
+            # (since it is not included).  Now read data.
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
         header = vdif.VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
-                                                    bps=m5pl.bps)
+                                                    bps=m5pl.bps) 
+        # transfer all header info into a vdif header
+        # then test whether all the following header information are
+        # transferred (or set) correctly
         assert all(m5h[key] == header[key] for key in m5h.keys())
-        assert header.time == m5h.time
+        assert header.time == m5h.time 
         assert header.nchan == 8
         assert header.bps == 2
         assert not header['complex_data']
@@ -33,16 +40,19 @@ class TestVDIFMark5B(object):
         assert header.payloadsize == m5h.payloadsize
         assert header.samples_per_frame == 10000 * 8 // m5pl.bps // m5pl.nchan
 
-    def test_payload(self):
-        with open(SAMPLE_M5B, 'rb') as fh:
+    def test_payload(self):  # transfer only the actual data (payload)
+        with open(SAMPLE_FILE, 'rb') as fh:
             m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
         header = vdif.VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
                                                     bps=m5pl.bps)
+        # above three lines same as in the previous object
         payload = vdif.VDIFPayload(m5pl.words, header)
+        # now only transfer the actual data part of the file content (payload)
         assert np.all(payload.words == m5pl.words)
         assert np.all(payload.data == m5pl.data)
         payload2 = vdif.VDIFPayload.fromdata(m5pl.data, header)
+        # transferring the "data" and "words" seem to have the same effect?
         assert np.all(payload2.words == m5pl.words)
         assert np.all(payload2.data == m5pl.data)
         header2 = header.copy()
@@ -50,8 +60,8 @@ class TestVDIFMark5B(object):
         with pytest.raises(ValueError):
             vdif.VDIFPayload(m5pl.words, header2)
 
-    def test_frame(self):
-        with mark5b.open(SAMPLE_M5B, 'rb') as fh:
+    def test_frame(self):  # transfer only the frame properties.
+        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
             m5f = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
         frame = vdif.VDIFFrame.from_mark5b_frame(m5f)
         assert frame.size == 10032
@@ -67,15 +77,20 @@ class TestMark5BToVDIF3(object):
             m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
         # check that we have enough information to create VDIF EDV 3 header.
+        # and actually make that header
         header = vdif.VDIFHeader.fromvalues(
             edv=3, bps=m5pl.bps, nchan=1, station='WB', time=m5h.time,
             bandwidth=16.*u.MHz, complex_data=False)
         assert header.time == m5h.time
 
     def test_stream(self):
-        with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, ref_mjd=57000,
+        # ref_mjd is set by hand, nchan, bps comes from the telescope info,
+        # and sample_rate is derivable from that (a subroutine that stores
+        # these for each telescpoe would be nice).
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2, ref_mjd=57000,
                          sample_rate=32.*u.MHz) as fr:
             m5h = fr.header0
+            # header information transfer.
             header = vdif.VDIFHeader.fromvalues(
                 edv=3, bps=fr.bps, nchan=1, station='WB', time=m5h.time,
                 bandwidth=16.*u.MHz, complex_data=False)
@@ -84,14 +99,20 @@ class TestMark5BToVDIF3(object):
 
         with io.BytesIO() as s, vdif.open(s, 'ws', nthread=data.shape[1],
                                           header=header) as fw:
+            # here "s" is just a memory segment to output the result.
+            # In an actual conversion, change it to the output file name
+            # Some compilers will not be happy with these two parallel
+            # statements while the second one uses an object defined by the
+            # first one.
             assert (fw.tell(unit='time') - m5h.time) < 2. * u.ns
-            fw.write(data)
+            fw.write(data)  # write 20000 data
             assert (fw.tell(unit='time') - time1) < 2. * u.ns
-            fw.fh_raw.flush()
-            s.seek(0)
+            fw.fh_raw.flush()  # not clear this is necessary.
+            s.seek(0)          # goes to the beginning of the output file
             with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, ref_mjd=57000,
                              sample_rate=32.*u.MHz) as fm, vdif.open(
                                  s, 'rs') as fv:
+                # fm = input, fv = output
                 assert fm.header0.time == fv.header0.time
                 dm = fm.read(20000)
                 dv = fv.read(20000)
