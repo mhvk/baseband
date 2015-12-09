@@ -111,6 +111,20 @@ class TestVDIF(object):
         assert np.all(vdif.payload.lut4bit[0xff] * 2.95 == 7)
         assert np.all(-vdif.payload.lut4bit[0x11] ==
                       vdif.payload.lut4bit[0xff])
+        aint = np.arange(-128, 128, dtype=np.int8).view(np.uint32)
+        # Mark5access would have -127.5, 127.5, 256 here, but MWA data does
+        # not follow that logic, so we're keeping it simple.
+        areal = np.linspace(-128, 127, 256).reshape(-1, 1)
+        acmplx = areal[::2] + 1j * areal[1::2]
+        payload1 = vdif.VDIFPayload(aint, bps=8, complex_data=False)
+        assert np.all(payload1.data == areal)
+        payload2 = vdif.VDIFPayload(aint, bps=8, complex_data=True)
+        assert np.all(payload2.data == acmplx)
+        header = vdif.VDIFHeader.fromvalues(edv=0, complex_data=False, bps=8,
+                                            payloadsize=payload1.size)
+        assert np.all(vdif.VDIFPayload.fromdata(areal, header) == payload1)
+        header['complex_data'] = True
+        assert np.all(vdif.VDIFPayload.fromdata(acmplx, header) == payload2)
 
     def test_payload(self):
         with open(SAMPLE_FILE, 'rb') as fh:
