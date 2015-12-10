@@ -10,8 +10,10 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 
-from ..vlbi_base.payload import (VLBIPayloadBase, encode_2bit_real_base,
-                                 decoder_levels, DTYPE_WORD)
+from ..vlbi_base.payload import VLBIPayloadBase, DTYPE_WORD
+from ..vlbi_base.encoding import (encode_2bit_real_base, decoder_levels,
+                                  decode_8bit_real, encode_8bit_real,
+                                  decode_8bit_complex, encode_8bit_complex)
 
 
 __all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
@@ -207,5 +209,5 @@ class VDIFPayload(VLBIPayloadBase):
                                               header['complex_data']]
         else:
             encoder = cls._encoders[header.bps, header['complex_data']]
-        words = encoder(data.ravel())
+        words = encoder(data.ravel()).view(DTYPE_WORD)
         return cls(words, header)
