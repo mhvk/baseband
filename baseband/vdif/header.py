@@ -428,6 +428,16 @@ class VDIFBaseHeader(VDIFHeader):
                     self._header_parser.defaults['sync_pattern'])
 
 
+class VDIFHeader0(VDIFBaseHeader):
+    """VDIF Header for EDV=0.
+
+    EDV=0 implies the extended user data fields are not used.
+    """
+    def verify(self):
+        assert all(word == 0 for word in self.words[4:])
+        super(VDIFHeader0, self).verify()
+
+
 class VDIFSampleRateHeader(VDIFBaseHeader):
     """Base for VDIF headers that include the sample rate (EDV= 1, 3, 4)."""
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
@@ -567,6 +577,7 @@ is_legacy_header = VDIFBaseHeader._header_parser.parsers['legacy_mode']
 get_header_edv = VDIFBaseHeader._header_parser.parsers['edv']
 
 vdif_header_classes = {False: VDIFLegacyHeader,
+                       0: VDIFHeader0,
                        1: VDIFHeader1,
                        2: VDIFHeader2,
                        3: VDIFHeader3,
