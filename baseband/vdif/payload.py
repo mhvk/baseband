@@ -63,6 +63,32 @@ def decode_2bit_complex(words, out=None):
         return out
 
 
+def decode_8bit_real(words, out=None):
+    """Decode 8 bit VDIF data.
+
+    We assume bytes encode -128 to 127, i.e., their direct values.
+    This is the same as assumed in MWA beam-combined data, but in contrast
+    to mark5access, which assumes they represent -127.5 .. 127.5, i.e.,
+    symmetric around zero.
+    """
+    b = words.view(np.int8)
+    if out is None:
+        return b.astype(np.float32)
+    else:
+        outf4 = out.reshape(-1)
+        assert outf4.base is out or outf4.base is out.base
+        outf4[:] = b
+        return out
+
+
+def decode_8bit_complex(words, out=None):
+    if out is None:
+        return decode_8bit_real(words, out).view(np.complex64)
+    else:
+        decode_8bit_real(words, out.view(np.float32))
+        return out
+
+
 shift2bit = np.arange(0, 8, 2).astype(np.uint8)
 
 
@@ -74,6 +100,22 @@ def encode_2bit_real(values):
 
 def encode_2bit_complex(values):
     return encode_2bit_real(values.view(values.real.dtype))
+
+
+def encode_8bit_real(values):
+    """Encode 8 bit VDIF data.
+
+    We assume bytes encode -128 to 127, i.e., their direct values.
+    This is the same as assumed in MWA beam-combined data, but in contrast
+    to mark5access, which assumes they represent -127.5 .. 127.5, i.e.,
+    symmetric around zero.
+    """
+    return np.clip(np.round(values),
+                   -128, 127).astype(np.int8).view(DTYPE_WORD)
+
+
+def encode_8bit_complex(values):
+    return encode_8bit_real(values.view(values.real.dtype))
 
 
 class VDIFPayload(VLBIPayloadBase):
@@ -98,10 +140,14 @@ class VDIFPayload(VLBIPayloadBase):
         Complex or float data.  Default: `False`.
     """
     _decoders = {(2, False): decode_2bit_real,
-                 (2, True): decode_2bit_complex}
+                 (2, True): decode_2bit_complex,
+                 (8, False): decode_8bit_real,
+                 (8, True): decode_8bit_complex}
 
     _encoders = {(2, False): encode_2bit_real,
-                 (2, True): encode_2bit_complex}
+                 (2, True): encode_2bit_complex,
+                 (8, False): encode_8bit_real,
+                 (8, True): encode_8bit_complex}
 
     def __init__(self, words, header=None,
                  nchan=1, bps=2, complex_data=False):
