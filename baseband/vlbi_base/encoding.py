@@ -89,7 +89,7 @@ def decode_8bit_complex(words, out=None):
     if out is None:
         return decode_8bit_real(words, out).view(np.complex64)
     else:
-        decode_8bit_real(words, out.view(np.float32))
+        decode_8bit_real(words, out.view(out.real.dtype))
         return out
 
 
