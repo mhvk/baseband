@@ -11,8 +11,8 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import sys
 import numpy as np
-from ..vlbi_base.payload import (VLBIPayloadBase, encode_2bit_real_base,
-                                 decoder_levels)
+from ..vlbi_base.payload import VLBIPayloadBase
+from ..vlbi_base.encoding import encode_2bit_real_base, decoder_levels
 
 
 __all__ = ['reorder32', 'reorder64', 'init_luts', 'decode_8chan_2bit_fanout4',

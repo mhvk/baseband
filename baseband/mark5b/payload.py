@@ -10,8 +10,8 @@ http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
-from ..vlbi_base.payload import (VLBIPayloadBase, encode_2bit_real_base,
-                                 decoder_levels, DTYPE_WORD)
+from ..vlbi_base.payload import VLBIPayloadBase
+from ..vlbi_base.encoding import encode_2bit_real_base, decoder_levels
 
 
 __all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
@@ -90,7 +90,7 @@ def encode_2bit_real(values):
     # swap 1 & 2
     reorder.take(bitvalues, out=bitvalues)
     bitvalues <<= shift2bit
-    return np.bitwise_or.reduce(bitvalues, axis=-1).view(DTYPE_WORD)
+    return np.bitwise_or.reduce(bitvalues, axis=-1)
 
 encode_2bit_real.__doc__ = encode_2bit_real_base.__doc__
 
@@ -113,17 +113,9 @@ class Mark5BPayload(VLBIPayloadBase):
     _encoders = {(2, False): encode_2bit_real}
     _decoders = {(2, False): decode_2bit_real}
 
-    def __init__(self, words, nchan=1, bps=2):
+    def __init__(self, words, nchan=1, bps=2, complex_data=False):
+        if complex_data:
+            raise ValueError("Mark5B format does not support complex data.")
+
         super(Mark5BPayload, self).__init__(words, nchan, bps,
                                             complex_data=False)
-
-    @classmethod
-    def fromdata(cls, data, bps=2):
-        """Encode data as payload, using a given number of bits per sample.
-
-        It is assumed that the last dimension is the number of channels.
-        """
-        if data.dtype.kind == 'c':
-            raise ValueError("Mark5B format does not support complex data.")
-        encoder = cls._encoders[bps, False]
-        return cls(encoder(data.ravel()), nchan=data.shape[-1], bps=bps)

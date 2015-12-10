@@ -171,7 +171,7 @@ class TestMark4(object):
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
-        o2h = vlbi_base.payload.OPTIMAL_2BIT_HIGH
+        o2h = vlbi_base.encoding.OPTIMAL_2BIT_HIGH
         assert np.all(mark4.payload.lut1bit[0] == 1.)
         assert np.all(mark4.payload.lut1bit[0xff] == -1.)
         assert np.all(mark4.payload.lut1bit.astype(int) ==

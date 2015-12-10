@@ -10,64 +10,11 @@ from __future__ import (absolute_import, division, print_function,
 import numpy as np
 
 
-__all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
-           'DTYPE_WORD', 'decoder_levels', 'encode_2bit_real_base',
-           'VLBIPayloadBase']
+__all__ = ['VLBIPayloadBase', 'DTYPE_WORD']
 
-# the high mag value for 2-bit reconstruction
-OPTIMAL_2BIT_HIGH = 3.3359
-r"""Optimal high value for a 2-bit digitizer for which the low value is 1.
 
-It is chosen such that for a normal distribution in which 68.269% of all values
-are at the low level, this is the mean of the others, i.e.,
-
-.. math::
-
-     l = \frac{\int_1^\infty x \exp(-\frac12x^2) dx}
-              {\int_0^1 x \exp(-\frac12x^2) dx} \times
-         \frac{\int_0^1 \exp(-\frac12x^2)dx}
-              {\int_1^\infty \exp(-\frac12x^2) dx}
-
-Note that for this value, the standard deviation is 2.1745.
-"""
-TWO_BIT_1_SIGMA = 2.1745
-"""Optimal level between low and high for the above OPTIMAL_2BIT_HIGH."""
-FOUR_BIT_1_SIGMA = 2.95
-"""Level for four-bit encoding."""
 DTYPE_WORD = np.dtype('<u4')
 """Dtype for 32-bit unsigned integers, with least signicant byte first."""
-
-
-decoder_levels = {
-    1: np.array([-1.0, 1.0], dtype=np.float32),
-    2: np.array([-OPTIMAL_2BIT_HIGH, -1.0, 1.0, OPTIMAL_2BIT_HIGH],
-                dtype=np.float32),
-    4: (np.arange(16) - 8.)/FOUR_BIT_1_SIGMA}
-"""Levels for data encoded with different numbers of bits.."""
-
-two_bit_2_sigma = 2 * TWO_BIT_1_SIGMA
-clip_low, clip_high = -1.5 * TWO_BIT_1_SIGMA, 1.5 * TWO_BIT_1_SIGMA
-
-
-def encode_2bit_real_base(values):
-    """Encode data using two bits.
-
-    Effectively, get indices such that for ``lv=TWO_BIT_1_SIGMA=2.1745``:
-      ================= ======
-      Input range       Output
-      ================= ======
-            value < -lv   0
-      -lv < value <  0.   2
-       0. < value <  lv   1
-       lv < value         3
-      ================= ======
-    """
-    # Optimized for speed by doing calculations in-place, and ensuring that
-    # the dtypes match.
-    values = np.clip(values, clip_low, clip_high)
-    values += two_bit_2_sigma
-    bitvalues = np.empty(values.shape, np.uint8)
-    return np.floor_divide(values, TWO_BIT_1_SIGMA, out=bitvalues)
 
 
 class VLBIPayloadBase(object):
@@ -144,8 +91,13 @@ class VLBIPayloadBase(object):
             imaginary part separately; default: 2).
         """
         complex_data = data.dtype.kind == 'c'
-        encoder = cls._encoders[bps, complex_data]
-        words = encoder(data.ravel())
+        try:
+            encoder = cls._encoders[bps, complex_data]
+        except KeyError:
+            raise ValueError("{0} cannot encode {1} data with {2} bits"
+                             .format(cls.__name__, 'complex' if complex_data
+                                     else'real', bps))
+        words = encoder(data.ravel()).view(DTYPE_WORD)
         return cls(words, nchan=data.shape[-1], bps=bps,
                    complex_data=complex_data)
 
