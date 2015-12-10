@@ -159,11 +159,12 @@ class VDIFStreamBase(VLBIStreamBase):
 
     _frame_class = VDIFFrame
 
-    def __init__(self, fh_raw, header0, thread_ids):
-        try:
-            sample_rate = header0.bandwidth * 2
-        except:
-            sample_rate = None
+    def __init__(self, fh_raw, header0, thread_ids, sample_rate=None):
+        if sample_rate is None:
+            try:
+                sample_rate = header0.bandwidth * 2
+            except:
+                pass
         super(VDIFStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, nchan=header0.nchan,
             bps=header0.bps, thread_ids=thread_ids, sample_rate=sample_rate)
@@ -192,8 +193,13 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         file handle of the raw VDIF stream
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
+    sample_rate : `~astropy.units.Quantity`, optional
+       Equivalent sample rate that would be needed to sample a real-valued
+       data stream required to get the data.  If not given, it will be inferred
+       from the bandwidth if that is given in the header, or from the samples
+       per frame and the frame rate determined by scanning the file.
     """
-    def __init__(self, raw, thread_ids=None):
+    def __init__(self, raw, thread_ids=None, sample_rate=None):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
@@ -205,7 +211,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         if thread_ids is None:
             thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
         self._framesetsize = raw.tell()
-        super(VDIFStreamReader, self).__init__(raw, header, thread_ids)
+        super(VDIFStreamReader, self).__init__(raw, header, thread_ids,
+                                               sample_rate)
 
     @lazyproperty
     def header1(self):
@@ -407,6 +414,11 @@ def open(name, mode='rs', *args, **kwargs):
 
     thread_ids : list of int, optional
        Specific threads to read.  By default, all threads are read.
+    sample_rate : `~astropy.units.Quantity`, optional
+       Equivalent sample rate that would be needed to sample a real-valued
+       data stream required to get the data.  If not given, it will be inferred
+       from the bandwidth if that is given in the header, or from the samples
+       per frame and the frame rate determined by scanning the file.
 
     --- For writing : (see :class:`VDIFStreamWriter`)
 

@@ -28,10 +28,11 @@ class VLBIStreamBase(object):
             samples_per_frame = header0.payloadsize * 8 // bps // nchan
 
         if sample_rate is None:
+            oldpos = fh_raw.tell()
             fh_raw.seek(0)
             self.frames_per_second = get_frame_rate(fh_raw, type(header0))
-            fh_raw.seek(self._frame.size)
-            sample_rate = (self.frames_per_second *
+            fh_raw.seek(oldpos)
+            sample_rate = (self.frames_per_second * u.Hz *
                            samples_per_frame).to(u.MHz)
         else:
             self.frames_per_second = (sample_rate /
