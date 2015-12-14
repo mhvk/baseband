@@ -295,7 +295,7 @@ class TestVDIF(object):
 def test_mwa_vdif():
     """Test phased VDIF format (uses EDV=0)"""
     with vdif.open(SAMPLE_MWA, 'rs', sample_rate=1.28*u.MHz) as fh:
-        assert fh.header0.edv == 0
         assert fh.samples_per_frame == 128
         assert fh.frames_per_second == 10000
         assert fh.tell(unit='time') == Time('2015-10-03T20:49:45.000')
+        assert fh.header0.edv == 0

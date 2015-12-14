@@ -12,6 +12,7 @@ from .. import mark5b
 SAMPLE_M4 = os.path.join(os.path.dirname(__file__), 'sample.m4')
 SAMPLE_M5B = os.path.join(os.path.dirname(__file__), 'sample.m5b')
 SAMPLE_VDIF = os.path.join(os.path.dirname(__file__), 'sample.vdif')
+SAMPLE_MWA = os.path.join(os.path.dirname(__file__), 'sample_mwa.vdif')
 
 
 class TestVDIFMark5B(object):
@@ -57,6 +58,32 @@ class TestVDIFMark5B(object):
         assert frame.size == 10032
         assert frame.shape == (5000, 8)
         assert np.all(frame.data == m5f.data)
+
+
+class TestVDIF0VDIF1(object):
+    """Conversion between EDV versions."""
+    with vdif.open(SAMPLE_MWA, 'rs', sample_rate=1.28*u.MHz) as f0:
+        h0 = f0.header0
+        d0 = f0.read(1024)
+        with io.BytesIO() as s:
+            kwargs = dict(h0)
+            kwargs['edv'] = 1
+            with vdif.open(s, 'ws', frames_per_second=10000, **kwargs) as f1w:
+                h1w = f1w.header0
+                assert list(h1w.words[:4]) == list(h0.words[:4])
+                assert h1w.framerate == 10. * u.kHz
+                assert h1w.bandwidth == 1.28 * f0.nchan * u.MHz
+                f1w.write(d0)
+                f1w.fh_raw.flush()
+
+                s.seek(0)
+                with vdif.open(s, 'rs') as f1r:
+                    h1r = f1r.header0
+                    d1r = f1r.read(1024)
+                assert h1r.words[:4] == h0.words[:4]
+                assert h1r.framerate == 10. * u.kHz
+                assert h1r.bandwidth == 1.28 * f0.nchan * u.MHz
+                assert np.all(d1r == d0)
 
 
 class TestMark5BToVDIF3(object):

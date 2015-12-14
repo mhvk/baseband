@@ -30,8 +30,8 @@ information.
 >>> fh
 <VDIFStreamReader name=... offset=0
     nthread=8, samples_per_frame=20000, nchan=1,
-    station=65532, (start) time=2014-06-16T05:56:07.000000000,
-    bandwidth=16.0 MHz, complex_data=False, bps=2, edv=3>
+    frames_per_second=1600, complex_data=False, bps=2, edv=3,
+    station=65532, (start) time=2014-06-16T05:56:07.000000000>
 >>> d = fh.read(12)
 >>> d.shape
 (12, 8)
@@ -52,8 +52,8 @@ coincidentally, what is given by the reader above suffices:
 >>> import astropy.units as u, numpy as np
 >>> fw = vdif.open('try.vdif', 'ws',
 ...                nthread=2, samples_per_frame=20000, nchan=1,
-...                station=65532, time=Time('2014-06-16T05:56:07.000000000'),
-...                bandwidth=16.0*u.MHz, complex_data=False, bps=2, edv=3)
+...                frames_per_second=1600, complex_data=False, bps=2, edv=3,
+...                station=65532, time=Time('2014-06-16T05:56:07.000000000'))
 >>> fw.write(d)
 >>> fw.close()
 >>> fh = vdif.open('try.vdif', 'rs')

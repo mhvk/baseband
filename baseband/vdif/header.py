@@ -442,7 +442,7 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
     """Base for VDIF headers that include the sample rate (EDV= 1, 3, 4)."""
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
         (('sampling_unit', (4, 23, 1)),
-         ('sample_rate', (4, 0, 23)),
+         ('sampling_rate', (4, 0, 23)),
          ('sync_pattern', (5, 0, 32, 0xACABFEED))))
 
     # Add extra properties, ensuring 'time' comes after 'framerate', since
@@ -457,7 +457,7 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
 
     @property
     def bandwidth(self):
-        return u.Quantity(self['sample_rate'],
+        return u.Quantity(self['sampling_rate'],
                           u.MHz if self['sampling_unit'] else u.kHz)
 
     @bandwidth.setter
@@ -465,24 +465,26 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
         self['sampling_unit'] = not (bandwidth.unit == u.kHz or
                                      bandwidth.to(u.MHz).value % 1 != 0)
         if self['sampling_unit']:
-            self['sample_rate'] = int(bandwidth.to(u.MHz).value)
+            self['sampling_rate'] = int(bandwidth.to(u.MHz).value)
         else:
             assert bandwidth.to(u.kHz).value % 1 == 0
-            self['sample_rate'] = int(bandwidth.to(u.kHz).value)
+            self['sampling_rate'] = int(bandwidth.to(u.kHz).value)
 
     @property
     def framerate(self):
         # Could use self.bandwidth here, but speed up the calculation by
         # changing to a Quantity only at the end.
-        return u.Quantity(self['sample_rate'] *
-                          (1000000 if self['sampling_unit'] else 1000) *
-                          2 * self.nchan / self.samples_per_frame, u.Hz)
+        return u.Quantity(self['sampling_rate'] *
+                          (1000000 if self['sampling_unit'] else 1000) /
+                          (self.nchan * self.samples_per_frame) *
+                          (1 if self['complex_data'] else 2), u.Hz)
 
     @framerate.setter
     def framerate(self, framerate):
         framerate = framerate.to(u.Hz)
         assert framerate.value % 1 == 0
-        self.bandwidth = framerate * self.samples_per_frame / (2 * self.nchan)
+        self.bandwidth = (framerate * self.samples_per_frame * self.nchan /
+                          (1 if self['complex_data'] else 2))
 
 
 class VDIFHeader1(VDIFSampleRateHeader):

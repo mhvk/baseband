@@ -155,20 +155,24 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
         time stamps.  By default, will be inferred from the file creation date.
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
+    frames_per_second : int, optional
+        Needed to calculate timestamps. If not given, will be inferred from
+        ``sample_rate``, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
-        If not given, it will be determined from the frame rate.
     """
 
     _frame_class = Mark5BFrame
 
     def __init__(self, raw, nchan, bps=2, ref_mjd=None, thread_ids=None,
-                 sample_rate=None):
+                 frames_per_second=None, sample_rate=None):
         self._frame = raw.read_frame(ref_mjd=ref_mjd, nchan=nchan, bps=bps)
         self._frame_data = None
+        header = self._frame.header
         super(Mark5BStreamReader, self).__init__(
-            raw, header0=self._frame.header, nchan=nchan, bps=bps,
-            thread_ids=thread_ids, sample_rate=sample_rate)
+            raw, header0=header, nchan=nchan, bps=bps, thread_ids=thread_ids,
+            samples_per_frame=header.payloadsize * 8 // bps // nchan,
+            frames_per_second=frames_per_second, sample_rate=sample_rate)
 
     @property
     def size(self):
@@ -260,9 +264,11 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
     ----------
     raw : `~baseband.mark5b.base.Mark5BFileWriter` instance.
         Which will write filled sets of frames to storage.
-    sample_rate : `~astropy.units.Quantity`
+    frames_per_second : int, optional
+        Needed to calculate timestamps. If not given, inferred from
+        ``sample_rate``.
+    sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
-        This is needed to calculate time stamps.
     nchan : int, optional
         Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
         Default is 1.
@@ -283,13 +289,14 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
 
     _frame_class = Mark5BFrame
 
-    def __init__(self, raw, sample_rate, nchan=1, bps=2, header=None,
-                 **kwargs):
+    def __init__(self, raw, frames_per_second=None, sample_rate=None,
+                 nchan=1, bps=2, header=None, **kwargs):
         if header is None:
             header = Mark5BHeader.fromvalues(**kwargs)
         super(Mark5BStreamWriter, self).__init__(
-            raw, sample_rate=sample_rate, header0=header, nchan=nchan, bps=bps,
-            thread_ids=None)
+            raw, header0=header, nchan=nchan, bps=bps, thread_ids=None,
+            samples_per_frame=header.payloadsize * 8 // bps // nchan,
+            frames_per_second=frames_per_second, sample_rate=sample_rate)
         self._data = np.zeros((self.samples_per_frame, self.nchan), np.float32)
         self._valid = True
 
@@ -357,15 +364,19 @@ def open(name, mode='rs', **kwargs):
         time stamps.  By default, will be inferred from the file creation date.
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
-    sample_rate : :class`~astropy.units.Quantity`, optional
+    frames_per_second : int, optional
+        Needed to calculate timestamps. If not given, will be inferred from
+        ``sample_rate``, or by scanning the file.
+    sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
-        If not given, it will be determined from the frame rate.
 
     --- For writing a stream : (see `~baseband.mark5b.base.Mark5BStreamWriter`)
 
-    sample_rate : :class:`~astropy.units.Quantity`
+    frames_per_second : int, optional
+        Needed to calculate timestamps. If not given, inferred from
+        ``sample_rate``.
+    sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
-        This is needed to calculate time stamps.
     nchan : int, optional
         Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
         Default is 1.
