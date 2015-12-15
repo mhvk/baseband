@@ -155,27 +155,27 @@ class Mark4StreamReader(VLBIStreamReaderBase):
         By default, it will be inferred from the file creation date.
     thread_ids: list of int, optional
         Specific threads/channels to read.  By default, all are read.
+    frames_per_second : int, optional
+        Needed to calculate timestamps. If not given, will be inferred from
+        ``sample_rate``, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
-        If not given, it will be determined from the frame rate.
     """
 
     _frame_class = Mark4Frame
 
     def __init__(self, raw, ntrack, decade=None, thread_ids=None,
-                 sample_rate=None):
+                 frames_per_second=None, sample_rate=None):
         self.offset0 = raw.find_frame(ntrack=ntrack)
         self._frame = raw.read_frame(ntrack, decade)
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
-        bps = header.bps
-        nchan = header.nchan
         super(Mark4StreamReader, self).__init__(
-            fh_raw=raw, header0=header, nchan=nchan, bps=bps,
+            fh_raw=raw, header0=header, nchan=header.nchan, bps=header.bps,
             thread_ids=thread_ids,
-            samples_per_frame=header.framesize * 8 // bps // nchan,
-            sample_rate=sample_rate)
+            samples_per_frame=header.samples_per_frame,
+            frames_per_second=frames_per_second, sample_rate=sample_rate)
 
     def read(self, count=None, fill_value=0., squeeze=True, out=None):
         """Read count samples.
@@ -250,9 +250,11 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
     ----------
     raw : `~baseband.mark4.Mark4FileWriter`
         Which will write filled sets of frames to storage.
-    sample_rate : `~astropy.units.Quantity`
+    frames_per_second : int, optional
+        Needed to calculate timestamps. If not given, inferred from
+        ``sample_rate``.
+    sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
-        This is needed to calculate time stamps.
     header : `~baseband.mark4.Mark4Header`
         Header for the first frame, holding start time information, etc.
     **kwargs
@@ -274,7 +276,8 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
 
     _frame_class = Mark4Frame
 
-    def __init__(self, raw, sample_rate, header=None, **kwargs):
+    def __init__(self, raw, frames_per_second=None, sample_rate=None,
+                 header=None, **kwargs):
         if header is None:
             header = Mark4Header.fromvalues(**kwargs)
         super(Mark4StreamWriter, self).__init__(
@@ -282,7 +285,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
             bps=header.bps, nchan=header.nchan,
             samples_per_frame=(header.framesize * 8 // header.bps //
                                header.nchan),
-            sample_rate=sample_rate)
+            frames_per_second=frames_per_second, sample_rate=sample_rate)
 
         self._data = np.zeros((self.samples_per_frame, self.nchan), np.float32)
 
@@ -343,15 +346,19 @@ def open(name, mode='rs', **kwargs):
         Number of tracks used to store the data.
     thread_ids: list of int, optional
         Specific threads/channels to read.  By default, all are read.
+    frames_per_second : int, optional
+        Needed to calculate timestamps. If not given, will be inferred from
+        ``sample_rate``, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
-        If not given, it will be determined from the frame rate.
 
     --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
 
-    sample_rate : `~astropy.units.Quantity`
+    frames_per_second : int, optional
+        Needed to calculate timestamps. If not given, inferred from
+        ``sample_rate``.
+    sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
-        This is needed to calculate time stamps.
     header : `~baseband.mark4.Mark4Header`
         Header for the first frame, holding time information, etc.
     **kwargs

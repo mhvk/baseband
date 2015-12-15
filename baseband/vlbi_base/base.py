@@ -17,29 +17,25 @@ class VLBIStreamBase(object):
     _frame_class = None
 
     def __init__(self, fh_raw, header0, nchan, bps, thread_ids,
-                 samples_per_frame=None, sample_rate=None):
+                 samples_per_frame, frames_per_second=None,
+                 sample_rate=None):
         self.fh_raw = fh_raw
         self.header0 = header0
         self.nchan = nchan
         self.bps = bps
         self.thread_ids = thread_ids
         self.nthread = nchan if thread_ids is None else len(thread_ids)
-        if samples_per_frame is None:
-            samples_per_frame = header0.payloadsize * 8 // bps // nchan
-
-        if sample_rate is None:
-            oldpos = fh_raw.tell()
-            fh_raw.seek(0)
-            self.frames_per_second = get_frame_rate(fh_raw, type(header0))
-            fh_raw.seek(oldpos)
-            sample_rate = (self.frames_per_second * u.Hz *
-                           samples_per_frame).to(u.MHz)
-        else:
-            self.frames_per_second = (sample_rate /
-                                      samples_per_frame).to(u.Hz).value
-
         self.samples_per_frame = samples_per_frame
-        self.sample_rate = sample_rate
+        if frames_per_second is None:
+            frames_per_second = sample_rate.to(u.Hz).value / samples_per_frame
+            if frames_per_second % 1:
+                raise ValueError("Sampling rate {0} and samples per frame {1} "
+                                 "imply non-integer number of frames per "
+                                 "second".format(sample_rate,
+                                                 samples_per_frame))
+            frames_per_second = int(frames_per_second)
+
+        self.frames_per_second = frames_per_second
         self.offset = 0
 
     # Providing normal File IO properties.
@@ -100,6 +96,19 @@ class VLBIStreamBase(object):
 
 class VLBIStreamReaderBase(VLBIStreamBase):
     _find_frame = None
+
+    def __init__(self, fh_raw, header0, nchan, bps, thread_ids,
+                 samples_per_frame, frames_per_second=None,
+                 sample_rate=None):
+        if frames_per_second is None and sample_rate is None:
+            oldpos = fh_raw.tell()
+            fh_raw.seek(0)
+            frames_per_second = get_frame_rate(fh_raw, type(header0))
+            fh_raw.seek(oldpos)
+
+        super(VLBIStreamReaderBase, self).__init__(
+            fh_raw, header0, nchan, bps, thread_ids, samples_per_frame,
+            frames_per_second, sample_rate)
 
     @lazyproperty
     def header1(self):

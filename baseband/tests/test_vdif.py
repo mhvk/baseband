@@ -2,10 +2,13 @@ import io
 import os
 import numpy as np
 from astropy.tests.helper import pytest
+from astropy.time import Time
+import astropy.units as u
 from .. import vdif, vlbi_base
 
 
 SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.vdif')
+SAMPLE_MWA = os.path.join(os.path.dirname(__file__), 'sample_mwa.vdif')
 
 
 # Comparisn with m5access routines (check code on 2015-MAY-30) on vlba.m5a,
@@ -287,3 +290,12 @@ class TestVDIF(object):
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==
                       np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
+
+
+def test_mwa_vdif():
+    """Test phased VDIF format (uses EDV=0)"""
+    with vdif.open(SAMPLE_MWA, 'rs', sample_rate=1.28*u.MHz) as fh:
+        assert fh.samples_per_frame == 128
+        assert fh.frames_per_second == 10000
+        assert fh.tell(unit='time') == Time('2015-10-03T20:49:45.000')
+        assert fh.header0.edv == 0

@@ -237,8 +237,8 @@ class Mark4Header(Mark4TrackHeader):
 
     _track_header = Mark4TrackHeader
     _properties = (Mark4TrackHeader._properties +
-                   ('ntrack', 'fanout', 'nchan', 'bps',
-                    'framesize', 'payloadsize'))
+                   ('ntrack', 'framesize', 'payloadsize', 'fanout',
+                    'samples_per_frame', 'bps', 'nchan'))
     _dtypes = {1: 'b',
                2: 'u1',
                4: 'u1',
@@ -388,15 +388,6 @@ class Mark4Header(Mark4TrackHeader):
         return self.ntrack * 160 // 8
 
     @property
-    def payloadsize(self):
-        """Payloadsize; missing pieces are the header bytes."""
-        return self.framesize - self.size
-
-    @payloadsize.setter
-    def payloadsize(self, payloadsize):
-        self.framesize = payloadsize + self.size
-
-    @property
     def framesize(self):
         return self.ntrack * PAYLOADSIZE // 8
 
@@ -404,6 +395,15 @@ class Mark4Header(Mark4TrackHeader):
     def framesize(self, framesize):
         assert framesize * 8 % PAYLOADSIZE == 0
         self.ntrack = framesize * 8 // PAYLOADSIZE
+
+    @property
+    def payloadsize(self):
+        """Payloadsize; missing pieces are the header bytes."""
+        return self.framesize - self.size
+
+    @payloadsize.setter
+    def payloadsize(self, payloadsize):
+        self.framesize = payloadsize + self.size
 
     @property
     def fanout(self):
@@ -420,12 +420,16 @@ class Mark4Header(Mark4TrackHeader):
             self.ntrack // 2 // fanout, axis=0).ravel()
 
     @property
-    def nchan(self):
-        return self.ntrack // self.fanout // self.bps
+    def samples_per_frame(self):
+        """Number of samples per channel encoded in frame."""
+        # Header overwrites part of payload, so we need framesize.
+        # framesize * 8 // bps // nchan, but use ntrack and fanout, as these
+        # are more basic; ntrack / fanout by definition equals bps * nchan.
+        return self.framesize * 8 // (self.ntrack // self.fanout)
 
-    @nchan.setter
-    def nchan(self, nchan):
-        self.bps = self.ntrack // self.fanout // nchan
+    @samples_per_frame.setter
+    def samples_per_frame(self, samples_per_frame):
+        self.fanout = samples_per_frame * self.ntrack // 8 // self.framesize
 
     @property
     def bps(self):
@@ -447,6 +451,14 @@ class Mark4Header(Mark4TrackHeader):
         self['converter_id'] = np.repeat(
             np.arange(nchan).reshape(-1, 2, 2).transpose(0, 2, 1),
             self.ntrack // nchan, axis=1).ravel()
+
+    @property
+    def nchan(self):
+        return self.ntrack // self.fanout // self.bps
+
+    @nchan.setter
+    def nchan(self, nchan):
+        self.bps = self.ntrack // self.fanout // nchan
 
     def get_time(self):
         """
