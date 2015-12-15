@@ -75,6 +75,7 @@ class TestMark4(object):
         assert header.nchan == 8
         assert int(header.time.mjd) == 56824
         assert header.time.isot == '2014-06-16T07:38:12.47500'
+        assert header.samples_per_frame == 20000 * 4
         assert header.framesize == 20000 * 64 // 8
         assert header.payloadsize == header.framesize - header.size
         assert header.mutable is False

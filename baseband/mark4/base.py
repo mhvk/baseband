@@ -171,12 +171,10 @@ class Mark4StreamReader(VLBIStreamReaderBase):
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
-        bps = header.bps
-        nchan = header.nchan
         super(Mark4StreamReader, self).__init__(
-            fh_raw=raw, header0=header, nchan=nchan, bps=bps,
+            fh_raw=raw, header0=header, nchan=header.nchan, bps=header.bps,
             thread_ids=thread_ids,
-            samples_per_frame=header.framesize * 8 // bps // nchan,
+            samples_per_frame=header.samples_per_frame,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
 
     def read(self, count=None, fill_value=0., squeeze=True, out=None):
