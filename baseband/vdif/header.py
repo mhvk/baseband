@@ -67,7 +67,11 @@ class VDIFHeader(VLBIHeaderBase):
             else:
                 edv = get_header_edv(words)
 
-        cls = vdif_header_classes.get(edv, VDIFBaseHeader)
+        # Have to use key "-1" instead of "False" since the dict-lookup treats
+        # 0 and False as identical.
+        cls = vdif_edv_headers.get(edv if edv is not False else -1,
+                                   VDIFBaseHeader)
+
         self = super(VDIFHeader, cls).__new__(cls)
         self.edv = edv
         # We intialise VDIFHeader subclasses, so their __init__ will be called.
@@ -355,7 +359,7 @@ class VDIFHeader(VLBIHeaderBase):
                     raise ValueError("Cannot calculate frame rate for this "
                                      "header. Pass it in explicitly.")
             self['frame_nr'] = int(round((frac_sec * framerate)
-                                         .to(u.one).value))
+                                         .to(u.dimensionless_unscaled).value))
 
     time = property(get_time, set_time)
 
@@ -388,7 +392,7 @@ class VDIFLegacyHeader(VDIFHeader):
             self.words = (0, 0, 0, 0)
         else:
             self.words = words
-        if self.edv is not None:
+        if edv is not None:
             self.edv = edv
         if verify:
             self.verify()
@@ -578,12 +582,12 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
 is_legacy_header = VDIFBaseHeader._header_parser.parsers['legacy_mode']
 get_header_edv = VDIFBaseHeader._header_parser.parsers['edv']
 
-vdif_header_classes = {False: VDIFLegacyHeader,
-                       0: VDIFHeader0,
-                       1: VDIFHeader1,
-                       2: VDIFHeader2,
-                       3: VDIFHeader3,
-                       4: VDIFHeader4,
-                       0xab: VDIFMark5BHeader}
+vdif_edv_headers = {-1: VDIFLegacyHeader,
+                    0: VDIFHeader0,
+                    1: VDIFHeader1,
+                    2: VDIFHeader2,
+                    3: VDIFHeader3,
+                    4: VDIFHeader4,
+                    0xab: VDIFMark5BHeader}
 
-__all__ += [cls.__name__ for cls in vdif_header_classes.values()]
+__all__ += [cls.__name__ for cls in vdif_edv_headers.values()]
