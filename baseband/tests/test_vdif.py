@@ -299,3 +299,29 @@ def test_mwa_vdif():
         assert fh.frames_per_second == 10000
         assert fh.tell(unit='time') == Time('2015-10-03T20:49:45.000')
         assert fh.header0.edv == 0
+
+
+def test_legacy_vdif():
+    """Create legacy header, ensuring it is not treated as EDV=0 (see #12)."""
+    # legacy_mode, 1 sec, epoch 4, vdif v1, nchan=2, 507*8 bytes, bps=2, 'AA'
+    words = (1 << 30 | 1, 4 << 24, 1 << 29 | 1 << 24 | 507, 1 << 26 | 0x4141)
+    header = vdif.VDIFHeader(words)
+    assert header['legacy_mode'] is True
+    assert header.edv is False
+    assert abs(header.time - Time('2002-01-01T00:00:01.000000000')) < 1. * u.ns
+    assert header['frame_nr'] == 0
+    assert header['vdif_version'] == 1
+    assert header.nchan == 2
+    assert header.framesize == 507 * 8
+    assert header.size == 16
+    assert header['complex_data'] is False
+    assert header.bps == 2
+    assert header['thread_id'] == 0
+    assert header.station == 'AA'
+    with io.BytesIO() as s:
+        header.tofile(s)
+        # Add fake payload
+        s.write(np.zeros(503, dtype=np.int64).tostring())
+        s.seek(0)
+        header2 = vdif.VDIFHeader.fromfile(s)
+    assert header2 == header
