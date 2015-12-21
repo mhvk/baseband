@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE.rst
 """
 Base definitions for VLBI Headers, used for VDIF and Mark 5B.
 
@@ -26,7 +27,7 @@ eight_word_struct = struct.Struct('<8I')
 """Struct instance that packs/unpacks 8 unsigned 32-bit integers."""
 
 
-def make_parser(word_index, bit_index, bit_length):
+def make_parser(word_index, bit_index, bit_length, default=None):
     """Construct a function that converts specific bits from a header.
 
     The function acts on a tuple/array of 32-bit words, extracting given bits
@@ -162,7 +163,7 @@ class HeaderPropertyGetter(object):
         self.__doc__ = doc or getter.__doc__
 
     def __get__(self, instance, owner_cls=None):
-        return HeaderProperty(instance, self.getter)
+        return HeaderProperty(instance, getattr(instance, self.getter))
 
 
 class HeaderParser(OrderedDict):
@@ -189,12 +190,20 @@ class HeaderParser(OrderedDict):
     Note that while in principle, parsers and setters could be calculated on
     the fly, we precalculate the parsers to speed up header keyword access.
     """
+
     def __init__(self, *args, **kwargs):
         # Use a dict rather than OrderedDict for the parsers for better speed.
         # Note that this gets filled by calls to __setitem__.
         self.parsers = {}
+        self._make_parser = kwargs.pop('make_parser', make_parser)
+        self._make_setter = kwargs.pop('make_setter', make_setter)
+        self._get_default = kwargs.pop('get_default', get_default)
         super(HeaderParser, self).__init__(*args, **kwargs)
-        self.parsers = {k: make_parser(*v[:3]) for k, v in self.items()}
+
+    def copy(self):
+        return self.__class__(self, make_parser=self._make_parser,
+                              make_setter=self._make_setter,
+                              get_default=self._get_default)
 
     def __add__(self, other):
         if not isinstance(other, HeaderParser):
@@ -204,15 +213,15 @@ class HeaderParser(OrderedDict):
         return result
 
     def __setitem__(self, item, value):
-        self.parsers[item] = make_parser(*value[:3])
+        self.parsers[item] = self._make_parser(*value)
         super(HeaderParser, self).__setitem__(item, value)
 
     defaults = HeaderPropertyGetter(
-        get_default,
+        '_get_default',
         doc="Dict-like allowing access to default header values by keyword.")
 
     setters = HeaderPropertyGetter(
-        make_setter,
+        '_make_setter',
         doc="Dict-like returning function to set header keyword to a value")
 
     def update(self, other):
