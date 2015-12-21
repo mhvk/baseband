@@ -9,3 +9,4 @@ from __future__ import (absolute_import, division, print_function,
 # from .base import open
 from .header import GSBHeader
 from .payload import GSBPayload
+from .frame import GSBFrame

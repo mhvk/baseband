@@ -107,6 +107,7 @@ class GSBHeader(VLBIHeaderBase):
     header : `GSBHeader` subclass
         As appropriate for the mode.
     """
+    _mode = None
 
     def __new__(cls, words, mode=None, utc_offset=5.5*u.hr, verify=True):
 
@@ -157,20 +158,27 @@ class GSBHeader(VLBIHeaderBase):
     @classmethod
     def fromvalues(cls, mode=None, *args, **kwargs):
         if mode is None:
-            if set(kwargs.keys()) & {'gps', 'gps_time', 'seq_nr', 'sub_int'}:
-                mode = 'phased'
+            if cls._mode is not None:
+                mode = cls._mode
             else:
-                raise TypeError("Cannot construct a GSB header from values "
-                                "without knowing the mode.")
+                if set(kwargs.keys()) & {'gps', 'gps_time',
+                                         'seq_nr', 'sub_int'}:
+                    mode = 'phased'
+                else:
+                    raise TypeError("Cannot construct a GSB header from "
+                                    "values without knowing the mode.")
         return super(GSBHeader, cls).fromvalues(mode, *args, **kwargs)
 
     @classmethod
     def fromkeys(cls, mode=None, *args, **kwargs):
         if mode is None:
-            if set(kwargs.keys()) & {'gps', 'seq_nr', 'sub_int'}:
-                mode = 'phased'
+            if cls._mode is not None:
+                mode = cls._mode
             else:
-                mode = 'rawdump'
+                if set(kwargs.keys()) & {'gps', 'seq_nr', 'sub_int'}:
+                    mode = 'phased'
+                else:
+                    mode = 'rawdump'
         return super(GSBHeader, cls).fromkeys(mode, *args, **kwargs)
 
     def __eq__(self, other):
@@ -210,7 +218,7 @@ class GSBPhasedHeader(GSBRawdumpHeader):
     _mode = 'phased'
     _size = GSBRawdumpHeader._size + 7 + 2
     _pc_time_precision = 6
-    _properties = GSBRawdumpHeader._properties + ('gps_time',)
+    _properties = ('time', 'gps_time') + GSBRawdumpHeader._properties
 
     _header_parser = GSBRawdumpHeader._header_parser + HeaderParser(
         (('gps', (7, 7, ' '.join, str.split)),
@@ -230,7 +238,14 @@ class GSBPhasedHeader(GSBRawdumpHeader):
         t.precision = 9
         self['gps'] = t.gsb
 
-    time = gps_time
+    @property
+    def time(self):
+        return self.gps_time
+
+    @time.setter
+    def time(self, time):
+        self.gps_time = time
+        self.pc_time = time
 
 
 gsb_header_classes = {'rawdump': GSBRawdumpHeader,

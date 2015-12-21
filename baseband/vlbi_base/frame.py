@@ -70,7 +70,7 @@ class VLBIFrameBase(object):
         """Simple verification.  To be added to by subclasses."""
         assert isinstance(self.header, self._header_class)
         assert isinstance(self.payload, self._payload_class)
-        assert (self.payloadsize ==
+        assert (self.header.payloadsize ==
                 self.payload.words.size * self.payload.words.dtype.itemsize)
         assert (self.payloadsize == getattr(self.header, 'payloadsize',
                                             self.payloadsize))
