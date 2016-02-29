@@ -146,7 +146,7 @@ class TestMark4(object):
         assert np.all(abs(header7.time - header.time -
                           np.arange(64) * 125 * u.ms) < 1.*u.ns)
         with pytest.raises(ValueError):
-            header7.time = header.time + np.arange(64) * u.year
+            header7.time = header.time - np.linspace(0, 20, 64) * u.year
         # Check slicing.
         header8 = header[:2]
         assert type(header8) is mark4.Mark4Header

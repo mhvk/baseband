@@ -1,8 +1,8 @@
 language: python
 
 python:
+    - 3.5
     - 2.7
-    - 3.4
     # This is just for "egg_info".  All other builds are explicitly given in the matrix
 
 # Setting sudo to false opts in to Travis-CI container-based builds.
@@ -25,7 +25,7 @@ env:
         # The following versions are the 'default' for tests, unless
         # overidden underneath. They are defined here in order to save having
         # to repeat them for all configurations.
-        - NUMPY_VERSION=1.9
+        - NUMPY_VERSION=stable
         - ASTROPY_VERSION=stable
         - CONDA_INSTALL='conda install -c astropy-ci-extras --yes'
         - PIP_INSTALL='pip install'
@@ -35,8 +35,8 @@ env:
 matrix:
     include:
 
-        # Do a coverage test in Python 2.
-        - python: 2.7
+        # Do a coverage test in Python 3.
+        - python: 3.5
           env: SETUP_CMD='test --coverage'
 
         # Check for sphinx doc build warnings - we do this first because it
@@ -45,16 +45,18 @@ matrix:
           env: SETUP_CMD='build_sphinx -w'
 
         # Try all python versions with the latest numpy and astropy
-        - python: 2.7
+        - python: 3.5
           env: SETUP_CMD='test'
-        - python: 3.4
+        - python: 2.7
           env: SETUP_CMD='test'
 
         # Try Astropy development version on new python
-        - python: 3.4
+        - python: 3.5
           env: ASTROPY_VERSION=development SETUP_CMD='test'
 
         # Try older numpy versions on old python
+        - python: 2.7
+          env: NUMPY_VERSION=1.9 SETUP_CMD='test'
         - python: 2.7
           env: NUMPY_VERSION=1.8 SETUP_CMD='test'
         - python: 2.7

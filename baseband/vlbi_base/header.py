@@ -122,11 +122,9 @@ def make_setter(word_index, bit_index, bit_length, default=None):
             return words
 
         word = words[word_index]
-        # Zero the part to be set.
+        # Zero the part to be set, and add the value.
         bit_mask <<= bit_index
-        word = ((word | bit_mask) ^ bit_mask)
-        # Add the value
-        word |= value << bit_index
+        word = ((word | bit_mask) ^ bit_mask) | (value << bit_index)
         words[word_index] = word
         return words
 

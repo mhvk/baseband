@@ -50,7 +50,7 @@ def stream2words(stream, track=None):
         track = np.arange(stream.dtype.itemsize * 8, dtype=stream.dtype)
 
     track_sel = ((stream.reshape(-1, 32, 1) >> track) & 1).astype(np.uint32)
-    track_sel <<= np.arange(31, -1, -1).reshape(1, 32, 1)
+    track_sel <<= np.arange(31, -1, -1, dtype=np.uint32).reshape(1, 32, 1)
     words = np.bitwise_or.reduce(track_sel, axis=1)
     return words.squeeze()
 
@@ -518,14 +518,14 @@ class Mark4Header(Mark4TrackHeader):
                 np.all(self.words == other.words))
 
     def __repr__(self):
-        if getattr(self.words, 'size', 5) == 5:
-            return super(Mark4Header, self).__repr__()
-
         name = self.__class__.__name__
         outs = []
         for k in self.keys():
             v = self[k]
-            if np.all(v == v[0]):
+            if len(v) == 1:
+                outs.append('{0}: {1}'.format(
+                    k, hex(v[0]) if self._repr_as_hex(k) else v[0]))
+            elif np.all(v == v[0]):
                 outs.append('{0}: [{1}]*{2}'.format(
                     k, hex(v[0]) if self._repr_as_hex(k) else v[0], v.size))
             else:
