@@ -83,6 +83,15 @@ class TestGSB(object):
         with pytest.raises(TypeError):
             gsb.GSBHeader(None)
 
+    def test_header_non_gmrt(self):
+        header = gsb.GSBHeader(tuple(self.phased_ts.split()),
+                               utc_offset=0.*u.hr)
+        assert abs(header.pc_time -
+                   Time('2014-01-20T02:28:10.811174')) < 1.*u.ns
+        assert header.gps_time == header.time
+        assert abs(header.time -
+                   Time('2014-01-20T02:28:10.622453760')) < 1.*u.ns
+
     def test_decoding(self):
         """Check that 4-bit encoding works."""
         areal = np.arange(-8, 8)
