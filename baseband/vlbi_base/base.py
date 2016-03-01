@@ -157,20 +157,20 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return int(round((self.time1 - self.time0).to(u.s).value *
                          self.frames_per_second * self.samples_per_frame))
 
-    def seek(self, offset, from_what=0):
-        """Offset to a given position in the file.
+    def seek(self, offset, whence=0):
+        """Change stream position.
 
         This works like a normal seek, but the offset is in samples
-        (or seconds or an absolute time).
+        (or a relative or absolute time).
 
         Parameters
         ----------
         offset : int, `~astropy.units.Quantity`, or `~astropy.time.Time`
             Offset to move to.  Can be an (integer) number of samples,
             an offset in time units, or an absolute time.
-        from_what : int
+        whence : int
             Like regular seek, the offset is taken to be from the start if
-            ``from_what=0`` (default), from the current position if ``1``,
+            ``whence=0`` (default), from the current position if ``1``,
             and from the end if ``2``.  Ignored if ``offset`` is a time.`
         """
         try:
@@ -181,20 +181,20 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             except:
                 pass
             else:
-                from_what = 0
+                whence = 0
 
             offset = offset.to(u_sample, equivalencies=[(u.s, u.Unit(
                 self.samples_per_frame * self.frames_per_second * u_sample))])
             offset = int(round(offset.value))
 
-        if from_what == 0:
+        if whence == 0:
             self.offset = offset
-        elif from_what == 1:
+        elif whence == 1:
             self.offset += offset
-        elif from_what == 2:
+        elif whence == 2:
             self.offset = self.size + offset
         else:
-            raise ValueError("invalid 'from_what'; should be 0, 1, or 2.")
+            raise ValueError("invalid 'whence'; should be 0, 1, or 2.")
 
         return self.offset
 
