@@ -62,7 +62,8 @@ def encode_2bit_real_base(values):
     values = np.clip(values, clip_low, clip_high)
     values += two_bit_2_sigma
     bitvalues = np.empty(values.shape, np.uint8)
-    return np.floor_divide(values, TWO_BIT_1_SIGMA, out=bitvalues)
+    return np.floor_divide(values, TWO_BIT_1_SIGMA, out=bitvalues,
+                           casting='unsafe')
 
 
 def decode_8bit_real(words, out=None):
