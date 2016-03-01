@@ -109,25 +109,37 @@ class TestVDIF(object):
         assert np.all(vdif.payload.lut2bit[0x55] == -1.)
         assert np.all(vdif.payload.lut2bit[0xaa] == 1.)
         assert np.all(vdif.payload.lut2bit[0xff] == o2h)
-        assert np.all(vdif.payload.lut4bit[0] * 2.95 == -8.)
+        assert np.allclose(vdif.payload.lut4bit[0] * 2.95, -8.)
         assert np.all(vdif.payload.lut4bit[0x88] == 0.)
-        assert np.all(vdif.payload.lut4bit[0xff] * 2.95 == 7)
+        assert np.allclose(vdif.payload.lut4bit[0xff] * 2.95, 7)
         assert np.all(-vdif.payload.lut4bit[0x11] ==
                       vdif.payload.lut4bit[0xff])
-        aint = np.arange(-128, 128, dtype=np.int8).view(np.uint32)
-        # Mark5access would have -127.5, 127.5, 256 here, but MWA data does
-        # not follow that logic, so we're keeping it simple.
-        areal = np.linspace(-128, 127, 256).reshape(-1, 1)
+        aint = np.arange(0, 256, dtype=np.uint8)
+        words = aint.view(np.uint32)
+        areal = np.linspace(-127.5, 127.5, 256).reshape(-1, 1) / 35.5
         acmplx = areal[::2] + 1j * areal[1::2]
-        payload1 = vdif.VDIFPayload(aint, bps=8, complex_data=False)
-        assert np.all(payload1.data == areal)
-        payload2 = vdif.VDIFPayload(aint, bps=8, complex_data=True)
-        assert np.all(payload2.data == acmplx)
+        payload1 = vdif.VDIFPayload(words, bps=8, complex_data=False)
+        assert np.allclose(payload1.data, areal)
+        payload2 = vdif.VDIFPayload(words, bps=8, complex_data=True)
+        assert np.allclose(payload2.data, acmplx)
         header = vdif.VDIFHeader.fromvalues(edv=0, complex_data=False, bps=8,
                                             payloadsize=payload1.size)
         assert np.all(vdif.VDIFPayload.fromdata(areal, header) == payload1)
         header['complex_data'] = True
         assert np.all(vdif.VDIFPayload.fromdata(acmplx, header) == payload2)
+        # Also check for bps=4
+        decode = (aint[:, np.newaxis] >> np.array([0, 4])) & 0xf
+        areal = ((decode - 8.) / 2.95).reshape(-1, 1)
+        acmplx = areal[::2] + 1j * areal[1::2]
+        payload3 = vdif.VDIFPayload(words, bps=4, complex_data=False)
+        assert np.allclose(payload3.data, areal)
+        payload4 = vdif.VDIFPayload(words, bps=4, complex_data=True)
+        assert np.allclose(payload4.data, acmplx)
+        header = vdif.VDIFHeader.fromvalues(edv=0, complex_data=False, bps=4,
+                                            payloadsize=payload3.size)
+        assert vdif.VDIFPayload.fromdata(areal, header) == payload3
+        header['complex_data'] = True
+        assert vdif.VDIFPayload.fromdata(acmplx, header) == payload4
 
     def test_payload(self):
         with open(SAMPLE_FILE, 'rb') as fh:

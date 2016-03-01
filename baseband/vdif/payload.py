@@ -11,10 +11,10 @@ from __future__ import (absolute_import, division, print_function,
 import numpy as np
 
 from ..vlbi_base.payload import VLBIPayloadBase, DTYPE_WORD
-from ..vlbi_base.encoding import (encode_2bit_real_base, decoder_levels,
+from ..vlbi_base.encoding import (encode_2bit_real_base, encode_4bit_real_base,
+                                  decoder_levels,
                                   decode_8bit_real, encode_8bit_real,
                                   decode_8bit_complex, encode_8bit_complex)
-
 
 __all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
            'decode_2bit_complex', 'encode_2bit_complex', 'VDIFPayload']
@@ -78,6 +78,38 @@ def encode_2bit_complex(values):
     return encode_2bit_real(values.view(values.real.dtype))
 
 
+def decode_4bit_real(words, out=None):
+    b = words.view(np.uint8)
+    if out is None:
+        return lut4bit.take(b, axis=0).ravel()
+    else:
+        outf2 = out.reshape(-1, 2)
+        assert outf2.base is out or outf2.base is out.base
+        lut4bit.take(b, axis=0, out=outf2)
+        return out
+
+
+def decode_4bit_complex(words, out=None):
+    if out is None:
+        return decode_4bit_real(words).view(np.complex64)
+    else:
+        decode_4bit_real(words, out.view(out.real.dtype))
+        return out
+
+
+shift04 = np.array([0, 4], np.uint8)
+
+
+def encode_4bit_real(values):
+    b = encode_4bit_real_base(values).reshape(-1, 2)
+    b <<= shift04
+    return b[:, 0] | b[:, 1]
+
+
+def encode_4bit_complex(values):
+    return encode_4bit_real(values.view(values.real.dtype))
+
+
 class VDIFPayload(VLBIPayloadBase):
     """Container for decoding and encoding VDIF payloads.
 
@@ -101,11 +133,15 @@ class VDIFPayload(VLBIPayloadBase):
     """
     _decoders = {(2, False): decode_2bit_real,
                  (2, True): decode_2bit_complex,
+                 (4, False): decode_4bit_real,
+                 (4, True): decode_4bit_complex,
                  (8, False): decode_8bit_real,
                  (8, True): decode_8bit_complex}
 
     _encoders = {(2, False): encode_2bit_real,
                  (2, True): encode_2bit_complex,
+                 (4, False): encode_4bit_real,
+                 (4, True): encode_4bit_complex,
                  (8, False): encode_8bit_real,
                  (8, True): encode_8bit_complex}
 
