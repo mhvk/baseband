@@ -5,7 +5,9 @@ import numpy as np
 
 
 __all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
-           'decoder_levels', 'encode_2bit_real_base']
+           'EIGHT_BIT_1_SIGMA', 'decoder_levels', 'encode_2bit_real_base',
+           'encode_4bit_real_base', 'decode_8bit_real', 'encode_8bit_real',
+           'decode_8bit_complex', 'encode_8bit_complex']
 
 
 # The high mag value for 2-bit reconstruction.
@@ -27,14 +29,15 @@ Note that for this value, the standard deviation is 2.1745.
 TWO_BIT_1_SIGMA = 2.1745
 """Optimal level between low and high for the above OPTIMAL_2BIT_HIGH."""
 FOUR_BIT_1_SIGMA = 2.95
-"""Level for four-bit encoding."""
-
+"""Scaling for four-bit encoding that makes it look like 2 bit."""
+EIGHT_BIT_1_SIGMA = 71.0 / 2.
+"""Scaling for eight-bit encoding that makes it look like 2 bit."""
 
 decoder_levels = {
     1: np.array([-1.0, 1.0], dtype=np.float32),
     2: np.array([-OPTIMAL_2BIT_HIGH, -1.0, 1.0, OPTIMAL_2BIT_HIGH],
                 dtype=np.float32),
-    4: (np.arange(16) - 8.)/FOUR_BIT_1_SIGMA}
+    4: (np.arange(16, dtype=np.float32) - 8.)/FOUR_BIT_1_SIGMA}
 """Levels for data encoded with different numbers of bits.."""
 
 two_bit_2_sigma = 2 * TWO_BIT_1_SIGMA
@@ -66,22 +69,48 @@ def encode_2bit_real_base(values):
                            casting='unsafe')
 
 
+def encode_4bit_real_base(values):
+    """Generic encoder for data stored using four bits.
+
+    This returns an unsigned integer array with values ranging from 0 to 15.
+    It does not do the merging of samples together.
+
+    Here, levels are linear between 0 and 15, with values first scaled by
+    `~baseband.vlbi_base.encoding.FOUR_BIT_1_SIGMA` (2.95) and then 8 added.
+    Some sample output levels are:
+      ========================= ======
+      Input range               Output
+      ========================= ======
+             value*scale < -7.5    0
+      -7.5 < value*scale < -6.5    1
+      -0.5 < value*scale < +0.5    8
+       6.5 < value*scale          15
+      ========================= ======
+    """
+    # Optimized for speed by doing calculations in-place.
+    values = values * FOUR_BIT_1_SIGMA
+    values += 8.
+    return np.clip(values, 0., 15., out=values).astype(np.uint8)
+
+
 def decode_8bit_real(words, out=None):
     """Generic decoder for data stored using 8 bits.
 
-    We assume bytes encode -128 to 127, i.e., their direct values.
-    This is the same as assumed in MWA beam-combined data and in GMRT
-    phased data, but in contrast to mark5access, which assumes they
-    represent -127.5 .. 127.5, i.e., symmetric around zero.
+    We follow mark5access, which assumes the values 0 to 255 encode
+    -127.5 to 127.5, scaled down to match 2 bit data by a factor of 35.5
+    (`~baseband.vlbi_base.encoding.EIGHT_BIT_1_SIGMA`)
+
+    For comparison, GMRT phased data treats the 8-bit data values simply
+    as signed integers.
     """
-    b = words.view(np.int8)
+    b = words.view(np.uint8).astype(np.float32)
+    b -= 127.5
     if out is None:
-        return b.astype(np.float32)
+        b /= EIGHT_BIT_1_SIGMA
+        return b
     else:
-        outf4 = out.reshape(-1)
-        assert outf4.base is out or outf4.base is out.base
-        outf4[:] = b
-        return out
+        b.shape = out.shape
+        return np.true_divide(b, EIGHT_BIT_1_SIGMA, out=out)
 
 
 def decode_8bit_complex(words, out=None):
@@ -89,19 +118,22 @@ def decode_8bit_complex(words, out=None):
     if out is None:
         return decode_8bit_real(words, out).view(np.complex64)
     else:
-        decode_8bit_real(words, out.view(np.float32))
+        decode_8bit_real(words, out.view(out.real.dtype))
         return out
 
 
 def encode_8bit_real(values):
     """Encode 8 bit VDIF data.
 
-    We assume bytes encode -128 to 127, i.e., their direct values.
-    This is the same as assumed in MWA beam-combined data, but in contrast
-    to mark5access, which assumes they represent -127.5 .. 127.5, i.e.,
-    symmetric around zero.
+    We follow mark5access, which assumes the values 0 to 255 encode
+    -127.5 to 127.5, scaled down to match 2 bit data by a factor of 35.5
+    (`~baseband.vlbi_base.encoding.EIGHT_BIT_1_SIGMA`)
+
+    For comparison, GMRT phased data treats the 8-bit data values simply
+    as signed integers.
     """
-    return np.clip(np.round(values), -128, 127).astype(np.int8)
+    return (np.clip(np.rint(values * EIGHT_BIT_1_SIGMA + 127.5), 0, 255)
+            .astype(np.uint8))
 
 
 def encode_8bit_complex(values):
