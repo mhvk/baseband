@@ -13,6 +13,8 @@ from .. import vdif, vlbi_base
 
 SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.vdif')
 SAMPLE_MWA = os.path.join(os.path.dirname(__file__), 'sample_mwa.vdif')
+SAMPLE_AROCHIME = os.path.join(os.path.dirname(__file__),
+                               'sample_arochime.vdif')
 
 
 # Comparisn with m5access routines (check code on 2015-MAY-30) on vlba.m5a,
@@ -327,6 +329,24 @@ def test_mwa_vdif():
         assert fh.frames_per_second == 10000
         assert fh.tell(unit='time') == Time('2015-10-03T20:49:45.000')
         assert fh.header0.edv == 0
+
+
+def test_arochime_vdif():
+    """Test ARO CHIME format (uses EDV=0)"""
+    with vdif.open(SAMPLE_AROCHIME, 'rs', frames_per_second=390625) as fh:
+        assert fh.samples_per_frame == 1
+        t0 = fh.tell(unit='time')
+        assert abs(t0 - Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
+        assert abs(t0 - fh.time0) < 1. * u.ns
+        assert fh.header0.edv == 0
+        assert fh.size == 5
+        d = fh.read()
+        assert d.shape == (5, 2, 1024)
+        assert d.dtype.kind == 'c'
+        t1 = fh.tell(unit='time')
+        assert abs(t1 - fh.time1) < 1. * u.ns
+        assert abs(t1 - t0 - u.s * (fh.size / fh.samples_per_frame /
+                                    fh.frames_per_second)) < 1. * u.ns
 
 
 def test_legacy_vdif():
