@@ -12,7 +12,7 @@ u_sample = u.def_unit('sample', doc='One sample from a data stream')
 
 
 class VLBIStreamBase(object):
-    """VLBI file wrapper, allowing one to read frames."""
+    """VLBI file wrapper, allowing access as a stream of data."""
 
     _frame_class = None
 
@@ -48,18 +48,39 @@ class VLBIStreamBase(object):
     def seekable(self):
         return self.fh_raw.readable()
 
-    def tell(self, offset=None, unit=None):
-        """Return offset (in samples or in the given unit)."""
-        if offset is None:
-            offset = self.offset
+    def _get_time(self, header):
+        """Get time from a header."""
+        # Subclasses can override this if information is needed beyond that
+        # provided in the header.
+        return header.time
 
+    @lazyproperty
+    def time0(self):
+        """Start time."""
+        return self._get_time(self.header0)
+
+    def tell(self, unit=None):
+        """Current offset in file.
+
+        Parameters
+        ----------
+        unit : `~astropy.units.Unit` or str, optional
+            Time unit the offset should be returned in.  By default, no unit
+            is used, i.e., an integer enumerating samples is returned. For the
+            special string 'time', the absolute time is calculated.
+
+        Returns
+        -------
+        offset : int, `~astropy.units.Quantity`, or `~astropy.time.Time`
+             Offset in current file (or time at current position)
+        """
         if unit is None:
-            return offset
+            return self.offset
 
         if unit == 'time':
-            return self.header0.time + self.tell(unit=u.s)
+            return self.time0 + self.tell(unit=u.s)
 
-        return (offset * u_sample).to(unit, equivalencies=[(u.s, u.Unit(
+        return (self.offset * u_sample).to(unit, equivalencies=[(u.s, u.Unit(
             self.samples_per_frame * self.frames_per_second * u_sample))])
 
     def _frame_info(self):
@@ -90,7 +111,7 @@ class VLBIStreamBase(object):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
                 "    nchan={s.nchan}, thread_ids={s.thread_ids}, "
                 "samples_per_frame={s.samples_per_frame}, bps={s.bps}\n"
-                "    sample_rate={s.sample_rate}, (start) time={h.time.isot}>"
+                "    sample_rate={s.sample_rate}, (start) time={s.time0.isot}>"
                 .format(s=self, h=self.header0))
 
 
@@ -112,6 +133,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
     @lazyproperty
     def header1(self):
+        """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek(-self.header0.framesize, 2)
         header1 = self.fh_raw.find_frame(template_header=self.header0,
@@ -123,21 +145,56 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                             .format(10*self.header0.framesize))
         return header1
 
+    @lazyproperty
+    def time1(self):
+        """Time of the sample just beyond the last one in the file."""
+        return self._get_time(self.header1) + u.s / self.frames_per_second
+
     @property
     def size(self):
-        n_frames = round(
-            (self.header1.time - self.header0.time).to(u.s).value *
-            self.frames_per_second) + 1
-        return n_frames * self.samples_per_frame
+        """Number of samples in the file."""
+        return int(round((self.time1 - self.time0).to(u.s).value *
+                         self.frames_per_second * self.samples_per_frame))
 
     def seek(self, offset, from_what=0):
-        """Like normal seek, but with the offset in samples."""
+        """Offset to a given position in the file.
+
+        This works like a normal seek, but the offset is in samples
+        (or seconds or an absolute time).
+
+        Parameters
+        ----------
+        offset : int, `~astropy.units.Quantity`, or `~astropy.time.Time`
+            Offset to move to.  Can be an (integer) number of samples,
+            an offset in time units, or an absolute time.
+        from_what : int
+            Like regular seek, the offset is taken to be from the start if
+            ``from_what=0`` (default), from the current position if ``1``,
+            and from the end if ``2``.  Ignored if ``offset`` is a time.`
+        """
+        try:
+            offset = offset.__index__()
+        except:
+            try:
+                offset = offset - self.time0
+            except:
+                pass
+            else:
+                from_what = 0
+
+            offset = offset.to(u_sample, equivalencies=[(u.s, u.Unit(
+                self.samples_per_frame * self.frames_per_second * u_sample))])
+            offset = int(round(offset.value))
+
         if from_what == 0:
             self.offset = offset
         elif from_what == 1:
             self.offset += offset
         elif from_what == 2:
             self.offset = self.size + offset
+        else:
+            raise ValueError("invalid 'from_what'; should be 0, 1, or 2.")
+
         return self.offset
 
 

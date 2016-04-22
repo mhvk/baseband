@@ -175,13 +175,20 @@ class VDIFStreamBase(VLBIStreamBase):
             frames_per_second=frames_per_second,
             sample_rate=sample_rate)
 
+    def _get_time(self, header):
+        """Calculate time for given header.
+
+        This passes on frame rate, since not all VDIF headers can calculate it.
+        """
+        return header.get_time(framerate=self.frames_per_second * u.Hz)
+
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
                 "    nthread={s.nthread}, "
                 "samples_per_frame={s.samples_per_frame}, nchan={s.nchan},\n"
                 "    frames_per_second={s.frames_per_second}, "
                 "complex_data={c}, bps={h.bps}, edv={h.edv},\n"
-                "    station={h.station}, (start) time={h.time}>"
+                "    station={h.station}, (start) time={s.time0}>"
                 .format(s=self, h=self.header0,
                         c=self.header0['complex_data']))
 

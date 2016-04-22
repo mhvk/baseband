@@ -1,3 +1,7 @@
+# Licensed under the GPLv3 - see LICENSE.rst
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
 import io
 import os
 import numpy as np
@@ -292,12 +296,24 @@ class TestVDIF(object):
             assert repr(fh).startswith('<VDIFStreamReader')
             assert fh.tell() == 0
             assert header == fh.header0
+            assert fh.time0 == fh.header0.time
+            assert abs(fh.tell(unit='time') - fh.time0) < 1. * u.ns
             record = fh.read(12)
             assert fh.tell() == 12
+            t12 = fh.tell(unit='time')
+            s12 = 12 / fh.samples_per_frame / fh.frames_per_second * u.s
+            assert abs(t12 - fh.time0 - s12) < 1. * u.ns
             fh.seek(10, 1)
             fh.tell() == 22
-            fh.seek(0)
+            fh.seek(t12)
+            assert fh.tell() == 12
+            fh.seek(-s12, 1)
             assert fh.tell() == 0
+            assert fh.size == 40000
+            assert abs(fh.time1 - fh.header1.time - u.s /
+                       fh.frames_per_second) < 1. * u.ns
+            assert abs(fh.time1 - fh.time0 - u.s * fh.size /
+                       fh.samples_per_frame / fh.frames_per_second) < 1. * u.ns
 
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==
