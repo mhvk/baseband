@@ -83,6 +83,15 @@ class TestGSB(object):
             gsb.GSBHeader.fromvalues(**header6)
         with pytest.raises(TypeError):
             gsb.GSBHeader(None)
+        # Check that recovering with the actual header type works as well.
+        header9 = type(header).fromkeys(**header)
+        assert header9 == header
+        with pytest.raises(KeyError):
+            type(header).fromkeys(**header6)
+        header10 = type(header6).fromkeys(**header6)
+        assert header10 == header6
+        with pytest.raises(KeyError):
+            type(header6).fromkeys(**header)
 
     def test_header_non_gmrt(self):
         header = gsb.GSBHeader(tuple(self.phased_ts.split()),
@@ -246,7 +255,8 @@ class TestGSB(object):
                 data = fh_r.read(len(self.data) * 2)
             assert np.all(data.reshape(2, -1) == self.data.ravel())
 
-    def test_phased_stream(self):
+    @pytest.mark.parametrize('bps', (4, 8))
+    def test_phased_stream(self, bps):
         header = gsb.GSBHeader(self.phased_ts.split())
         # Two polarisations, 16 channels
         cmplx = self.data[::2] + 1j * self.data[1::2]
@@ -255,7 +265,7 @@ class TestGSB(object):
                 io.BytesIO() as sp0, io.BytesIO() as sp1, \
                 io.BytesIO() as sp2, io.BytesIO() as sp3, \
                 gsb.open(sh, 'ws', raw=((sp0, sp1), (sp2, sp3)),
-                         sample_rate=128*u.Hz,
+                         bps=bps, sample_rate=128*u.Hz,
                          samples_per_frame=twopol.shape[0] // 2,
                          nchan=twopol.shape[2], nthread=twopol.shape[1],
                          complex_data=True, header=header) as fh_w:
@@ -265,15 +275,17 @@ class TestGSB(object):
             assert_quantity_allclose(fh_w.tell(unit=u.s), 0.5 * u.s)
             assert fh_w._header['seq_nr'] == fh_w.header0['seq_nr'] + 3
             fh_w.flush()
+            assert sp0.tell() == 1024 * bps // 8
             for fh in sh, sp0, sp1, sp2, sp3:
                 fh.seek(0)
             with gsb.open(sh, mode='rs', raw=((sp0, sp1), (sp2, sp3)),
-                          samples_per_frame=twopol.shape[0] // 2,
+                          bps=bps, samples_per_frame=twopol.shape[0] // 2,
                           nchan=twopol.shape[2]) as fh_r:
                 assert fh_r.header0 == header
                 assert np.isclose(fh_r.frames_per_second, 8.)
                 data = fh_r.read(twopol.shape[0] * 2)
                 assert fh_r.tell() == twopol.shape[0] * 2
                 assert_quantity_allclose(fh_r.tell(unit=u.s), 0.5 * u.s)
+                assert sp0.tell() == 1024 * bps // 8
             assert np.all(data[:twopol.shape[0]] == twopol)
             assert np.all(data[twopol.shape[0]:] == twopol[::-1])

@@ -170,9 +170,12 @@ class GSBPayloadSet(tuple):
 
     @classmethod
     def fromfile(cls, fh_raw, *args, **kwargs):
-        return cls(tuple(cls._payload_class.fromfile(fh, *args, **kwargs)
+        self = cls(tuple(cls._payload_class.fromfile(fh, *args, **kwargs)
                          for fh in fh_pair)
                    for fh_pair in fh_raw)
+        if kwargs.get('verify', True):
+            self.verify()
+        return self
 
     def tofile(self, fh_raw):
         for payload_pair, fh_pair in zip(self, fh_raw):
@@ -181,9 +184,12 @@ class GSBPayloadSet(tuple):
 
     @classmethod
     def fromdata(cls, data, *args, **kwargs):
-        return cls(tuple(cls._payload_class.fromdata(d, *args, **kwargs)
+        self = cls(tuple(cls._payload_class.fromdata(d, *args, **kwargs)
                          for d in thread.reshape((2, -1) + thread.shape[1:]))
                    for thread in data)
+        if kwargs.get('verify', True):
+            self.verify()
+        return self
 
     def todata(self, data=None, invalid_data_value=0.):
         """Decode the payloads.
