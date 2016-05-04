@@ -181,6 +181,25 @@ class GSBHeader(VLBIHeaderBase):
                     mode = 'rawdump'
         return super(GSBHeader, cls).fromkeys(mode, *args, **kwargs)
 
+    def seek_offset(self, n, size=None):
+        """Offset in bytes needed to move a file pointer to another header.
+
+        Some GSB headers have variable size and hence one cannot trivially jump
+        to another entry in a timestamp file.  This routine allows one to
+        calculate the offset required to move the file pointer ``n`` headers.
+
+        Parameters
+        ----------
+        n : int
+            The number of headers to move to, relative to the present header.
+        size : int, optional
+            The size in bytes of the present header (if not given, it will
+            be calculated assuming the termination string is a single ``\n``).
+        """
+        if size is None:
+            size = len(' '.join(self.words)) + 1
+        return n * size
+
     def __eq__(self, other):
         return (type(self) is type(other) and
                 tuple(self.words) == tuple(other.words))
@@ -246,6 +265,48 @@ class GSBPhasedHeader(GSBRawdumpHeader):
     def time(self, time):
         self.gps_time = time
         self.pc_time = time
+
+    def seek_offset(self, n, size=None):
+        """Offset in bytes needed to move a file pointer to another header.
+
+        GSB headers for phased data differ in size depending on the sequence
+        number, making it impossible to trivially jump to another entry in a
+        timestamp file.  This routine allows one to calculate the offset
+        required to move the file pointer ``n`` headers.
+
+        Parameters
+        ----------
+        n : int
+            The number of headers to move to, relative to the present header.
+        size : int, optional
+            The size in bytes of the present header (if not given, it will
+            be calculated assuming the termination string is a single ``\n``).
+        """
+        if size is None:
+            size = len(' '.join(self.words)) + 1
+        # Initial guess assuming all headers have same size.
+        guess = n * size
+        # Get number of digits of current sequence number.
+        seq = self['seq_nr']
+        ndseq = len(str(seq))
+        # Find the sequence/subint number we're trying to reach.
+        seq_sub_targ = seq * 8 + self['sub_int'] + n
+        # And get number of digits for the target sequence number.
+        ndtarg = len(str(seq_sub_targ // 8))
+        # If numbers not the same, correct appropriately.  The multiplication
+        # with 8 is to account for the fact that each sequence has 8 sub
+        # integrations.
+        while ndseq != ndtarg:
+            if n > 0:
+                next_power_of_ten = int('1' + ndseq * '0')
+                guess += seq_sub_targ - next_power_of_ten * 8
+                ndseq += 1
+            else:
+                next_power_of_ten = int('1' + (ndseq - 1) * '0')
+                guess += next_power_of_ten * 8 - seq_sub_targ
+                ndseq -= 1
+
+        return guess
 
 
 gsb_header_classes = {'rawdump': GSBRawdumpHeader,

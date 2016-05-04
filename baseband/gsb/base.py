@@ -114,13 +114,14 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
                  frames_per_second=None):
         self.fh_ts = fh_ts
         header0 = fh_ts.read_timestamp()
-        self._headersize = fh_ts.tell()
+        self._header0_size = fh_ts.tell()
         if complex_data is None:
             complex_data = False if header0.mode == 'rawdump' else True
         self._complex_data = complex_data
         if frames_per_second is None:
             header1 = fh_ts.read_timestamp()
-            assert fh_ts.tell() == 2 * self._headersize
+            assert (fh_ts.tell() ==
+                    header0.seek_offset(2, size=self._header0_size))
             frames_per_second = (1./(header1.time -
                                      header0.time).to(u.s)).value
         fh_ts.seek(0)
@@ -177,6 +178,9 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
                 # Read relevant frame (possibly reusing data array from
                 # previous frame set).
                 self._read_frame(fill_value, out=self._frame_data)
+                assert np.isclose(self._frame_nr, self.frames_per_second *
+                                  (self._frame.header.time -
+                                   self.time0).to(u.s).value)
 
             if self._frame_data.ndim == 2:
                 data = self._frame_data[:, np.newaxis, :]
@@ -194,7 +198,8 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
 
     def _read_frame(self, fill_value=0., out=None):
         frame_nr = self.offset // self.samples_per_frame
-        self.fh_ts.seek(frame_nr * self._headersize)
+        self.fh_ts.seek(self.header0.seek_offset(frame_nr,
+                                                 size=self._header0_size))
         for fh_pair in self.fh_raw:
             for fh in fh_pair:
                 fh.seek(frame_nr * self._payloadsize)

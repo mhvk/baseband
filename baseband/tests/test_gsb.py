@@ -93,6 +93,24 @@ class TestGSB(object):
         with pytest.raises(KeyError):
             type(header6).fromkeys(**header)
 
+    def test_header_seek_offset(self):
+        header = gsb.GSBHeader(tuple(self.phased_ts.split()))
+        header_size = len(self.phased_ts) + 1
+        assert header.seek_offset(1) == header_size
+        # seq_nr=5049, sub_int=1
+        n_1000_0 = 1000 * 8 - (5049 * 8 + 1)
+        offset_to_1000_0 = header.seek_offset(n_1000_0)
+        assert offset_to_1000_0 == n_1000_0 * header_size
+        # Go to 999 7
+        assert header.seek_offset(n_1000_0 - 1) == (
+            (n_1000_0 - 1) * header_size + 1)
+        # Go to 100 0
+        assert header.seek_offset(n_1000_0 - 900 * 8) == (
+            (n_1000_0 - 900 * 8) * header_size + 900 * 8)
+        # Go to 99 7
+        assert header.seek_offset(n_1000_0 - 900 * 8 - 1) == (
+            (n_1000_0 - 900 * 8 - 1) * header_size + 900 * 8 + 2)
+
     def test_header_non_gmrt(self):
         header = gsb.GSBHeader(tuple(self.phased_ts.split()),
                                utc_offset=0.*u.hr)
