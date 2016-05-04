@@ -3,6 +3,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import io
 import numpy as np
+from astropy.utils import lazyproperty
 import astropy.units as u
 from ..vlbi_base.base import (VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
@@ -137,6 +138,24 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
                              self.bps // 8)
         self._read_frame()
 
+    @lazyproperty
+    def header1(self):
+        """Last header of the timestamp file."""
+        fh_ts_offset = self.fh_ts.tell()
+        from_end = 3 * self._header0_size // 2
+        self.fh_ts.seek(0, 2)
+        if self.fh_ts.tell() < from_end:
+            # only one line in file
+            return self.header0
+
+        # Read last bytes in binary, since cannot seek back from end in
+        # text files.
+        self.fh_ts.buffer.seek(-from_end, 2)
+        last_lines = self.fh_ts.buffer.read(from_end).strip().split(b'\n')
+        last_line = last_lines[-1].decode('ascii')
+        self.fh_ts.seek(fh_ts_offset)
+        return type(self.header0)(tuple(last_line.split()))
+
     def read(self, count=None, fill_value=0., squeeze=True, out=None):
         """Read count samples.
 
@@ -255,12 +274,12 @@ class GSBStreamWriter(VLBIStreamWriterBase, GSBStreamBase):
                 time_offset = self.tell(unit=u.s)
                 if self.header0.mode == 'phased':
                     full_sub_int = ((frame_nr + self.header0['seq_nr']) * 8 +
-                                    self.header0['sub_int'] - 1)
+                                    self.header0['sub_int'])
                     self._header = type(self.header0).fromvalues(
                         gps_time=self.header0.gps_time + time_offset,
                         pc_time=self.header0.pc_time + time_offset,
                         seq_nr=full_sub_int // 8,
-                        sub_int=(full_sub_int % 8) + 1)
+                        sub_int=full_sub_int % 8)
                 else:
                     self._header = type(self.header0).fromvalues(
                         time=self.header0.time + time_offset)
@@ -339,6 +358,10 @@ def open(name, mode='rs', **kwargs):
         :class:`~baseband.gsb.base.GSBStreamReader` or
         :class:`~baseband.gsb.base.GSBStreamWriter` instance (stream)
     """
+    if not ('r' in mode or 'w' in mode):
+        raise ValueError("Only support opening GSB file for reading "
+                         "or writing (mode='r' or 'w').")
+
     if 't' in mode:
         if not hasattr(name, 'read' if 'r' in mode else 'write'):
             name = io.open(name, mode.replace('t', '')+'b')
@@ -352,13 +375,10 @@ def open(name, mode='rs', **kwargs):
             if not hasattr(name, 'write'):
                 name = io.open(name, 'wb')
             return GSBFileWriter(name)
-        elif 'r' in mode:
+        else:
             if not hasattr(name, 'read'):
                 name = io.open(name, 'rb')
             return GSBFileReader(name)
-        else:
-            raise ValueError("Only support opening GSB file for reading "
-                             "or writing (mode='r' or 'w').")
 
     # stream mode.
     fh_ts = open(name, mode.replace('s', '') + 't')

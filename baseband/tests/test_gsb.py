@@ -253,6 +253,7 @@ class TestGSB(object):
                 data = fh_r.read(len(self.data))
                 assert fh_r.tell() == len(data)
                 assert_quantity_allclose(fh_r.tell(unit=u.s), 1. * u.s)
+                assert fh_r.header1 == header
             assert np.all(data == self.data.ravel())
 
         with io.BytesIO() as sh, io.BytesIO() as sp, gsb.open(
@@ -271,6 +272,9 @@ class TestGSB(object):
                 assert fh_r.header0 == header
                 assert np.isclose(fh_r.frames_per_second, 2)
                 data = fh_r.read(len(self.data) * 2)
+                assert_quantity_allclose(
+                    (fh_r.header1.time - fh_r.header0.time).to(u.s),
+                    u.s/fh_r.frames_per_second)
             assert np.all(data.reshape(2, -1) == self.data.ravel())
 
     @pytest.mark.parametrize('bps', (4, 8))
@@ -305,5 +309,6 @@ class TestGSB(object):
                 assert fh_r.tell() == twopol.shape[0] * 2
                 assert_quantity_allclose(fh_r.tell(unit=u.s), 0.5 * u.s)
                 assert sp0.tell() == 1024 * bps // 8
+                assert fh_r._frame.header == fh_r.header1
             assert np.all(data[:twopol.shape[0]] == twopol)
             assert np.all(data[twopol.shape[0]:] == twopol[::-1])
