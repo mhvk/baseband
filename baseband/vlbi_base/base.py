@@ -109,10 +109,11 @@ class VLBIStreamBase(object):
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
-                "    nchan={s.nchan}, thread_ids={s.thread_ids}, "
-                "samples_per_frame={s.samples_per_frame}, bps={s.bps}\n"
-                "    sample_rate={s.sample_rate}, (start) time={s.time0.isot}>"
-                .format(s=self, h=self.header0))
+                "    samples_per_frame={s.samples_per_frame}, nchan={s.nchan},"
+                " frames_per_second={s.frames_per_second}, bps={s.bps},\n"
+                "    {t}(start) time={s.time0.isot}>"
+                .format(s=self, t=('thread_ids={0}, '.format(self.thread_ids)
+                                   if self.thread_ids else '')))
 
 
 class VLBIStreamReaderBase(VLBIStreamBase):
