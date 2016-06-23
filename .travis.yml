@@ -38,26 +38,25 @@ env:
 matrix:
     include:
 
+        # Slow ones first... Try Astropy development version on new python
+        - python: 3.5
+          env: ASTROPY_VERSION=development SETUP_CMD='test'
+
+        # Check for sphinx doc build warnings.
+        - python: 2.7
+          env: SETUP_CMD='build_sphinx -w'
+
         # Do a coverage test in Python 3.
         - python: 3.5
           env: SETUP_CMD='test --coverage'
 
-        # Check for sphinx doc build warnings - we do this first because it
-        # may run for a long time
-        - python: 2.7
-          env: SETUP_CMD='build_sphinx -w'
-
-        # Try Astropy development version on new python
+        # Try some older numpy versions.
         - python: 3.5
-          env: ASTROPY_VERSION=development SETUP_CMD='test'
-
-        # Try older numpy versions on older python
+          env: NUMPY_VERSION=1.10 SETUP_CMD='test'
         - python: 2.7
           env: NUMPY_VERSION=1.9 SETUP_CMD='test'
         - python: 2.7
-          env: NUMPY_VERSION=1.8 SETUP_CMD='test'
-        - python: 2.7
-          env: NUMPY_VERSION=1.7 SETUP_CMD='test'
+          env: NUMPY_VERSION=1.7 ASTROPY_VERSION=lts SETUP_CMD='test'
 
 before_install:
 
