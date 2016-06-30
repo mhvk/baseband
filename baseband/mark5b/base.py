@@ -181,16 +181,6 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
             self.frames_per_second) + 1
         return n_frames * self.samples_per_frame
 
-    def seek(self, offset, from_what=0):
-        """Like normal seek, but with the offset in samples."""
-        if from_what == 0:
-            self.offset = offset
-        elif from_what == 1:
-            self.offset += offset
-        elif from_what == 2:
-            self.offset = self.size + offset
-        return self.offset
-
     def read(self, count=None, fill_value=0., squeeze=True, out=None):
         """Read count samples.
 
