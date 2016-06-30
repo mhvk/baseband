@@ -209,6 +209,10 @@ class TestMark5B(object):
             record2 = fh.read(2)
             assert fh.tell() == 10002
             assert fh.fh_raw.tell() == 3.*header.framesize
+            assert np.abs(fh.tell(unit='time') -
+                          (fh.time0 + 10002 / (32*u.MHz))) < 1. * u.ns
+            fh.seek(fh.time0 + 1000 / (32*u.MHz))
+            assert fh.tell() == 1000
 
         assert header1['frame_nr'] == 3
         assert header1['user'] == header['user']
