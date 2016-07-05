@@ -43,7 +43,7 @@ matrix:
           env: ASTROPY_VERSION=development SETUP_CMD='test'
 
         # Check for sphinx doc build warnings.
-        - python: 2.7
+        - python: 3.5
           env: SETUP_CMD='build_sphinx -w'
 
         # Do a coverage test in Python 3.
