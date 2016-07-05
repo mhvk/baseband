@@ -11,9 +11,8 @@ from __future__ import (absolute_import, division, print_function,
 from copy import copy
 import struct
 import warnings
+from collections import OrderedDict
 import numpy as np
-
-from astropy.utils import OrderedDict
 
 
 __all__ = ['four_word_struct', 'eight_word_struct',
