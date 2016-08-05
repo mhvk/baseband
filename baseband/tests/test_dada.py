@@ -81,3 +81,38 @@ class TestDADA(object):
         assert header8 == header
         assert header8.mutable is True
         assert header8.comments == header.comments
+
+    def test_payload(self):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(4096)  # skip header
+            payload = dada.DADAPayload.fromfile(fh, payloadsize=64000, bps=8,
+                                                complex_data=True,
+                                                sample_shape=(2,))
+        assert payload.size == 64000
+        assert payload.shape == (16000, 2)
+        assert payload.dtype == np.complex64
+        data = payload.data
+        assert np.all(data[:3] ==
+                      np.array([[-38.-38.j, -38.-38.j],
+                                [-38.-38.j, -40.+0.j],
+                                [-105.+60.j, 85.-15.j]], dtype=np.complex64))
+        in_place = np.zeros_like(data)
+        payload.todata(data=in_place)
+        assert in_place is not data
+        assert np.all(in_place == data)
+
+        with io.BytesIO() as s:
+            payload.tofile(s)
+            s.seek(0)
+            payload2 = dada.DADAPayload.fromfile(s, payloadsize=64000, bps=8,
+                                                 complex_data=True,
+                                                 sample_shape=(2,))
+            assert payload2 == payload
+            with pytest.raises(EOFError):
+                # Too few bytes.
+                s.seek(100)
+                dada.DADAPayload.fromfile(s, payloadsize=64000, bps=8,
+                                          complex_data=True,
+                                          sample_shape=(2,))
+        payload3 = dada.DADAPayload.fromdata(data, bps=8)
+        assert payload3 == payload
