@@ -69,7 +69,7 @@ class TestVLBIBase(object):
         self.Payload = Payload
         self.payload = Payload(np.array([0x12345678, 0xffff0000],
                                         dtype=DTYPE_WORD),
-                               bps=8, nchan=2, complex_data=False)
+                               bps=8, sample_shape=(2,), complex_data=False)
 
         class Frame(VLBIFrameBase):
             _header_class = Header
@@ -176,7 +176,7 @@ class TestVLBIBase(object):
 
     def test_payload_basics(self):
         assert self.payload.complex_data is False
-        assert self.payload.nchan == 2
+        assert self.payload.sample_shape == (2,)
         assert self.payload.bps == 8
         assert self.payload.shape == (4, 2)
         assert self.payload.size == 8
@@ -193,14 +193,15 @@ class TestVLBIBase(object):
                 self.Payload.fromfile(s)  # no size given
             s.seek(0)
             payload = self.Payload.fromfile(
-                s, payloadsize=len(self.payload.words) * 4)
+                s, payloadsize=len(self.payload.words) * 4,
+                sample_shape=(2,), bps=8)
         assert payload == self.payload
 
     def test_payload_fromdata(self):
         data = np.random.normal(0., 64., 16).reshape(16, 1)
         payload = self.Payload.fromdata(data, bps=8)
         assert payload.complex_data is False
-        assert payload.nchan == 1
+        assert payload.sample_shape == (1,)
         assert payload.bps == 8
         assert payload.words.dtype is DTYPE_WORD
         assert len(payload.words) == 4
@@ -208,6 +209,11 @@ class TestVLBIBase(object):
         assert payload.size == 16
         payload2 = self.Payload.fromdata(self.payload.data, self.payload.bps)
         assert payload2 == self.payload
+        payload3 = self.Payload.fromdata(data.ravel(), bps=8)
+        assert payload3.sample_shape == ()
+        assert payload3.shape == (16,)
+        assert payload3 != payload
+        assert np.all(payload3.data == payload.data.ravel())
 
     def test_frame_basics(self):
         assert self.frame.header is self.header
@@ -227,7 +233,8 @@ class TestVLBIBase(object):
         with io.BytesIO() as s:
             self.frame.tofile(s)
             s.seek(0)
-            frame = self.Frame.fromfile(s, payloadsize=self.payload.size)
+            frame = self.Frame.fromfile(s, payloadsize=self.payload.size,
+                                        sample_shape=(2,), bps=8)
         assert frame == self.frame
 
     def test_frame_fromdata(self):

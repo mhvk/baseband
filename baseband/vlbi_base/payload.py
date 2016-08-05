@@ -7,6 +7,8 @@ it as a numpy array.
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
+import operator
+from functools import reduce
 import numpy as np
 
 
@@ -29,10 +31,11 @@ class VLBIPayloadBase(object):
     words : ndarray
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    nchan : int
-        Number of channels in the data.  Default: 1.
     bps : int
-        Number of bits per sample (or real/imaginary component).  Default: 2.
+        Number of bits per sample part (i.e., per channel and per real or
+        imaginary component).  Default: 2.
+    sample_shape : tuple
+        Shape of the samples; e.g., (nchan,).  Default: ().
     complex_data : bool
         Whether data is complex or float.  Default: False.
     """
@@ -42,9 +45,9 @@ class VLBIPayloadBase(object):
     _encoders = {}
     _decoders = {}
 
-    def __init__(self, words, nchan=1, bps=2, complex_data=False):
+    def __init__(self, words, bps=2, sample_shape=(), complex_data=False):
         self.words = words
-        self.nchan = nchan
+        self.sample_shape = sample_shape
         self.bps = bps
         self.complex_data = complex_data
         if self._size is not None and self._size != self.size:
@@ -96,9 +99,9 @@ class VLBIPayloadBase(object):
         except KeyError:
             raise ValueError("{0} cannot encode {1} data with {2} bits"
                              .format(cls.__name__, 'complex' if complex_data
-                                     else'real', bps))
+                                     else 'real', bps))
         words = encoder(data.ravel()).view(DTYPE_WORD)
-        return cls(words, nchan=data.shape[-1], bps=bps,
+        return cls(words, sample_shape=data.shape[1:], bps=bps,
                    complex_data=complex_data)
 
     def todata(self, data=None):
@@ -124,12 +127,13 @@ class VLBIPayloadBase(object):
     def nsample(self):
         """Number of samples in the payload."""
         return (len(self.words) * (self.words.dtype.itemsize * 8) //
-                self.bps // (2 if self.complex_data else 1) // self.nchan)
+                self.bps // (2 if self.complex_data else 1) //
+                reduce(operator.mul, self.sample_shape, 1))
 
     @property
     def shape(self):
-        """Shape of the decoded data array (nsample, nchan)."""
-        return (self.nsample, self.nchan)
+        """Shape of the decoded data array (nsample, sample_shape)."""
+        return (self.nsample,) + self.sample_shape
 
     @property
     def dtype(self):
@@ -143,4 +147,6 @@ class VLBIPayloadBase(object):
 
     def __eq__(self, other):
         return (type(self) is type(other) and
+                self.shape == other.shape and
+                self.dtype == other.dtype and
                 np.all(self.words == other.words))

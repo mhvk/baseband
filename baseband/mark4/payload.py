@@ -161,8 +161,10 @@ class Mark4Payload(VLBIPayloadBase):
             fanout = header.fanout
             self._size = header.payloadsize
         self.fanout = fanout
-        super(Mark4Payload, self).__init__(words, nchan, bps,
+        super(Mark4Payload, self).__init__(words, bps=bps,
+                                           sample_shape=(nchan,),
                                            complex_data=False)
+        self.nchan = nchan
 
     @classmethod
     def fromfile(cls, fh, header):

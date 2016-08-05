@@ -10,7 +10,7 @@ http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
-from ..vlbi_base.payload import VLBIPayloadBase
+from ..vlbi_base.payload import VLBIPayloadBase, DTYPE_WORD
 from ..vlbi_base.encoding import encode_2bit_real_base, decoder_levels
 
 
@@ -117,5 +117,19 @@ class Mark5BPayload(VLBIPayloadBase):
         if complex_data:
             raise ValueError("Mark5B format does not support complex data.")
 
-        super(Mark5BPayload, self).__init__(words, nchan, bps,
+        super(Mark5BPayload, self).__init__(words, bps=bps,
+                                            sample_shape=(nchan,),
                                             complex_data=False)
+        self.nchan = nchan
+
+    @classmethod
+    def fromdata(cls, data, bps=2):
+        """Encode data as payload, using a given number of bits per sample.
+
+        It is assumed that the last dimension is the number of channels.
+        """
+        if data.dtype.kind == 'c':
+            raise ValueError("Mark5B format does not support complex data.")
+        encoder = cls._encoders[bps, False]
+        words = encoder(data.ravel()).view(DTYPE_WORD)
+        return cls(words, nchan=data.shape[-1], bps=bps)

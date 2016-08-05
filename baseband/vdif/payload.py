@@ -158,7 +158,10 @@ class VDIFPayload(VLBIPayloadBase):
                 self._encoders = Mark5BPayload._encoders
                 if complex_data:
                     raise ValueError("VDIF/Mark5B payload cannot be complex.")
-        super(VDIFPayload, self).__init__(words, nchan, bps, complex_data)
+        super(VDIFPayload, self).__init__(words, bps=bps,
+                                          sample_shape=(nchan,),
+                                          complex_data=complex_data)
+        self.nchan = nchan
 
     @classmethod
     def fromfile(cls, fh, header):
