@@ -12,7 +12,7 @@ from astropy.tests.helper import pytest
 
 def encode_8bit_real(values):
     return np.clip(np.round(values),
-                   -128, 127).astype(np.int8).view(DTYPE_WORD)
+                   -128, 127).astype(np.int8)
 
 
 def decode_8bit_real(values):
@@ -185,21 +185,64 @@ class TestVLBIBase(object):
         assert np.all(np.array(self.payload).ravel() ==
                       self.payload.words.view(np.int8))
 
-    @pytest.mark.parametrize('item', (2, slice(1, 3), (), slice(2, None)))
+    @pytest.mark.parametrize('item', (2, slice(1, 3), (), slice(2, None),
+                                      (2, 1), (slice(None), 0),
+                                      (slice(1, 3), 1)))
     def test_payload_getitem_setitem(self, item):
         sel_data = self.payload.data[item]
         assert np.all(self.payload[item] == sel_data)
         payload = self.Payload(self.payload.words.copy(), bps=8,
                                sample_shape=(2,), complex_data=False)
         assert payload == self.payload
-        payload[item] = np.ones_like(sel_data)
-        assert np.all(payload[item].ravel() == 1)
+        payload[item] = 1-sel_data
+        check = self.payload.data
+        check[item] = 1-sel_data
+        assert np.all(payload[item] == 1-sel_data)
+        assert np.all(payload.data == check)
         assert np.all(payload[:] ==
                       payload.words.view(np.int8).reshape(-1, 2))
         assert payload != self.payload
         payload[item] = sel_data
         assert np.all(payload[item] == sel_data)
         assert payload == self.payload
+
+    def test_payload_empty_item(self):
+        p11 = self.payload[1:1]
+        assert p11.size == 0
+        assert p11.shape == (0,) + self.payload.sample_shape
+        assert p11.dtype == self.payload.dtype
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        payload[1:1] = 1
+        assert payload == self.payload
+
+    @pytest.mark.parametrize('item', (20, -20, (slice(None), 5)))
+    def test_payload_invalid_item(self, item):
+        with pytest.raises(IndexError):
+            self.payload[item]
+
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        with pytest.raises(IndexError):
+            payload[item] = 1
+
+    def test_payload_setitem_wrong_shape(self):
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        with pytest.raises(ValueError):
+            payload[1] = np.ones(10)
+
+        with pytest.raises(ValueError):
+            payload[1] = np.ones((2, 2))
+
+        with pytest.raises(ValueError):
+            payload[1:3] = np.ones((2, 3))
+
+        with pytest.raises(ValueError):
+            payload[1:3, 0] = np.ones((2, 2))
+
+        with pytest.raises(ValueError):
+            payload[1:3, :1] = np.ones((1, 2))
 
     def test_payload_fromfile(self):
         with io.BytesIO() as s:

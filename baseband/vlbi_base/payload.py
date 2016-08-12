@@ -41,6 +41,8 @@ class VLBIPayloadBase(object):
     """
     # Possible fixed payload size.
     _size = None
+    # Default type for encoded data
+    _dtype_word = DTYPE_WORD
     # To be defined by subclasses.
     _encoders = {}
     _decoders = {}
@@ -50,8 +52,9 @@ class VLBIPayloadBase(object):
         self.sample_shape = sample_shape
         self.bps = bps
         self.complex_data = complex_data
-        self._bpfs = (self.bps * (2 if self.complex_data else 1) *
-                      reduce(operator.mul, self.sample_shape, 1))
+        self._bpfs = (bps * (2 if complex_data else 1) *
+                      reduce(operator.mul, sample_shape, 1))
+        self._coder = bps
         if self._size is not None and self._size != self.size:
             raise ValueError("Encoded data should have length {0}"
                              .format(self._size))
@@ -76,7 +79,7 @@ class VLBIPayloadBase(object):
         s = fh.read(payloadsize)
         if len(s) < payloadsize:
             raise EOFError("Could not read full payload.")
-        return cls(np.fromstring(s, dtype=DTYPE_WORD), *args, **kwargs)
+        return cls(np.fromstring(s, dtype=cls._dtype_word), *args, **kwargs)
 
     def tofile(self, fh):
         """Write VLBI payload to filehandle."""
@@ -104,24 +107,9 @@ class VLBIPayloadBase(object):
                              .format(cls.__name__, bps))
         if complex_data:
             data = data.view(data.real.dtype)
-        words = encoder(data.ravel()).view(DTYPE_WORD)
+        words = encoder(data).ravel().view(cls._dtype_word)
         return cls(words, sample_shape=sample_shape, bps=bps,
                    complex_data=complex_data)
-
-    def todata(self, data=None):
-        """Decode the payload.
-
-        Parameters
-        ----------
-        data : ndarray or None
-            If given, used to decode the payload into.  It should have the
-            right size to store it.  Its shape is not changed.
-        """
-        if data is None:
-            data = self.data
-        else:
-            data[()] = self.data
-        return data
 
     def __array__(self, dtype=None):
         """Interface to arrays."""
@@ -157,6 +145,10 @@ class VLBIPayloadBase(object):
         ``self.words[words_slice]`` the returned data is the smallest possible
         array that includes the requested item or slice (as ``data_slice``).
         """
+        if isinstance(item, tuple):
+            word_slice, data_slice = self._item_to_slices(item[0])
+            return word_slice, (data_slice,) + item[1:]
+
         is_slice = isinstance(item, slice)
         if is_slice:
             start, stop, step = item.indices(self.nsample)
@@ -211,7 +203,7 @@ class VLBIPayloadBase(object):
         return words_slice, data_slice
 
     def __getitem__(self, item=()):
-        decoder = self._decoders[self.bps]
+        decoder = self._decoders[self._coder]
         if item is () or item == slice(None):
             data = decoder(self.words)
             if self.complex_data:
@@ -219,6 +211,7 @@ class VLBIPayloadBase(object):
             return data.reshape(self.shape)
 
         words_slice, data_slice = self._item_to_slices(item)
+
         return (decoder(self.words[words_slice]).view(self.dtype)
                 .reshape(-1, *self.sample_shape)[data_slice])
 
@@ -233,7 +226,7 @@ class VLBIPayloadBase(object):
         if not (data_slice == slice(None) and
                 data.shape[-len(self.sample_shape):] == self.sample_shape and
                 data.dtype.kind == self.dtype.kind):
-            decoder = self._decoders[self.bps]
+            decoder = self._decoders[self._coder]
             current_data = decoder(self.words[words_slice])
             if self.complex_data:
                 current_data = current_data.view(self.dtype)
@@ -241,12 +234,11 @@ class VLBIPayloadBase(object):
             current_data[data_slice] = data
             data = current_data
 
-        data = data.ravel()
         if data.dtype.kind == 'c':
             data = data.view(data.real.dtype)
 
-        encoder = self._encoders[self.bps]
-        self.words[words_slice] = encoder(data).view(DTYPE_WORD)
+        encoder = self._encoders[self._coder]
+        self.words[words_slice] = encoder(data).ravel().view(self._dtype_word)
 
     data = property(__getitem__, doc="Full decoded payload.")
 

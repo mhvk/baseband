@@ -125,10 +125,14 @@ class VLBIFrameBase(object):
         invalid_data_value : float
             Value to use for invalid data frames (default: 0.).
         """
-        out = self.payload.todata(data)
+        if data is None:
+            data = self.payload.data
+        else:
+            data[...] = self.payload.data
+
         if not self.valid:
-            out[...] = invalid_data_value
-        return out
+            data[...] = invalid_data_value
+        return data
 
     data = property(todata, doc="Decode the payload, zeroing it if not valid.")
 

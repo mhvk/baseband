@@ -117,7 +117,7 @@ class TestMark5B(object):
         assert payload.size == 10000
         assert payload.shape == (5000, 8)
         assert payload.dtype == np.float32
-        assert np.all(payload.data[:3].astype(int) ==
+        assert np.all(payload[:3].astype(int) ==
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
                                 [-3, +3, -1, +3, -1, -1, -1, +1],
                                 [+3, -1, +3, +3, +1, -1, +3, -1]]))
@@ -137,6 +137,28 @@ class TestMark5B(object):
         with pytest.raises(ValueError):
             mark5b.Mark5BPayload.fromdata(np.zeros((5000, 8), np.complex64),
                                           bps=2)
+
+    @pytest.mark.parametrize('item', (2, (), -1, slice(1, 3), slice(2, 4),
+                                      slice(2, 4), slice(-3, None),
+                                      (2, slice(3, 5)), (10, 4),
+                                      (slice(None), 5)))
+    def test_payload_getitem_setitem(self, item):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(16)  # skip header
+            payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
+        sel_data = payload.data[item]
+        assert np.all(payload[item] == sel_data)
+        payload2 = mark5b.Mark5BPayload(payload.words.copy(), nchan=8, bps=2)
+        assert payload2 == payload
+        payload2[item] = -sel_data
+        check = payload.data
+        check[item] = -sel_data
+        assert np.all(payload2[item] == -sel_data)
+        assert np.all(payload2.data == check)
+        assert payload2 != payload
+        payload2[item] = sel_data
+        assert np.all(payload2[item] == sel_data)
+        assert payload2 == payload
 
     def test_frame(self):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:

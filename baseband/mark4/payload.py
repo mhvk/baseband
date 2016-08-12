@@ -150,6 +150,8 @@ class Mark4Payload(VLBIPayloadBase):
     The total number of tracks is `nchan` * `bps` * `fanout`.
     """
 
+    # Ensure that words can hold up to maximum number of channels.
+    _dtype_word = np.dtype('<u8')
     # Decoders keyed by (nchan, nbit, fanout).
     _encoders = {(8, 2, 4): encode_8chan_2bit_fanout4}
     _decoders = {(8, 2, 4): decode_8chan_2bit_fanout4}
@@ -165,6 +167,7 @@ class Mark4Payload(VLBIPayloadBase):
                                            sample_shape=(nchan,),
                                            complex_data=False)
         self.nchan = nchan
+        self._coder = (nchan, bps, fanout)
 
     @classmethod
     def fromfile(cls, fh, header):
@@ -189,17 +192,3 @@ class Mark4Payload(VLBIPayloadBase):
         encoder = cls._encoders[header.nchan, header.bps, header.fanout]
         words = encoder(data)
         return cls(words, header)
-
-    def todata(self, data=None):
-        """Decode the payload.
-
-        Parameters
-        ----------
-        data : ndarray or None
-            If given, used to decode the payload into.  It should have the
-            right size to store it.  Its shape is not changed.
-        """
-        decoder = self._decoders[self.nchan, self.bps, self.fanout]
-        return decoder(self.words, out=data)
-
-    data = property(todata, doc="Decoded payload.")

@@ -207,15 +207,10 @@ class TestMark4(object):
         assert payload.size == (20000 - 160) * 64 // 8
         assert payload.shape == ((20000 - 160) * 4, 8)
         assert payload.dtype == np.float32
-        data = payload.data
-        assert np.all(data[0].astype(int) ==
+        assert np.all(payload[0].astype(int) ==
                       np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(data[1].astype(int) ==
+        assert np.all(payload[1].astype(int) ==
                       np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
-        in_place = np.zeros_like(data)
-        payload.todata(data=in_place)
-        assert in_place is not data
-        assert np.all(in_place == data)
 
         with io.BytesIO() as s:
             payload.tofile(s)
@@ -234,12 +229,35 @@ class TestMark4(object):
                                         header)
         with pytest.raises(ValueError):
             # Too few data.
-            mark4.Mark4Payload.fromdata(payload.data[:100], header)
+            mark4.Mark4Payload.fromdata(payload[:100], header)
 
         with pytest.raises(ValueError):
             # Wrong data type
             mark4.Mark4Payload.fromdata(np.zeros((5000, 8), np.complex64),
                                         header)
+
+    @pytest.mark.parametrize('item', (2, (), -1, slice(1, 3), slice(2, 4),
+                                      slice(2, 4), slice(-3, None),
+                                      (2, slice(3, 5)), (10, 4),
+                                      (slice(None), 5)))
+    def test_payload_getitem_setitem(self, item):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+            payload = mark4.Mark4Payload.fromfile(fh, header)
+        sel_data = payload.data[item]
+        assert np.all(payload[item] == sel_data)
+        payload2 = mark4.Mark4Payload(payload.words.copy(), header)
+        assert payload2 == payload
+        payload2[item] = -sel_data
+        check = payload.data
+        check[item] = -sel_data
+        assert np.all(payload2[item] == -sel_data)
+        assert np.all(payload2.data == check)
+        assert payload2 != payload
+        payload2[item] = sel_data
+        assert np.all(payload2[item] == sel_data)
+        assert payload2 == payload
 
     def test_frame(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
