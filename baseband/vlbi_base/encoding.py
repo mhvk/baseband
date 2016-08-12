@@ -6,8 +6,7 @@ import numpy as np
 
 __all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
            'EIGHT_BIT_1_SIGMA', 'decoder_levels', 'encode_2bit_real_base',
-           'encode_4bit_real_base', 'decode_8bit_real', 'encode_8bit_real',
-           'decode_8bit_complex', 'encode_8bit_complex']
+           'encode_4bit_real_base', 'decode_8bit_real', 'encode_8bit_real']
 
 
 # The high mag value for 2-bit reconstruction.
@@ -113,15 +112,6 @@ def decode_8bit_real(words, out=None):
         return np.true_divide(b, EIGHT_BIT_1_SIGMA, out=out)
 
 
-def decode_8bit_complex(words, out=None):
-    """Generic decoder for complex data stored using 8 bits per component."""
-    if out is None:
-        return decode_8bit_real(words, out).view(np.complex64)
-    else:
-        decode_8bit_real(words, out.view(out.real.dtype))
-        return out
-
-
 def encode_8bit_real(values):
     """Encode 8 bit VDIF data.
 
@@ -134,7 +124,3 @@ def encode_8bit_real(values):
     """
     return (np.clip(np.rint(values * EIGHT_BIT_1_SIGMA + 127.5), 0, 255)
             .astype(np.uint8))
-
-
-def encode_8bit_complex(values):
-    return encode_8bit_real(values.view(values.real.dtype))

@@ -95,15 +95,17 @@ class VLBIPayloadBase(object):
             Number of bits per sample to use (for complex data, for real and
             imaginary part separately; default: 2).
         """
+        sample_shape = data.shape[1:]
         complex_data = data.dtype.kind == 'c'
         try:
-            encoder = cls._encoders[bps, complex_data]
+            encoder = cls._encoders[bps]
         except KeyError:
-            raise ValueError("{0} cannot encode {1} data with {2} bits"
-                             .format(cls.__name__, 'complex' if complex_data
-                                     else 'real', bps))
+            raise ValueError("{0} cannot encode data with {1} bits"
+                             .format(cls.__name__, bps))
+        if complex_data:
+            data = data.view(data.real.dtype)
         words = encoder(data.ravel()).view(DTYPE_WORD)
-        return cls(words, sample_shape=data.shape[1:], bps=bps,
+        return cls(words, sample_shape=sample_shape, bps=bps,
                    complex_data=complex_data)
 
     def todata(self, data=None):
@@ -115,9 +117,11 @@ class VLBIPayloadBase(object):
             If given, used to decode the payload into.  It should have the
             right size to store it.  Its shape is not changed.
         """
-        decoder = self._decoders[self.bps, self.complex_data]
-        out = decoder(self.words, out=data)
-        return out.reshape(self.shape) if data is None else data
+        if data is None:
+            data = self.data
+        else:
+            data[()] = self.data
+        return data
 
     def __array__(self, dtype=None):
         """Interface to arrays."""
@@ -207,7 +211,7 @@ class VLBIPayloadBase(object):
         return words_slice, data_slice
 
     def __getitem__(self, item=()):
-        decoder = self._decoders[self.bps, False]
+        decoder = self._decoders[self.bps]
         if item is () or item == slice(None):
             data = decoder(self.words)
             if self.complex_data:
@@ -229,7 +233,7 @@ class VLBIPayloadBase(object):
         if not (data_slice == slice(None) and
                 data.shape[-len(self.sample_shape):] == self.sample_shape and
                 data.dtype.kind == self.dtype.kind):
-            decoder = self._decoders[self.bps, False]
+            decoder = self._decoders[self.bps]
             current_data = decoder(self.words[words_slice])
             if self.complex_data:
                 current_data = current_data.view(self.dtype)
@@ -241,8 +245,8 @@ class VLBIPayloadBase(object):
         if data.dtype.kind == 'c':
             data = data.view(data.real.dtype)
 
-        encoder = self._encoders[self.bps, False]
-        self.words[words_slice] = encoder(data)
+        encoder = self._encoders[self.bps]
+        self.words[words_slice] = encoder(data).view(DTYPE_WORD)
 
     data = property(__getitem__, doc="Full decoded payload.")
 

@@ -110,8 +110,8 @@ class Mark5BPayload(VLBIPayloadBase):
     """
 
     _size = 2500 * 4
-    _encoders = {(2, False): encode_2bit_real}
-    _decoders = {(2, False): decode_2bit_real}
+    _encoders = {2: encode_2bit_real}
+    _decoders = {2: decode_2bit_real}
 
     def __init__(self, words, nchan=1, bps=2, complex_data=False):
         if complex_data:
@@ -130,6 +130,6 @@ class Mark5BPayload(VLBIPayloadBase):
         """
         if data.dtype.kind == 'c':
             raise ValueError("Mark5B format does not support complex data.")
-        encoder = cls._encoders[bps, False]
+        encoder = cls._encoders[bps]
         words = encoder(data.ravel()).view(DTYPE_WORD)
         return cls(words, nchan=data.shape[-1], bps=bps)

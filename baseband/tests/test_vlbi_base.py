@@ -15,13 +15,13 @@ def encode_8bit_real(values):
                    -128, 127).astype(np.int8).view(DTYPE_WORD)
 
 
-def decode_8bit_real(values, out=None):
+def decode_8bit_real(values):
     return values.view(np.int8).astype(np.float32)
 
 
 class Payload(VLBIPayloadBase):
-    _encoders = {(8, False): encode_8bit_real}
-    _decoders = {(8, False): decode_8bit_real}
+    _encoders = {8: encode_8bit_real}
+    _decoders = {8: decode_8bit_real}
 
 
 class TestBCD(object):
