@@ -185,6 +185,22 @@ class TestVLBIBase(object):
         assert np.all(np.array(self.payload).ravel() ==
                       self.payload.words.view(np.int8))
 
+    @pytest.mark.parametrize('item', (2, slice(1, 3), (), slice(2, None)))
+    def test_payload_getitem_setitem(self, item):
+        sel_data = self.payload.data[item]
+        assert np.all(self.payload[item] == sel_data)
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        assert payload == self.payload
+        payload[item] = np.ones_like(sel_data)
+        assert np.all(payload[item].ravel() == 1)
+        assert np.all(payload[:] ==
+                      payload.words.view(np.int8).reshape(-1, 2))
+        assert payload != self.payload
+        payload[item] = sel_data
+        assert np.all(payload[item] == sel_data)
+        assert payload == self.payload
+
     def test_payload_fromfile(self):
         with io.BytesIO() as s:
             self.payload.tofile(s)

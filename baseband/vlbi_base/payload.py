@@ -50,6 +50,8 @@ class VLBIPayloadBase(object):
         self.sample_shape = sample_shape
         self.bps = bps
         self.complex_data = complex_data
+        self._bpfs = (self.bps * (2 if self.complex_data else 1) *
+                      reduce(operator.mul, self.sample_shape, 1))
         if self._size is not None and self._size != self.size:
             raise ValueError("Encoded data should have length {0}"
                              .format(self._size))
@@ -117,18 +119,22 @@ class VLBIPayloadBase(object):
         out = decoder(self.words, out=data)
         return out.reshape(self.shape) if data is None else data
 
-    data = property(todata, doc="Decoded payload.")
-
-    def __array__(self):
+    def __array__(self, dtype=None):
         """Interface to arrays."""
-        return self.data
+        if dtype is None or dtype == self.dtype:
+            return self.data
+        else:
+            return self.data.astype(dtype)
+
+    @property
+    def size(self):
+        """Size in bytes of payload."""
+        return len(self.words) * self.words.dtype.itemsize
 
     @property
     def nsample(self):
         """Number of samples in the payload."""
-        return (len(self.words) * (self.words.dtype.itemsize * 8) //
-                self.bps // (2 if self.complex_data else 1) //
-                reduce(operator.mul, self.sample_shape, 1))
+        return self.size * 8 // self._bpfs
 
     @property
     def shape(self):
@@ -140,13 +146,112 @@ class VLBIPayloadBase(object):
         """Type of the decoded data array."""
         return np.dtype(np.complex64 if self.complex_data else np.float32)
 
-    @property
-    def size(self):
-        """Size in bytes of payload."""
-        return len(self.words) * self.words.dtype.itemsize
+    def _item_to_slices(self, item):
+        """Get word and data slices required to get given item.
+
+        Returns ``words_slice`` and ``data_slice`` such that if one decodes
+        ``self.words[words_slice]`` the returned data is the smallest possible
+        array that includes the requested item or slice (as ``data_slice``).
+        """
+        is_slice = isinstance(item, slice)
+        if is_slice:
+            start, stop, step = item.indices(self.nsample)
+            n = stop - start
+            if step == 1:
+                step = None
+        else:
+            try:
+                item = item.__index__()
+            except:
+                raise TypeError("{0} object can only be indexed or sliced."
+                                .format(type(self)))
+            if item < 0:
+                item += self.nsample
+
+            if not (0 <= item < self.nsample):
+                raise IndexError("{0} index out of range.".format(type(self)))
+
+            start, stop, step, n = item, item+1, 1, 1
+
+        if n == self.nsample:
+            words_slice = slice(None)
+            data_slice = slice(None, None, step) if is_slice else 0
+
+        else:
+            bpw = 8 * self.words.dtype.itemsize
+            bpfs = self._bpfs
+            if bpfs % bpw == 0:
+                # Each full sample requires one or more encoded words.
+                # Get corresponding range in words required, and decode those.
+                wpfs = bpfs // bpw
+                words_slice = slice(start * wpfs, stop * wpfs)
+                data_slice = slice(None, None, step) if is_slice else 0
+
+            elif bpw % bpfs == 0:
+                # Each word contains multiple samples.
+                # Get words in which required samples are contained.
+                fspw = bpw // bpfs
+                w_start, o_start = divmod(start, fspw)
+                w_stop, o_stop = divmod(stop, fspw)
+
+                words_slice = slice(w_start, w_stop + 1 if o_stop else w_stop)
+                data_slice = slice(o_start if o_start else None,
+                                   o_start + n if o_stop else None,
+                                   step) if is_slice else o_start
+
+            else:
+                raise TypeError("Do not know how to extract data when full "
+                                "samples have {0} bits and words have {1} bits"
+                                .format(bpfs, bpw))
+
+        return words_slice, data_slice
+
+    def __getitem__(self, item=()):
+        decoder = self._decoders[self.bps, False]
+        if item is () or item == slice(None):
+            data = decoder(self.words)
+            if self.complex_data:
+                data = data.view(self.dtype)
+            return data.reshape(self.shape)
+
+        words_slice, data_slice = self._item_to_slices(item)
+        return (decoder(self.words[words_slice]).view(self.dtype)
+                .reshape(-1, *self.sample_shape)[data_slice])
+
+    def __setitem__(self, item, data):
+        if item is () or item == slice(None):
+            words_slice = data_slice = slice(None)
+        else:
+            words_slice, data_slice = self._item_to_slices(item)
+
+        data = np.asanyarray(data)
+        # Avoid decoding if possible.
+        if not (data_slice == slice(None) and
+                data.shape[-len(self.sample_shape):] == self.sample_shape and
+                data.dtype.kind == self.dtype.kind):
+            decoder = self._decoders[self.bps, False]
+            current_data = decoder(self.words[words_slice])
+            if self.complex_data:
+                current_data = current_data.view(self.dtype)
+            current_data.shape = (-1,) + self.sample_shape
+            current_data[data_slice] = data
+            data = current_data
+
+        data = data.ravel()
+        if data.dtype.kind == 'c':
+            data = data.view(data.real.dtype)
+
+        encoder = self._encoders[self.bps, False]
+        self.words[words_slice] = encoder(data)
+
+    data = property(__getitem__, doc="Full decoded payload.")
 
     def __eq__(self, other):
         return (type(self) is type(other) and
                 self.shape == other.shape and
                 self.dtype == other.dtype and
-                np.all(self.words == other.words))
+                (self.words is other.words or
+                 np.all(self.words == other.words)))
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
