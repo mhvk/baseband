@@ -116,3 +116,45 @@ class TestDADA(object):
                                           sample_shape=(2,))
         payload3 = dada.DADAPayload.fromdata(data, bps=8)
         assert payload3 == payload
+
+    def test_filestreamer(self):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            header = dada.DADAHeader.fromfile(fh)
+            payload = dada.DADAPayload.fromfile(fh, payloadsize=64000, bps=8,
+                                                complex_data=True,
+                                                sample_shape=(2,))
+
+        with dada.open(SAMPLE_FILE, 'rs') as fh:
+            assert header == fh.header0
+            assert fh.fh_raw.tell() == header.size
+            assert fh.size == 16000
+            record = fh.read(12)
+            assert fh.tell() == 12
+            fh.seek(10000)
+            record2 = fh.read(2)
+            assert fh.tell() == 10002
+            assert fh.fh_raw.tell() == header.size + 10002 * 4
+        #     assert np.abs(fh.tell(unit='time') -
+        #                   (fh.time0 + 10002 / (32*u.MHz))) < 1. * u.ns
+        #     fh.seek(fh.time0 + 1000 / (32*u.MHz))
+        #     assert fh.tell() == 1000
+
+        # assert header1['frame_nr'] == 3
+        # assert header1['user'] == header['user']
+        # assert header1['bcd_jday'] == header['bcd_jday']
+        # assert header1['bcd_seconds'] == header['bcd_seconds']
+        # assert header1['bcd_fraction'] == 4
+        # assert (round((1./((header1.time-header.time)/3.)).to(u.Hz).value) ==
+        #         6400)
+        # assert record.shape == (12, 8)
+        # assert np.all(record.astype(int)[:3] ==
+        #               np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
+        #                         [-3, +3, -1, +3, -1, -1, -1, +1],
+        #                         [+3, -1, +3, +3, +1, -1, +3, -1]]))
+        # assert record2.shape == (2, 8)
+        # assert np.all(record2.astype(int) ==
+        #               np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
+        #                         [-1, +1, -3, +3, -3, +1, +3, +1]]))
+        assert record.shape == (12, 2) and record.dtype == np.complex64
+        assert np.all(record == payload.data[:12])
+        assert np.all(record2 == payload.data[10000:10002])
