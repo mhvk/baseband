@@ -103,7 +103,7 @@ class VLBIPayloadBase(object):
             raise ValueError("{0} cannot encode data with {1} bits"
                              .format(cls.__name__, bps))
         if complex_data:
-            data = data.view(data.real.dtype)
+            data = data.view((data.real.dtype, (2,)))
         words = encoder(data).ravel().view(cls._dtype_word)
         return cls(words, sample_shape=sample_shape, bps=bps,
                    complex_data=complex_data)
@@ -232,7 +232,7 @@ class VLBIPayloadBase(object):
             data = current_data
 
         if data.dtype.kind == 'c':
-            data = data.view(data.real.dtype)
+            data = data.view((data.real.dtype, (2,)))
 
         encoder = self._encoders[self._coder]
         self.words[words_slice] = encoder(data).ravel().view(self._dtype_word)

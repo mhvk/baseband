@@ -10,18 +10,18 @@ import numpy as np
 from astropy.tests.helper import pytest
 
 
-def encode_8bit_real(values):
+def encode_8bit(values):
     return np.clip(np.round(values),
                    -128, 127).astype(np.int8)
 
 
-def decode_8bit_real(values):
+def decode_8bit(values):
     return values.view(np.int8).astype(np.float32)
 
 
 class Payload(VLBIPayloadBase):
-    _encoders = {8: encode_8bit_real}
-    _decoders = {8: decode_8bit_real}
+    _encoders = {8: encode_8bit}
+    _decoders = {8: decode_8bit}
 
 
 class TestBCD(object):

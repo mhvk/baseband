@@ -12,7 +12,7 @@ from __future__ import (absolute_import, division, print_function,
 import sys
 import numpy as np
 from ..vlbi_base.payload import VLBIPayloadBase
-from ..vlbi_base.encoding import encode_2bit_real_base, decoder_levels
+from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
 
 
 __all__ = ['reorder32', 'reorder64', 'init_luts', 'decode_8chan_2bit_fanout4',
@@ -114,7 +114,7 @@ def encode_8chan_2bit_fanout4(values):
     """Encode payload for 8 channels using 2 bits, fan-out 4 (64 tracks)."""
     reorder_channels = np.array([0, 2, 1, 3, 4, 6, 5, 7])
     values = values[:, reorder_channels].reshape(-1, 4, 8).transpose(0, 2, 1)
-    bitvalues = encode_2bit_real_base(values)
+    bitvalues = encode_2bit_base(values)
     reorder_bits = np.array([0, 2, 1, 3], dtype=np.uint8)
     reorder_bits.take(bitvalues, out=bitvalues)
     bitvalues <<= np.array([0, 2, 4, 6], dtype=np.uint8)
