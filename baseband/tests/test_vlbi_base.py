@@ -184,12 +184,21 @@ class TestVLBIBase(object):
                       self.payload.words.view(np.int8))
         assert np.all(np.array(self.payload).ravel() ==
                       self.payload.words.view(np.int8))
+        assert np.all(np.array(self.payload, dtype=np.int8).ravel() ==
+                      self.payload.words.view(np.int8))
+        payload = self.Payload(self.payload.words, bps=4)
+        with pytest.raises(KeyError):
+            payload.data
+        payload = self.Payload(self.payload.words, bps=8, complex_data=True)
+        assert np.all(payload.data ==
+                      self.payload.data[:, 0] + 1j * self.payload.data[:, 1])
 
     @pytest.mark.parametrize('item', (2, slice(1, 3), (), slice(2, None),
                                       (2, 1), (slice(None), 0),
                                       (slice(1, 3), 1)))
     def test_payload_getitem_setitem(self, item):
-        sel_data = self.payload.data[item]
+        data = self.payload.data
+        sel_data = data[item]
         assert np.all(self.payload[item] == sel_data)
         payload = self.Payload(self.payload.words.copy(), bps=8,
                                sample_shape=(2,), complex_data=False)
@@ -205,6 +214,13 @@ class TestVLBIBase(object):
         payload[item] = sel_data
         assert np.all(payload[item] == sel_data)
         assert payload == self.payload
+        payload = self.Payload.fromdata(data + 1j * data, bps=8)
+        sel_data = payload.data[item]
+        assert np.all(payload[item] == sel_data)
+        payload[item] = 1-sel_data
+        check = payload.data
+        check[item] = 1-sel_data
+        assert np.all(payload.data == check)
 
     def test_payload_empty_item(self):
         p11 = self.payload[1:1]
@@ -225,6 +241,14 @@ class TestVLBIBase(object):
                                sample_shape=(2,), complex_data=False)
         with pytest.raises(IndexError):
             payload[item] = 1
+
+    def test_payload_invalid_item2(self):
+        with pytest.raises(TypeError):
+            self.payload['l']
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        with pytest.raises(TypeError):
+            payload['l'] = 1
 
     def test_payload_setitem_wrong_shape(self):
         payload = self.Payload(self.payload.words.copy(), bps=8,
@@ -273,6 +297,15 @@ class TestVLBIBase(object):
         assert payload3.shape == (16,)
         assert payload3 != payload
         assert np.all(payload3.data == payload.data.ravel())
+        with pytest.raises(ValueError):  # don't have relevant encoder.
+            self.Payload.fromdata(data, bps=4)
+        payload4 = self.Payload.fromdata(data[::2, 0] + 1j * data[1::2, 0],
+                                         bps=8)
+        assert payload4.complex_data is True
+        assert payload4.sample_shape == ()
+        assert payload4.shape == (8,)
+        assert payload4 != payload
+        assert np.all(payload4.words == payload.words)
 
     def test_frame_basics(self):
         assert self.frame.header is self.header
