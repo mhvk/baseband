@@ -12,11 +12,7 @@ from functools import reduce
 import numpy as np
 
 
-__all__ = ['VLBIPayloadBase', 'DTYPE_WORD']
-
-
-DTYPE_WORD = np.dtype('<u4')
-"""Dtype for 32-bit unsigned integers, with least signicant byte first."""
+__all__ = ['VLBIPayloadBase']
 
 
 class VLBIPayloadBase(object):
@@ -42,7 +38,8 @@ class VLBIPayloadBase(object):
     # Possible fixed payload size.
     _size = None
     # Default type for encoded data
-    _dtype_word = DTYPE_WORD
+    _dtype_word = np.dtype('<u4')
+    """Default for words: 32-bit unsigned integers, with lsb first."""
     # To be defined by subclasses.
     _encoders = {}
     _decoders = {}

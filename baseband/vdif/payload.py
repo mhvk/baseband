@@ -10,7 +10,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 
-from ..vlbi_base.payload import VLBIPayloadBase, DTYPE_WORD
+from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.encoding import (encode_2bit_real_base, encode_4bit_real_base,
                                   decoder_levels,
                                   decode_8bit_real, encode_8bit_real)
@@ -132,7 +132,7 @@ class VDIFPayload(VLBIPayloadBase):
         s = fh.read(header.payloadsize)
         if len(s) < header.payloadsize:
             raise EOFError("Could not read full payload.")
-        return cls(np.fromstring(s, dtype=DTYPE_WORD), header)
+        return cls(np.fromstring(s, dtype=cls._dtype_word), header)
 
     @classmethod
     def fromdata(cls, data, header):
@@ -161,5 +161,5 @@ class VDIFPayload(VLBIPayloadBase):
             encoder = cls._encoders[header.bps]
         if data.dtype.kind == 'c':
             data = data.view(data.real.dtype)
-        words = encoder(data.ravel()).view(DTYPE_WORD)
+        words = encoder(data.ravel()).view(cls._dtype_word)
         return cls(words, header)

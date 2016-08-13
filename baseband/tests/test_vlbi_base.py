@@ -1,6 +1,6 @@
 from ..vlbi_base.utils import bcd_encode, bcd_decode, CRC
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, four_word_struct
-from ..vlbi_base.payload import VLBIPayloadBase, DTYPE_WORD
+from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.frame import VLBIFrameBase
 
 
@@ -68,7 +68,7 @@ class TestVLBIBase(object):
         self.header = self.Header([0x12345678, 0xffff0000, 0x0, 0xffffffff])
         self.Payload = Payload
         self.payload = Payload(np.array([0x12345678, 0xffff0000],
-                                        dtype=DTYPE_WORD),
+                                        dtype=Payload._dtype_word),
                                bps=8, sample_shape=(2,), complex_data=False)
 
         class Frame(VLBIFrameBase):
@@ -262,7 +262,7 @@ class TestVLBIBase(object):
         assert payload.complex_data is False
         assert payload.sample_shape == (1,)
         assert payload.bps == 8
-        assert payload.words.dtype is DTYPE_WORD
+        assert payload.words.dtype is self.Payload._dtype_word
         assert len(payload.words) == 4
         assert payload.nsample == len(data)
         assert payload.size == 16
