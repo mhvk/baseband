@@ -283,10 +283,13 @@ class TestVLBIBase(object):
         assert self.frame.valid is True
         frame = self.Frame(self.header, self.payload, valid=False)
         assert np.all(frame.data == 0.)
-        assert np.all(frame.todata(invalid_data_value=1.) == 1.)
+        frame.invalid_data_value = 1.
+        assert np.all(frame.data == 1.)
 
         assert 'x2_0_64' in self.frame
         assert self.frame['x2_0_64'] == self.header['x2_0_64']
+        for item in (3, (1, 1), slice(0, 2)):
+            assert np.all(self.frame[item] == self.frame.payload[item])
 
     def test_frame_fromfile(self):
         with io.BytesIO() as s:

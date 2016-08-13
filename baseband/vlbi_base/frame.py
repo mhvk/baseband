@@ -8,6 +8,7 @@ payload, providing access to the values encoded in both.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+from astropy.extern import six
 
 __all__ = ['VLBIFrameBase']
 
@@ -32,15 +33,19 @@ class VLBIFrameBase(object):
 
     The Frame can also be read instantiated using class methods:
 
-      fromfile : read header and payload from a filehandle
+      `VLBIFrameBase.fromfile` : read header and payload from a filehandle
 
-      fromdata : encode data as payload
+      `VLBIFrameBase.fromdata` : encode data as payload
 
-    It also has methods to do the opposite:
+    Of course, one can also do the opposite:
 
-      tofile : write header and payload to filehandle
+      `VLBIFrameBase.tofile` (method) : write header and payload to filehandle
 
-      todata : decode payload to data
+      `VLBIFrameBase.data` : decode payload to data
+
+    One can decode part of the payload by indexing or slicing the frame.
+    If the frame does not contain valid data, all values returned are set
+    to ``self.invalid_data_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, ``words`` the full encoded frame, and ``size``
@@ -51,6 +56,8 @@ class VLBIFrameBase(object):
 
     _header_class = None
     _payload_class = None
+    invalid_data_value = 0.
+    """Value used to replace data if the frame does not contain valid data."""
 
     def __init__(self, header, payload, valid=True, verify=True):
         self.header = header
@@ -134,8 +141,6 @@ class VLBIFrameBase(object):
             data[...] = invalid_data_value
         return data
 
-    data = property(todata, doc="Decode the payload, zeroing it if not valid.")
-
     @property
     def shape(self):
         """Shape of the data held in the payload (samples_per_frame, nchan)."""
@@ -151,13 +156,26 @@ class VLBIFrameBase(object):
         """Size of the encoded frame in bytes."""
         return self.header.size + self.payload.size
 
-    def __array__(self):
+    def __array__(self, dtype=None):
         """Interface to arrays."""
-        return self.data
+        if dtype is None or dtype == self.dtype:
+            return self.data
+        else:
+            return self.data.astype(dtype)
 
-    # Header behaves as a dictionary.  Let frame behave the same.
-    def __getitem__(self, item):
-        return self.header.__getitem__(item)
+    # Header behaves as a dictionary, while Payload can be indexed/sliced.
+    # Let frame behave appropriately.
+    def __getitem__(self, item=()):
+        if isinstance(item, six.string_types):
+            return self.header.__getitem__(item)
+        else:
+            data = self.payload.__getitem__(item)
+            if not self.valid:
+                data[...] = self.invalid_data_value
+            return data
+
+    data = property(__getitem__,
+                    doc="Decode the payload, zeroing it if not valid.")
 
     def keys(self):
         return self.header.keys()
