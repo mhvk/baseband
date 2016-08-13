@@ -87,7 +87,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                                        sample_shape=(self.header0['NPOL'],
                                                      self.header0['NCHAN']))
 
-        out = payload.todata(data=out)
+        out = payload.data
         self.offset += count
         return out.squeeze() if squeeze else out
 

@@ -96,10 +96,6 @@ class TestDADA(object):
                       np.array([[-38.-38.j, -38.-38.j],
                                 [-38.-38.j, -40.+0.j],
                                 [-105.+60.j, 85.-15.j]], dtype=np.complex64))
-        in_place = np.zeros_like(data)
-        payload.todata(data=in_place)
-        assert in_place is not data
-        assert np.all(in_place == data)
 
         with io.BytesIO() as s:
             payload.tofile(s)
