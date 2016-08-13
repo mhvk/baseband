@@ -11,6 +11,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
+from astropy.extern import six
 
 from ..vlbi_base.frame import VLBIFrameBase
 from .header import Mark4Header, PAYLOADSIZE
@@ -46,11 +47,15 @@ class Mark4Frame(VLBIFrameBase):
 
       fromdata : encode data as payload
 
-    It also has methods to do the opposite:
+    Of course, one can also do the opposite:
 
-      tofile : write header and payload to filehandle
+      tofile : method to write header and payload to filehandle
 
-      todata : decode payload to data
+      data : property that yields full decoded payload
+
+    One can decode part of the payload by indexing or slicing the frame.
+    If the frame does not contain valid data, all values returned are set
+    to ``self.invalid_data_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, ``words`` the full encoded frame, and ``size``
@@ -134,32 +139,27 @@ class Mark4Frame(VLBIFrameBase):
 
         return cls(header, payload, verify=verify)
 
-    def todata(self, data=None, invalid_data_value=0.):
-        """Decode the payload.
-
-        Parameters
-        ----------
-        data : None or ndarray
-            If given, the data is decoded into the array (which should have
-            the correct shape).  By default, a new array is created.
-        invalid_data_value : float
-            Value to use for part of frame overwritten by header as well as
-            for the rest if the frame is invalid (default: 0.).
-        """
-        if data is None:
-            data = np.empty(self.shape, self.dtype)
+    @property
+    def data(self):
+        """Decode the payload, setting the header to ``invalid_data_value``."""
+        data = np.empty(self.shape, self.dtype)
         if self.valid:
-            valid_start = data.shape[0] * VALIDSTART // PAYLOADSIZE
-            data[:valid_start] = invalid_data_value
+            valid_start = self.shape[0] * VALIDSTART // PAYLOADSIZE
+            data[:valid_start] = self.invalid_data_value
             data[valid_start:] = self.payload.data
         else:
-            data[...] = invalid_data_value
+            data[...] = self.invalid_data_value
         return data
-
-    data = property(todata, doc="Decode the payload.")
 
     @property
     def shape(self):
         """Shape of the data held in the payload (samples_per_frame, nchan)."""
         return (self.payload.shape[0] * PAYLOADSIZE //
-                (PAYLOADSIZE - VALIDSTART), self.payload.shape[1])
+                (PAYLOADSIZE - VALIDSTART),) + self.payload.shape[1:]
+
+    def __getitem__(self, item=()):
+        if isinstance(item, six.string_types):
+            return self.header.__getitem__(item)
+        else:
+            raise IndexError("{0} object can not be indexed or sliced yet."
+                             .format(type(self)))

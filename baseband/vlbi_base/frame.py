@@ -33,15 +33,15 @@ class VLBIFrameBase(object):
 
     The Frame can also be read instantiated using class methods:
 
-      `VLBIFrameBase.fromfile` : read header and payload from a filehandle
+      fromfile : read header and payload from a filehandle
 
-      `VLBIFrameBase.fromdata` : encode data as payload
+      fromdata : encode data as payload
 
     Of course, one can also do the opposite:
 
-      `VLBIFrameBase.tofile` (method) : write header and payload to filehandle
+      tofile : method to write header and payload to filehandle
 
-      `VLBIFrameBase.data` : decode payload to data
+      data : property that yields full decoded payload
 
     One can decode part of the payload by indexing or slicing the frame.
     If the frame does not contain valid data, all values returned are set
@@ -120,26 +120,6 @@ class VLBIFrameBase(object):
         verify = kwargs.pop('verify', True)
         payload = cls._payload_class.fromdata(data, *args, **kwargs)
         return cls(header, payload, valid=valid, verify=verify)
-
-    def todata(self, data=None, invalid_data_value=0.):
-        """Decode the payload.
-
-        Parameters
-        ----------
-        data : None or ndarray
-            If given, the data is decoded into the array (which should have
-            the correct shape).  By default, a new array is created.
-        invalid_data_value : float
-            Value to use for invalid data frames (default: 0.).
-        """
-        if data is None:
-            data = self.payload.data
-        else:
-            data[...] = self.payload.data
-
-        if not self.valid:
-            data[...] = invalid_data_value
-        return data
 
     @property
     def shape(self):

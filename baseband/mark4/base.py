@@ -215,8 +215,7 @@ class Mark4StreamReader(VLBIStreamReaderBase):
             frame_nr, sample_offset = divmod(self.offset,
                                              self.samples_per_frame)
             if frame_nr != self._frame_nr:
-                # Read relevant frame, reusing data array from previous frame.
-                self._read_frame(frame_nr, out=self._frame_data)
+                self._read_frame()
 
             data = self._frame.data
             if self.thread_ids:
@@ -231,16 +230,14 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
         return out.squeeze() if squeeze else out
 
-    def _read_frame(self, frame_nr=None, out=None):
-        if frame_nr is None:
-            frame_nr = self.offset // self.samples_per_frame
+    def _read_frame(self):
+        frame_nr = self.offset // self.samples_per_frame
         self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
         self._frame = self.fh_raw.read_frame(ntrack=self.header0.ntrack,
                                              decade=self.header0.decade)
         # Convert payloads to data array.
-        self._frame_data = self._frame.todata(data=out)
+        self._frame_data = self._frame.data
         self._frame_nr = frame_nr
-        return self._frame_data
 
 
 class Mark4StreamWriter(VLBIStreamWriterBase):
