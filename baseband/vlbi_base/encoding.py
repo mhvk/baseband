@@ -92,7 +92,7 @@ def encode_4bit_real_base(values):
     return np.clip(values, 0., 15., out=values).astype(np.uint8)
 
 
-def decode_8bit_real(words, out=None):
+def decode_8bit_real(words):
     """Generic decoder for data stored using 8 bits.
 
     We follow mark5access, which assumes the values 0 to 255 encode
@@ -104,12 +104,8 @@ def decode_8bit_real(words, out=None):
     """
     b = words.view(np.uint8).astype(np.float32)
     b -= 127.5
-    if out is None:
-        b /= EIGHT_BIT_1_SIGMA
-        return b
-    else:
-        b.shape = out.shape
-        return np.true_divide(b, EIGHT_BIT_1_SIGMA, out=out)
+    b /= EIGHT_BIT_1_SIGMA
+    return b
 
 
 def encode_8bit_real(values):

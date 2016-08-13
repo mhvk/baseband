@@ -70,15 +70,9 @@ lut1bit, lut2bit = init_luts()
 
 
 # Decoders keyed by bits_per_sample, complex_data:
-def decode_2bit_real(words, out=None):
+def decode_2bit_real(words):
     b = words.view(np.uint8)
-    if out is None:
-        return lut2bit.take(b, axis=0).ravel()
-    else:
-        outf4 = out.reshape(-1, 4)
-        assert outf4.base is out or outf4.base is out.base
-        lut2bit.take(b, axis=0, out=outf4)
-        return out
+    return lut2bit.take(b, axis=0)
 
 
 shift2bit = np.arange(0, 8, 2).astype(np.uint8)
