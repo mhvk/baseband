@@ -45,7 +45,7 @@ class TestDADA(object):
             bps=header.bps, complex_data=header.complex_data,
             bandwidth=header.bandwidth, sideband=header.sideband,
             samples_per_frame=header.samples_per_frame,
-            npol=header['NPOL'], nchan=header['NCHAN'],
+            sample_shape=header.sample_shape,
             source=header['SOURCE'], ra=header['RA'], dec=header['DEC'],
             telescope=header['TELESCOPE'], instrument=header['INSTRUMENT'],
             receiver=header['RECEIVER'], freq=header['FREQ'],
@@ -58,7 +58,7 @@ class TestDADA(object):
             bps=header.bps, complex_data=header.complex_data,
             bandwidth=header.bandwidth, sideband=header.sideband,
             samples_per_frame=header.samples_per_frame,
-            npol=header['NPOL'], nchan=header['NCHAN'],
+            sample_shape=header.sample_shape,
             source=header['SOURCE'], ra=header['RA'], dec=header['DEC'],
             telescope=header['TELESCOPE'], instrument=header['INSTRUMENT'],
             receiver=header['RECEIVER'], freq=header['FREQ'],
@@ -84,52 +84,120 @@ class TestDADA(object):
 
     def test_payload(self):
         with open(SAMPLE_FILE, 'rb') as fh:
-            fh.seek(4096)  # skip header
-            payload = dada.DADAPayload.fromfile(fh, payloadsize=64000, bps=8,
-                                                complex_data=True,
-                                                sample_shape=(2,))
+            header = dada.DADAHeader.fromfile(fh)
+            payload = dada.DADAPayload.fromfile(fh, header)
         assert payload.size == 64000
-        assert payload.shape == (16000, 2)
+        assert payload.shape == (16000, 2, 1)
         assert payload.dtype == np.complex64
-        data = payload.data
-        assert np.all(data[:3] ==
-                      np.array([[-38.-38.j, -38.-38.j],
-                                [-38.-38.j, -40.+0.j],
-                                [-105.+60.j, 85.-15.j]], dtype=np.complex64))
+        assert np.all(payload[:3] == np.array(
+            [[[-38.-38.j], [-38.-38.j]],
+             [[-38.-38.j], [-40.+0.j]],
+             [[-105.+60.j], [85.-15.j]]], dtype=np.complex64))
 
         with io.BytesIO() as s:
             payload.tofile(s)
             s.seek(0)
             payload2 = dada.DADAPayload.fromfile(s, payloadsize=64000, bps=8,
                                                  complex_data=True,
-                                                 sample_shape=(2,))
+                                                 sample_shape=(2, 1))
             assert payload2 == payload
             with pytest.raises(EOFError):
                 # Too few bytes.
                 s.seek(100)
-                dada.DADAPayload.fromfile(s, payloadsize=64000, bps=8,
-                                          complex_data=True,
-                                          sample_shape=(2,))
-        payload3 = dada.DADAPayload.fromdata(data, bps=8)
+                dada.DADAPayload.fromfile(s, header)
+        payload3 = dada.DADAPayload.fromdata(payload.data, bps=8)
         assert payload3 == payload
+        with open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(4096)
+            payload4 = dada.DADAPayload.fromfile(fh, header, memmap=True)
+        assert isinstance(payload4.words, np.memmap)
+        assert not isinstance(payload.words, np.memmap)
+        assert payload == payload4
+
+    def test_frame(self):
+        with dada.open(SAMPLE_FILE, 'rb') as fh:
+            header = dada.DADAHeader.fromfile(fh)
+            payload = dada.DADAPayload.fromfile(fh, header)
+            fh.seek(0)
+            frame = fh.read_frame(memmap=False)
+
+        assert frame.header == header
+        assert frame.payload == payload
+        assert frame == dada.DADAFrame(header, payload)
+        assert np.all(frame[:3] == np.array(
+            [[[-38.-38.j], [-38.-38.j]],
+             [[-38.-38.j], [-40.+0.j]],
+             [[-105.+60.j], [85.-15.j]]], dtype=np.complex64))
+        with io.BytesIO() as s:
+            frame.tofile(s)
+            s.seek(0)
+            frame2 = dada.DADAFrame.fromfile(s, memmap=False)
+        assert frame2 == frame
+        frame3 = dada.DADAFrame.fromdata(payload.data, header)
+        assert frame3 == frame
+        frame4 = dada.DADAFrame.fromdata(payload.data, **header)
+        assert frame4 == frame
+        header5 = header.copy()
+        frame5 = dada.DADAFrame(header5, payload, valid=False)
+        assert frame5.valid is False
+        assert np.all(frame5.data == 0.)
+        frame5.valid = True
+        assert frame5 == frame
+        with dada.open(SAMPLE_FILE, 'rb') as fh:
+            frame6 = fh.read_frame(memmap=True)
+        assert frame6 == frame
+        assert isinstance(frame6.payload.words, np.memmap)
+        assert np.all(frame6[:3] == np.array(
+            [[[-38.-38.j], [-38.-38.j]],
+             [[-38.-38.j], [-40.+0.j]],
+             [[-105.+60.j], [85.-15.j]]], dtype=np.complex64))
+
+    def test_frame_memmap(self, tmpdir):
+        filename = tmpdir.join('a.dada').strpath
+        with dada.open(SAMPLE_FILE, 'rb') as fr:
+            frame = fr.read_frame(memmap=False)
+
+        with dada.open(filename, 'wb') as fw:
+            fw.write_frame(frame)
+
+        with dada.open(filename, 'rb') as fw:
+            frame2 = fw.read_frame()
+
+        assert frame2 == frame
+
+        with dada.open(filename, 'wb') as fw:
+            frame3 = fw.memmap_frame(frame.header)
+
+        assert frame3 != frame
+
+        with dada.open(filename, 'rb') as fw:
+            frame4 = fw.read_frame()
+
+        assert frame4 != frame
+
+        frame3[:20] = frame[:20]
+        assert frame3 != frame
+        frame3[20:] = frame[20:]
+        assert frame3 == frame
+
+        with dada.open(filename, 'rb') as fw:
+            frame5 = fw.read_frame()
+
+        assert frame5 == frame
 
     def test_filestreamer(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = dada.DADAHeader.fromfile(fh)
-            payload = dada.DADAPayload.fromfile(fh, payloadsize=64000, bps=8,
-                                                complex_data=True,
-                                                sample_shape=(2,))
+            payload = dada.DADAPayload.fromfile(fh, header)
 
         with dada.open(SAMPLE_FILE, 'rs') as fh:
             assert header == fh.header0
-            assert fh.fh_raw.tell() == header.size
             assert fh.size == 16000
             record = fh.read(12)
             assert fh.tell() == 12
             fh.seek(10000)
             record2 = fh.read(2)
             assert fh.tell() == 10002
-            assert fh.fh_raw.tell() == header.size + 10002 * 4
         #     assert np.abs(fh.tell(unit='time') -
         #                   (fh.time0 + 10002 / (32*u.MHz))) < 1. * u.ns
         #     fh.seek(fh.time0 + 1000 / (32*u.MHz))
@@ -152,5 +220,5 @@ class TestDADA(object):
         #               np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
         #                         [-1, +1, -3, +3, -3, +1, +3, +1]]))
         assert record.shape == (12, 2) and record.dtype == np.complex64
-        assert np.all(record == payload.data[:12])
-        assert np.all(record2 == payload.data[10000:10002])
+        assert np.all(record == payload[:12].squeeze())
+        assert np.all(record2 == payload[10000:10002].squeeze())

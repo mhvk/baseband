@@ -4,3 +4,4 @@ from __future__ import (absolute_import, division, print_function,
 from .base import open
 from .header import DADAHeader
 from .payload import DADAPayload
+from .frame import DADAFrame

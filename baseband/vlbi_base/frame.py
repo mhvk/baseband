@@ -157,6 +157,12 @@ class VLBIFrameBase(object):
     data = property(__getitem__,
                     doc="Decode the payload, zeroing it if not valid.")
 
+    def __setitem__(self, item, value):
+        if isinstance(item, six.string_types):
+            self.header.__setitem__(item, value)
+        else:
+            self.payload.__setitem__(item, value)
+
     def keys(self):
         return self.header.keys()
 

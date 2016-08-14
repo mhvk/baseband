@@ -48,8 +48,8 @@ class DADAHeader(OrderedDict):
     """
 
     _properties = ('payloadsize', 'framesize', 'bps', 'complex_data',
-                   'bandwidth', 'sideband', 'tsamp', 'samples_per_frame',
-                   'offset', 'time0', 'time')
+                   'sample_shape', 'bandwidth', 'sideband', 'tsamp',
+                   'samples_per_frame', 'offset', 'time0', 'time')
     """Properties accessible/usable in initialisation for all headers."""
 
     _defaults = [('HEADER', 'DADA'),
@@ -161,7 +161,7 @@ class DADAHeader(OrderedDict):
         lines = []
         while fh.tell() < hdr_size:
             line = fh.readline().decode('ascii')
-            if lines == '' or line[0] == '#' and 'end of header' in line:
+            if line == '' or line[0] == '#' and 'end of header' in line:
                 break
 
             if line.startswith('HDR_SIZE'):
@@ -300,6 +300,14 @@ class DADAHeader(OrderedDict):
     @complex_data.setter
     def complex_data(self, complex_data):
         self['NDIM'] = 2 if complex_data else 1
+
+    @property
+    def sample_shape(self):
+        return self['NPOL'], self['NCHAN']
+
+    @sample_shape.setter
+    def sample_shape(self, sample_shape):
+        self['NPOL'], self['NCHAN'] = sample_shape
 
     @property
     def bandwidth(self):
