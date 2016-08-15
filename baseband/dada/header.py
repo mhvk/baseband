@@ -260,7 +260,7 @@ class DADAHeader(OrderedDict):
             return super(DADAHeader, self).__getattribute__(attr)
         except AttributeError as exc:
             try:
-                return self[attr]
+                return self[attr.upper()]
             except:
                 raise exc
 

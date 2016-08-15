@@ -1,7 +1,11 @@
 # Licensed under the GPLv3 - see LICENSE.rst
+import os
 import io
+import re
 
 import numpy as np
+from astropy.extern import six
+from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (VLBIStreamBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase)
@@ -12,6 +16,45 @@ from .frame import DADAFrame
 
 __all__ = ['DADAFileReader', 'DADAFileWriter',
            'DADAStreamBase', 'DADAStreamReader', 'DADAStreamWriter', 'open']
+
+
+class DADAFileNameSequencer(object):
+    def __init__(self, template, header0):
+        # convert template names to upper case, since header keywords are
+        # upper case as well.
+        self.items = {}
+
+        def check_and_convert(x):
+            string = x.group().upper()
+            key = string[1:-1]
+            if key != 'FRAME_NR' and key != 'FILE_NR':
+                self.items[key] = header0[key]
+            return string
+
+        self.template = re.sub(r'{\w+[}:]', check_and_convert, template)
+        self._has_obs_offset = 'OBS_OFFSET' in self.items
+        if self._has_obs_offset:
+            self._obs_offset0 = self.items['OBS_OFFSET']
+            self._file_size = header0['FILE_SIZE']
+
+    def __getitem__(self, frame_nr):
+        if frame_nr < 0:
+            frame_nr += len(self)
+            if frame_nr < 0:
+                raise IndexError('frame number out of range.')
+
+        self.items['FRAME_NR'] = self.items['FILE_NR'] = frame_nr
+        if self._has_obs_offset:
+            self.items['OBS_OFFSET'] = (self._obs_offset0 +
+                                        frame_nr * self._file_size)
+        return self.template.format(**self.items)
+
+    def __len__(self):
+        frame_nr = 0
+        while os.path.isfile(self[frame_nr]):
+            frame_nr += 1
+
+        return frame_nr
 
 
 class DADAFileReader(io.BufferedReader):
@@ -78,7 +121,8 @@ class DADAFileWriter(io.BufferedRandom):
 class DADAStreamBase(VLBIStreamBase):
     """DADA file wrapper, which combines threads into streams."""
 
-    def __init__(self, fh_raw, header0, thread_ids=None):
+    def __init__(self, fh_raw, header0, thread_ids=None, files=None,
+                 template=None):
         frames_per_second = (1. / (header0['TSAMP'] * 1e-6) /
                              header0.samples_per_frame)
         if thread_ids is None:
@@ -88,11 +132,27 @@ class DADAStreamBase(VLBIStreamBase):
             bps=header0.bps, thread_ids=thread_ids,
             samples_per_frame=header0.samples_per_frame,
             frames_per_second=frames_per_second)
-        self._frame_nr = 0
+        if files and template:
+            raise TypeError('cannot pass in both template and file list.')
+
+        if template:
+            self.files = DADAFileNameSequencer(template, header0)
+        else:
+            self.files = files
+        self._frame_nr = None
 
     def _frame_info(self):
         """Convert offset to file number and offset into that file."""
         return divmod(self.offset, self.samples_per_frame)
+
+    def _open_file(self, frame_nr, mode):
+        if frame_nr is None:
+            frame_nr = self.offset // self.samples_per_frame
+
+        if frame_nr != self._frame_nr:
+            if self.fh_raw:
+                self.fh_raw.close()
+            self.fh_raw = open(self.files[frame_nr], mode)
 
 
 class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
@@ -104,19 +164,30 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
     Parameters
     ----------
     raw : filehandle
-        file handle of the raw DADA stream
+        file handle of the (first) raw DADA stream
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
+    files : tuple, list or str
+        Container with all files of a given observation, or a format string
+        that can be formatted using 'obs_offset' and other header keywords.
     """
-    def __init__(self, raw, thread_ids=None):
-        self._frame = raw.read_frame(memmap=True)
-        header = self._frame.header
-        super(DADAStreamReader, self).__init__(raw, header, thread_ids)
+    def __init__(self, raw, thread_ids=None, files=None, template=None):
+        header = DADAHeader.fromfile(raw)
+        super(DADAStreamReader, self).__init__(raw, header, thread_ids,
+                                               files=files, template=template)
+        if self.files is None:
+            self._frame = DADAFrame(header, DADAPayload.fromfile(raw, header,
+                                                                 memmap=True))
+            self._frame_nr = 0
+        else:
+            self._get_frame(0)
 
-    @property
+    @lazyproperty
     def header1(self):
-        """Last header of the file."""
-        return self.header0
+        """Last header."""
+        if self.files:
+            self._get_frame(len(self.files) - 1)
+        return self._frame.header
 
     def read(self, count=None, squeeze=True, out=None):
         """Read count samples.
@@ -152,10 +223,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
             frame_nr, sample_offset = self._frame_info()
             if frame_nr != self._frame_nr:
                 # Open relevant file.
-                self._read_frame()
-                assert (self._frame.header['OBS_OFFSET'] ==
-                        self.header0['OBS_OFFSET'] + frame_nr *
-                        self.header0.payloadsize)
+                self._get_frame(frame_nr)
 
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
@@ -170,13 +238,12 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
 
         return out.squeeze() if squeeze else out
 
-    def _read_frame(self):
-        frame_nr = self.offset // self.samples_per_frame
-        if frame_nr != self._frame_nr:
-            self.fh_raw.close()
-            self.fh_raw = DADAFileReader(io.open(self.files[frame_nr], 'rb'))
+    def _get_frame(self, frame_nr=None):
+        self._open_file(frame_nr, 'rb')
         self._frame = self.fh_raw.read_frame(memmap=True)
-        self._frame_nr = frame_nr
+        assert (self._frame.header['OBS_OFFSET'] ==
+                self.header0['OBS_OFFSET'] + frame_nr *
+                self.header0.payloadsize)
 
 
 class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
@@ -208,11 +275,17 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     samples_per_frame : int
         Number of complete samples in a given frame.
     """
-    def __init__(self, raw, header=None, **kwargs):
+    def __init__(self, raw, header=None, files=None, template=None, **kwargs):
         if header is None:
             header = DADAHeader.fromvalues(**kwargs)
-        super(DADAStreamWriter, self).__init__(raw, header)
-        self.header0.tofile(self.fh_raw)
+        assert header.get('OBS_OVERLAP', 0) == 0
+        super(DADAStreamWriter, self).__init__(raw, header, files=files,
+                                               template=template)
+        if self.files is None:
+            self._frame = self.fh_raw.memmap_frame(header)
+            self._frame_nr = 0
+        else:
+            self._get_frame(0)
 
     def write(self, data, squeezed=True, invalid_data=False):
         """Write data, buffering by frames as needed."""
@@ -225,9 +298,36 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
         assert data.shape[1] == self.nthread
         assert data.shape[2] == self.nchan
 
-        payload = DADAPayload.fromdata(data, bps=self.header0.bps)
-        payload.tofile(self.fh_raw)
-        self.offset += data.shape[0]
+        count = data.shape[0]
+        sample = 0
+        offset0 = self.offset
+        while count > 0:
+            frame_nr, sample_offset = self._frame_info()
+            if self._frame_nr is None:
+                assert sample_offset == 0
+                self._get_frame(frame_nr)
+
+            nsample = min(count, self.samples_per_frame - sample_offset)
+            sample_end = sample_offset + nsample
+            sample = self.offset - offset0
+            self._frame[sample_offset:
+                        sample_end] = data[sample:sample + nsample]
+            if sample_end == self.samples_per_frame:
+                # deleting frame flushes memmap'd data to disk
+                del self._frame
+                self._frame_nr = None
+
+            self.offset += nsample
+            count -= nsample
+
+    def _get_frame(self, frame_nr=None):
+        self._open_file(frame_nr, 'wb')
+        # set up header for new frame.
+        header = self.header0.copy()
+        header.update(obs_offset=self.header0['OBS_OFFSET'] +
+                      frame_nr * self.header0.payloadsize)
+        self._frame = self.fh_raw.memmap_frame(header)
+        self._frame_nr = frame_nr
 
 
 def open(name, mode='rs', *args, **kwargs):
@@ -269,6 +369,18 @@ def open(name, mode='rs', *args, **kwargs):
         :class:`~baseband.dada.base.DADAStreamWriter` instance (stream).
     """
     # Typical name 2016-04-23-07:29:30_0000000000000000.000000.dada
+    if 'b' not in mode:
+        if isinstance(name, (tuple, list)):
+            kwargs['files'] = name
+            name = name[0]
+        elif isinstance(name, six.string_types) and ('{' in name and
+                                                     '}' in name):
+            kwargs['template'] = name
+            if 'w' in mode:
+                return DADAStreamWriter(None, **kwargs)
+
+            name = name.format(frame_nr=0, file_nr=0, obs_offset=0)
+
     if 'w' in mode:
         if not hasattr(name, 'write'):
             name = io.open(name, 'w+b')
