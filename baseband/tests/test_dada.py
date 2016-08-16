@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import os
 import io
+import copy
 import numpy as np
 import astropy.units as u
 from astropy.tests.helper import pytest, catch_warnings
@@ -32,18 +33,61 @@ class TestDADA(object):
         assert header.framesize == 64000 + 4096
         assert header.payloadsize == 64000
         assert header.mutable is False
+        with pytest.raises(TypeError):
+            header['NCHAN'] = 2
+        assert header['NCHAN'] == 1
+        # access key via attribute
+        assert header.nchan == 1
+        with pytest.raises(AttributeError):
+            header.python
+
         with io.BytesIO() as s:
             header.tofile(s)
             assert s.tell() == header.size
             s.seek(0)
             header2 = dada.DADAHeader.fromfile(s)
+            assert header2 == header
+            assert header2.mutable is False
             assert s.tell() == header.size
-        assert header2 == header
-        assert header2.mutable is False
+            # headers should be at the start of a file.
+            with pytest.raises(ValueError):
+                dada.DADAHeader.fromfile(s)
+
+        with io.BytesIO() as s:
+            s.write(b'         ')
+            with pytest.raises(ValueError):
+                header.tofile(s)
+            s.seek(0)
+            # check it does write fine if we go back to start.
+            header.tofile(s)
+            # now create header with wrong HDR_SIZE in file
+            bad_header = header.copy()
+            bad_header['HDR_SIZE'] = 1000
+            s.seek(0)
+            with pytest.raises(ValueError):
+                bad_header.tofile(s)
+            # now write header explicitly, skipping the check in tofile,
+            # so we create a bad header.
+            for line in bad_header._tolines():
+                s.write((line + '\n').encode('ascii'))
+            s.write('# end of header\n'.encode('ascii'))
+            s.seek(0)
+            with catch_warnings(UserWarning) as w:
+                dada.DADAHeader.fromfile(s)
+            assert 'Odd' in str(w[0].message)
+
         # Note that this is not guaranteed to preserve order!
         header3 = dada.DADAHeader.fromkeys(**header)
         assert header3 == header
         assert header3.mutable is True
+        # check attribute setting.
+        header3.time0 = header.time0 - 0.5 * u.day
+        assert np.abs(header3.time0 - (header.time0 - 0.5 * u.day)) < 1 * u.ns
+        assert np.abs(header3.time - (header.time - 0.5 * u.day)) < 1 * u.ns
+        header3['NCHAN'] = 2
+        assert header3['NCHAN'] == 2
+        header3.framesize = 9096
+        assert header3.payloadsize == 5000
         # # Try initialising with properties instead of keywords.
         # Here, we first just try the start time.
         header4 = dada.DADAHeader.fromvalues(
@@ -87,6 +131,10 @@ class TestDADA(object):
         assert header8 == header
         assert header8.mutable is True
         assert header8.comments == header.comments
+        header9 = copy.copy(header8)
+        assert header9 == header
+        assert header9.mutable is True
+        assert header9.comments == header.comments
 
     def test_payload(self):
         payload = self.payload
@@ -307,7 +355,7 @@ class TestDADA(object):
                           (header.time + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data2 == data)
 
-        # More complicated template, 8 files
+        # More complicated template, 8 files.
         header.payloadsize = self.header.payloadsize // 8
         template = str(tmpdir
                        .join('{utc_start}_{obs_offset:016d}.000000.dada'))
@@ -388,3 +436,5 @@ class TestDADAFileNameSequencer(object):
             with open(filename, 'wb') as fh:
                 fh.write(b'bird')
         assert len(fns) == 5
+        assert fns[-2] == fns[3]
+        assert fns[-1].endswith('a4.dada')
