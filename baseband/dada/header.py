@@ -67,6 +67,10 @@ class DADAHeader(OrderedDict):
                  ('TELESCOPE', 'unset'),
                  ('INSTRUMENT', 'unset'),
                  ('RECEIVER', 'unset'),
+                 ('NBIT', 8),
+                 ('NDIM', 1),
+                 ('NPOL', 1),
+                 ('NCHAN', 1),
                  ('RESOLUTION', 1),
                  ('DSB', 1)]
 
