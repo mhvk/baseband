@@ -7,12 +7,15 @@ from astropy.tests.helper import pytest
 from .. import vdif
 from .. import mark4
 from .. import mark5b
+from .. import dada
+from ..vlbi_base.encoding import EIGHT_BIT_1_SIGMA
 
 
 SAMPLE_M4 = os.path.join(os.path.dirname(__file__), 'sample.m4')
 SAMPLE_M5B = os.path.join(os.path.dirname(__file__), 'sample.m5b')
 SAMPLE_VDIF = os.path.join(os.path.dirname(__file__), 'sample.vdif')
 SAMPLE_MWA = os.path.join(os.path.dirname(__file__), 'sample_mwa.vdif')
+SAMPLE_DADA = os.path.join(os.path.dirname(__file__), 'sample.dada')
 
 
 class TestVDIFMark5B(object):
@@ -242,3 +245,103 @@ class TestMark4ToVDIF1(object):
                     orig_bytes = fm_raw.read(number_of_bytes)
                     conv_bytes = s2.read(number_of_bytes)
                     assert orig_bytes == conv_bytes
+
+
+class TestDADAToVDIF1(object):
+    """Real conversion: DADA to VDIF EDV 1, and back to DADA.
+
+    Here, we use a VDIF format with a flexible size so it is easier to fit
+    the dada file inside the VDIF one.
+    """
+    def get_vdif_header(self, header):
+        return vdif.VDIFHeader.fromvalues(
+            edv=1, time=header.time, bandwidth=header.bandwidth,
+            bps=header.bps, nchan=header['NCHAN'],
+            complex_data=header.complex_data,
+            payloadsize=header.payloadsize // 2,
+            station=header['TELESCOPE'][:2])
+
+    def get_vdif_data(self, dada_data):
+        return (dada_data + 0.5 + 0.5j) / EIGHT_BIT_1_SIGMA
+
+    def get_dada_data(self, vdif_data):
+        return vdif_data * EIGHT_BIT_1_SIGMA - 0.5 - 0.5j
+
+    def test_header(self):
+        with open(SAMPLE_DADA, 'rb') as fh:
+            ddh = dada.DADAHeader.fromfile(fh)
+        # check that we have enough information to create VDIF EDV 1 header.
+        header = self.get_vdif_header(ddh)
+        assert abs(header.time - ddh.time) < 2. * u.ns
+        assert header.payloadsize == ddh.payloadsize // 2
+
+    def test_payload(self):
+        with open(SAMPLE_DADA, 'rb') as fh:
+            fh.seek(4096)
+            ddp = dada.DADAPayload.fromfile(fh, sample_shape=(2, 1),
+                                            complex_data=True, bps=8,
+                                            payloadsize=64000)
+        dada_data = ddp.data
+        # check that conversion between scalings works.
+        vdif_data = self.get_vdif_data(dada_data)
+        assert np.allclose(self.get_dada_data(vdif_data), dada_data)
+        # check that we can create correct payloads
+        vdif_payload0 = vdif.VDIFPayload.fromdata(vdif_data[:, 0, :], bps=8)
+        vdif_payload1 = vdif.VDIFPayload.fromdata(vdif_data[:, 1, :], bps=8)
+        vd0, vd1 = vdif_payload0.data, vdif_payload1.data
+        assert np.allclose(vd0, vdif_data[:, 0, :])
+        assert np.allclose(vd1, vdif_data[:, 1, :])
+        vd = np.zeros((vd0.shape[0], 2, vd0.shape[1]), vd0.dtype)
+        vd[:, 0] = vd0
+        vd[:, 1] = vd1
+        dd_new = self.get_dada_data(vd)
+        ddp2 = dada.DADAPayload.fromdata(dd_new, bps=8)
+        assert ddp2 == ddp
+
+    def test_stream(self, tmpdir):
+        with dada.open(SAMPLE_DADA, 'rs') as fr:
+            ddh = fr.header0
+            dada_data = fr.read()
+            offset1 = fr.tell()
+            time1 = fr.tell(unit='time')
+
+        header = self.get_vdif_header(ddh)
+        data = self.get_vdif_data(dada_data)
+        assert abs(header.time - ddh.time) < 2. * u.ns
+        vdif_file = str(tmpdir.join('converted_dada.vdif'))
+        with vdif.open(vdif_file, 'ws', nthread=data.shape[1],
+                       header=header) as fw:
+            assert (fw.tell(unit='time') - header.time) < 2. * u.ns
+            # Write all data in since frameset, made of two frames.
+            fw.write(data)
+            assert (fw.tell(unit='time') - time1) < 2. * u.ns
+            assert fw.offset == offset1
+
+        with vdif.open(vdif_file, 'rs') as fv:
+            assert abs(fv.header0.time - ddh.time) < 2. * u.ns
+            dv = fv.read()
+            assert fv.offset == offset1
+            assert np.abs(fv.tell(unit='time') - time1) < 2.*u.ns
+            vh = fv.header0
+            vnthread = fv.nthread
+        assert np.allclose(dv, data)
+
+        # Convert VDIF file back to DADA.
+        dada_file = str(tmpdir.join('reconverted.dada'))
+        dv_data = self.get_dada_data(dv)
+        assert np.allclose(dv_data, dada_data)
+        with dada.open(dada_file, 'ws', bandwidth=vh.bandwidth,
+                       time=vh.time, npol=vnthread, bps=vh.bps,
+                       payloadsize=vh.payloadsize*2, nchan=vh.nchan,
+                       telescope=vh.station,
+                       complex_data=vh.complex_data) as fw:
+            new_header = fw.header0
+            fw.write(dv_data)
+
+        assert self.get_vdif_header(new_header) == vh
+        with dada.open(dada_file, 'rs') as fh:
+            header = fh.header0
+            new_dada_data = fh.read()
+        assert header == new_header
+        assert self.get_vdif_header(header) == vh
+        assert np.allclose(new_dada_data, dada_data)
