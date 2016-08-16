@@ -220,7 +220,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
             if(dt != self._frame.seconds - self.header0.seconds or
                frame_nr != self._frame['frame_nr']):
                 # Read relevant frame, reusing data array from previous frame.
-                self._read_frame(out=self._frame_data)
+                self._read_frame()
                 assert dt == (self._frame.seconds - self.header0.seconds)
                 assert frame_nr == self._frame['frame_nr']
 
@@ -237,14 +237,13 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
 
         return out.squeeze() if squeeze else out
 
-    def _read_frame(self, out=None):
+    def _read_frame(self):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
         self._frame = self.fh_raw.read_frame(ref_mjd=self.header0.kday,
                                              nchan=self.nchan, bps=self.bps)
         # Convert payloads to data array.
-        self._frame_data = self._frame.todata(data=out)
-        return self._frame_data
+        self._frame_data = self._frame.data
 
 
 class Mark5BStreamWriter(VLBIStreamWriterBase):

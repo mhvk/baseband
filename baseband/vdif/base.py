@@ -293,7 +293,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                frame_nr != self._frameset['frame_nr']):
                 # Read relevant frame (possibly reusing data array from
                 # previous frame set).
-                self._read_frame_set(fill_value, out=self._frameset._data)
+                self._read_frame_set(fill_value)
                 assert dt == (self._frameset['seconds'] -
                               self.header0['seconds'])
                 assert frame_nr == self._frameset['frame_nr']
@@ -311,13 +311,12 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
         return out.squeeze() if squeeze else out
 
-    def _read_frame_set(self, fill_value=0., out=None):
+    def _read_frame_set(self, fill_value=0.):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._framesetsize)
         self._frameset = self.fh_raw.read_frameset(self.thread_ids,
                                                    edv=self.header0.edv)
-        # Convert payloads to data array.
-        return self._frameset.todata(data=out, invalid_data_value=fill_value)
+        self._frameset.invalid_data_value = fill_value
 
 
 class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):

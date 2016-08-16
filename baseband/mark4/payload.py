@@ -12,7 +12,7 @@ from __future__ import (absolute_import, division, print_function,
 import sys
 import numpy as np
 from ..vlbi_base.payload import VLBIPayloadBase
-from ..vlbi_base.encoding import encode_2bit_real_base, decoder_levels
+from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
 
 
 __all__ = ['reorder32', 'reorder64', 'init_luts', 'decode_8chan_2bit_fanout4',
@@ -96,33 +96,25 @@ nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
          .sum(1).astype(np.int16))
 
 
-def decode_8chan_2bit_fanout4(frame, out=None):
+def decode_8chan_2bit_fanout4(frame):
     """Decode payload for 8 channels using 2 bits, fan-out 4 (64 tracks)."""
     # Bitwise reordering of tracks, to align sign and magnitude bits,
     # reshaping to get VLBI channels in sequential, but wrong order.
     frame = reorder64(frame).view(np.uint8).reshape(-1, 8)
-    # Correct ordering, at the same time possibly selecting specific channels.
+    # Correct ordering.
     frame = frame.take(np.array([0, 2, 1, 3, 4, 6, 5, 7]), axis=1)
     # The look-up table splits each data byte into 4 measurements.
     # Using transpose ensures channels are first, then time samples, then
     # those 4 measurements, so the reshape orders the samples correctly.
     # Another transpose ensures samples are the first dimension.
-    if out is None:
-        return lut2bit1.take(frame.T, axis=0).reshape(8, -1).T
-    else:
-        # in-place decoding is about a factor 2 slower, so probably not
-        # useful, but provided for consistency.
-        outf4 = out.reshape(-1, 4, 8).transpose(2, 0, 1)
-        assert outf4.base is out or outf4.base is out.base
-        lut2bit1.take(frame.T, axis=0, out=outf4)
-        return out
+    return lut2bit1.take(frame.T, axis=0).reshape(8, -1).T
 
 
 def encode_8chan_2bit_fanout4(values):
     """Encode payload for 8 channels using 2 bits, fan-out 4 (64 tracks)."""
     reorder_channels = np.array([0, 2, 1, 3, 4, 6, 5, 7])
     values = values[:, reorder_channels].reshape(-1, 4, 8).transpose(0, 2, 1)
-    bitvalues = encode_2bit_real_base(values)
+    bitvalues = encode_2bit_base(values)
     reorder_bits = np.array([0, 2, 1, 3], dtype=np.uint8)
     reorder_bits.take(bitvalues, out=bitvalues)
     bitvalues <<= np.array([0, 2, 4, 6], dtype=np.uint8)
@@ -150,6 +142,8 @@ class Mark4Payload(VLBIPayloadBase):
     The total number of tracks is `nchan` * `bps` * `fanout`.
     """
 
+    # Ensure that words can hold up to maximum number of channels.
+    _dtype_word = np.dtype('<u8')
     # Decoders keyed by (nchan, nbit, fanout).
     _encoders = {(8, 2, 4): encode_8chan_2bit_fanout4}
     _decoders = {(8, 2, 4): decode_8chan_2bit_fanout4}
@@ -161,8 +155,11 @@ class Mark4Payload(VLBIPayloadBase):
             fanout = header.fanout
             self._size = header.payloadsize
         self.fanout = fanout
-        super(Mark4Payload, self).__init__(words, nchan, bps,
+        super(Mark4Payload, self).__init__(words, bps=bps,
+                                           sample_shape=(nchan,),
                                            complex_data=False)
+        self.nchan = nchan
+        self._coder = (nchan, bps, fanout)
 
     @classmethod
     def fromfile(cls, fh, header):
@@ -187,17 +184,3 @@ class Mark4Payload(VLBIPayloadBase):
         encoder = cls._encoders[header.nchan, header.bps, header.fanout]
         words = encoder(data)
         return cls(words, header)
-
-    def todata(self, data=None):
-        """Decode the payload.
-
-        Parameters
-        ----------
-        data : ndarray or None
-            If given, used to decode the payload into.  It should have the
-            right size to store it.  Its shape is not changed.
-        """
-        decoder = self._decoders[self.nchan, self.bps, self.fanout]
-        return decoder(self.words, out=data)
-
-    data = property(todata, doc="Decoded payload.")

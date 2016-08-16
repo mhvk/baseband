@@ -11,10 +11,10 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 from ..vlbi_base.payload import VLBIPayloadBase
-from ..vlbi_base.encoding import encode_2bit_real_base, decoder_levels
+from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
 
 
-__all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
+__all__ = ['init_luts', 'decode_2bit', 'encode_2bit',
            'Mark5BPayload']
 
 
@@ -70,29 +70,23 @@ lut1bit, lut2bit = init_luts()
 
 
 # Decoders keyed by bits_per_sample, complex_data:
-def decode_2bit_real(words, out=None):
+def decode_2bit(words):
     b = words.view(np.uint8)
-    if out is None:
-        return lut2bit.take(b, axis=0).ravel()
-    else:
-        outf4 = out.reshape(-1, 4)
-        assert outf4.base is out or outf4.base is out.base
-        lut2bit.take(b, axis=0, out=outf4)
-        return out
+    return lut2bit.take(b, axis=0)
 
 
 shift2bit = np.arange(0, 8, 2).astype(np.uint8)
 reorder = np.array([0, 2, 1, 3], dtype=np.uint8)
 
 
-def encode_2bit_real(values):
-    bitvalues = encode_2bit_real_base(values.reshape(-1, 4))
+def encode_2bit(values):
+    bitvalues = encode_2bit_base(values.reshape(-1, 4))
     # swap 1 & 2
     reorder.take(bitvalues, out=bitvalues)
     bitvalues <<= shift2bit
     return np.bitwise_or.reduce(bitvalues, axis=-1)
 
-encode_2bit_real.__doc__ = encode_2bit_real_base.__doc__
+encode_2bit.__doc__ = encode_2bit_base.__doc__
 
 
 class Mark5BPayload(VLBIPayloadBase):
@@ -110,12 +104,26 @@ class Mark5BPayload(VLBIPayloadBase):
     """
 
     _size = 2500 * 4
-    _encoders = {(2, False): encode_2bit_real}
-    _decoders = {(2, False): decode_2bit_real}
+    _encoders = {2: encode_2bit}
+    _decoders = {2: decode_2bit}
 
     def __init__(self, words, nchan=1, bps=2, complex_data=False):
         if complex_data:
             raise ValueError("Mark5B format does not support complex data.")
 
-        super(Mark5BPayload, self).__init__(words, nchan, bps,
+        super(Mark5BPayload, self).__init__(words, bps=bps,
+                                            sample_shape=(nchan,),
                                             complex_data=False)
+        self.nchan = nchan
+
+    @classmethod
+    def fromdata(cls, data, bps=2):
+        """Encode data as payload, using a given number of bits per sample.
+
+        It is assumed that the last dimension is the number of channels.
+        """
+        if data.dtype.kind == 'c':
+            raise ValueError("Mark5B format does not support complex data.")
+        encoder = cls._encoders[bps]
+        words = encoder(data).view(cls._dtype_word)
+        return cls(words, nchan=data.shape[-1], bps=bps)

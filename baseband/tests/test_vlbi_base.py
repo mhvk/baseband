@@ -1,6 +1,6 @@
 from ..vlbi_base.utils import bcd_encode, bcd_decode, CRC
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, four_word_struct
-from ..vlbi_base.payload import VLBIPayloadBase, DTYPE_WORD
+from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.frame import VLBIFrameBase
 
 
@@ -10,18 +10,18 @@ import numpy as np
 from astropy.tests.helper import pytest
 
 
-def encode_8bit_real(values):
+def encode_8bit(values):
     return np.clip(np.round(values),
-                   -128, 127).astype(np.int8).view(DTYPE_WORD)
+                   -128, 127).astype(np.int8)
 
 
-def decode_8bit_real(values, out=None):
+def decode_8bit(values):
     return values.view(np.int8).astype(np.float32)
 
 
 class Payload(VLBIPayloadBase):
-    _encoders = {(8, False): encode_8bit_real}
-    _decoders = {(8, False): decode_8bit_real}
+    _encoders = {8: encode_8bit}
+    _decoders = {8: decode_8bit}
 
 
 class TestBCD(object):
@@ -68,8 +68,8 @@ class TestVLBIBase(object):
         self.header = self.Header([0x12345678, 0xffff0000, 0x0, 0xffffffff])
         self.Payload = Payload
         self.payload = Payload(np.array([0x12345678, 0xffff0000],
-                                        dtype=DTYPE_WORD),
-                               bps=8, nchan=2, complex_data=False)
+                                        dtype=Payload._dtype_word),
+                               bps=8, sample_shape=(2,), complex_data=False)
 
         class Frame(VLBIFrameBase):
             _header_class = Header
@@ -176,7 +176,7 @@ class TestVLBIBase(object):
 
     def test_payload_basics(self):
         assert self.payload.complex_data is False
-        assert self.payload.nchan == 2
+        assert self.payload.sample_shape == (2,)
         assert self.payload.bps == 8
         assert self.payload.shape == (4, 2)
         assert self.payload.size == 8
@@ -184,6 +184,89 @@ class TestVLBIBase(object):
                       self.payload.words.view(np.int8))
         assert np.all(np.array(self.payload).ravel() ==
                       self.payload.words.view(np.int8))
+        assert np.all(np.array(self.payload, dtype=np.int8).ravel() ==
+                      self.payload.words.view(np.int8))
+        payload = self.Payload(self.payload.words, bps=4)
+        with pytest.raises(KeyError):
+            payload.data
+        payload = self.Payload(self.payload.words, bps=8, complex_data=True)
+        assert np.all(payload.data ==
+                      self.payload.data[:, 0] + 1j * self.payload.data[:, 1])
+
+    @pytest.mark.parametrize('item', (2, slice(1, 3), (), slice(2, None),
+                                      (2, 1), (slice(None), 0),
+                                      (slice(1, 3), 1)))
+    def test_payload_getitem_setitem(self, item):
+        data = self.payload.data
+        sel_data = data[item]
+        assert np.all(self.payload[item] == sel_data)
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        assert payload == self.payload
+        payload[item] = 1-sel_data
+        check = self.payload.data
+        check[item] = 1-sel_data
+        assert np.all(payload[item] == 1-sel_data)
+        assert np.all(payload.data == check)
+        assert np.all(payload[:] ==
+                      payload.words.view(np.int8).reshape(-1, 2))
+        assert payload != self.payload
+        payload[item] = sel_data
+        assert np.all(payload[item] == sel_data)
+        assert payload == self.payload
+        payload = self.Payload.fromdata(data + 1j * data, bps=8)
+        sel_data = payload.data[item]
+        assert np.all(payload[item] == sel_data)
+        payload[item] = 1-sel_data
+        check = payload.data
+        check[item] = 1-sel_data
+        assert np.all(payload.data == check)
+
+    def test_payload_empty_item(self):
+        p11 = self.payload[1:1]
+        assert p11.size == 0
+        assert p11.shape == (0,) + self.payload.sample_shape
+        assert p11.dtype == self.payload.dtype
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        payload[1:1] = 1
+        assert payload == self.payload
+
+    @pytest.mark.parametrize('item', (20, -20, (slice(None), 5)))
+    def test_payload_invalid_item(self, item):
+        with pytest.raises(IndexError):
+            self.payload[item]
+
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        with pytest.raises(IndexError):
+            payload[item] = 1
+
+    def test_payload_invalid_item2(self):
+        with pytest.raises(TypeError):
+            self.payload['l']
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        with pytest.raises(TypeError):
+            payload['l'] = 1
+
+    def test_payload_setitem_wrong_shape(self):
+        payload = self.Payload(self.payload.words.copy(), bps=8,
+                               sample_shape=(2,), complex_data=False)
+        with pytest.raises(ValueError):
+            payload[1] = np.ones(10)
+
+        with pytest.raises(ValueError):
+            payload[1] = np.ones((2, 2))
+
+        with pytest.raises(ValueError):
+            payload[1:3] = np.ones((2, 3))
+
+        with pytest.raises(ValueError):
+            payload[1:3, 0] = np.ones((2, 2))
+
+        with pytest.raises(ValueError):
+            payload[1:3, :1] = np.ones((1, 2))
 
     def test_payload_fromfile(self):
         with io.BytesIO() as s:
@@ -193,21 +276,36 @@ class TestVLBIBase(object):
                 self.Payload.fromfile(s)  # no size given
             s.seek(0)
             payload = self.Payload.fromfile(
-                s, payloadsize=len(self.payload.words) * 4)
+                s, payloadsize=len(self.payload.words) * 4,
+                sample_shape=(2,), bps=8)
         assert payload == self.payload
 
     def test_payload_fromdata(self):
         data = np.random.normal(0., 64., 16).reshape(16, 1)
         payload = self.Payload.fromdata(data, bps=8)
         assert payload.complex_data is False
-        assert payload.nchan == 1
+        assert payload.sample_shape == (1,)
         assert payload.bps == 8
-        assert payload.words.dtype is DTYPE_WORD
+        assert payload.words.dtype is self.Payload._dtype_word
         assert len(payload.words) == 4
         assert payload.nsample == len(data)
         assert payload.size == 16
         payload2 = self.Payload.fromdata(self.payload.data, self.payload.bps)
         assert payload2 == self.payload
+        payload3 = self.Payload.fromdata(data.ravel(), bps=8)
+        assert payload3.sample_shape == ()
+        assert payload3.shape == (16,)
+        assert payload3 != payload
+        assert np.all(payload3.data == payload.data.ravel())
+        with pytest.raises(ValueError):  # don't have relevant encoder.
+            self.Payload.fromdata(data, bps=4)
+        payload4 = self.Payload.fromdata(data[::2, 0] + 1j * data[1::2, 0],
+                                         bps=8)
+        assert payload4.complex_data is True
+        assert payload4.sample_shape == ()
+        assert payload4.shape == (8,)
+        assert payload4 != payload
+        assert np.all(payload4.words == payload.words)
 
     def test_frame_basics(self):
         assert self.frame.header is self.header
@@ -218,16 +316,20 @@ class TestVLBIBase(object):
         assert self.frame.valid is True
         frame = self.Frame(self.header, self.payload, valid=False)
         assert np.all(frame.data == 0.)
-        assert np.all(frame.todata(invalid_data_value=1.) == 1.)
+        frame.invalid_data_value = 1.
+        assert np.all(frame.data == 1.)
 
         assert 'x2_0_64' in self.frame
         assert self.frame['x2_0_64'] == self.header['x2_0_64']
+        for item in (3, (1, 1), slice(0, 2)):
+            assert np.all(self.frame[item] == self.frame.payload[item])
 
     def test_frame_fromfile(self):
         with io.BytesIO() as s:
             self.frame.tofile(s)
             s.seek(0)
-            frame = self.Frame.fromfile(s, payloadsize=self.payload.size)
+            frame = self.Frame.fromfile(s, payloadsize=self.payload.size,
+                                        sample_shape=(2,), bps=8)
         assert frame == self.frame
 
     def test_frame_fromdata(self):

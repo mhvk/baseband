@@ -154,7 +154,7 @@ class TestVDIF(object):
         assert payload.size == 5000
         assert payload.shape == (20000, 1)
         assert payload.dtype == np.float32
-        assert np.all(payload.data[:12, 0].astype(int) ==
+        assert np.all(payload[:12, 0].astype(int) ==
                       np.array([1, 1, 1, -3, 1, 1, -3, -3, -3, 3, 3, -1]))
         with io.BytesIO() as s:
             payload.tofile(s)
@@ -172,7 +172,7 @@ class TestVDIF(object):
             vdif.VDIFPayload.fromdata(np.empty((payload.shape[0], 2)), header)
         with pytest.raises(ValueError):
             # Too few data.
-            vdif.VDIFPayload.fromdata(payload.data[:100], header)
+            vdif.VDIFPayload.fromdata(payload[:100], header)
         # check if it works with complex data
         payload4 = vdif.VDIFPayload(payload.words, nchan=1, bps=2,
                                     complex_data=True)
@@ -181,18 +181,33 @@ class TestVDIF(object):
         assert payload4.shape == (10000, 1)
         assert payload4.dtype == np.complex64
         assert np.all(payload4.data ==
-                      payload.data[::2] + 1j * payload.data[1::2])
-        # check in-place decoding
-        in_place = np.zeros(payload4.shape, payload4.dtype)
-        payload4.todata(data=in_place)
-        assert in_place is not payload4.data
-        assert np.all(in_place == payload4.data)
+                      payload[::2] + 1j * payload[1::2])
         with pytest.raises(ValueError):
-            vdif.VDIFPayload.fromdata(in_place, header)
+            vdif.VDIFPayload.fromdata(payload4.data, header)
         header5 = header.copy()
         header5['complex_data'] = True
-        payload5 = vdif.VDIFPayload.fromdata(in_place, header5)
+        payload5 = vdif.VDIFPayload.fromdata(payload4.data, header5)
         assert payload5 == payload4
+
+    @pytest.mark.parametrize('item', (2, (), -1, slice(1, 3),
+                                      slice(2, 4), slice(-3, None)))
+    def test_payload_getitem_setitem(self, item):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            header = vdif.VDIFHeader.fromfile(fh)
+            payload = vdif.VDIFPayload.fromfile(fh, header)
+        sel_data = payload.data[item]
+        assert np.all(payload[item] == sel_data)
+        payload2 = vdif.VDIFPayload(payload.words.copy(), header)
+        assert payload2 == payload
+        payload2[item] = -sel_data
+        check = payload.data
+        check[item] = -sel_data
+        assert np.all(payload2[item] == -sel_data)
+        assert np.all(payload2.data == check)
+        assert payload2 != payload
+        payload2[item] = sel_data
+        assert np.all(payload2[item] == sel_data)
+        assert payload2 == payload
 
     def test_frame(self):
         with vdif.open(SAMPLE_FILE, 'rb') as fh:

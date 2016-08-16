@@ -44,11 +44,15 @@ class VDIFFrame(VLBIFrameBase):
 
       fromdata : encode data as payload
 
-    It also has methods to do the opposite:
+    Of course, one can also do the opposite:
 
-      tofile : write header and payload to filehandle
+      tofile : method to write header and payload to filehandle
 
-      todata : decode payload to data
+      data : property that yields full decoded payload
+
+    One can decode part of the payload by indexing or slicing the frame.
+    If the frame does not contain valid data, all values returned are set
+    to ``self.invalid_data_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, ``words`` the full encoded frame, and ``size``
@@ -165,11 +169,15 @@ class VDIFFrameSet(object):
 
       fromdata : encode data as a set of frames
 
-    It also has methods to do the opposite:
+    Of course, one can also do the opposite:
 
       tofile : write frames to filehandle
 
-      todata : decode frame payloads to data
+      data : property that yields full decoded frame payloads
+
+    One can decode part of the payload by indexing or slicing the frame.
+    If the frame does not contain valid data, all values returned are set
+    to ``self.invalid_data_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, and ``size`` the total size in bytes.  Like a
@@ -178,9 +186,11 @@ class VDIFFrameSet(object):
     is not defined on the frame set itself, such as ``.time`` will also be
     looked up on the header.
     """
+    invalid_data_value = 0.
+
     def __init__(self, frames, header0=None):
         self.frames = frames
-        # Used in .todata below to decode data only once.
+        # Used in .data below to decode data only once.
         self._data = None
         if header0 is None:
             self.header0 = self.frames[0].header
@@ -296,31 +306,15 @@ class VDIFFrameSet(object):
                   for d, h in zip(data, headers)]
         return cls(frames)
 
-    def todata(self, data=None, invalid_data_value=0.):
-        """Decode the payload.
-
-        Parameters
-        ----------
-        data : None or ndarray
-            If given, the data is decoded into the array (which should have
-            the correct shape).  By default, a new array is created, which is
-            kept for other invocations (i.e., decoding is only done once).
-        invalid_data_value : float
-            Value to use for invalid data frames (default: 0.).
-        """
-        if data is None:
-            if self._data is not None:
-                return self._data
-
-            data = np.empty(self.shape, dtype=self.dtype)
-
-        for frame, datum in zip(self.frames, data):
-            frame.todata(datum, invalid_data_value)
-
-        self._data = data
-        return data
-
-    data = property(todata, doc="Decode the payloads in all frames.")
+    @property
+    def data(self):
+        """Decode the payload."""
+        if self._data is None:
+            self._data = np.empty(self.shape, dtype=self.dtype)
+            for frame, datum in zip(self.frames, self._data):
+                datum[...] = (frame.data if frame.valid else
+                              self.invalid_data_value)
+        return self._data
 
     @property
     def size(self):

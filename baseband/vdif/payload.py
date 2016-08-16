@@ -10,14 +10,12 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 
-from ..vlbi_base.payload import VLBIPayloadBase, DTYPE_WORD
-from ..vlbi_base.encoding import (encode_2bit_real_base, encode_4bit_real_base,
-                                  decoder_levels,
-                                  decode_8bit_real, encode_8bit_real,
-                                  decode_8bit_complex, encode_8bit_complex)
+from ..vlbi_base.payload import VLBIPayloadBase
+from ..vlbi_base.encoding import (encode_2bit_base, encode_4bit_base,
+                                  decoder_levels, decode_8bit, encode_8bit)
 
-__all__ = ['init_luts', 'decode_2bit_real', 'encode_2bit_real',
-           'decode_2bit_complex', 'encode_2bit_complex', 'VDIFPayload']
+__all__ = ['init_luts', 'decode_2bit', 'encode_2bit',
+           'VDIFPayload']
 
 
 def init_luts():
@@ -43,71 +41,32 @@ def init_luts():
 lut1bit, lut2bit, lut4bit = init_luts()
 
 
-def decode_2bit_real(words, out=None):
+def decode_2bit(words):
     b = words.view(np.uint8)
-    if out is None:
-        return lut2bit.take(b, axis=0).ravel()
-    else:
-        outf4 = out.reshape(-1, 4)
-        assert outf4.base is out or outf4.base is out.base
-        lut2bit.take(b, axis=0, out=outf4)
-        return out
-
-
-def decode_2bit_complex(words, out=None):
-    b = words.view(np.uint8)
-    if out is None:
-        return lut2bit.take(b, axis=0).ravel().view(np.complex64)
-    else:
-        outf4 = out.reshape(-1, 2).view(np.float32)
-        assert outf4.base is out or outf4.base is out.base
-        lut2bit.take(words.view(np.uint8), axis=0, out=outf4)
-        return out
+    return lut2bit.take(b, axis=0)
 
 
 shift2bit = np.arange(0, 8, 2).astype(np.uint8)
 
 
-def encode_2bit_real(values):
-    bitvalues = encode_2bit_real_base(values.reshape(-1, 4))
+def encode_2bit(values):
+    bitvalues = encode_2bit_base(values.reshape(-1, 4))
     bitvalues <<= shift2bit
-    return np.bitwise_or.reduce(bitvalues, axis=-1).view(DTYPE_WORD)
+    return np.bitwise_or.reduce(bitvalues, axis=-1)
 
 
-def encode_2bit_complex(values):
-    return encode_2bit_real(values.view(values.real.dtype))
-
-
-def decode_4bit_real(words, out=None):
+def decode_4bit(words):
     b = words.view(np.uint8)
-    if out is None:
-        return lut4bit.take(b, axis=0).ravel()
-    else:
-        outf2 = out.reshape(-1, 2)
-        assert outf2.base is out or outf2.base is out.base
-        lut4bit.take(b, axis=0, out=outf2)
-        return out
-
-
-def decode_4bit_complex(words, out=None):
-    if out is None:
-        return decode_4bit_real(words).view(np.complex64)
-    else:
-        decode_4bit_real(words, out.view(out.real.dtype))
-        return out
+    return lut4bit.take(b, axis=0)
 
 
 shift04 = np.array([0, 4], np.uint8)
 
 
-def encode_4bit_real(values):
-    b = encode_4bit_real_base(values).reshape(-1, 2)
+def encode_4bit(values):
+    b = encode_4bit_base(values).reshape(-1, 2)
     b <<= shift04
     return b[:, 0] | b[:, 1]
-
-
-def encode_4bit_complex(values):
-    return encode_4bit_real(values.view(values.real.dtype))
 
 
 class VDIFPayload(VLBIPayloadBase):
@@ -131,19 +90,13 @@ class VDIFPayload(VLBIPayloadBase):
     complex_data : bool
         Complex or float data.  Default: `False`.
     """
-    _decoders = {(2, False): decode_2bit_real,
-                 (2, True): decode_2bit_complex,
-                 (4, False): decode_4bit_real,
-                 (4, True): decode_4bit_complex,
-                 (8, False): decode_8bit_real,
-                 (8, True): decode_8bit_complex}
+    _decoders = {2: decode_2bit,
+                 4: decode_4bit,
+                 8: decode_8bit}
 
-    _encoders = {(2, False): encode_2bit_real,
-                 (2, True): encode_2bit_complex,
-                 (4, False): encode_4bit_real,
-                 (4, True): encode_4bit_complex,
-                 (8, False): encode_8bit_real,
-                 (8, True): encode_8bit_complex}
+    _encoders = {2: encode_2bit,
+                 4: encode_4bit,
+                 8: encode_8bit}
 
     def __init__(self, words, header=None,
                  nchan=1, bps=2, complex_data=False):
@@ -158,7 +111,10 @@ class VDIFPayload(VLBIPayloadBase):
                 self._encoders = Mark5BPayload._encoders
                 if complex_data:
                     raise ValueError("VDIF/Mark5B payload cannot be complex.")
-        super(VDIFPayload, self).__init__(words, nchan, bps, complex_data)
+        super(VDIFPayload, self).__init__(words, bps=bps,
+                                          sample_shape=(nchan,),
+                                          complex_data=complex_data)
+        self.nchan = nchan
 
     @classmethod
     def fromfile(cls, fh, header):
@@ -175,33 +131,47 @@ class VDIFPayload(VLBIPayloadBase):
         s = fh.read(header.payloadsize)
         if len(s) < header.payloadsize:
             raise EOFError("Could not read full payload.")
-        return cls(np.fromstring(s, dtype=DTYPE_WORD), header)
+        return cls(np.fromstring(s, dtype=cls._dtype_word), header)
 
     @classmethod
-    def fromdata(cls, data, header):
+    def fromdata(cls, data, header=None, bps=2, edv=None):
         """Encode data as payload, using header information.
 
         Parameters
         ----------
         data : ndarray
             Values to be encoded.
-        header : `~baseband.vdif.VDIFHeader`
-            Used to infer the encoding, and to verify the number of channels
-            and whether the data is complex.
+        header : `~baseband.vdif.VDIFHeader`, optional
+            If given, used to infer the encoding, and to verify the number of
+            channels and whether the data is complex.
+        bps : int, optional
+            Used if header is not given.
+        edv : int, optional
+            Should be given if not header is specified and the payload is
+            encoded as Mark 5 data (i.e., edv=0xab).
         """
-        if header.nchan != data.shape[-1]:
-            raise ValueError("Header is for {0} channels but data has {1}"
-                             .format(header.nchan, data.shape[-1]))
-        if header['complex_data'] != (data.dtype.kind == 'c'):
-            raise ValueError("Header is for {0} data but data is {1}"
-                             .format(*(('complex' if c else 'real') for c
-                                       in (header['complex_data'],
-                                           data.dtype.kind == 'c'))))
-        if header.edv == 0xab:  # Mark5B payload
+        nchan = data.shape[-1]
+        complex_data = (data.dtype.kind == 'c')
+        if header is not None:
+            if header.nchan != nchan:
+                raise ValueError("Header is for {0} channels but data has {1}"
+                                 .format(header.nchan, data.shape[-1]))
+            if header['complex_data'] != complex_data:
+                raise ValueError("Header is for {0} data but data is {1}"
+                                 .format(*(('complex' if c else 'real') for c
+                                           in (header['complex_data'],
+                                               complex_data))))
+            bps = header.bps
+            edv = header.edv
+
+        if edv == 0xab:  # Mark5B payload
             from ..mark5b import Mark5BPayload
-            encoder = Mark5BPayload._encoders[header.bps,
-                                              header['complex_data']]
+            encoder = Mark5BPayload._encoders[bps]
         else:
-            encoder = cls._encoders[header.bps, header['complex_data']]
-        words = encoder(data.ravel()).view(DTYPE_WORD)
-        return cls(words, header)
+            encoder = cls._encoders[bps]
+
+        if complex_data:
+            data = data.view((data.real.dtype, (2,)))
+        words = encoder(data).ravel().view(cls._dtype_word)
+        return cls(words, header, nchan=nchan, bps=bps,
+                   complex_data=complex_data)

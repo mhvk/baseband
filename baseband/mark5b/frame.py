@@ -41,11 +41,15 @@ class Mark5BFrame(VLBIFrameBase):
 
       fromdata : encode data as payload
 
-    It also has methods to do the opposite:
+    Of course, one can also do the opposite:
 
-      tofile : write header and payload to filehandle
+      tofile : method to write header and payload to filehandle
 
-      todata : decode payload to data
+      data : property that yields full decoded payload
+
+    One can decode part of the payload by indexing or slicing the frame.
+    If the frame does not contain valid data, all values returned are set
+    to ``self.invalid_data_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, ``words`` the full encoded frame, and ``size``

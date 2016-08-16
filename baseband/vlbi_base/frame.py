@@ -8,6 +8,7 @@ payload, providing access to the values encoded in both.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+from astropy.extern import six
 
 __all__ = ['VLBIFrameBase']
 
@@ -36,11 +37,15 @@ class VLBIFrameBase(object):
 
       fromdata : encode data as payload
 
-    It also has methods to do the opposite:
+    Of course, one can also do the opposite:
 
-      tofile : write header and payload to filehandle
+      tofile : method to write header and payload to filehandle
 
-      todata : decode payload to data
+      data : property that yields full decoded payload
+
+    One can decode part of the payload by indexing or slicing the frame.
+    If the frame does not contain valid data, all values returned are set
+    to ``self.invalid_data_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, ``words`` the full encoded frame, and ``size``
@@ -51,6 +56,8 @@ class VLBIFrameBase(object):
 
     _header_class = None
     _payload_class = None
+    invalid_data_value = 0.
+    """Value used to replace data if the frame does not contain valid data."""
 
     def __init__(self, header, payload, valid=True, verify=True):
         self.header = header
@@ -114,24 +121,6 @@ class VLBIFrameBase(object):
         payload = cls._payload_class.fromdata(data, *args, **kwargs)
         return cls(header, payload, valid=valid, verify=verify)
 
-    def todata(self, data=None, invalid_data_value=0.):
-        """Decode the payload.
-
-        Parameters
-        ----------
-        data : None or ndarray
-            If given, the data is decoded into the array (which should have
-            the correct shape).  By default, a new array is created.
-        invalid_data_value : float
-            Value to use for invalid data frames (default: 0.).
-        """
-        out = self.payload.todata(data)
-        if not self.valid:
-            out[...] = invalid_data_value
-        return out
-
-    data = property(todata, doc="Decode the payload, zeroing it if not valid.")
-
     @property
     def shape(self):
         """Shape of the data held in the payload (samples_per_frame, nchan)."""
@@ -147,13 +136,26 @@ class VLBIFrameBase(object):
         """Size of the encoded frame in bytes."""
         return self.header.size + self.payload.size
 
-    def __array__(self):
+    def __array__(self, dtype=None):
         """Interface to arrays."""
-        return self.data
+        if dtype is None or dtype == self.dtype:
+            return self.data
+        else:
+            return self.data.astype(dtype)
 
-    # Header behaves as a dictionary.  Let frame behave the same.
-    def __getitem__(self, item):
-        return self.header.__getitem__(item)
+    # Header behaves as a dictionary, while Payload can be indexed/sliced.
+    # Let frame behave appropriately.
+    def __getitem__(self, item=()):
+        if isinstance(item, six.string_types):
+            return self.header.__getitem__(item)
+        else:
+            data = self.payload.__getitem__(item)
+            if not self.valid:
+                data[...] = self.invalid_data_value
+            return data
+
+    data = property(__getitem__,
+                    doc="Decode the payload, zeroing it if not valid.")
 
     def keys(self):
         return self.header.keys()

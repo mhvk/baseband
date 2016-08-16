@@ -5,9 +5,8 @@ import numpy as np
 
 
 __all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
-           'EIGHT_BIT_1_SIGMA', 'decoder_levels', 'encode_2bit_real_base',
-           'encode_4bit_real_base', 'decode_8bit_real', 'encode_8bit_real',
-           'decode_8bit_complex', 'encode_8bit_complex']
+           'EIGHT_BIT_1_SIGMA', 'decoder_levels', 'encode_2bit_base',
+           'encode_4bit_base', 'decode_8bit', 'encode_8bit']
 
 
 # The high mag value for 2-bit reconstruction.
@@ -44,7 +43,7 @@ two_bit_2_sigma = 2 * TWO_BIT_1_SIGMA
 clip_low, clip_high = -1.5 * TWO_BIT_1_SIGMA, 1.5 * TWO_BIT_1_SIGMA
 
 
-def encode_2bit_real_base(values):
+def encode_2bit_base(values):
     """Generic encoder for data stored using two bits.
 
     This returns an unsigned integer array with values ranging from 0 to 3.
@@ -69,7 +68,7 @@ def encode_2bit_real_base(values):
                            casting='unsafe')
 
 
-def encode_4bit_real_base(values):
+def encode_4bit_base(values):
     """Generic encoder for data stored using four bits.
 
     This returns an unsigned integer array with values ranging from 0 to 15.
@@ -93,7 +92,7 @@ def encode_4bit_real_base(values):
     return np.clip(values, 0., 15., out=values).astype(np.uint8)
 
 
-def decode_8bit_real(words, out=None):
+def decode_8bit(words):
     """Generic decoder for data stored using 8 bits.
 
     We follow mark5access, which assumes the values 0 to 255 encode
@@ -105,24 +104,11 @@ def decode_8bit_real(words, out=None):
     """
     b = words.view(np.uint8).astype(np.float32)
     b -= 127.5
-    if out is None:
-        b /= EIGHT_BIT_1_SIGMA
-        return b
-    else:
-        b.shape = out.shape
-        return np.true_divide(b, EIGHT_BIT_1_SIGMA, out=out)
+    b /= EIGHT_BIT_1_SIGMA
+    return b
 
 
-def decode_8bit_complex(words, out=None):
-    """Generic decoder for complex data stored using 8 bits per component."""
-    if out is None:
-        return decode_8bit_real(words, out).view(np.complex64)
-    else:
-        decode_8bit_real(words, out.view(out.real.dtype))
-        return out
-
-
-def encode_8bit_real(values):
+def encode_8bit(values):
     """Encode 8 bit VDIF data.
 
     We follow mark5access, which assumes the values 0 to 255 encode
@@ -134,7 +120,3 @@ def encode_8bit_real(values):
     """
     return (np.clip(np.rint(values * EIGHT_BIT_1_SIGMA + 127.5), 0, 255)
             .astype(np.uint8))
-
-
-def encode_8bit_complex(values):
-    return encode_8bit_real(values.view(values.real.dtype))
