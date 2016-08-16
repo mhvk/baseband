@@ -277,6 +277,8 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     """
     def __init__(self, raw, header=None, files=None, template=None, **kwargs):
         if header is None:
+            if 'nthread' in kwargs:
+                kwargs.setdefault('npol', kwargs.pop('nthread'))
             header = DADAHeader.fromvalues(**kwargs)
         assert header.get('OBS_OVERLAP', 0) == 0
         super(DADAStreamWriter, self).__init__(raw, header, files=files,
@@ -343,8 +345,8 @@ def open(name, mode='rs', *args, **kwargs):
     mode : {'rb', 'wb', 'rs', or 'ws'}, optional
         Whether to open for reading or writing, and as a regular binary file
         or as a stream (default is reading a stream).
-    **kwargs :
-        Additional arguments when opening the file as a stream
+    *args, **kwargs
+        Additional arguments when opening the file as a stream.
 
     --- For reading : (see :class:`~baseband.dada.DADAStreamReader`)
 
@@ -377,7 +379,7 @@ def open(name, mode='rs', *args, **kwargs):
                                                      '}' in name):
             kwargs['template'] = name
             if 'w' in mode:
-                return DADAStreamWriter(None, **kwargs)
+                return DADAStreamWriter(None, *args, **kwargs)
 
             name = name.format(frame_nr=0, file_nr=0, obs_offset=0)
 
@@ -385,12 +387,12 @@ def open(name, mode='rs', *args, **kwargs):
         if not hasattr(name, 'write'):
             name = io.open(name, 'w+b')
         fh = DADAFileWriter(name)
-        return fh if 'b' in mode else DADAStreamWriter(fh, **kwargs)
+        return fh if 'b' in mode else DADAStreamWriter(fh, *args, **kwargs)
     elif 'r' in mode:
         if not hasattr(name, 'read'):
             name = io.open(name, 'rb')
         fh = DADAFileReader(name)
-        return fh if 'b' in mode else DADAStreamReader(fh, **kwargs)
+        return fh if 'b' in mode else DADAStreamReader(fh, *args, **kwargs)
     else:
         raise ValueError("Only support opening DADA file for reading "
                          "or writing (mode='r' or 'w').")

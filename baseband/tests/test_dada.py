@@ -6,7 +6,7 @@ import os
 import io
 import numpy as np
 import astropy.units as u
-from astropy.tests.helper import pytest
+from astropy.tests.helper import pytest, catch_warnings
 from .. import dada
 from ..dada.base import DADAFileNameSequencer
 
@@ -14,6 +14,11 @@ SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.dada')
 
 
 class TestDADA(object):
+    def setup(self):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            self.header = dada.DADAHeader.fromfile(fh)
+            self.payload = dada.DADAPayload.fromfile(fh, self.header)
+
     def test_header(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = dada.DADAHeader.fromfile(fh)
@@ -84,9 +89,7 @@ class TestDADA(object):
         assert header8.comments == header.comments
 
     def test_payload(self):
-        with open(SAMPLE_FILE, 'rb') as fh:
-            header = dada.DADAHeader.fromfile(fh)
-            payload = dada.DADAPayload.fromfile(fh, header)
+        payload = self.payload
         assert payload.size == 64000
         assert payload.shape == (16000, 2, 1)
         assert payload.dtype == np.complex64
@@ -105,25 +108,22 @@ class TestDADA(object):
             with pytest.raises(EOFError):
                 # Too few bytes.
                 s.seek(100)
-                dada.DADAPayload.fromfile(s, header)
+                dada.DADAPayload.fromfile(s, self.header)
         payload3 = dada.DADAPayload.fromdata(payload.data, bps=8)
         assert payload3 == payload
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(4096)
-            payload4 = dada.DADAPayload.fromfile(fh, header, memmap=True)
+            payload4 = dada.DADAPayload.fromfile(fh, self.header, memmap=True)
         assert isinstance(payload4.words, np.memmap)
         assert not isinstance(payload.words, np.memmap)
         assert payload == payload4
 
     def test_frame(self):
         with dada.open(SAMPLE_FILE, 'rb') as fh:
-            header = dada.DADAHeader.fromfile(fh)
-            payload = dada.DADAPayload.fromfile(fh, header)
-            fh.seek(0)
             frame = fh.read_frame(memmap=False)
-
-        assert frame.header == header
-        assert frame.payload == payload
+        header, payload = frame.header, frame.payload
+        assert header == self.header
+        assert payload == self.payload
         assert frame == dada.DADAFrame(header, payload)
         assert np.all(frame[:3] == np.array(
             [[[-38.-38.j], [-38.-38.j]],
@@ -197,25 +197,22 @@ class TestDADA(object):
         assert frame6 == frame
 
     def test_filestreamer(self, tmpdir):
-        with open(SAMPLE_FILE, 'rb') as fh:
-            header = dada.DADAHeader.fromfile(fh)
-            payload = dada.DADAPayload.fromfile(fh, header)
-
+        time0 = self.header.time
         with dada.open(SAMPLE_FILE, 'rs') as fh:
-            assert header == fh.header0
+            assert fh.header0 == self.header
             assert fh.size == 16000
+            assert fh.time0 == time0
             record1 = fh.read(12)
             assert fh.tell() == 12
             fh.seek(10000)
             record2 = fh.read(2)
             assert fh.tell() == 10002
             assert np.abs(fh.tell(unit='time') -
-                          (fh.time0 + 10002 / (16*u.MHz))) < 1. * u.ns
+                          (time0 + 10002 / (16*u.MHz))) < 1. * u.ns
             fh.seek(fh.time0 + 1000 / (16*u.MHz))
             assert fh.tell() == 1000
             assert fh.header1 is fh.header0
-            assert np.abs(fh.time1 -
-                          (fh.time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fh.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         assert record1.shape == (12, 2)
         assert np.all(record1[:3] == np.array(
@@ -223,35 +220,38 @@ class TestDADA(object):
              [-38.-38.j, -40.+0.j],
              [-105.+60.j, 85.-15.j]], dtype=np.complex64))
         assert record1.shape == (12, 2) and record1.dtype == np.complex64
-        assert np.all(record1 == payload[:12].squeeze())
+        assert np.all(record1 == self.payload[:12].squeeze())
         assert record2.shape == (2, 2)
-        assert np.all(record2 == payload[10000:10002].squeeze())
+        assert np.all(record2 == self.payload[10000:10002].squeeze())
 
         filename = str(tmpdir.join('a.dada'))
-        # For writing streams, we do assertions at end, since if they fail
-        # inside the write, one could get errors from closing the file.
-        with dada.open(filename, 'ws', header=header) as fw:
-            fw.write(payload.data)
-            time0 = fw.time0
-            time_end = fw.tell(unit='time')
-        assert time0 == header.time
-        assert np.abs(time_end - (header.time + 16000 / (16.*u.MHz))) < 1.*u.ns
+        with dada.open(filename, 'ws', header=self.header) as fw:
+            fw.write(self.payload.data)
+            assert fw.time0 == time0
+            assert np.abs(fw.tell(unit='time') -
+                          (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         with dada.open(filename, 'rs') as fh:
             data = fh.read()
-            assert fh.time0 == header.time
+            assert fh.time0 == time0
             assert np.abs(fh.tell(unit='time') -
-                          (header.time + 16000 / (16.*u.MHz))) < 1.*u.ns
+                          (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
             assert np.abs(fh.time1 == fh.tell(unit='time'))
-        assert np.all(data == payload.data.squeeze())
+        assert np.all(data == self.payload.data.squeeze())
+
+    def test_incomplete_stream(self, tmpdir):
+        filename = str(tmpdir.join('a.dada'))
+        with catch_warnings(UserWarning) as w:
+            with dada.open(filename, 'ws', header=self.header) as fw:
+                fw.write(self.payload[:10])
+        assert len(w) == 1
+        assert 'partial buffer' in str(w[0].message)
 
     def test_multiple_files_stream(self, tmpdir):
-        with open(SAMPLE_FILE, 'rb') as fh:
-            header0 = dada.DADAHeader.fromfile(fh)
-            payload0 = dada.DADAPayload.fromfile(fh, header0)
-        data = payload0.data.squeeze()
-        header = header0.copy()
-        header.payloadsize = header0.payloadsize // 2
+        time0 = self.header.time
+        data = self.payload.data.squeeze()
+        header = self.header.copy()
+        header.payloadsize = self.header.payloadsize // 2
         filenames = (str(tmpdir.join('a.dada')),
                      str(tmpdir.join('b.dada')))
         with dada.open(filenames, 'ws', header=header) as fw:
@@ -261,31 +261,28 @@ class TestDADA(object):
             fw.write(data[1000:])
             time_end = fw.tell(unit='time')
         assert time0 == header.time
-        assert np.abs(time1000 - (header.time + 1000 / (16.*u.MHz))) < 1.*u.ns
-        assert np.abs(time_end - (header.time + 16000 / (16.*u.MHz))) < 1.*u.ns
+        assert np.abs(time1000 - (time0 + 1000 / (16.*u.MHz))) < 1.*u.ns
+        assert np.abs(time_end - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         with dada.open(filenames[1], 'rs') as fr:
             assert np.abs(fr.tell(unit='time') -
-                          (header0.time + 8000 / (16.*u.MHz))) < 1.*u.ns
+                          (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
             data1 = fr.read()
         assert np.all(data1 == data[8000:])
 
         with dada.open(filenames, 'rs') as fr:
-            assert fr.time0 == header0.time
-            assert fr.tell(unit='time') == header0.time
-            assert np.abs(fr.time1 -
-                          (header0.time + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert fr.time0 == time0
+            assert fr.tell(unit='time') == time0
+            assert np.abs(fr.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
             data2 = fr.read()
             assert fr.tell(unit='time') == fr.time1
         assert np.all(data2 == data)
 
     def test_template_stream(self, tmpdir):
-        with open(SAMPLE_FILE, 'rb') as fh:
-            header0 = dada.DADAHeader.fromfile(fh)
-            payload0 = dada.DADAPayload.fromfile(fh, header0)
-        data = payload0.data.squeeze()
-        header = header0.copy()
-        header.payloadsize = header0.payloadsize // 4
+        time0 = self.header.time
+        data = self.payload.data.squeeze()
+        header = self.header.copy()
+        header.payloadsize = self.header.payloadsize // 4
         template = str(tmpdir.join('a{frame_nr}.dada'))
         with dada.open(template, 'ws', header=header) as fw:
             fw.write(data[:1000])
@@ -296,18 +293,14 @@ class TestDADA(object):
         assert np.abs(time_end - (header.time + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         with dada.open(template.format(frame_nr=1), 'rs') as fr:
-            time0 = fr.time0
-            time1 = fr.time1
             data1 = fr.read()
             assert fr.tell(unit='time') == fr.time1
-            assert np.abs(fr.time0 -
-                          (header0.time + 4000 / (16.*u.MHz))) < 1.*u.ns
-            assert np.abs(time1 -
-                          (header0.time + 8000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.time0 - (time0 + 4000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.time1 - (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data1 == data[4000:8000])
 
         with dada.open(template, 'rs') as fr:
-            assert fr.tell(unit='time') == header0.time
+            assert fr.tell(unit='time') == time0
             data2 = fr.read()
             assert fr.time1 == fr.tell(unit='time')
             assert np.abs(fr.time1 -
@@ -315,29 +308,25 @@ class TestDADA(object):
         assert np.all(data2 == data)
 
         # More complicated template, 8 files
-        header.payloadsize = header0.payloadsize // 8
+        header.payloadsize = self.header.payloadsize // 8
         template = str(tmpdir
                        .join('{utc_start}_{obs_offset:016d}.000000.dada'))
         with dada.open(template, 'ws', header=header) as fw:
             fw.write(data[:7000])
-            time7000 = fw.tell(unit='time')
-            frame_nr7000 = fw._frame_nr
+            assert fw.time0 == header.time
+            assert np.abs(fw.tell(unit='time') -
+                          (time0 + 7000 / (16.*u.MHz))) < 1.*u.ns
+            assert fw._frame_nr == 3
             fw.write(data[7000:])
-            time_end = fw.tell(unit='time')
-            time0 = fw.time0
-        assert time0 == header.time
-        assert frame_nr7000 == 3
-        assert np.abs(time_end - (header.time + 16000 / (16.*u.MHz))) < 1.*u.ns
-        assert np.abs(time7000 - (header.time + 7000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fw.tell(unit='time') -
+                          (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         name3 = template.format(utc_start=header['UTC_START'],
                                 obs_offset=header['OBS_OFFSET'] +
                                 3 * header.payloadsize)
         with dada.open(name3, 'rs') as fr:
-            assert np.abs(fr.time0 -
-                          (header0.time + 6000 / (16.*u.MHz))) < 1.*u.ns
-            assert np.abs(fr.time1 -
-                          (header0.time + 8000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.time0 - (time0 + 6000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.time1 - (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
             data1 = fr.read()
             assert fr.time1 == fr.tell(unit='time')
         assert np.all(data1 == data[6000:8000])
@@ -345,11 +334,10 @@ class TestDADA(object):
         name0 = template.format(utc_start=header['UTC_START'],
                                 obs_offset=header['OBS_OFFSET'])
         with dada.open(name0, 'rs', template=template) as fr:
-            assert fr.tell(unit='time') == header0.time
+            assert fr.tell(unit='time') == time0
             data2 = fr.read()
             assert fr.tell(unit='time') == fr.time1
-            assert np.abs(fr.time1 -
-                          (header0.time + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data2 == data)
 
 
