@@ -107,6 +107,7 @@ class DADAHeader(OrderedDict):
 
     @staticmethod
     def _fromlines(lines):
+        """Interpret a list of lines as a header, converting its values."""
         args = []
         for line_no, line in enumerate(lines):
             split = line.strip().split('#')
@@ -129,6 +130,7 @@ class DADAHeader(OrderedDict):
         return args
 
     def _tolines(self):
+        """Write header to a list of strings."""
         lines = []
         for key in self:
             value = self[key]
@@ -149,7 +151,7 @@ class DADAHeader(OrderedDict):
     @classmethod
     def fromfile(cls, fh, verify=True):
         """
-        Reads in dada header block from a file.
+        Reads in DADA header block from a file.
 
         Parameters
         ----------
@@ -159,7 +161,7 @@ class DADAHeader(OrderedDict):
             Whether to do basic checks on whether the header is valid.
         """
         if fh.tell() > 0:
-            raise ValueError("DADA Headers should be at the start of a file.")
+            raise ValueError("DADA header should be at the start of a file.")
 
         hdr_size = 4096
         lines = []
@@ -182,16 +184,18 @@ class DADAHeader(OrderedDict):
         return cls(cls._fromlines(lines), verify=verify, mutable=False)
 
     def tofile(self, fh):
-        """Write DADA file header to filehandle."""
+        """Write DADA file header to filehandle.
+
+        Parts of the header beyond the ascii lines are filled with 0x00."""
         if fh.tell() > 0:
-            raise ValueError("Should write header at start of file.")
+            raise ValueError("should write header at start of file.")
         with io.BytesIO() as s:
             for line in self._tolines():
                 s.write((line + '\n').encode('ascii'))
             s.write('# end of header\n'.encode('ascii'))
             extra = self.size - s.tell()
             if extra < 0:
-                raise ValueError("Cannot write header in allocated size of "
+                raise ValueError("cannot write header in allocated size of "
                                  "{0}".format(self.size))
             s.seek(0)
             fh.write(s.read())
@@ -214,7 +218,7 @@ class DADAHeader(OrderedDict):
         """Initialise a header from parsed values.
 
         Here, the parsed values must be given as keyword arguments, i.e., for
-        any ``header = cls(<words>)``, ``cls.fromvalues(**header) == header``.
+        any ``header``, ``cls.fromvalues(**header) == header``.
 
         However, unlike for the ``fromkeys`` class method, data can also be set
         using arguments named after header methods such as ``time``.
@@ -239,9 +243,12 @@ class DADAHeader(OrderedDict):
             Arguments used to set keywords and properties.
         """
         verify = kwargs.pop('verify', True)
+        # remove kwargs that set properties, in correct order.
         extras = [(key, kwargs.pop(key)) for key in self._properties
                   if key in kwargs]
+        # update the normal keywords.
         super(DADAHeader, self).update(**kwargs)
+        # Now set the properties.
         for attr, value in extras:
             setattr(self, attr, value)
         if verify:
@@ -290,7 +297,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def bps(self):
-        """Bits per complete complex or real sample."""
+        """Bits per sample (or real/imaginary part)."""
         return self['NBIT']
 
     @bps.setter
@@ -307,6 +314,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def sample_shape(self):
+        """Shape of a single payload sample: (npol, nchan)."""
         return self['NPOL'], self['NCHAN']
 
     @sample_shape.setter
@@ -334,6 +342,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def samples_per_frame(self):
+        """Complete samples per frame (i.e., each having ``sample_shape``)."""
         return (self.payloadsize * 8 //
                 self.bps // (2 if self.complex_data else 1) // self['NPOL'] //
                 self['NCHAN'])

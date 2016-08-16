@@ -19,7 +19,40 @@ __all__ = ['DADAFileReader', 'DADAFileWriter',
 
 
 class DADAFileNameSequencer(object):
-    def __init__(self, template, header0):
+    """List-like generator of filenames using a template.
+
+    The template is formatted, filling in any items in curly brackets with
+    values from the header, as well as possibly a file number, indicated with
+    '{file_nr}'.  The value '{obs_offset}' is treated specially, in being
+    calculated using the file number.
+
+    Paramaters
+    ----------
+    template : str
+        Template to format to get specific filenames.
+    header : dict-like
+        Structure holding key'd values that are used to fill in the format.
+
+    Examples
+    --------
+
+    >>> from baseband import dada
+    >>> dfs = dada.base.DADAFileNameSequencer('a{file_nr:03d}.dada', {})
+    >>> dfs[10]
+    'a010.dada'
+    >>> from baseband.tests.test_dada import SAMPLE_FILE
+    >>> with open(SAMPLE_FILE, 'rb') as fh:
+    ...     header = dada.DADAHeader.fromfile(fh)
+    >>> template = '{utc_start}.{obs_offset:016d}.000000.dada'
+    >>> dfs = DADAFileNameSequencer(template, header)
+    >>> dfs[0]
+    '2013-07-02-01:37:40.0000006400000000.000000.dada'
+    >>> dfs[1]
+    '2013-07-02-01:37:40.0000006400064000.000000.dada'
+    >>> dfs[10]
+    '2013-07-02-01:37:40.0000006400640000.000000.dada'
+    """
+    def __init__(self, template, header):
         # convert template names to upper case, since header keywords are
         # upper case as well.
         self.items = {}
@@ -28,14 +61,14 @@ class DADAFileNameSequencer(object):
             string = x.group().upper()
             key = string[1:-1]
             if key != 'FRAME_NR' and key != 'FILE_NR':
-                self.items[key] = header0[key]
+                self.items[key] = header[key]
             return string
 
         self.template = re.sub(r'{\w+[}:]', check_and_convert, template)
         self._has_obs_offset = 'OBS_OFFSET' in self.items
         if self._has_obs_offset:
             self._obs_offset0 = self.items['OBS_OFFSET']
-            self._file_size = header0['FILE_SIZE']
+            self._file_size = header['FILE_SIZE']
 
     def __getitem__(self, frame_nr):
         if frame_nr < 0:

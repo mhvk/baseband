@@ -13,11 +13,50 @@ __all__ = ['DADAFrame']
 
 
 class DADAFrame(VLBIFrameBase):
+    """Representation of a DADA file, consisting of a header and payload.
+
+    Parameters
+    ----------
+    header : `~baseband.dada.DADAHeader`
+        Wrapper around the header lines, providing access to the values.
+    payload : `~baseband.dada.DADAPayload`
+        Wrapper around the payload, provding mechanisms to decode it.
+    valid : bool
+        Whether this frame contains valid data (default: True).  Note that
+        for DADA, this cannot be written to file.
+    verify : bool
+        Whether to do basic verification of integrity (default: True)
+
+    Notes
+    -----
+
+    The Frame can also be instantiated using class methods:
+
+      fromfile : read header and and map or read payload from a filehandle
+
+      fromdata : encode data as payload
+
+    Of course, one can also do the opposite:
+
+      tofile : method to write header and payload to filehandle
+
+      data : property that yields full decoded payload
+
+    One can decode part of the payload by indexing or slicing the frame.
+    If the frame does not contain valid data, all values returned are set
+    to ``self.invalid_data_value``.
+
+    A number of properties are defined: ``shape`` and ``dtype`` are the shape
+    and type of the data array, ``words`` the full encoded frame, and ``size``
+    the frame size in bytes.  Furthermore, the frame acts as a dictionary, with
+    keys those of the header. Any attribute that is not defined on the frame
+    itself, such as ``.time`` will be looked up on the header as well.
+    """
     _header_class = DADAHeader
     _payload_class = DADAPayload
 
     @classmethod
-    def fromfile(cls, fh, memmap=True, verify=True):
+    def fromfile(cls, fh, memmap=True, valid=True, verify=True):
         """Read a frame from a filehandle, possible mapping the payload.
 
         Parameters
@@ -27,16 +66,23 @@ class DADAFrame(VLBIFrameBase):
         memmap : bool, optional
             If `True` (default), use `~numpy.memmap` to map the payload.
             If `False`, just read it from disk.
-        verify : bool
+        valid : bool, optional
+            Whether the data is valid. Note that this cannot be inferred from
+            the header or payload itself.
+        verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
         """
         header = cls._header_class.fromfile(fh, verify)
         payload = cls._payload_class.fromfile(fh, header=header, memmap=memmap)
-        return cls(header, payload, verify=verify)
+        return cls(header, payload, valid=valid, verify=verify)
 
     @classmethod
-    def fromdata(cls, data, header=None, verify=True, **kwargs):
+    def fromdata(cls, data, header=None, valid=True, verify=True, **kwargs):
         """Construct frame from data and header.
+
+        Note that since DADA files are generally very large, one would normally
+        map the file, and then set pieces of it by assigning to slices of the
+        frame.  See `~baseband.base.DADAFileWriter.memmap_frame`.
 
         Parameters
         ----------
@@ -44,10 +90,13 @@ class DADAFrame(VLBIFrameBase):
             Array holding complex or real data to be encoded.
         header : `~baseband.dada.DADAHeader` or None, optional
             If `None`, it will be attemtped to create one using the keywords.
+        valid : bool, optional
+            Whether the data is valid. Note that this information cannot be
+            written to disk.
         verify : bool
             Whether or not to do basic assertions that check the integrity.
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)
         payload = cls._payload_class.fromdata(data, header.bps)
-        return cls(header, payload, verify=verify)
+        return cls(header, payload, valid=valid, verify=verify)

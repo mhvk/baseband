@@ -7,9 +7,8 @@ methods to read a :class:`~baseband.mark4.Mark4Frame`.  For dada files, which
 consist of just a single header and payload, such frames contain all the data.
 
 >>> from baseband import dada
->>> sample_file = dada.__file__.replace('dada/__init__.py',
-...                                     'tests/sample.dada')
->>> fh = dada.open(sample_file, 'rb')
+>>> from baseband.tests.test_dada import SAMPLE_FILE
+>>> fh = dada.open(SAMPLE_FILE, 'rb')
 >>> frame = fh.read_frame()
 >>> frame.shape
 (16000, 2, 1)
@@ -26,7 +25,7 @@ above example thus loads 12 bytes into memory).
 Opening in stream mode wraps the low-level routines such that reading and
 writing is in units of samples, and one has access to header information.
 
->>> fh = dada.open(sample_file, 'rs')
+>>> fh = dada.open(SAMPLE_FILE, 'rs')
 >>> fh
 <DADAStreamReader name=... offset=0
     samples_per_frame=16000, nchan=1, frames_per_second=1000.0, bps=8,
