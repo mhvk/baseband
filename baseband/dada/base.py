@@ -152,7 +152,26 @@ class DADAFileWriter(io.BufferedRandom):
 
 
 class DADAStreamBase(VLBIStreamBase):
-    """DADA file wrapper, which combines threads into streams."""
+    """DADA file wrapper, which combines threads into streams.
+
+    Parameters
+    ----------
+    raw : filehandle
+        File handle of the (first) raw DADA stream
+    header0 : `~baseband.dada.DADAHeader`
+        Header for the first frame, which is used to infer frame size,
+        encoding, etc.
+    thread_ids: list of int, optional
+        Specific threads to use.  By default, as many as there are
+        polarisations ('header0["NPOL"]').
+    files : list or tuple of str, optional
+        Should contain the names of all files of a given observation,
+        in time-order.
+    template : str, optional
+        A template string that can be formatted using 'frame_nr', 'obs_offset',
+        and other header keywords.  For details, see
+        :class:`~baseband.dada.base.DADAFileNameSequencer`.
+    """
 
     def __init__(self, fh_raw, header0, thread_ids=None, files=None,
                  template=None):
@@ -179,9 +198,6 @@ class DADAStreamBase(VLBIStreamBase):
         return divmod(self.offset, self.samples_per_frame)
 
     def _open_file(self, frame_nr, mode):
-        if frame_nr is None:
-            frame_nr = self.offset // self.samples_per_frame
-
         if frame_nr != self._frame_nr:
             if self.fh_raw:
                 self.fh_raw.close()
@@ -200,9 +216,14 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         file handle of the (first) raw DADA stream
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
-    files : tuple, list or str
-        Container with all files of a given observation, or a format string
-        that can be formatted using 'obs_offset' and other header keywords.
+    files : list or tuple of str, optional
+        Should contain the names of all files of a given observation,
+        in time-order.
+    template : str, optional
+        A template string that can be formatted using 'frame_nr', 'obs_offset',
+        and other header keywords.  Many series of dada files can be read with
+        something like '2013-07-02-01:37:40_{obs_offset:016d}.000000.dada'.
+        For details, see :class:`~baseband.dada.base.DADAFileNameSequencer`.
     """
     def __init__(self, raw, thread_ids=None, files=None, template=None):
         header = DADAHeader.fromfile(raw)
@@ -271,7 +292,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
 
         return out.squeeze() if squeeze else out
 
-    def _get_frame(self, frame_nr=None):
+    def _get_frame(self, frame_nr):
         self._open_file(frame_nr, 'rb')
         self._frame = self.fh_raw.read_frame(memmap=True)
         assert (self._frame.header['OBS_OFFSET'] ==
@@ -285,9 +306,18 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     Parameters
     ----------
     raw : filehandle
-        For writing the header and raw data.
+        For writing the header and raw data.  This can be `None` if a template
+        filename is passed in.
     header : :class:`~baseband.dada.DADAHeader`, optional
         Header for the file, holding time information, etc.
+    files : list or tuple of str, optional
+        Should contain the names of all files to be used to write the data,
+        in time-order.
+    template : str, optional
+        A template string that can be formatted using 'frame_nr', 'obs_offset',
+        and other header keywords.  To reproduce what is used by some other
+        implementations, use '{utc_start}_{obs_offset:016d}.000000.dada'.
+        For details, see :class:`~baseband.dada.base.DADAFileNameSequencer`.
     **kwargs
         If no header is give, an attempt is made to construct the header from
         these.  For a standard header, this would include the following.
@@ -355,7 +385,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
             self.offset += nsample
             count -= nsample
 
-    def _get_frame(self, frame_nr=None):
+    def _get_frame(self, frame_nr):
         self._open_file(frame_nr, 'wb')
         # set up header for new frame.
         header = self.header0.copy()
@@ -371,10 +401,25 @@ def open(name, mode='rs', *args, **kwargs):
     Opened as binary, one gets a standard file handle.  Opened as a stream, the
     file handle is wrapped, allowing access to it as a series of samples.
 
+    For streams, one can also pass in a list of files or a template string that
+    can be formatted using 'frame_nr', 'obs_offset', and other header keywords
+    (using :class:`~baseband.dada.base.DADAFileNameSequencer`).
+
+    For writing, one can mimic what is done at quite a few telescopes by using
+    the template '{utc_start}_{obs_offset:016d}.000000.dada'.
+
+    For reading, to read series such as the above, use something like
+    '2013-07-02-01:37:40_{obs_offset:016d}.000000.dada'.  Note that here we
+    have to pass in the date explicitly, since the template is used to get the
+    first file name, before any header is read, and therefore the only keywords
+    available are 'frame_nr', 'file_nr', and 'obs_offset', all of which are
+    assumed to be zero for the first file. To avoid this restriction, pass in
+    the first file name directly, and use the ``template`` keyword argument.
+
     Parameters
     ----------
-    name : str
-        File name
+    name : str, list or tuple of str
+        File name or name template, or series of file names.
     mode : {'rb', 'wb', 'rs', or 'ws'}, optional
         Whether to open for reading or writing, and as a regular binary file
         or as a stream (default is reading a stream).
@@ -385,6 +430,8 @@ def open(name, mode='rs', *args, **kwargs):
 
     thread_ids : list of int, optional
         Specific threads to read.  By default, all threads are read.
+        (For DADA, the number threads equals ``header['NPOL']``, i.e.,
+        the number of polarisations.)
 
     --- For writing : (see :class:`~baseband.dada.DADAStreamWriter`)
 
@@ -403,7 +450,6 @@ def open(name, mode='rs', *args, **kwargs):
         :class:`~baseband.dada.base.DADAStreamReader` or
         :class:`~baseband.dada.base.DADAStreamWriter` instance (stream).
     """
-    # Typical name 2016-04-23-07:29:30_0000000000000000.000000.dada
     if 'b' not in mode:
         if isinstance(name, (tuple, list)):
             kwargs['files'] = name
@@ -413,8 +459,14 @@ def open(name, mode='rs', *args, **kwargs):
             kwargs['template'] = name
             if 'w' in mode:
                 return DADAStreamWriter(None, *args, **kwargs)
-
-            name = name.format(frame_nr=0, file_nr=0, obs_offset=0)
+            try:
+                name = name.format(frame_nr=0, file_nr=0, obs_offset=0)
+            except KeyError:
+                raise KeyError(
+                    "For reading, a template for file names can only contain "
+                    "'file_nr', 'frame_nr', or 'obs_offset', since the header "
+                    "is not available for the first file. One can pass in a "
+                    "full file name and use 'template={0}'".format(name))
 
     if 'w' in mode:
         if not hasattr(name, 'write'):

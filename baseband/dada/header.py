@@ -370,10 +370,11 @@ class DADAHeader(OrderedDict):
 
     @property
     def time0(self):
-        utc_start = self['UTC_START']
+        mjd_int, frac = self['MJD_START'].split('.')
+        mjd_int = int(mjd_int)
+        frac = float('.' + frac)
         # replace '-' between date and time with a 'T' and convert to Time
-        return Time(utc_start[:10]+'T'+utc_start[11:],
-                    scale='utc', format='isot')
+        return Time(mjd_int, frac, scale='utc', format='mjd')
 
     @time0.setter
     def time0(self, time0):
@@ -386,7 +387,7 @@ class DADAHeader(OrderedDict):
             mjd_int -= 1
             mjd_frac += 1.
         self['MJD_START'] = ('{0:05d}'.format(mjd_int) +
-                             ('{0:17.15}'.format(mjd_frac))[1:])
+                             ('{0:17.15f}'.format(mjd_frac))[1:])
 
     @property
     def time(self):
