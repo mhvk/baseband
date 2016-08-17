@@ -47,15 +47,11 @@ class Mark5BFrame(VLBIFrameBase):
 
       data : property that yields full decoded payload
 
-    One can decode part of the payload by indexing or slicing the frame.
-    If the frame does not contain valid data, all values returned are set
-    to ``self.invalid_data_value``.
-
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, ``words`` the full encoded frame, and ``size``
     the frame size in bytes.  Furthermore, the frame acts as a dictionary, with
-    keys those of the header, and any attribute that is not defined on the
-    frame itself, such as ``.time`` will be looked up on the header.
+    keys those of the header. Any attribute that is not defined on the frame
+    itself, such as ``.time`` will be looked up on the header as well.
     """
 
     _header_class = Mark5BHeader

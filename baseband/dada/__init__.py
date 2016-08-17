@@ -3,7 +3,7 @@
 
 All files should be opened using :func:`~baseband.dada.open`.  Single files can
 be opened in binary mode, which provides a normal file reader but extended with
-methods to read a :class:`~baseband.mark4.Mark4Frame`.  For dada files, which
+methods to read a :class:`~baseband.dada.DADAFrame`.  For dada files, which
 consist of just a single header and payload, such frames contain all the data.
 
 >>> from baseband import dada

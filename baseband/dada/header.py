@@ -99,6 +99,7 @@ class DADAHeader(OrderedDict):
                                            'DADA_VERSION'))
 
     def copy(self):
+        """Create a mutable and independent copy."""
         # Cannot do super(DADAHeader, self).copy(), since this first
         # initializes an empty header, which does not pass verification.
         new = self.__class__(self)
@@ -157,6 +158,8 @@ class DADAHeader(OrderedDict):
         """
         Reads in DADA header block from a file.
 
+        The file pointer should be at the start.
+
         Parameters
         ----------
         fh : filehandle
@@ -190,7 +193,9 @@ class DADAHeader(OrderedDict):
     def tofile(self, fh):
         """Write DADA file header to filehandle.
 
-        Parts of the header beyond the ascii lines are filled with 0x00."""
+        Parts of the header beyond the ascii lines are filled with 0x00.
+        Note that file should be at the start.
+        """
         if fh.tell() > 0:
             raise ValueError("should write header at start of file.")
         with io.BytesIO() as s:
@@ -213,7 +218,8 @@ class DADAHeader(OrderedDict):
 
         Like fromvalues, but without any interpretation of keywords.
 
-        For compatibility with other header classes; just calls ``__init__``.
+        This just calls the class initializer; it is present for compatibility
+        with other header classes only.
         """
         return cls(*args, **kwargs)
 
@@ -237,7 +243,8 @@ class DADAHeader(OrderedDict):
         """Update the header with new values.
 
         Here, any keywords matching properties are processed as well, in the
-        order set by the class (in ``_properties``).
+        order set by the class (in ``_properties``), and after all other
+        keywords have been processed.
 
         Parameters
         ----------
@@ -281,10 +288,12 @@ class DADAHeader(OrderedDict):
 
     @property
     def size(self):
+        """Size in bytes of the header."""
         return self['HDR_SIZE']
 
     @property
     def payloadsize(self):
+        """Size in bytes of the payload part of the file."""
         return self['FILE_SIZE']
 
     @payloadsize.setter
@@ -293,6 +302,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def framesize(self):
+        """Size in bytes of the full file, header plus payload."""
         return self.size + self.payloadsize
 
     @framesize.setter
@@ -327,6 +337,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def bandwidth(self):
+        """Bandwidth covered by the data."""
         return abs(self['BW']) * u.MHz
 
     @bandwidth.setter
@@ -374,6 +385,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def time0(self):
+        """Start time of the observation."""
         mjd_int, frac = self['MJD_START'].split('.')
         mjd_int = int(mjd_int)
         frac = float('.' + frac)
@@ -395,6 +407,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def time(self):
+        """Start time the part of the observation covered by this header."""
         return self.time0 + self.offset
 
     @time.setter
