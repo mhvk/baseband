@@ -14,7 +14,7 @@ from .payload import DADAPayload
 from .frame import DADAFrame
 
 
-__all__ = ['DADAFileReader', 'DADAFileWriter',
+__all__ = ['DADAFileNameSequencer', 'DADAFileReader', 'DADAFileWriter',
            'DADAStreamBase', 'DADAStreamReader', 'DADAStreamWriter', 'open']
 
 
@@ -426,14 +426,14 @@ def open(name, mode='rs', *args, **kwargs):
     *args, **kwargs
         Additional arguments when opening the file as a stream.
 
-    --- For reading : (see :class:`~baseband.dada.DADAStreamReader`)
+    --- For reading : (see :class:`~baseband.dada.base.DADAStreamReader`)
 
     thread_ids : list of int, optional
         Specific threads to read.  By default, all threads are read.
         (For DADA, the number threads equals ``header['NPOL']``, i.e.,
         the number of polarisations.)
 
-    --- For writing : (see :class:`~baseband.dada.DADAStreamWriter`)
+    --- For writing : (see :class:`~baseband.dada.base.DADAStreamWriter`)
 
     header : `~baseband.dada.DADAHeader`, optional
         Header for the first frame, holding time information, etc.
