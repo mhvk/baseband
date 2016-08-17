@@ -20,13 +20,16 @@ class DADAFrame(VLBIFrameBase):
     payload : `~baseband.dada.DADAPayload`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool
-        Whether this frame contains valid data (default: True).  Note that
-        for DADA, this cannot be written to file.
+        Whether this frame contains valid data (default: True).
     verify : bool
         Whether to do basic verification of integrity (default: True)
 
     Notes
     -----
+
+    DADA files do not support storing whether data are valid or not on disk.
+    Hence, this has to be determined independently.  If ``valid=False``, any
+    decoded data is set to ``cls.invalid_data_value`` (by default, 0).
 
     The Frame can also be instantiated using class methods:
 
@@ -41,14 +44,12 @@ class DADAFrame(VLBIFrameBase):
       data : property that yields full decoded payload
 
     One can decode part of the payload by indexing or slicing the frame.
-    If the frame does not contain valid data, all values returned are set
-    to ``self.invalid_data_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, ``words`` the full encoded frame, and ``size``
-    the frame size in bytes.  Furthermore, the frame acts as a dictionary, with
-    keys those of the header. Any attribute that is not defined on the frame
-    itself, such as ``.time`` will be looked up on the header as well.
+    and type of the data array, and ``size`` the frame size in bytes.
+    Furthermore, the frame acts as a dictionary, with keys those of the header.
+    Any attribute that is not defined on the frame itself, such as ``.time``
+    will be looked up on the header as well.
     """
     _header_class = DADAHeader
     _payload_class = DADAPayload
@@ -66,7 +67,8 @@ class DADAFrame(VLBIFrameBase):
             If `False`, just read it from disk.
         valid : bool, optional
             Whether the data is valid. Note that this cannot be inferred from
-            the header or payload itself.
+            the header or payload itself.  If `True`, any data read will be
+            set to ``cls.invalid_data_value``.
         verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
         """
@@ -93,6 +95,8 @@ class DADAFrame(VLBIFrameBase):
             written to disk.
         verify : bool
             Whether or not to do basic assertions that check the integrity.
+        **kwargs
+            Used to construct a header if it was not explicitly passed in.
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)

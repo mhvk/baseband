@@ -18,15 +18,18 @@ __all__ = ['DADAFileNameSequencer', 'DADAFileReader', 'DADAFileWriter',
            'DADAStreamBase', 'DADAStreamReader', 'DADAStreamWriter', 'open']
 
 
-class DADAFileNameSequencer(object):
+class DADAFileNameSequencer:
     """List-like generator of filenames using a template.
 
     The template is formatted, filling in any items in curly brackets with
     values from the header, as well as possibly a file number, indicated with
     '{file_nr}'.  The value '{obs_offset}' is treated specially, in being
-    calculated using the file number.
+    calculated using ``header['OBS_OFFSET'] + file_nr * header['FILE_SIZE']``.
 
-    Paramaters
+    The length of the instance will be the number of files that exist that
+    match the template for increasing values of the file fumber.
+
+    Parameters
     ----------
     template : str
         Template to format to get specific filenames.
@@ -103,13 +106,13 @@ class DADAFileReader(io.BufferedReader):
         Parameters
         ----------
         memmap : bool, optional
-            Whether to map the payload on disk using `~numpy.memmap`, so that
+            If `True` (default), map the payload using `~numpy.memmap`, so that
             parts are only loaded into memory as needed to access data.
 
         Returns
         -------
         frame : `~baseband.dada.DADAFrame`
-            With a ``.header`` and ``.payload`` properties.  The ``.data``
+            With ``.header`` and ``.payload`` properties.  The ``.data``
             property returns all data encoded in the frame.  Since this may
             be too large to fit in memory, it may be better to access the
             parts of interest by slicing the frame.
@@ -134,16 +137,32 @@ class DADAFileWriter(io.BufferedRandom):
             get the information needed to encode the array, and to construct
             the DADA frame.
         header : `~baseband.dada.DADAHeader`, optional
-            Ignored if `data` is a DADA Frame.
+            Ignored if ``data`` is a DADA Frame.
         **kwargs
-            If no `header` is given, an attempt is made to initialize one
-            using keywords arguments.
+            Used to initialize a header if none was passed in explicitly.
         """
         if not isinstance(data, DADAFrame):
             data = DADAFrame.fromdata(data, header, **kwargs)
         return data.tofile(self)
 
     def memmap_frame(self, header=None, **kwargs):
+        """Get frame by writing the header to disk and mapping its payload.
+
+        The header is written to disk immediately, but the payload is mapped,
+        so that it can be filled in pieces, by setting slices of the frame.
+
+        Parameters
+        ----------
+        header : `~baseband.dada.DADAHeader`, optional
+            Written to disk immediately.
+        **kwargs
+            Used to initialize a header if none was passed in explicitly.
+
+        Returns
+        -------
+        frame: `~baseband.dada.DADAFrame`
+            By assigning slices to data, the payload can be encoded piecewise.
+        """
         if header is None:
             header = DADAHeader.fromvalues(**kwargs)
         header.tofile(self)
@@ -157,11 +176,12 @@ class DADAStreamBase(VLBIStreamBase):
     Parameters
     ----------
     raw : filehandle
-        File handle of the (first) raw DADA stream
+        File handle of the (first) raw DADA stream.  Ignored if ``files`` or
+        ``template`` is given.
     header0 : `~baseband.dada.DADAHeader`
         Header for the first frame, which is used to infer frame size,
         encoding, etc.
-    thread_ids: list of int, optional
+    thread_ids : list of int, optional
         Specific threads to use.  By default, as many as there are
         polarisations ('header0["NPOL"]').
     files : list or tuple of str, optional
@@ -198,14 +218,20 @@ class DADAStreamBase(VLBIStreamBase):
         return divmod(self.offset, self.samples_per_frame)
 
     def _open_file(self, frame_nr, mode):
-        if frame_nr != self._frame_nr:
-            if self.fh_raw:
-                self.fh_raw.close()
-            self.fh_raw = open(self.files[frame_nr], mode)
+        if self.fh_raw:
+            self.fh_raw.close()
+        self.fh_raw = open(self.files[frame_nr], mode)
+
+    def _unsqueeze(self, data):
+        if data.ndim < 3 and self.nthread == 1:
+            data = data[:, np.newaxis]
+        if data.ndim < 3 and self.nchan == 1:
+            data = data[..., np.newaxis]
+        return data
 
 
 class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
-    """DADA format reader.
+    """DADA format stream reader.
 
     This wrapper allows one to access a DADA file as a continues series of
     samples.
@@ -213,8 +239,8 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
     Parameters
     ----------
     raw : filehandle
-        file handle of the (first) raw DADA stream
-    thread_ids: list of int, optional
+        file handle of the (first) raw DADA stream.
+    thread_ids : list of int, optional
         Specific threads to read.  By default, all threads are read.
     files : list or tuple of str, optional
         Should contain the names of all files of a given observation,
@@ -238,7 +264,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
 
     @lazyproperty
     def header1(self):
-        """Last header."""
+        """Header of the last file for this stream."""
         if self.files:
             self._get_frame(len(self.files) - 1)
         return self._frame.header
@@ -248,29 +274,35 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
 
         Parameters
         ----------
-        count : int
+        count : int, optional
             Number of samples to read.  If omitted or negative, the whole
-            file is read.
+            file is read. Ignored if ``out`` is given.
         squeeze : bool
-            If `True` (default), remove channel and thread dimensions if unity.
+            If `True` (default), remove channel and thread dimensions if unity
+            (or allow those to have been removed in ``out``).
         out : `None` or array
-            Array to store the data in. If given, count will be inferred,
-            and squeeze is set to `False`.
+            Array to store the data in. If given, ``count`` will be inferred.
+            If ``squeeze`` is `True`, unity dimensions can be absent.
 
         Returns
         -------
         out : array of float or complex
-            Dimensions are (sample-time, thread, channel).
+            Dimensions are (sample-time, thread, channel), with dimensions of
+            length unity possibly removed (if ``squeeze`` is `True`, or if they
+            were not present in the ``out`` array passed in).
         """
         if out is None:
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            out = np.empty((count,) + self._frame.sample_shape,
-                           dtype=self._frame.dtype)
+            result = np.empty((count,) + self._frame.sample_shape,
+                              dtype=self._frame.dtype)
+            # Generate view of the result data set that will be returned.
+            out = result.squeeze() if squeeze else result
         else:
             count = out.shape[0]
-            squeeze = False
+            # Create a properly-shaped view of the output if needed.
+            result = self._unsqueeze(out) if squeeze else out
 
         offset0 = self.offset
         while count > 0:
@@ -286,11 +318,11 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
             if self.thread_ids:
                 data_slice = (data_slice, self.thread_ids)
 
-            out[sample:sample + nsample] = self._frame[data_slice]
+            result[sample:sample + nsample] = self._frame[data_slice]
             self.offset += nsample
             count -= nsample
 
-        return out.squeeze() if squeeze else out
+        return out
 
     def _get_frame(self, frame_nr):
         self._open_file(frame_nr, 'rb')
@@ -306,8 +338,8 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     Parameters
     ----------
     raw : filehandle
-        For writing the header and raw data.  This can be `None` if a template
-        filename is passed in.
+        For writing the header and raw data.  This can be `None` if ``files``
+        or ``template`` is passed in.
     header : :class:`~baseband.dada.DADAHeader`, optional
         Header for the file, holding time information, etc.
     files : list or tuple of str, optional
@@ -319,15 +351,17 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
         implementations, use '{utc_start}_{obs_offset:016d}.000000.dada'.
         For details, see :class:`~baseband.dada.base.DADAFileNameSequencer`.
     **kwargs
-        If no header is give, an attempt is made to construct the header from
-        these.  For a standard header, this would include the following.
+        Used to construct a header if none is passed in explicitly.
+        For a standard header, this would include the following.
 
     --- Header keywords : (see :meth:`~baseband.dada.DADAHeader.fromvalues`)
 
     time : `~astropy.time.Time`
         The start time of this file.
     offset : `~astropy.units.Quantity`
-        A possible offset from the start of the whole observation.
+        A possible time offset from the start of the whole observation.
+    npol : int, optional
+        Number of polarizations (and thus threads; default 1).
     nchan : int, optional
         Number of FFT channels within stream (default 1).
         Note: that different # of channels per thread is not supported.
@@ -337,6 +371,9 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
         Bits per sample (or real, imaginary component).
     samples_per_frame : int
         Number of complete samples in a given frame.
+    bandwidth : `~astropy.units.Quantity`
+        Bandwidth spanned by the data.  Used to infer the sample rate and
+        thus to calculate times.
     """
     def __init__(self, raw, header=None, files=None, template=None, **kwargs):
         if header is None:
@@ -353,12 +390,23 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
             self._get_frame(0)
 
     def write(self, data, squeezed=True, invalid_data=False):
-        """Write data, buffering by frames as needed."""
-        if squeezed and data.ndim < 3:
-            if self.nthread == 1:
-                data = np.expand_dims(data, axis=1)
-            if self.nchan == 1:
-                data = np.expand_dims(data, axis=-1)
+        """Write data, using multiple files as needed.
+
+        Parameters
+        ----------
+        data : array
+            Piece of data to be written.  This should be properly scaled to
+            make best use of the dynamic range delivered by the encoding.
+        squeezed : bool, optional
+            If `True` (default), allow dimensions with size one to be absent
+            (i.e., if ``nthread`` and/or ``nchan`` is unity).
+        invalid_data : bool
+            Whether the current data is valid.  Present for consistency with
+            other stream writers.  It does not seem possible to store this
+            information in dada files.
+        """
+        if squeezed:
+            data = self._unsqueeze(data)
 
         assert data.shape[1] == self.nthread
         assert data.shape[2] == self.nchan
@@ -440,7 +488,7 @@ def open(name, mode='rs', *args, **kwargs):
     **kwargs
         If the header is not given, an attempt will be made to construct one
         with any further keyword arguments.  See
-        :class:`~baseband.dada.DADAStreamWriter`.
+        :class:`~baseband.dada.base.DADAStreamWriter`.
 
     Returns
     -------

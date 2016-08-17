@@ -48,10 +48,10 @@ class VLBIFrameBase(object):
     to ``self.invalid_data_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, ``words`` the full encoded frame, and ``size``
-    the frame size in bytes.  Furthermore, the frame acts as a dictionary, with
-    keys those of the header. Any attribute that is not defined on the frame
-    itself, such as ``.time`` will be looked up on the header as well.
+    and type of the data array, and ``size`` the frame size in bytes.
+    Furthermore, the frame acts as a dictionary, with keys those of the header.
+    Any attribute that is not defined on the frame itself, such as ``.time``
+    will be looked up on the header as well.
     """
 
     _header_class = None
@@ -72,6 +72,8 @@ class VLBIFrameBase(object):
         assert isinstance(self.payload, self._payload_class)
         assert (self.payloadsize ==
                 self.payload.words.size * self.payload.words.dtype.itemsize)
+        assert (self.payloadsize == getattr(self.header, 'payloadsize',
+                                            self.payloadsize))
 
     @property
     def valid(self):

@@ -61,8 +61,8 @@ class DADAPayload(VLBIPayloadBase):
         fh : filehandle
             Handle to the file which will be read or mapped.
         header : `~baseband.dada.DADAHeader`, optional
-            If given, used to infer the payloadsize, bps, sample_shape, and
-            whether data is complex.  If not given, those have to be passed in.
+            If given, used to infer ``payloadsize``, ``bps``, ``sample_shape``,
+            and ``complex_data``.  If not given, those have to be passed in.
         memmap : bool, optional
             If `False` (default), read from file.  Otherwise, map the file in
             memory (see `~numpy.memmap`).
@@ -71,7 +71,7 @@ class DADAPayload(VLBIPayloadBase):
             ``cls._size``, or, for mapping, to the end of the file).
         **kwargs
             Additional arguments are passed on to the class initializer. These
-            should only be used if ``header`` is not given.
+            are only needed if ``header`` is not given.
         """
         if payloadsize is None:
             payloadsize = cls._size if header is None else header.payloadsize
