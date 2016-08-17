@@ -15,6 +15,9 @@ from astropy.time import Time
 from astropy.extern import six
 
 
+__all__ = ['DADAHeader']
+
+
 class DADAHeader(OrderedDict):
     """DADA baseband file format header.
 
@@ -34,17 +37,18 @@ class DADAHeader(OrderedDict):
         Any further header keywords to be set.  If any value is a 2-item tuple,
         the second one will be considered a comment.
 
-    Remarks
-    -------
-    Like OrderedDict, in order to ensure keywords are kept in the right order,
-    one should pass on values as a tuple, not as a dict.  E.g., to copy a
-    header, one should not do ``DADAHeader(**header)``, but rather::
+    Notes
+    -----
+    Like `~collections.OrderedDict`, in order to ensure keywords are kept in
+    the right order, one should pass on values as a tuple, not as a dict.
+    E.g., to copy a header, one should not do ``DADAHeader(**header)``, but
+    rather::
 
-    DADAHeader(((key, header[key]) for key in header))
+        DADAHeader(((key, header[key]) for key in header))
 
     or, to also keep the comments::
 
-    DADAHeader(((key, (header[key], header.comments[key])) for key in header))
+        DADAHeader(((key, (header[key], header.comments[key])) for key in header))
     """
 
     _properties = ('payloadsize', 'framesize', 'bps', 'complex_data',
