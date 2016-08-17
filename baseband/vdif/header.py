@@ -347,10 +347,12 @@ class VDIFHeader(VLBIHeaderBase):
         self['ref_epoch'] = ref_index
         seconds = time - ref_epochs[ref_index]
         int_sec = int(seconds.sec)
-        self['seconds'] = int_sec
         frac_sec = seconds - int_sec * u.s
         if abs(frac_sec) < 2. * u.ns:
-            self['frame_nr'] = 0
+            frame_nr = 0
+        elif abs(1. * u.s - frac_sec) < 2. * u.ns:
+            int_sec += 1
+            frame_nr = 0
         else:
             if framerate is None:
                 try:
@@ -358,8 +360,14 @@ class VDIFHeader(VLBIHeaderBase):
                 except AttributeError:
                     raise ValueError("Cannot calculate frame rate for this "
                                      "header. Pass it in explicitly.")
-            self['frame_nr'] = int(round((frac_sec * framerate)
-                                         .to(u.dimensionless_unscaled).value))
+            frame_nr = int(round((frac_sec * framerate)
+                                 .to(u.dimensionless_unscaled).value))
+            if frame_nr == framerate.value:
+                frame_nr = 0
+                int_sec += 1
+
+        self['seconds'] = int_sec
+        self['frame_nr'] = frame_nr
 
     time = property(get_time, set_time)
 
