@@ -50,7 +50,7 @@ even smaller size of the payload, to show how one can define multiple files.
 >>> fw.write(d)
 >>> fw.close()
 >>> import os
->>> [f for f in os.listdir() if f.startswith('2013')]
+>>> [f for f in sorted(os.listdir('.')) if f.startswith('2013')]
 ['2013-07-02-01:39:20.0000000000000000.000000.dada',
  '2013-07-02-01:39:20.0000000000020000.000000.dada']
 >>> fr = dada.open('2013-07-02-01:39:20.{obs_offset:016d}.000000.dada', 'rs')
