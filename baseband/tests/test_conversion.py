@@ -22,13 +22,20 @@ class TestVDIFMark5B(object):
     """Simplest conversion: VDIF frame containing Mark5B data (EDV 0xab)."""
 
     def test_header(self):
+        """Check Mark 5B header information can be stored in a VDIF header."""
         with open(SAMPLE_M5B, 'rb') as fh:
+            # A rough start time is needed for Mark 5B to calculate time.
             m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
+            # For the payload, pass in how data is encoded.
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
+        # Create a VDIF header based on both the Mark 5B header and payload.
         header = vdif.VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
                                                     bps=m5pl.bps)
+        # Check all direct information is set correctly.
         assert all(m5h[key] == header[key] for key in m5h.keys())
+        # As well as the time calculated from the header information.
         assert header.time == m5h.time
+        # Check information on the payload is also correct.
         assert header.nchan == 8
         assert header.bps == 2
         assert not header['complex_data']
@@ -38,23 +45,32 @@ class TestVDIFMark5B(object):
         assert header.samples_per_frame == 10000 * 8 // m5pl.bps // m5pl.nchan
 
     def test_payload(self):
+        """Check Mark 5B payloads can used in a Mark5B VDIF payload."""
+        # Get Mark 5B header, payload, and construct VDIF header, as above.
         with open(SAMPLE_M5B, 'rb') as fh:
             m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
         header = vdif.VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
                                                     bps=m5pl.bps)
+        # Create VDIF payload from the Mark 5B encoded payload.
         payload = vdif.VDIFPayload(m5pl.words, header)
+        # Check that the payload (i.e., encoded data) is the same.
         assert np.all(payload.words == m5pl.words)
+        # And check that if we decode the payload, we get the same result.
         assert np.all(payload.data == m5pl.data)
+        # Now construct a VDIF payload from the Mark 5B data, checking that
+        # the encoding works correctly too.
         payload2 = vdif.VDIFPayload.fromdata(m5pl.data, header)
         assert np.all(payload2.words == m5pl.words)
         assert np.all(payload2.data == m5pl.data)
+        # Mark 5B data cannot complex. Check that this raises an exception.
         header2 = header.copy()
         header2['complex_data'] = True
         with pytest.raises(ValueError):
             vdif.VDIFPayload(m5pl.words, header2)
 
     def test_frame(self):
+        """Check a whole Mark 5B frame can be translated to VDIF."""
         with mark5b.open(SAMPLE_M5B, 'rb') as fh:
             m5f = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
         frame = vdif.VDIFFrame.from_mark5b_frame(m5f)
@@ -102,49 +118,57 @@ class TestMark5BToVDIF3(object):
             bandwidth=16.*u.MHz, complex_data=False)
         assert header.time == m5h.time
 
-    def test_stream(self):
+    def test_stream(self, tmpdir):
+        """Convert Mark 5B data stream to VDIF."""
+        # Here, we need to give how the data is encoded, since the data do not
+        # self-describe this.  Furthermore, we need to pass in a rough time,
+        # and the rate at which samples were taken, so that absolute times can
+        # be calculated.
         with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, ref_mjd=57000,
                          sample_rate=32.*u.MHz) as fr:
             m5h = fr.header0
+            # create VDIF header from Mark 5B stream information.
             header = vdif.VDIFHeader.fromvalues(
                 edv=3, bps=fr.bps, nchan=1, station='WB', time=m5h.time,
                 bandwidth=16.*u.MHz, complex_data=False)
             data = fr.read(20000)  # enough to fill one EDV3 frame.
             time1 = fr.tell(unit='time')
 
-        with io.BytesIO() as s, vdif.open(s, 'ws', nthread=data.shape[1],
-                                          header=header) as fw:
+        # Get a file name in our temporary testing directory.
+        vdif_file = str(tmpdir.join('converted.vdif'))
+        # create and fill vdif file with converted data.
+        with vdif.open(vdif_file, 'ws', nthread=data.shape[1],
+                       header=header) as fw:
             assert (fw.tell(unit='time') - m5h.time) < 2. * u.ns
             fw.write(data)
             assert (fw.tell(unit='time') - time1) < 2. * u.ns
-            fw.fh_raw.flush()
-            s.seek(0)
-            with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, ref_mjd=57000,
-                             sample_rate=32.*u.MHz) as fm, vdif.open(
-                                 s, 'rs') as fv:
-                assert fm.header0.time == fv.header0.time
-                dm = fm.read(20000)
-                dv = fv.read(20000)
-                assert np.all(dm == dv)
-                assert fm.offset == fv.offset
-                assert fm.tell(unit='time') == fv.tell(unit='time')
 
-                # Convert VDIF file back to Mark 5B, and check byte-for-byte.
-                hv = fv.header0
-                hm = fm.header0
-                with io.BytesIO() as s2, mark5b.open(
-                        s2, 'ws', nchan=dv.shape[1], bps=hv.bps, time=hv.time,
-                        sample_rate=hv.bandwidth*2, user=hm['user'],
-                        internal_tvg=hm['internal_tvg']) as fw:
-                    fw.write(dv)
-                    number_of_bytes = s2.tell()
-                    fm_raw = fm.fh_raw
-                    assert number_of_bytes == fm_raw.tell()
-                    s2.seek(0)
-                    fm_raw.seek(0)
-                    orig_bytes = fm_raw.read(number_of_bytes)
-                    conv_bytes = s2.read(number_of_bytes)
-                    assert orig_bytes == conv_bytes
+        # check two files contain same information.
+        with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, ref_mjd=57000,
+                         sample_rate=32.*u.MHz) as fm, vdif.open(vdif_file,
+                                                                 'rs') as fv:
+            assert fm.header0.time == fv.header0.time
+            dm = fm.read(20000)
+            dv = fv.read(20000)
+            assert np.all(dm == dv)
+            assert fm.offset == fv.offset
+            assert fm.tell(unit='time') == fv.tell(unit='time')
+
+            # Convert VDIF file back to Mark 5B
+            mark5b_new_file = str(tmpdir.join('reconverted.mark5b'))
+            hv = fv.header0
+            hm = fm.header0
+            # Here, we fill some unimportant Mark 5B header information by
+            # hand, so we can compare byte-for-byte.
+            with mark5b.open(mark5b_new_file, 'ws', nchan=dv.shape[1],
+                             bps=hv.bps, time=hv.time,
+                             sample_rate=hv.bandwidth*2, user=hm['user'],
+                             internal_tvg=hm['internal_tvg']) as fw:
+                fw.write(dv)
+
+        with open(SAMPLE_M5B, 'rb') as fh_orig, open(mark5b_new_file,
+                                                     'rb') as fh_new:
+            assert fh_orig.read() == fh_new.read()
 
 
 class TestVDIF3ToMark5B(object):
