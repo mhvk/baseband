@@ -6,7 +6,7 @@ import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import assert_quantity_allclose
 from .. import gsb
-from ..gsb.payload import decode_4bit_real, encode_4bit_real
+from ..gsb.payload import decode_4bit, encode_4bit
 
 
 class TestGSB(object):
@@ -123,11 +123,11 @@ class TestGSB(object):
     def test_decoding(self):
         """Check that 4-bit encoding works."""
         areal = np.arange(-8, 8)
-        b = encode_4bit_real(areal)
+        b = encode_4bit(areal)
         assert np.all(b.view(np.uint8) ==
                       np.array([0x98, 0xba, 0xdc, 0xfe,
                                 0x10, 0x32, 0x54, 0x76]))
-        d = decode_4bit_real(b)
+        d = decode_4bit(b)
         assert np.all(d == areal)
 
     def test_payload(self):
