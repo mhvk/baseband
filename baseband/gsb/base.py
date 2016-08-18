@@ -96,16 +96,19 @@ class GSBFileWriter(io.BufferedWriter):
         """
         if not isinstance(data, GSBPayload):
             data = GSBPayload.fromdata(data, bps=bps)
-
         return data.tofile(self)
 
 
 class GSBStreamBase(VLBIStreamBase):
 
     def close(self):
-        for fh_pair in self.fh_raw:
-            for fh in fh_pair:
-                fh.close()
+        self.fh_ts.close()
+        try:
+            self.fh_raw.close()
+        except AttributeError:
+            for fh_pair in self.fh_raw:
+                for fh in fh_pair:
+                    fh.close()
 
 
 class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
@@ -127,13 +130,14 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
                                      header0.time).to(u.s)).value
         fh_ts.seek(0)
         if thread_ids is None:
-            thread_ids = list(range(len(fh_raw)))
+            thread_ids = list(range(len(fh_raw) if header0.mode == 'phased'
+                                    else 1))
 
         super(GSBStreamReader, self).__init__(
             fh_raw, header0=header0, nchan=nchan, bps=bps,
             thread_ids=thread_ids, samples_per_frame=samples_per_frame,
             frames_per_second=frames_per_second)
-        self._payloadsize = (self.samples_per_frame // len(fh_raw[0]) *
+        self._payloadsize = (self.samples_per_frame // self.nthread *
                              self.nchan * (2 if self._complex_data else 1) *
                              self.bps // 8)
         self._read_frame()
@@ -154,7 +158,7 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
         last_lines = self.fh_ts.buffer.read(from_end).strip().split(b'\n')
         last_line = last_lines[-1].decode('ascii')
         self.fh_ts.seek(fh_ts_offset)
-        return type(self.header0)(tuple(last_line.split()))
+        return self.header0.__class__(tuple(last_line.split()))
 
     def read(self, count=None, fill_value=0., squeeze=True, out=None):
         """Read count samples.
@@ -183,8 +187,8 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            out = np.empty((self.nthread, count, self.nchan),
-                           dtype=self._frame.dtype).transpose(1, 0, 2)
+            out = np.empty((count,) + self._frame.payload.sample_shape,
+                           dtype=self._frame.dtype)
         else:
             count = out.shape[0]
             squeeze = False
@@ -196,20 +200,16 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
             if(frame_nr != self._frame_nr):
                 # Read relevant frame (possibly reusing data array from
                 # previous frame set).
-                self._read_frame(fill_value, out=self._frame_data)
+                self._read_frame(fill_value)
                 assert np.isclose(self._frame_nr, self.frames_per_second *
                                   (self._frame.header.time -
                                    self.time0).to(u.s).value)
 
-            if self._frame_data.ndim == 2:
-                data = self._frame_data[:, np.newaxis, :]
-            else:
-                data = self._frame_data.transpose(1, 0, 2)
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            out[sample:sample + nsample] = data[sample_offset:
-                                                sample_offset + nsample]
+            out[sample:sample + nsample] = self._frame[sample_offset:
+                                                       sample_offset + nsample]
             self.offset += nsample
             count -= nsample
 
@@ -219,17 +219,18 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
         frame_nr = self.offset // self.samples_per_frame
         self.fh_ts.seek(self.header0.seek_offset(frame_nr,
                                                  size=self._header0_size))
-        for fh_pair in self.fh_raw:
-            for fh in fh_pair:
-                fh.seek(frame_nr * self._payloadsize)
+        if self.header0.mode == 'rawdump':
+            self.fh_raw.seek(frame_nr * self._payloadsize)
+        else:
+            for fh_pair in self.fh_raw:
+                for fh in fh_pair:
+                    fh.seek(frame_nr * self._payloadsize)
         self._frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
                                         payloadsize=self._payloadsize,
                                         nchan=self.nchan, bps=self.bps,
                                         complex_data=self._complex_data)
         self._frame_nr = frame_nr
-        self._frame_data = self._frame.todata(data=out)
-        # Convert payloads to data array.
-        return self._frame_data
+        return self._frame
 
 
 class GSBStreamWriter(VLBIStreamWriterBase, GSBStreamBase):
@@ -239,13 +240,13 @@ class GSBStreamWriter(VLBIStreamWriterBase, GSBStreamBase):
         self.fh_ts = fh_ts
         if header is None:
             header = GSBHeader.fromvalues(**kwargs)
+        thread_ids = list(range(len(fh_raw) if header.mode == 'phased' else 1))
         frames_per_second = (sample_rate / samples_per_frame).to(u.Hz).value
         super(GSBStreamWriter, self).__init__(
             fh_raw, header0=header, nchan=nchan, bps=bps,
-            thread_ids=range(len(fh_raw)),
-            samples_per_frame=samples_per_frame,
+            thread_ids=thread_ids, samples_per_frame=samples_per_frame,
             frames_per_second=frames_per_second)
-        self._data = np.zeros((self.nthread, self.samples_per_frame,
+        self._data = np.zeros((self.samples_per_frame, self.nthread,
                                self.nchan), (np.complex64 if complex_data
                                              else np.float32))
         self._valid = True
@@ -265,7 +266,6 @@ class GSBStreamWriter(VLBIStreamWriterBase, GSBStreamBase):
         count = data.shape[0]
         sample = 0
         offset0 = self.offset
-        frame = self._data.transpose(1, 0, 2)
         while count > 0:
             frame_nr, sample_offset = divmod(self.offset,
                                              self.samples_per_frame)
@@ -275,19 +275,20 @@ class GSBStreamWriter(VLBIStreamWriterBase, GSBStreamBase):
                 if self.header0.mode == 'phased':
                     full_sub_int = ((frame_nr + self.header0['seq_nr']) * 8 +
                                     self.header0['sub_int'])
-                    self._header = type(self.header0).fromvalues(
+                    self._header = self.header0.__class__.fromvalues(
                         gps_time=self.header0.gps_time + time_offset,
                         pc_time=self.header0.pc_time + time_offset,
                         seq_nr=full_sub_int // 8,
                         sub_int=full_sub_int % 8)
                 else:
-                    self._header = type(self.header0).fromvalues(
+                    self._header = self.header0.__class__.fromvalues(
                         time=self.header0.time + time_offset)
 
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample_end = sample_offset + nsample
             sample = self.offset - offset0
-            frame[sample_offset:sample_end] = data[sample:sample + nsample]
+            self._data[sample_offset:sample_end] = data[sample:
+                                                        sample + nsample]
             if sample_end == self.samples_per_frame:
                 self._frame = GSBFrame.fromdata(self._data, self._header,
                                                 self.bps)
@@ -298,9 +299,12 @@ class GSBStreamWriter(VLBIStreamWriterBase, GSBStreamBase):
 
     def flush(self):
         self.fh_ts.flush()
-        for fh_pair in self.fh_raw:
-            for fh in fh_pair:
-                fh.flush()
+        try:
+            self.fh_raw.flush()
+        except AttributeError:
+            for fh_pair in self.fh_raw:
+                for fh in fh_pair:
+                    fh.flush()
 
 
 def open(name, mode='rs', **kwargs):
@@ -385,12 +389,14 @@ def open(name, mode='rs', **kwargs):
     # Single of multiple files.
     raw = kwargs.pop('raw')
     if not isinstance(raw, (list, tuple)):
-        raw = ((raw,),)
-    # Single of multiple polarisations.
-    elif not isinstance(raw[0], (list, tuple)):
-        raw = (raw,)
-    fh_raw = tuple(tuple(open(p, mode.replace('s', '') + 'b') for p in pol)
-                   for pol in raw)
+        fh_raw = (raw if hasattr(raw, 'read' if 'r' in mode else 'write')
+                  else io.open(raw, mode.replace('s', '')+'b'))
+    else:
+        if not isinstance(raw[0], (list, tuple)):
+            raw = (raw,)
+        fh_raw = tuple(tuple((p if hasattr(p, 'read' if 'r' in mode else 'w')
+                              else open(p, mode.replace('s', '') + 'b'))
+                             for p in pol) for pol in raw)
     if 'w' in mode:
         return GSBStreamWriter(fh_ts, fh_raw, **kwargs)
     else:

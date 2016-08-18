@@ -122,13 +122,20 @@ class TestGSB(object):
 
     def test_decoding(self):
         """Check that 4-bit encoding works."""
-        areal = np.arange(-8, 8)
+        areal = np.arange(-8., 8.)
         b = encode_4bit(areal)
-        assert np.all(b.view(np.uint8) ==
-                      np.array([0x98, 0xba, 0xdc, 0xfe,
-                                0x10, 0x32, 0x54, 0x76]))
+        assert np.all(b.view(np.uint8) == np.array(
+            [0x98, 0xba, 0xdc, 0xfe, 0x10, 0x32, 0x54, 0x76]))
         d = decode_4bit(b)
         assert np.all(d == areal)
+        # Also check shape is preserved.
+        areal2 = np.hstack((areal, areal[::-1]))
+        b2 = encode_4bit(areal2)
+        assert np.all(b2.view(np.uint8) == np.array(
+            [0x98, 0xba, 0xdc, 0xfe, 0x10, 0x32, 0x54, 0x76,
+             0x67, 0x45, 0x23, 0x01, 0xef, 0xcd, 0xab, 0x89]))
+        d2 = decode_4bit(b2)
+        assert np.all(d2 == areal2)
 
     def test_payload(self):
         payload1 = gsb.GSBPayload.fromdata(self.data, bps=4)
@@ -151,6 +158,7 @@ class TestGSB(object):
             s.seek(0)
             payload6 = gsb.GSBPayload.fromfile(s, bps=4,
                                                payloadsize=payload1.size)
+        assert np.all(payload6.words == payload1.words)
         assert payload6 == payload1
 
     def test_rawdump_frame(self):
@@ -169,13 +177,13 @@ class TestGSB(object):
         assert frame3 == frame1
 
     def test_phased_frame(self):
-        data = self.data.reshape((1,) + self.data.shape)
+        data = self.data.reshape(-1, 1, 2)
         header1 = gsb.GSBHeader(self.phased_ts.split())
         frame1 = gsb.GSBFrame.fromdata(data, header1, bps=4)
         assert frame1.shape == data.shape
         assert np.all(frame1.data == data)
         assert frame1.size == data.size // 2
-        cmplx = data[:, ::2] + 1j * data[:, 1::2]
+        cmplx = data[::2] + 1j * data[1::2]
         frame2 = gsb.GSBFrame.fromdata(cmplx, header1, bps=4)
         assert frame2.dtype.kind == 'c'
         assert np.all(frame2.data == cmplx)
@@ -195,10 +203,11 @@ class TestGSB(object):
                 s.seek(0)
 
             frame3 = gsb.GSBFrame.fromfile(sh, ((sp0, sp1),), bps=4,
-                                           payloadsize=data.size // 4)
+                                           payloadsize=data.size // 4,
+                                           nchan=2)
         assert frame3 == frame1
         # Two polarisations, 16 channels
-        twopol = cmplx.reshape(2, -1, 16)
+        twopol = cmplx.reshape(-1, 2, 16)
         frame4 = gsb.GSBFrame.fromdata(twopol, header1, bps=4)
         assert frame4.size == frame1.size  # number of bytes doesn't change.
         assert frame4.shape == twopol.shape
@@ -207,12 +216,15 @@ class TestGSB(object):
                 io.BytesIO() as sp0, io.BytesIO() as sp1, \
                 io.BytesIO() as sp2, io.BytesIO() as sp3:
             frame4.tofile(sh, ((sp0, sp1), (sp2, sp3)))
-            for s in sh, sp0, sp1, sp2, sp3:
+            for s in sp0, sp1, sp2, sp3:
+                assert s.tell() == frame4.payload.size // 4
                 s.flush()
                 s.seek(0)
-
+            sh.flush()
+            sh.seek(0)
             frame5 = gsb.GSBFrame.fromfile(sh, ((sp0, sp1), (sp2, sp3)),
-                                           bps=4, payloadsize=data.size // 8)
+                                           bps=4, payloadsize=data.size // 8,
+                                           complex_data=True, nchan=16)
         assert frame5 == frame4
 
     def test_timestamp_io(self):
@@ -232,8 +244,9 @@ class TestGSB(object):
             fh_w.flush()
             s.seek(0)
             with gsb.open(s, 'rb') as fh_r:
-                payload2 = fh_r.read_payload(payload.size, payload.nchan,
-                                             payload.bps, payload.complex_data)
+                payload2 = fh_r.read_payload(payload.size, bps=payload.bps,
+                                             nchan=payload.sample_shape[-1],
+                                             complex_data=payload.complex_data)
             assert payload == payload2
 
     def test_raw_stream(self):

@@ -20,7 +20,7 @@ class VLBIPayloadBase(object):
 
     Any subclass should define dictionaries ``_decoders`` and ``_encoders``,
     which hold functions that decode/encode the payload words to/from ndarray.
-    These dictionaries are assumed to be indexed by ``(bps, complex_data)``.
+    These dictionaries are assumed to be indexed by ``bps``.
 
     Parameters
     ----------
@@ -118,7 +118,7 @@ class VLBIPayloadBase(object):
     @property
     def size(self):
         """Size in bytes of payload."""
-        return len(self.words) * self.words.dtype.itemsize
+        return self.words.size * self.words.dtype.itemsize
 
     @property
     def nsample(self):

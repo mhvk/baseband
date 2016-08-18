@@ -28,9 +28,8 @@ def decode_4bit(words):
     the first sample is in 3210, the second in 7654, and both are interpreted
     as signed 4-bit integers.
     """
-    b = words.view(np.int8)
     # left_shift(byte[:,np.newaxis], shift40):  [3210xxxx, 76543210]
-    split = np.left_shift(b[:, np.newaxis], shift40).ravel()
+    split = np.left_shift(words[:, np.newaxis], shift40).ravel()
     # right_shift(..., 4):                      [33333210, 77777654]
     # so least significant bits go first.
     split >>= 4
@@ -40,7 +39,7 @@ def decode_4bit(words):
 def decode_8bit(words):
     """GSB decoder for data stored using 8 bit signed integer.
     """
-    return words.view(np.int8).astype(np.float32)
+    return words.astype(np.float32)
 
 
 def encode_4bit(values):
@@ -62,11 +61,11 @@ class GSBPayload(VLBIPayloadBase):
     words : ndarray
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    nchan : int
-        Number of channels in the data.  Default: 1.
     bps : int
         Number of bits per sample part (i.e., per channel and per real or
         imaginary component).  Default: 2.
+    sample_shape : tuple
+        Shape of the samples; e.g., (nchan,).  Default: ().
     complex_data : bool
         Whether data is complex or float.  Default: False.
     """
@@ -75,3 +74,70 @@ class GSBPayload(VLBIPayloadBase):
                  8: encode_8bit}
     _decoders = {4: decode_4bit,
                  8: decode_8bit}
+    _dtype_word = np.int8
+
+    @classmethod
+    def fromfile(cls, fh, payloadsize=None, bps=4, nchan=1,
+                 complex_data=False):
+        """Read payloads from several threads.
+
+        Parameters
+        ----------
+        fh : filehandle or tuple of tuple of filehandle
+            Handles to the sets of files from which data is read.  The outer
+            tuple holds distinct threads, while the inner ones holds parts of
+            those threads.  Typically, these are the two polarisations and the
+            two parts of each in which phased baseband data are stored.
+        payloadsize : int
+            Number of bytes to read from each part.
+        bps : int
+            Number of bits per sample part (i.e., per channel and per real or
+            imaginary component).  Default: 4.
+        nchan : int
+            Number of fourier channels.  Default: 1.
+        complex_data : bool
+            Whether data is complex or float.  Default: False.
+        """
+        if hasattr(fh, 'read'):
+            return super(GSBPayload,
+                         cls).fromfile(fh, payloadsize=payloadsize,
+                                       bps=bps, sample_shape=(nchan,),
+                                       complex_data=complex_data)
+
+        nthread = len(fh)
+        payloads = [[super(GSBPayload,
+                           cls).fromfile(fh1, payloadsize=payloadsize, bps=bps,
+                                         sample_shape=(nchan,),
+                                         complex_data=complex_data)
+                     for fh1 in fh_set] for fh_set in fh]
+        if nthread == 1:
+            words = np.hstack([payload.words for payload in payloads[0]])
+        else:
+            bpfs = payloads[0][0]._bpfs
+            if bpfs % 8:
+                raise TypeError('cannot create phased payload: complete sample'
+                                ' does not fit in integer number of bytes.')
+            words = np.empty((len(payloads[0]),
+                              payloads[0][0].words.size * 8 // bpfs,
+                              nthread,
+                              bpfs // 8), dtype=cls._dtype_word)
+            for payload_set, thread in zip(payloads,
+                                           words.transpose(2, 0, 1, 3)):
+                for payload, part in zip(payload_set, thread):
+                    part[:] = payload.words.reshape(-1, bpfs // 8)
+
+        return cls(words.ravel(), bps=bps, sample_shape=(nthread, nchan),
+                   complex_data=complex_data)
+
+    def tofile(self, fh):
+        try:
+            fh.write(self.words.tostring())
+        except AttributeError:
+            nthread = len(fh)
+            assert nthread == self.sample_shape[0]
+
+            words = self.words.reshape(len(fh[0]), -1, nthread,
+                                       self._bpfs // nthread // 8)
+            for fh_set, thread in zip(fh, words.transpose(2, 0, 1, 3)):
+                for fh, part in zip(fh_set, thread):
+                    fh.write(part.tostring())
