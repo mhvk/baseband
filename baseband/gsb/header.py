@@ -17,6 +17,9 @@ from astropy.time import Time, TimeString
 from ..vlbi_base.header import VLBIHeaderBase, HeaderParser
 
 
+__all__ = ['TimeGSB', 'GSBHeader', 'GSBRawdumpHeader', 'GSBPhasedHeader']
+
+
 class TimeGSB(TimeString):
 
     name = 'gsb'
@@ -108,6 +111,7 @@ class GSBHeader(VLBIHeaderBase):
         As appropriate for the mode.
     """
     _mode = None
+    _gsb_header_classes = {}
 
     def __new__(cls, words, mode=None, utc_offset=5.5*u.hr, verify=True):
 
@@ -117,7 +121,7 @@ class GSBHeader(VLBIHeaderBase):
                                 "knowing the mode.")
             mode = 'rawdump' if len(words) == 7 else 'phased'
 
-        cls = gsb_header_classes.get(mode)
+        cls = cls._gsb_header_classes.get(mode)
         self = super(GSBHeader, cls).__new__(cls)
         # We intialise VDIFHeader subclasses, so their __init__ will be called.
         return self
@@ -194,7 +198,7 @@ class GSBHeader(VLBIHeaderBase):
             The number of headers to move to, relative to the present header.
         size : int, optional
             The size in bytes of the present header (if not given, it will
-            be calculated assuming the termination string is a single ``\n``).
+            be calculated assuming the termination string is a single CR).
         """
         if size is None:
             size = len(' '.join(self.words)) + 1
@@ -280,7 +284,7 @@ class GSBPhasedHeader(GSBRawdumpHeader):
             The number of headers to move to, relative to the present header.
         size : int, optional
             The size in bytes of the present header (if not given, it will
-            be calculated assuming the termination string is a single ``\n``).
+            be calculated assuming the termination string is a single CR).
         """
         if size is None:
             size = len(' '.join(self.words)) + 1
@@ -309,5 +313,5 @@ class GSBPhasedHeader(GSBRawdumpHeader):
         return guess
 
 
-gsb_header_classes = {'rawdump': GSBRawdumpHeader,
-                      'phased': GSBPhasedHeader}
+GSBHeader._gsb_header_classes.update(rawdump=GSBRawdumpHeader,
+                                     phased=GSBPhasedHeader)

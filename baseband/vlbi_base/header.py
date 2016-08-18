@@ -138,18 +138,20 @@ def get_default(word_index, bit_index, bit_length, default=None):
 class HeaderProperty(object):
     """Mimic a dictionary, calculating entries from header words.
 
-    Used below to calculate setter functions and extract default values.
+    Used to calculate setter functions and extract default values.
 
     Parameters
     ----------
     header_parser : HeaderParser instance
-        An dict with header encoding information.
+        A dict with header encoding information.
     getter : function
         Function that uses the encoding information to calculate a result.
     """
-    def __init__(self, header_parser, getter):
+    def __init__(self, header_parser, getter, doc=None):
         self.header_parser = header_parser
         self.getter = getter
+        if doc is not None:
+            self.__doc__ = doc
 
     def __getitem__(self, item):
         definition = self.header_parser[item]
@@ -163,7 +165,10 @@ class HeaderPropertyGetter(object):
         self.__doc__ = doc or getter.__doc__
 
     def __get__(self, instance, owner_cls=None):
-        return HeaderProperty(instance, getattr(instance, self.getter))
+        if instance is None:
+            return self
+        return HeaderProperty(instance, getattr(instance, self.getter),
+                              doc=self.__doc__)
 
 
 class HeaderParser(OrderedDict):
@@ -192,15 +197,16 @@ class HeaderParser(OrderedDict):
     """
 
     def __init__(self, *args, **kwargs):
-        # Use a dict rather than OrderedDict for the parsers for better speed.
-        # Note that this gets filled by calls to __setitem__.
-        self.parsers = {}
         self._make_parser = kwargs.pop('make_parser', make_parser)
         self._make_setter = kwargs.pop('make_setter', make_setter)
         self._get_default = kwargs.pop('get_default', get_default)
+        # Use a dict rather than OrderedDict for the parsers for better speed.
+        # Note that this gets filled by calls to __setitem__.
+        self._parsers = {}
         super(HeaderParser, self).__init__(*args, **kwargs)
 
     def copy(self):
+        """Make an independent copy."""
         return self.__class__(self, make_parser=self._make_parser,
                               make_setter=self._make_setter,
                               get_default=self._get_default)
@@ -213,23 +219,29 @@ class HeaderParser(OrderedDict):
         return result
 
     def __setitem__(self, item, value):
-        self.parsers[item] = self._make_parser(*value)
+        self._parsers[item] = self._make_parser(*value)
         super(HeaderParser, self).__setitem__(item, value)
+
+    @property
+    def parsers(self):
+        """Dict with functions to get specific header values."""
+        return self._parsers
 
     defaults = HeaderPropertyGetter(
         '_get_default',
-        doc="Dict-like allowing access to default header values by keyword.")
+        doc="Dict-like allowing access to default header values.")
 
     setters = HeaderPropertyGetter(
         '_make_setter',
-        doc="Dict-like returning function to set header keyword to a value")
+        doc="Dict-like returning function to set specific header value.")
 
     def update(self, other):
+        """Update the parser with the information from another one."""
         if not isinstance(other, HeaderParser):
             raise TypeError("Can only update using a HeaderParser instance.")
         super(HeaderParser, self).update(other)
         # Update the parsers rather than recalculate all the functions.
-        self.parsers.update(other.parsers)
+        self._parsers.update(other._parsers)
 
 
 class VLBIHeaderBase(object):
@@ -436,7 +448,7 @@ class VLBIHeaderBase(object):
     def __getitem__(self, item):
         """Get the value a particular header item from the header words."""
         try:
-            return self._header_parser.parsers[item](self.words)
+            return self._header_parser._parsers[item](self.words)
         except KeyError:
             raise KeyError("{0} header does not contain {1}"
                            .format(self.__class__.__name__, item))
