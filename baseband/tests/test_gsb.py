@@ -304,6 +304,7 @@ class TestGSB(object):
                          samples_per_frame=twopol.shape[0] // 2,
                          nchan=twopol.shape[2], nthread=twopol.shape[1],
                          complex_data=True, header=header) as fh_w:
+            # Write data twice.
             fh_w.write(twopol)
             fh_w.write(twopol[::-1])
             assert fh_w.tell() == twopol.shape[0] * 2
@@ -320,6 +321,8 @@ class TestGSB(object):
                 assert np.isclose(fh_r.frames_per_second, 8.)
                 data = fh_r.read(twopol.shape[0] * 2)
                 assert fh_r.tell() == twopol.shape[0] * 2
+                assert (fh_r._frame.header['seq_nr'] ==
+                        fh_r.header0['seq_nr'] + 3)
                 assert_quantity_allclose(fh_r.tell(unit=u.s), 0.5 * u.s)
                 assert sp0.tell() == 1024 * bps // 8
                 assert fh_r._frame.header == fh_r.header1

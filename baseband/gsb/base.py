@@ -137,10 +137,11 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
             fh_raw, header0=header0, nchan=nchan, bps=bps,
             thread_ids=thread_ids, samples_per_frame=samples_per_frame,
             frames_per_second=frames_per_second)
-        self._payloadsize = (self.samples_per_frame // self.nthread *
-                             self.nchan * (2 if self._complex_data else 1) *
-                             self.bps // 8)
-        self._read_frame()
+        self._payloadsize = (self.samples_per_frame * self.nchan *
+                             (2 if self._complex_data else 1) *
+                             self.bps // 8 // (1 if header0.mode == 'rawdump'
+                                               else len(fh_raw[0])))
+        self._frame_nr = None
 
     @lazyproperty
     def header1(self):
@@ -187,8 +188,12 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            out = np.empty((count,) + self._frame.payload.sample_shape,
-                           dtype=self._frame.dtype)
+            dtype = np.complex64 if self._complex_data else np.float32
+            if self.header0.mode == 'rawdump':
+                out = np.empty((count, self.nchan), dtype)
+            else:
+                out = np.empty((count, self.nthread, self.nchan), dtype)
+
         else:
             count = out.shape[0]
             squeeze = False
