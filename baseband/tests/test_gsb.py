@@ -9,6 +9,19 @@ from .. import gsb
 from ..gsb.payload import decode_4bit, encode_4bit
 
 
+# Test on 2016-AUG-19, using GMRT crab data
+# sshfs login.scinet.utoronto.ca:/scratch2/p/pen/franzk/data/GMRT/ddtb144_04oct2015/a gmrt
+# ipython  # not python3 for scintellometry
+# from baseband import gsb; from scintellometry.io import gmrt; from astropy import units as u
+# gmrt_base = 'gmrt/crab-04-10-15.raw'
+# tsf = gmrt_base + '.timestamp'
+# raws = [[gmrt_base + '.Pol-' + pol + part + '.dat' for part in ('1', '2')] for pol in ('L', 'R')]
+# fh_gsb = gsb.open(tsf, raw=raws, mode='rs', bps=8, samples_per_frame=2**14, complex_data=True, nchan=512)
+# fh_gmrt = gmrt.GMRTPhasedData(tsf, raws[0], 2**23, 512, 200./3*u.MHz, 170*u.MHz, True)
+# Note: GMRTPhasedData can only read single polarisation at a time.
+# fh_gsb.seek(2**15); np.all(fh_gmrt.seek_record_read(2**25, 2048) == fh_gsb.read(2)[:, 0])
+
+
 class TestGSB(object):
     def setup(self):
         self.rawdump_ts = '2015 04 27 18 45 00 0.000000240'
