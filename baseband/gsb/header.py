@@ -13,6 +13,7 @@ from __future__ import (absolute_import, division, print_function,
 import numpy as np
 from astropy import units as u, _erfa as erfa
 from astropy.time import Time, TimeString
+from astropy.extern import six
 
 from ..vlbi_base.header import VLBIHeaderBase, HeaderParser
 
@@ -209,6 +210,13 @@ class GSBHeader(VLBIHeaderBase):
                 tuple(self.words) == tuple(other.words))
 
 
+if six.PY2:
+    def str_split(string):
+        return str(string).split()
+else:
+    str_split = str.split
+
+
 class GSBRawdumpHeader(GSBHeader):
 
     _mode = 'rawdump'
@@ -217,7 +225,7 @@ class GSBRawdumpHeader(GSBHeader):
     _properties = ('pc_time', 'time')
 
     _header_parser = HeaderParser(
-        (('pc', (0, 7, ' '.join, str.split)),),
+        (('pc', (0, 7, ' '.join, str_split)),),
         make_parser=make_parser,
         make_setter=make_setter,
         get_default=get_default)
@@ -244,7 +252,7 @@ class GSBPhasedHeader(GSBRawdumpHeader):
     _properties = ('time', 'gps_time') + GSBRawdumpHeader._properties
 
     _header_parser = GSBRawdumpHeader._header_parser + HeaderParser(
-        (('gps', (7, 7, ' '.join, str.split)),
+        (('gps', (7, 7, ' '.join, str_split)),
          ('seq_nr', (14, 1, int, str, 1)),
          ('sub_int', (15, 1, int, str, 1))),
         make_parser=make_parser,
