@@ -14,6 +14,7 @@ Specific file formats
    mark5b/index
    mark4/index
    dada/index
+   gsb/index
    vlbi_base/index
 	       
 
@@ -24,4 +25,5 @@ Reference/API
 .. automodapi:: baseband.mark5b
 .. automodapi:: baseband.mark4
 .. automodapi:: baseband.dada
+.. automodapi:: baseband.gsb
 .. automodapi:: baseband

@@ -201,7 +201,8 @@ class DADAStreamBase(VLBIStreamBase):
             thread_ids = list(range(header0['NPOL']))
         super(DADAStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, nchan=header0['NCHAN'],
-            bps=header0.bps, thread_ids=thread_ids,
+            bps=header0.bps, complex_data=header0.complex_data,
+            thread_ids=thread_ids,
             samples_per_frame=header0.samples_per_frame,
             frames_per_second=frames_per_second)
         if files and template:

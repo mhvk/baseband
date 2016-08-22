@@ -173,7 +173,7 @@ class Mark4StreamReader(VLBIStreamReaderBase):
         header = self._frame.header
         super(Mark4StreamReader, self).__init__(
             fh_raw=raw, header0=header, nchan=header.nchan, bps=header.bps,
-            thread_ids=thread_ids,
+            complex_data=False, thread_ids=thread_ids,
             samples_per_frame=header.samples_per_frame,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
 
@@ -279,7 +279,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
             header = Mark4Header.fromvalues(**kwargs)
         super(Mark4StreamWriter, self).__init__(
             fh_raw=raw, header0=header, thread_ids=range(header.nchan),
-            bps=header.bps, nchan=header.nchan,
+            bps=header.bps, nchan=header.nchan, complex_data=False,
             samples_per_frame=(header.framesize * 8 // header.bps //
                                header.nchan),
             frames_per_second=frames_per_second, sample_rate=sample_rate)
