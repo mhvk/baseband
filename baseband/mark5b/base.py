@@ -170,7 +170,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
         self._frame_data = None
         header = self._frame.header
         super(Mark5BStreamReader, self).__init__(
-            raw, header0=header, nchan=nchan, bps=bps, thread_ids=thread_ids,
+            raw, header0=header, nchan=nchan, bps=bps, complex_data=False,
+            thread_ids=thread_ids,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
 
@@ -283,7 +284,8 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
         if header is None:
             header = Mark5BHeader.fromvalues(**kwargs)
         super(Mark5BStreamWriter, self).__init__(
-            raw, header0=header, nchan=nchan, bps=bps, thread_ids=None,
+            raw, header0=header, nchan=nchan, bps=bps, complex_data=False,
+            thread_ids=None,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
         self._data = np.zeros((self.samples_per_frame, self.nchan), np.float32)

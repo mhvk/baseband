@@ -16,13 +16,14 @@ class VLBIStreamBase(object):
 
     _frame_class = None
 
-    def __init__(self, fh_raw, header0, nchan, bps, thread_ids,
+    def __init__(self, fh_raw, header0, nchan, bps, complex_data, thread_ids,
                  samples_per_frame, frames_per_second=None,
                  sample_rate=None):
         self.fh_raw = fh_raw
         self.header0 = header0
         self.nchan = nchan
         self.bps = bps
+        self.complex_data = complex_data
         self.thread_ids = thread_ids
         self.nthread = nchan if thread_ids is None else len(thread_ids)
         self.samples_per_frame = samples_per_frame
@@ -119,7 +120,7 @@ class VLBIStreamBase(object):
 class VLBIStreamReaderBase(VLBIStreamBase):
     _find_frame = None
 
-    def __init__(self, fh_raw, header0, nchan, bps, thread_ids,
+    def __init__(self, fh_raw, header0, nchan, bps, complex_data, thread_ids,
                  samples_per_frame, frames_per_second=None,
                  sample_rate=None):
         if frames_per_second is None and sample_rate is None:
@@ -129,8 +130,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             fh_raw.seek(oldpos)
 
         super(VLBIStreamReaderBase, self).__init__(
-            fh_raw, header0, nchan, bps, thread_ids, samples_per_frame,
-            frames_per_second, sample_rate)
+            fh_raw, header0, nchan, bps, complex_data, thread_ids,
+            samples_per_frame, frames_per_second, sample_rate)
 
     @lazyproperty
     def header1(self):

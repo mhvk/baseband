@@ -170,7 +170,8 @@ class VDIFStreamBase(VLBIStreamBase):
 
         super(VDIFStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, nchan=header0.nchan,
-            bps=header0.bps, thread_ids=thread_ids,
+            bps=header0.bps, complex_data=header0['complex_data'],
+            thread_ids=thread_ids,
             samples_per_frame=header0.samples_per_frame,
             frames_per_second=frames_per_second,
             sample_rate=sample_rate)
@@ -187,10 +188,9 @@ class VDIFStreamBase(VLBIStreamBase):
                 "    nthread={s.nthread}, "
                 "samples_per_frame={s.samples_per_frame}, nchan={s.nchan},\n"
                 "    frames_per_second={s.frames_per_second}, "
-                "complex_data={c}, bps={h.bps}, edv={h.edv},\n"
+                "complex_data={s.complex_data}, bps={h.bps}, edv={h.edv},\n"
                 "    station={h.station}, (start) time={s.time0}>"
-                .format(s=self, h=self.header0,
-                        c=self.header0['complex_data']))
+                .format(s=self, h=self.header0))
 
 
 class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
@@ -380,7 +380,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
                 header.framerate = self.frames_per_second * u.Hz
         self._data = np.zeros(
             (self.nthread, self.samples_per_frame, self.nchan),
-            np.complex64 if header['complex_data'] else np.float32)
+            np.complex64 if self.complex_data else np.float32)
 
     def write(self, data, squeezed=True, invalid_data=False):
         """Write data, buffering by frames as needed."""

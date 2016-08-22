@@ -101,6 +101,34 @@ class GSBFileWriter(io.BufferedWriter):
 
 class GSBStreamBase(VLBIStreamBase):
 
+    def __init__(self, fh_ts, fh_raw, header0, thread_ids=None,
+                 nchan=None, bps=None, complex_data=None,
+                 samples_per_frame=None, payloadsize=None,
+                 frames_per_second=None, sample_rate=None):
+        self.fh_ts = fh_ts
+        rawdump = header0.mode == 'rawdump'
+        complex_data = (complex_data if complex_data is not None else
+                        (False if rawdump else True))
+        bps = bps if bps is not None else (4 if rawdump else 8)
+        nchan = nchan if nchan is not None else (1 if rawdump else 512)
+        thread_ids = (thread_ids if thread_ids is not None else
+                      list(range(1 if rawdump else len(fh_raw))))
+        if payloadsize is None:
+            payloadsize = (samples_per_frame * nchan *
+                           (2 if complex_data else 1) * bps // 8 //
+                           (1 if rawdump else len(fh_raw[0])))
+        elif samples_per_frame is None:
+            samples_per_frame = (payloadsize * 8 // bps *
+                                 (1 if rawdump else len(fh_raw[0])) //
+                                 (nchan * (2 if complex_data else 1)))
+
+        super(GSBStreamBase, self).__init__(
+            fh_raw, header0=header0, nchan=nchan, bps=bps,
+            complex_data=complex_data, thread_ids=thread_ids,
+            samples_per_frame=samples_per_frame,
+            frames_per_second=frames_per_second, sample_rate=sample_rate)
+        self._payloadsize = payloadsize
+
     def close(self):
         self.fh_ts.close()
         try:
@@ -111,36 +139,25 @@ class GSBStreamBase(VLBIStreamBase):
                     fh.close()
 
 
-class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
+class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     def __init__(self, fh_ts, fh_raw, thread_ids=None,
-                 nchan=1, bps=4, complex_data=None,
-                 samples_per_frame=1 << 25,
-                 frames_per_second=None):
-        self.fh_ts = fh_ts
+                 nchan=None, bps=None, complex_data=None,
+                 samples_per_frame=None, payloadsize=None,
+                 frames_per_second=None, sample_rate=None):
         header0 = fh_ts.read_timestamp()
         self._header0_size = fh_ts.tell()
-        if complex_data is None:
-            complex_data = False if header0.mode == 'rawdump' else True
-        self._complex_data = complex_data
-        if frames_per_second is None:
+        if frames_per_second is None and sample_rate is None:
             header1 = fh_ts.read_timestamp()
             assert (fh_ts.tell() ==
                     header0.seek_offset(2, size=self._header0_size))
             frames_per_second = (1./(header1.time -
                                      header0.time).to(u.s)).value
         fh_ts.seek(0)
-        if thread_ids is None:
-            thread_ids = list(range(len(fh_raw) if header0.mode == 'phased'
-                                    else 1))
-
         super(GSBStreamReader, self).__init__(
-            fh_raw, header0=header0, nchan=nchan, bps=bps,
+            fh_ts, fh_raw, header0, nchan=nchan, bps=bps,
+            complex_data=complex_data,
             thread_ids=thread_ids, samples_per_frame=samples_per_frame,
-            frames_per_second=frames_per_second)
-        self._payloadsize = (self.samples_per_frame * self.nchan *
-                             (2 if self._complex_data else 1) *
-                             self.bps // 8 // (1 if header0.mode == 'rawdump'
-                                               else len(fh_raw[0])))
+            frames_per_second=frames_per_second, sample_rate=sample_rate)
         self._frame_nr = None
 
     @lazyproperty
@@ -188,7 +205,7 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            dtype = np.complex64 if self._complex_data else np.float32
+            dtype = np.complex64 if self.complex_data else np.float32
             if self.header0.mode == 'rawdump':
                 out = np.empty((count, self.nchan), dtype)
             else:
@@ -233,26 +250,24 @@ class GSBStreamReader(VLBIStreamReaderBase, GSBStreamBase):
         self._frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
                                         payloadsize=self._payloadsize,
                                         nchan=self.nchan, bps=self.bps,
-                                        complex_data=self._complex_data)
+                                        complex_data=self.complex_data)
         self._frame_nr = frame_nr
         return self._frame
 
 
-class GSBStreamWriter(VLBIStreamWriterBase, GSBStreamBase):
-    def __init__(self, fh_ts, fh_raw, sample_rate=None,
-                 samples_per_frame=1 << 25, nchan=1, bps=4,
-                 complex_data=False, header=None, **kwargs):
-        self.fh_ts = fh_ts
+class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
+    def __init__(self, fh_ts, fh_raw, header=None, nchan=None, bps=None,
+                 complex_data=None, samples_per_frame=None, payloadsize=None,
+                 frames_per_second=None, sample_rate=None, **kwargs):
         if header is None:
             header = GSBHeader.fromvalues(**kwargs)
-        thread_ids = list(range(len(fh_raw) if header.mode == 'phased' else 1))
-        frames_per_second = (sample_rate / samples_per_frame).to(u.Hz).value
         super(GSBStreamWriter, self).__init__(
-            fh_raw, header0=header, nchan=nchan, bps=bps,
-            thread_ids=thread_ids, samples_per_frame=samples_per_frame,
-            frames_per_second=frames_per_second)
+            fh_ts, fh_raw, header, nchan=nchan, bps=bps,
+            complex_data=complex_data,
+            payloadsize=payloadsize, samples_per_frame=samples_per_frame,
+            frames_per_second=frames_per_second, sample_rate=sample_rate)
         self._data = np.zeros((self.samples_per_frame, self.nthread,
-                               self.nchan), (np.complex64 if complex_data
+                               self.nchan), (np.complex64 if self.complex_data
                                              else np.float32))
         self._valid = True
 
@@ -340,18 +355,23 @@ def open(name, mode='rs', **kwargs):
         the number of streams for each polarisation.  E.g.,
         ((polL1, polL2), (polR1, polR2)).  A single tuple is interpreted as
         two streams of a single polarisation.
+    nchan : int, optional
+        Number of channels. Default 1 for rawdump, 512 for phased.
+    bps : int, optional
+        Bits per elementary sample (e.g., the real or imaginary part of each
+        complex data sample).  Default: 4 for rawdump, 8 for phased.
+    complex_data : bool, optional
+        Default: `False` for rawdump, `True` for phased.
     samples_per_frame : int
-        Total number of samples per frame.
-
-    --- For reading a stream : (see `~baseband.gsb.base.GSBStreamReader`)
-
-    nchan : int
-        Number of channels used to store the data.
+        Total number of samples per frame.  Can also give ``payloadsize``, the
+        number of bytes per payload block.
 
     --- For writing a stream : (see `~baseband.gsb.base.GSBStreamWriter`)
 
-    sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which samples are given (bandwidth * 2; frequency units).
+    frames_per_second : float, optional
+        Rate at which frames are written (i.e., the inverse of the separation
+        between time stamps).  Can also give ``sample_rate``, i.e., the rate
+        at which samples are given (bandwidth * 2; frequency units).
     header : `~baseband.gsb.GSBHeader`
         Header for the first frame, holding time information, etc.
     **kwargs
