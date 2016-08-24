@@ -1,20 +1,12 @@
 import io
-import os
 import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
-from .. import mark4, vlbi_base
-from ..mark4.header import Mark4TrackHeader
-from ..mark4.payload import reorder32, reorder64
-
-
-SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m4')
-"""Mark 4 sample.
-
-Created from one of our EVN PSR B1957+20 observations using
-dd if=gp052d_ar_no0021 of=sample.m4 bs=128000 count=3
-"""
-
+from ... import mark4
+from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
+from ..header import Mark4TrackHeader
+from ..payload import reorder32, reorder64
+from ...data import SAMPLE_MARK4 as SAMPLE_FILE
 
 # Results from mark5access on 2015-JAN-22.
 # m5d evn/Ar/gp052d_ar_no0021 MKIV1_4-512-8-2 1000
@@ -172,7 +164,7 @@ class TestMark4(object):
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
-        o2h = vlbi_base.encoding.OPTIMAL_2BIT_HIGH
+        o2h = OPTIMAL_2BIT_HIGH
         assert np.all(mark4.payload.lut1bit[0] == 1.)
         assert np.all(mark4.payload.lut1bit[0xff] == -1.)
         assert np.all(mark4.payload.lut1bit.astype(int) ==

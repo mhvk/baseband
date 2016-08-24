@@ -3,18 +3,13 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import io
-import os
 import numpy as np
 from astropy.tests.helper import pytest
 from astropy.time import Time
 import astropy.units as u
-from .. import vdif, vlbi_base
-
-
-SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.vdif')
-SAMPLE_MWA = os.path.join(os.path.dirname(__file__), 'sample_mwa.vdif')
-SAMPLE_AROCHIME = os.path.join(os.path.dirname(__file__),
-                               'sample_arochime.vdif')
+from ... import vdif, vlbi_base
+from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_MWA_VDIF as SAMPLE_MWA,
+                     SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME)
 
 
 # Comparisn with m5access routines (check code on 2015-MAY-30) on vlba.m5a,

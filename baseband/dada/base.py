@@ -43,8 +43,8 @@ class DADAFileNameSequencer:
     >>> dfs = dada.base.DADAFileNameSequencer('a{file_nr:03d}.dada', {})
     >>> dfs[10]
     'a010.dada'
-    >>> from baseband.tests.test_dada import SAMPLE_FILE
-    >>> with open(SAMPLE_FILE, 'rb') as fh:
+    >>> from baseband.data import SAMPLE_DADA
+    >>> with open(SAMPLE_DADA, 'rb') as fh:
     ...     header = dada.DADAHeader.fromfile(fh)
     >>> template = '{utc_start}.{obs_offset:016d}.000000.dada'
     >>> dfs = DADAFileNameSequencer(template, header)

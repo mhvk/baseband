@@ -5,8 +5,8 @@ from astropy.tests.helper import pytest
 import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import assert_quantity_allclose
-from .. import gsb
-from ..gsb.payload import decode_4bit, encode_4bit
+from ... import gsb
+from ..payload import decode_4bit, encode_4bit
 
 
 # Test on 2016-AUG-19, using GMRT crab data

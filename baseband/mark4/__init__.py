@@ -14,8 +14,8 @@ to pass in the number of tracks used, and the decade the data were taken, since
 those numbers cannot be inferred from the data themselves.
 
 >>> from baseband import mark4
->>> sample_file = mark4.__file__.replace('mark4/__init__.py', 'tests/sample.m4')
->>> fh = mark4.open(sample_file, 'rb')
+>>> from baseband.data import SAMPLE_MARK4
+>>> fh = mark4.open(SAMPLE_MARK4, 'rb')
 >>> fh.find_frame(ntrack=64)
 2696
 >>> frame = fh.read_frame(ntrack=64, decade=2010)
@@ -28,7 +28,7 @@ writing is in units of samples.  It also provides access to header information.
 Here, we need to pass in the frame rate so that times for individual samples
 can be calculated (for longer files, this can be calculated from the file).
 
->>> fh = mark4.open(sample_file, 'rs', ntrack=64, decade=2010,
+>>> fh = mark4.open(SAMPLE_MARK4, 'rs', ntrack=64, decade=2010,
 ...                 frames_per_second=400)
 >>> fh
 <Mark4StreamReader name=... offset=0
