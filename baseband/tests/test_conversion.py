@@ -1,5 +1,4 @@
 import io
-import os
 import numpy as np
 from astropy import units as u
 from astropy.time import Time
@@ -9,13 +8,8 @@ from .. import mark4
 from .. import mark5b
 from .. import dada
 from ..vlbi_base.encoding import EIGHT_BIT_1_SIGMA
-
-
-SAMPLE_M4 = os.path.join(os.path.dirname(__file__), 'sample.m4')
-SAMPLE_M5B = os.path.join(os.path.dirname(__file__), 'sample.m5b')
-SAMPLE_VDIF = os.path.join(os.path.dirname(__file__), 'sample.vdif')
-SAMPLE_MWA = os.path.join(os.path.dirname(__file__), 'sample_mwa.vdif')
-SAMPLE_DADA = os.path.join(os.path.dirname(__file__), 'sample.dada')
+from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
+                    SAMPLE_VDIF, SAMPLE_MWA_VDIF as SAMPLE_MWA, SAMPLE_DADA)
 
 
 class TestVDIFMark5B(object):

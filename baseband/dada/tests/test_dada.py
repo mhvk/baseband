@@ -2,17 +2,15 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import os
 import io
 import copy
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import pytest, catch_warnings
-from .. import dada
-from ..dada.base import DADAFileNameSequencer
-
-SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.dada')
+from ... import dada
+from ..base import DADAFileNameSequencer
+from ...data import SAMPLE_DADA as SAMPLE_FILE
 
 
 class TestDADA(object):

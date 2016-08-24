@@ -15,8 +15,8 @@ binary mode provides a normal file reader but extended with methods to read a
 :class:`~baseband.vdif.VDIFFrame` (or :class:`~baseband.vdif.FrameSet`):
 
 >>> from baseband import vdif
->>> sample_file = vdif.__file__.replace('vdif/__init__.py', 'tests/sample.vdif')
->>> fh = vdif.open(sample_file, 'rb')
+>>> from baseband.data import SAMPLE_VDIF
+>>> fh = vdif.open(SAMPLE_VDIF, 'rb')
 >>> fs = fh.read_frameset()
 >>> fs.data.shape
 (8, 20000, 1)
@@ -26,7 +26,7 @@ Opening in stream mode wraps the low-level routines such that reading
 and writing is in units of samples.  It also provides access to header
 information.
 
->>> fh = vdif.open(sample_file, 'rs')
+>>> fh = vdif.open(SAMPLE_VDIF, 'rs')
 >>> fh
 <VDIFStreamReader name=... offset=0
     nthread=8, samples_per_frame=20000, nchan=1,
@@ -40,7 +40,7 @@ array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
 One can pick specific threads:
 
->>> fh = vdif.open(sample_file, 'rs', thread_ids=[2, 3])
+>>> fh = vdif.open(SAMPLE_VDIF, 'rs', thread_ids=[2, 3])
 >>> d = fh.read(20000)
 >>> d.shape
 (20000, 2)
@@ -66,7 +66,7 @@ Example to copy a VDIF file.  Here, we use the ``sort=False`` option to ensure
 the frames are written exactly in the same order, so the files should be
 identical.
 
->>> with vdif.open(sample_file, 'rb') as fr, vdif.open('try.vdif', 'wb') as fw:
+>>> with vdif.open(SAMPLE_VDIF, 'rb') as fr, vdif.open('try.vdif', 'wb') as fw:
 ...     while True:
 ...         try:
 ...             fw.write_frameset(fr.read_frameset(sort=False))
@@ -75,7 +75,7 @@ identical.
 
 For small files, one could just do:
 
->>> with vdif.open(sample_file, 'rs') as fr, vdif.open(
+>>> with vdif.open(SAMPLE_VDIF, 'rs') as fr, vdif.open(
 ...         'try.vdif', 'ws', header=fr.header0, nthread=fr.nthread) as fw:
 ...     fw.write(fr.read())
 

@@ -1,13 +1,11 @@
 import io
-import os
 import numpy as np
 from astropy import units as u
 from astropy.tests.helper import pytest
 from astropy.time import Time
-from .. import mark5b, vlbi_base
-
-
-SAMPLE_FILE = os.path.join(os.path.dirname(__file__), 'sample.m5b')
+from ... import mark5b
+from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
+from ...data import SAMPLE_MARK5B as SAMPLE_FILE
 
 
 # Check code on 2015-MAY-08.
@@ -98,7 +96,7 @@ class TestMark5B(object):
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
-        o2h = vlbi_base.encoding.OPTIMAL_2BIT_HIGH
+        o2h = OPTIMAL_2BIT_HIGH
         assert np.all(mark5b.payload.lut1bit[0] == -1.)
         assert np.all(mark5b.payload.lut1bit[0xff] == 1.)
         assert np.all(mark5b.payload.lut1bit.astype(int) ==
