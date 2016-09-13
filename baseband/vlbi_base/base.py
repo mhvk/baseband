@@ -138,9 +138,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek(-self.header0.framesize, 2)
-        header1 = self.fh_raw.find_frame(template_header=self.header0,
-                                         maximum=10*self.header0.framesize,
-                                         forward=False)
+        header1 = self.fh_raw.find_header(template_header=self.header0,
+                                          maximum=10*self.header0.framesize,
+                                          forward=False)
         self.fh_raw.seek(raw_offset)
         if header1 is None:
             raise TypeError("Corrupt VLBI frame? No frame in last {0} bytes."

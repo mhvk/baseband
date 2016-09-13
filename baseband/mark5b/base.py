@@ -15,7 +15,7 @@ __all__ = ['Mark5BFileReader', 'Mark5BFileWriter', 'Mark5BStreamReader',
 class Mark5BFileReader(io.BufferedReader):
     """Simple reader for Mark 5B files.
 
-    Adds ``read_frame`` and ``find_frame`` methods to the basic binary file
+    Adds ``read_frame`` and ``find_header`` methods to the basic binary file
     reader :class:`~io.BufferedReader`.
     """
 
@@ -41,8 +41,8 @@ class Mark5BFileReader(io.BufferedReader):
         return Mark5BFrame.fromfile(self, nchan=nchan, bps=bps,
                                     ref_mjd=ref_mjd)
 
-    def find_frame(self, kday=None, template_header=None, framesize=None,
-                   maximum=None, forward=True):
+    def find_header(self, template_header=None, kday=None, framesize=None,
+                    maximum=None, forward=True):
         """Look for the first occurrence of a frame.
 
         Search is from the current position.  If given, a template_header
