@@ -43,8 +43,7 @@ class Mark4FileReader(io.BufferedReader):
         """
         return Mark4Frame.fromfile(self, ntrack=ntrack, decade=decade)
 
-    def find_frame(self, ntrack=None, template_header=None,
-                   maximum=None, forward=True):
+    def find_frame(self, ntrack, maximum=None, forward=True):
         """Look for the first occurrence of a frame, from the current position.
 
         The search is for the following pattern:
@@ -55,6 +54,8 @@ class Mark4FileReader(io.BufferedReader):
 
         Parameters
         ----------
+        ntrack : int
+            Number of "tape tracks".
         maximum : int, optional
             Maximum number of bytes forward to search through.
             Default is the framesize (20000 * ntrack // 8).
@@ -65,8 +66,6 @@ class Mark4FileReader(io.BufferedReader):
         -------
         offset : int
         """
-        if template_header:
-            ntrack = template_header.ntrack
         nset = np.ones(32 * ntrack // 8, dtype=np.int16)
         nunset = np.ones(ntrack // 8, dtype=np.int16)
         b = ntrack * 2500
@@ -109,6 +108,23 @@ class Mark4FileReader(io.BufferedReader):
 
         self.seek(file_pos)
         return None
+
+    def find_header(self, template_header=None, ntrack=None, decade=None,
+                    maximum=None, forward=True):
+        """Look for the first occurrence of a frame, from the current position.
+
+        Read the header at that location and return it.
+        The file pointer is left at the start of the header.
+        """
+        if template_header is not None:
+            ntrack = template_header.ntrack
+            decade = template_header.decade
+        offset = self.find_frame(ntrack, maximum, forward)
+        if offset is None:
+            return None
+        header = Mark4Header.fromfile(self, ntrack=ntrack, decade=decade)
+        self.seek(offset)
+        return header
 
 
 class Mark4FileWriter(io.BufferedWriter):

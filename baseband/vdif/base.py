@@ -13,7 +13,7 @@ from .frame import VDIFFrame, VDIFFrameSet
 
 __all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
            'VDIFStreamReader', 'VDIFStreamWriter', 'open',
-           'find_frame']
+           'find_header']
 
 # Check code on 2015-MAY-30
 # 00000000  77 2c db 00 00 00 00 1c  75 02 00 20 fc ff 01 04  # header 0 - 3
@@ -239,9 +239,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         found = False
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
-            header1 = find_frame(self.fh_raw, template_header=self.header0,
-                                 maximum=10*self.header0.framesize,
-                                 forward=False)
+            header1 = find_header(self.fh_raw, template_header=self.header0,
+                                  maximum=10*self.header0.framesize,
+                                  forward=False)
             if header1 is None:
                 raise TypeError("Corrupt VDIF? No thread_id={0} frame in last "
                                 "{1} bytes."
@@ -484,13 +484,13 @@ def open(name, mode='rs', *args, **kwargs):
                          "or writing (mode='r' or 'w').")
 
 
-def find_frame(fh, template_header=None, framesize=None, maximum=None,
-               forward=True):
-    """Look for the first occurrence of a frame, from the current position.
+def find_header(fh, template_header=None, framesize=None, maximum=None,
+                forward=True):
+    """Look for the first occurrence of a header, from the current position.
 
     Search for a valid header at a given position which is consistent with
-    ``other_header`` or with a header a framesize ahead.   Note that the latter
-    turns out to be an unexpectedly weak check on real data!
+    ``template_header`` or with a header a framesize ahead.   Note that the
+    latter turns out to be an unexpectedly weak check on real data!
     """
     if template_header:
         framesize = template_header.framesize
