@@ -201,9 +201,10 @@ class Mark5BHeader(VLBIHeaderBase):
     def set_time(self, time):
         self.kday = int(time.mjd // 1000) * 1000
         self.jday = int(time.mjd - self.kday)
-        sec = (time - Time(self.kday+self.jday, format='mjd')).sec
-        sec, ns = divmod(sec, 1)
-        self.seconds = int(sec)
-        self.ns = round(ns * 1e9)
+        ns = int(round((time - Time(self.kday+self.jday, format='mjd')).sec *
+                       1e9))
+        sec, ns = divmod(ns, 1000000000)
+        self.seconds = sec
+        self.ns = ns
 
     time = property(get_time, set_time)
