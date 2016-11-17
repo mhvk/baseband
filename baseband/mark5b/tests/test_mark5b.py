@@ -93,6 +93,10 @@ class TestMark5B(object):
             header6.payloadsize = 9999
         with pytest.raises(ValueError):
             header6.framesize = 20
+        # Regression test
+        header7 = header.copy()
+        header7.time = Time('2016-09-10T12:26:40.000000000')
+        assert header7.ns == 0
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
