@@ -96,6 +96,20 @@ nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
          .sum(1).astype(np.int16))
 
 
+def decode_4chan_2bit_fanout4(frame):
+    """Decode payload for 4 channels using 2 bits, fan-out 4 (32 tracks)."""
+    # Bitwise reordering of tracks, to align sign and magnitude bits,
+    # reshaping to get VLBI channels in sequential, but wrong order.
+    frame = reorder32(frame).view(np.uint8).reshape(-1, 4)
+    # Correct ordering.
+    frame = frame.take(np.array([0, 2, 1, 3]), axis=1)
+    # The look-up table splits each data byte into 4 measurements.
+    # Using transpose ensures channels are first, then time samples, then
+    # those 4 measurements, so the reshape orders the samples correctly.
+    # Another transpose ensures samples are the first dimension.
+    return lut2bit1.take(frame.T, axis=0).reshape(4, -1).T
+
+
 def decode_8chan_2bit_fanout4(frame):
     """Decode payload for 8 channels using 2 bits, fan-out 4 (64 tracks)."""
     # Bitwise reordering of tracks, to align sign and magnitude bits,
@@ -146,7 +160,8 @@ class Mark4Payload(VLBIPayloadBase):
     _dtype_word = np.dtype('<u8')
     # Decoders keyed by (nchan, nbit, fanout).
     _encoders = {(8, 2, 4): encode_8chan_2bit_fanout4}
-    _decoders = {(8, 2, 4): decode_8chan_2bit_fanout4}
+    _decoders = {(4, 2, 4): decode_4chan_2bit_fanout4,
+                 (8, 2, 4): decode_8chan_2bit_fanout4}
 
     def __init__(self, words, header=None, nchan=1, bps=2, fanout=1):
         if header is not None:

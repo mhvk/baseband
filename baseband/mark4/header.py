@@ -260,7 +260,8 @@ class Mark4Header(Mark4TrackHeader):
     def verify(self):
         super(Mark4Header, self).verify()
         assert set(self['fan_out']) == set(np.arange(self.fanout))
-        assert set(self['converter_id']) == set(np.arange(self.nchan))
+        # The following cannot be assumed to be true, it seems.
+        # assert set(self['converter_id']) == set(np.arange(self.nchan))
 
     @classmethod
     def _stream_dtype(cls, ntrack):
