@@ -8,6 +8,13 @@ Created from a European VLBI Network/Arecibo PSR B1957+20 observation using
 dd if=gp052d_ar_no0021 of=sample.m4 bs=128000 count=3
 """
 
+SAMPLE_MARK4_32TRACK = __file__.replace('__init__.py', 'sample_32track.m4')
+"""Mark 4 sample.  ntrack=32, fanout=4, bps=2.
+
+Created from a Arecibo observation simultaneous with RadioAstron using
+dd if=ar/rg10a_ar_no0014 of=sample_32track.m4 bs=10000 count=17
+"""
+
 SAMPLE_MARK5B = __file__.replace('__init__.py', 'sample.m5b')
 """Mark 5B sample.  nchan=8, bps=2.
 

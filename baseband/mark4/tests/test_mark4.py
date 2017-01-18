@@ -6,7 +6,8 @@ from ... import mark4
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
 from ..header import Mark4TrackHeader
 from ..payload import reorder32, reorder64
-from ...data import SAMPLE_MARK4 as SAMPLE_FILE
+from ...data import (SAMPLE_MARK4 as SAMPLE_FILE,
+                     SAMPLE_MARK4_32TRACK as SAMPLE_32TRACK)
 
 # Results from mark5access on 2015-JAN-22.
 # m5d evn/Ar/gp052d_ar_no0021 MKIV1_4-512-8-2 1000
@@ -373,3 +374,50 @@ class TestMark4(object):
                 orig_bytes = fr.read(number_of_bytes)
                 conv_bytes = s.read()
                 assert conv_bytes == orig_bytes
+
+
+def test_32track_file():
+    with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
+        assert fh.find_frame(ntrack=32) == 9656
+
+    with mark4.open(SAMPLE_32TRACK, 'rs', ntrack=32, decade=2010,
+                    frames_per_second=400) as fh:
+        header0 = fh.header0
+        assert fh.samples_per_frame == 80000
+        time0 = fh.time0
+        assert time0.yday == '2015:011:01:23:10.48500'
+        record = fh.read(160000)
+        fh_raw_tell1 = fh.fh_raw.tell()
+        assert fh_raw_tell1 == 169656
+
+    assert np.all(record[:640] == 0.)
+    # Data retrieved using: m5d ar/rg10a_ar_no0014 MKIV1_4-256-4-2 700
+    assert np.all(record[640:644].astype(int) == np.array(
+        [[-1, 3, -1, -3],
+         [3, 3, -3, 1],
+         [-3, -1, 1, -1],
+         [1, 3, 1, 3]]))
+
+    with io.BytesIO() as s, mark4.open(s, 'ws', header=header0,
+                                       frames_per_second=400) as fw:
+        fw.write(record)
+        fw.fh_raw.flush()
+        number_of_bytes = s.tell()
+        assert number_of_bytes == fh_raw_tell1 - 9656
+
+        s.seek(0)
+        # Note: this test would not work if we wrote only a single record.
+        fh = mark4.open(s, 'rs', ntrack=32, decade=2010,
+                        frames_per_second=400)
+        assert fh.tell(unit='time').yday == time0.yday
+        record2 = fh.read(1000)
+        assert np.all(record2 == record[:1000])
+
+        s.seek(0)
+        with open(SAMPLE_32TRACK, 'rb') as fr:
+            fr.seek(9656)
+            orig_bytes = fr.read(number_of_bytes)
+            conv_bytes = s.read()
+            assert conv_bytes == orig_bytes
+
+        fh.close()
