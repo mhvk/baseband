@@ -1,13 +1,14 @@
+# Licensed under the GPLv3 - see LICENSE.rst
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+from copy import copy
+import io
+import numpy as np
+import pytest
 from ..utils import bcd_encode, bcd_decode, CRC
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
 from ..frame import VLBIFrameBase
-
-
-from copy import copy
-import io
-import numpy as np
-from astropy.tests.helper import pytest
 
 
 def encode_1bit(values):

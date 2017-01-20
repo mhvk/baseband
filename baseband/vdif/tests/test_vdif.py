@@ -4,7 +4,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import io
 import numpy as np
-from astropy.tests.helper import pytest
+import pytest
 from astropy.time import Time
 import astropy.units as u
 from ... import vdif, vlbi_base
