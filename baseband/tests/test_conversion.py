@@ -37,6 +37,10 @@ class TestVDIFMark5B(object):
         assert header.size == 32
         assert header.payloadsize == m5h.payloadsize
         assert header.samples_per_frame == 10000 * 8 // m5pl.bps // m5pl.nchan
+        # A copy will remove any `kday` keywords set, but should still work
+        # (Regression test for #34)
+        header1 = header.copy()
+        header1.verify()
 
     def test_payload(self):
         """Check Mark 5B payloads can used in a Mark5B VDIF payload."""
