@@ -578,6 +578,11 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
     def verify(self):
         super(VDIFMark5BHeader, self).verify()
         assert self['frame_length'] == 1254  # payload+header=10000+32 bytes/8
+        time = self.time
+        # Bit of a hack to ensure Mark5BHeader.get_time works.
+        # Seems pointless to do it in __init__ since this isn't really needed
+        # for anything but verification.
+        self.kday = int(time.mjd // 1000) * 1000
         assert abs(self.time - Mark5BHeader.get_time(self)) < 1. * u.ns
 
     def set_time(self, time):
