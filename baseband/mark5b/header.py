@@ -11,6 +11,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
+from astropy import units as u
 from astropy.time import Time
 
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, four_word_struct
@@ -95,6 +96,9 @@ class Mark5BHeader(VLBIHeaderBase):
         assert (self['sync_pattern'] ==
                 self._header_parser.defaults['sync_pattern'])
         assert self.kday is None or (33000 < self.kday < 400000)
+
+    def copy(self):
+        return super(Mark5BHeader, self).copy(kday=self.kday)
 
     def update(self, **kwargs):
         """Update the header by setting keywords or properties.
@@ -186,16 +190,45 @@ class Mark5BHeader(VLBIHeaderBase):
         fraction = int(ns / 100000)
         self['bcd_fraction'] = bcd_encode(fraction)
 
-    def get_time(self):
+    def get_time(self, framerate=None, frame_nr=None):
         """
         Convert year, BCD time code to Time object.
 
         Uses bcd-encoded 'jday', 'seconds', and 'frac_sec', plus ``kday``
         from the initialisation to calculate the time.  See
         http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+
+        Note that some non-compliant files have 'frac_sec' not set.  For those,
+        the time can still be retrieved using 'frame_nr' given a frame rate.
+
+        Parameters
+        ----------
+        framerate : `~astropy.units.Quantity`, optional
+            For non-zero `frame_nr`, this is used to calculate the
+            corresponding offset.
+        frame_nr : int, optional
+            Can be used to override the ``frame_nr`` from the header.  If 0,
+            the routine returns the time to integer seconds.
+
+        Returns
+        -------
+        `~astropy.time.Time`
         """
-        return Time(self.kday + self.jday,
-                    (self.seconds + 1.e-9 * self.ns) / 86400,
+        if framerate is None and frame_nr is None:
+            offset = self.ns * 1.e-9
+        else:
+            if frame_nr is None:
+                frame_nr = self['frame_nr']
+
+            if frame_nr == 0:
+                offset = 0.
+            else:
+                if framerate is None:
+                    raise ValueError("calculating the time for a non-zero "
+                                     "frame number requires a frame rate. "
+                                     "Pass it in explicitly.")
+                offset = (frame_nr / framerate).to(u.s).value
+        return Time(self.kday + self.jday, (self.seconds + offset) / 86400,
                     format='mjd', scale='utc', precision=9)
 
     def set_time(self, time):
