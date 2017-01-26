@@ -56,26 +56,32 @@ class VDIFHeader(VLBIHeaderBase):
                    'samples_per_frame', 'station', 'time')
     """Properties accessible/usable in initialisation for all VDIF headers."""
 
+    # These get set at the end.
+    _vdif_edv_header_classes = {}
+
     edv = None
 
     def __new__(cls, words, edv=None, verify=True, **kwargs):
-        # is_legacy_header, get_header_edv, and vdif_header_classes are
-        # defined at the end of the file.
+        # We use edv to define which class we return.
         if edv is None:
-            if is_legacy_header(words):
+            # If not given, we extract edv from the header words.  This uses
+            # parsers defined below, in VDIFBaseHeader.
+            base_parsers = VDIFBaseHeader._header_parser.parsers
+            if base_parsers['legacy_mode'](words):
                 edv = False
             else:
-                edv = get_header_edv(words)
+                edv = base_parsers['edv'](words)
 
         # Have to use key "-1" instead of "False" since the dict-lookup treats
         # 0 and False as identical.
-        cls = vdif_edv_headers.get(edv if edv is not False else -1,
-                                   VDIFBaseHeader)
+        cls = cls._vdif_edv_header_classes.get(edv if edv is not False else -1,
+                                               VDIFBaseHeader)
+        return super(VDIFHeader, cls).__new__(cls)
 
-        self = super(VDIFHeader, cls).__new__(cls)
-        self.edv = edv
-        # We intialise VDIFHeader subclasses, so their __init__ will be called.
-        return self
+    def __init__(self, words, edv=None, verify=True, **kwargs):
+        if edv is not None:
+            self.edv = edv
+        super(VDIFHeader, self).__init__(words, verify=verify, **kwargs)
 
     def copy(self):
         return super(VDIFHeader, self).copy(edv=self.edv)
@@ -394,16 +400,8 @@ class VDIFLegacyHeader(VDIFHeader):
          ('bits_per_sample', (3, 26, 5)),
          ('thread_id', (3, 16, 10, 0x0)),
          ('station_id', (3, 0, 16))))
-
-    def __init__(self, words=None, edv=False, verify=True):
-        if words is None:
-            self.words = (0, 0, 0, 0)
-        else:
-            self.words = words
-        if edv is not None:
-            self.edv = edv
-        if verify:
-            self.verify()
+    # Set default
+    edv = False
 
     def verify(self):
         """Basic checks of header integrity."""
@@ -420,15 +418,10 @@ class VDIFBaseHeader(VDIFHeader):
         (('legacy_mode', (0, 30, 1, False)),  # Repeat, to change default.
          ('edv', (4, 24, 8))))
 
-    def __init__(self, words=None, edv=None, verify=True, **kwargs):
-        if edv is not None:
-            self.edv = edv
-        super(VDIFBaseHeader, self).__init__(words, verify=verify, **kwargs)
-
     def verify(self):
         """Basic checks of header integrity."""
         assert not self['legacy_mode']
-        assert self.edv == self['edv']
+        assert self.edv is None or self.edv == self['edv']
         assert len(self.words) == 8
         if 'sync_pattern' in self.keys():
             assert (self['sync_pattern'] ==
@@ -440,6 +433,8 @@ class VDIFHeader0(VDIFBaseHeader):
 
     EDV=0 implies the extended user data fields are not used.
     """
+    edv = 0
+
     def verify(self):
         assert all(word == 0 for word in self.words[4:])
         super(VDIFHeader0, self).verify()
@@ -499,6 +494,7 @@ class VDIFHeader1(VDIFSampleRateHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0x01.pdf
     """
+    edv = 1
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('das_id', (6, 0, 64, 0x0)),))
 
@@ -508,6 +504,7 @@ class VDIFHeader3(VDIFSampleRateHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0x03.pdf
     """
+    edv = 3
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('frame_length', (2, 0, 24, 629)),  # Repeat, to set default.
          ('loif_tuning', (6, 0, 32, 0x0)),
@@ -530,7 +527,7 @@ class VDIFHeader4(VDIFSampleRateHeader):
 
     This is used for MWA according to Franz.  No extra header info?
     """
-    pass
+    edv = 4
 
 
 class VDIFHeader2(VDIFBaseHeader):
@@ -543,6 +540,7 @@ class VDIFHeader2(VDIFBaseHeader):
     This header is untested.  It may need to have subclasses, based on possible
     differentsync values.
     """
+    edv = 2
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
         (('complex_data', (3, 31, 1, 0x0)),  # Repeat, to set default.
          ('bits_per_sample', (3, 26, 5, 0x1)),  # Repeat, to set default.
@@ -564,6 +562,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
     """
+    edv = 0xab
     # Repeat 'frame_length' to set default.
     _header_parser = (VDIFBaseHeader._header_parser +
                       HeaderParser((('frame_length', (2, 0, 24, 1254)),)) +
@@ -636,15 +635,16 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
     time = property(VDIFHeader.get_time, set_time)
 
 
-is_legacy_header = VDIFBaseHeader._header_parser.parsers['legacy_mode']
-get_header_edv = VDIFBaseHeader._header_parser.parsers['edv']
+# For python >= 3.6, this could very easily be done with __init_subclass__,
+# but before it needs a metaclass, which seems to much trouble.
+VDIFHeader._vdif_edv_header_classes.update(
+    ((-1, VDIFLegacyHeader),
+     (0, VDIFHeader0),
+     (1, VDIFHeader1),
+     (2, VDIFHeader2),
+     (3, VDIFHeader3),
+     (4, VDIFHeader4),
+     (0xab, VDIFMark5BHeader)))
 
-vdif_edv_headers = {-1: VDIFLegacyHeader,
-                    0: VDIFHeader0,
-                    1: VDIFHeader1,
-                    2: VDIFHeader2,
-                    3: VDIFHeader3,
-                    4: VDIFHeader4,
-                    0xab: VDIFMark5BHeader}
-
-__all__ += [cls.__name__ for cls in vdif_edv_headers.values()]
+__all__ += [cls.__name__ for cls in
+            VDIFHeader._vdif_edv_header_classes.values()]
