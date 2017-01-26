@@ -331,13 +331,14 @@ class VDIFHeader(VLBIHeaderBase):
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
-    def set_time(self, time, framerate=None):
+    def set_time(self, time, framerate=None, frame_nr=None):
         """
         Convert Time object to ref_epoch, seconds, and frame_nr.
 
-        For non-integer seconds, the frame_nr will be calculated. This requires
-        the frame rate, which is calculated from the header.  It can be passed
-        on if this is not available (e.g., for a legacy VDIF header).
+        For non-integer seconds, the frame_nr will be calculated if not given
+        explicitly. This requires the frame rate, which is calculated from the
+        header.  It can be passed on if this is not available (e.g., for a
+        legacy VDIF header).
 
         Parameters
         ----------
@@ -347,30 +348,33 @@ class VDIFHeader(VLBIHeaderBase):
             For calculating the ``frame_nr`` from the fractional seconds.
             If not given, will try to calculate it from the sampling rate
             given in the header (but not all EDV contain this).
+        frame_nr : int, optional
+            An explicit frame number associated with the fractions of seconds.
         """
         assert time > ref_epochs[0]
         ref_index = np.searchsorted((ref_epochs - time).sec, 0) - 1
         self['ref_epoch'] = ref_index
         seconds = time - ref_epochs[ref_index]
         int_sec = int(seconds.sec)
-        frac_sec = seconds - int_sec * u.s
-        if abs(frac_sec) < 2. * u.ns:
-            frame_nr = 0
-        elif abs(1. * u.s - frac_sec) < 2. * u.ns:
-            int_sec += 1
-            frame_nr = 0
-        else:
-            if framerate is None:
-                try:
-                    framerate = self.framerate
-                except AttributeError:
-                    raise ValueError("Cannot calculate frame rate for this "
-                                     "header. Pass it in explicitly.")
-            frame_nr = int(round((frac_sec * framerate)
-                                 .to(u.dimensionless_unscaled).value))
-            if frame_nr == framerate.value:
+        if frame_nr is None:
+            frac_sec = seconds - int_sec * u.s
+            if abs(frac_sec) < 2. * u.ns:
                 frame_nr = 0
+            elif abs(1. * u.s - frac_sec) < 2. * u.ns:
                 int_sec += 1
+                frame_nr = 0
+            else:
+                if framerate is None:
+                    try:
+                        framerate = self.framerate
+                    except AttributeError:
+                        raise ValueError("Cannot calculate frame rate for "
+                                         "this header. Pass it in explicitly.")
+                frame_nr = int(round((frac_sec * framerate)
+                                     .to(u.dimensionless_unscaled).value))
+                if frame_nr == framerate.value:
+                    frame_nr = 0
+                    int_sec += 1
 
         self['seconds'] = int_sec
         self['frame_nr'] = frame_nr
@@ -582,6 +586,11 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         ref_mjd = ref_epochs[self['ref_epoch']].mjd + day
         assert ref_mjd % 1000 == self.jday  # Latter decodes 'bcd_jday'
 
+    def __setitem__(self, item, value):
+        super(VDIFMark5BHeader, self).__setitem__(item, value)
+        if item == 'frame_nr':
+            super(VDIFMark5BHeader, self).__setitem__('mark5b_frame_nr', value)
+
     def get_time(self, framerate=None, frame_nr=None):
         """
         Convert ref_epoch, seconds, and fractional seconds to Time object.
@@ -629,10 +638,10 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
     def set_time(self, time):
-        super(VDIFMark5BHeader, self).set_time(time)
         Mark5BHeader.set_time(self, time)
+        super(VDIFMark5BHeader, self).set_time(time, frame_nr=self['frame_nr'])
 
-    time = property(VDIFHeader.get_time, set_time)
+    time = property(get_time, set_time)
 
 
 # For python >= 3.6, this could very easily be done with __init_subclass__,

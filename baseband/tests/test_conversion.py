@@ -74,11 +74,16 @@ class TestVDIFMark5B(object):
     def test_frame(self):
         """Check a whole Mark 5B frame can be translated to VDIF."""
         with mark5b.open(SAMPLE_M5B, 'rb') as fh:
+            # pick the second frame just to be different from header checks
+            # above.
+            fh.seek(10016)
             m5f = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
+        assert m5f['frame_nr'] == 1
         frame = vdif.VDIFFrame.from_mark5b_frame(m5f)
         assert frame.size == 10032
         assert frame.shape == (5000, 8)
         assert np.all(frame.data == m5f.data)
+        assert frame.time == m5f.time
 
 
 class TestVDIF0VDIF1(object):
