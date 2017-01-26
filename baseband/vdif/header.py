@@ -58,7 +58,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     edv = None
 
-    def __new__(cls, words, edv=None, verify=True):
+    def __new__(cls, words, edv=None, verify=True, **kwargs):
         # is_legacy_header, get_header_edv, and vdif_header_classes are
         # defined at the end of the file.
         if edv is None:
@@ -420,15 +420,10 @@ class VDIFBaseHeader(VDIFHeader):
         (('legacy_mode', (0, 30, 1, False)),  # Repeat, to change default.
          ('edv', (4, 24, 8))))
 
-    def __init__(self, words=None, edv=None, verify=True):
-        if words is None:
-            self.words = [0, 0, 0, 0, 0, 0, 0, 0]
-        else:
-            self.words = words
+    def __init__(self, words=None, edv=None, verify=True, **kwargs):
         if edv is not None:
             self.edv = edv
-        if verify:
-            self.verify()
+        super(VDIFBaseHeader, self).__init__(words, verify=verify, **kwargs)
 
     def verify(self):
         """Basic checks of header integrity."""
@@ -572,18 +567,67 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
     # Repeat 'frame_length' to set default.
     _header_parser = (VDIFBaseHeader._header_parser +
                       HeaderParser((('frame_length', (2, 0, 24, 1254)),)) +
-                      HeaderParser(tuple((k, (v[0]+4,) + v[1:]) for (k, v) in
-                                         Mark5BHeader._header_parser.items())))
+                      HeaderParser(tuple(
+                          ((k if k != 'frame_nr' else 'mark5b_frame_nr'),
+                           (v[0]+4,) + v[1:])
+                          for (k, v) in Mark5BHeader._header_parser.items())))
 
     def verify(self):
         super(VDIFMark5BHeader, self).verify()
         assert self['frame_length'] == 1254  # payload+header=10000+32 bytes/8
-        time = self.time
-        # Bit of a hack to ensure Mark5BHeader.get_time works.
-        # Seems pointless to do it in __init__ since this isn't really needed
-        # for anything but verification.
-        self.kday = int(time.mjd // 1000) * 1000
-        assert abs(self.time - Mark5BHeader.get_time(self)) < 1. * u.ns
+        assert self['frame_nr'] == self['mark5b_frame_nr']
+        # check consistency of time down to the second (since some Mark 5B
+        # headers do not store 'bcd_fraction').
+        day, seconds = divmod(self['seconds'], 86400)
+        assert seconds == self.seconds  # Latter decodes 'bcd_seconds'
+        ref_mjd = ref_epochs[self['ref_epoch']].mjd + day
+        assert ref_mjd % 1000 == self.jday  # Latter decodes 'bcd_jday'
+
+    def get_time(self, framerate=None, frame_nr=None):
+        """
+        Convert ref_epoch, seconds, and fractional seconds to Time object.
+
+        Uses 'ref_epoch', which stores the number of half-years from 2000,
+        and 'seconds', from the VDIF part of the header, and the fractional
+        seconds from the Mark 5B part.
+
+        Since some Mark 5B headers do not store the fractional seconds,
+        one can also calculates the offset using the current frame number by
+        passing in a frame rate.
+
+        Set frame_nr=0 to just get the header time from ref_epoch and seconds.
+
+        Parameters
+        ----------
+        framerate : `~astropy.units.Quantity`, optional
+            For non-zero `frame_nr`, this is used to calculate the
+            corresponding offset.
+        frame_nr : int, optional
+            Can be used to override the ``frame_nr`` from the header.  If 0,
+            the routine simply returns the time to the integer second.
+
+        Returns
+        -------
+        `~astropy.time.Time`
+        """
+        if framerate is None and frame_nr is None:
+            # Get fractional second from the Mark 5B part of the header.
+            offset = self.ns * 1.e-9
+        else:
+            if frame_nr is None:
+                frame_nr = self['frame_nr']
+
+            if frame_nr == 0:
+                offset = 0.
+            else:
+                if framerate is None:
+                    raise ValueError("calculating the time for a non-zero "
+                                     "frame number requires a frame rate. "
+                                     "Pass it in explicitly.")
+            offset = (frame_nr / framerate).to(u.s).value
+
+        return (ref_epochs[self['ref_epoch']] +
+                TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
     def set_time(self, time):
         super(VDIFMark5BHeader, self).set_time(time)

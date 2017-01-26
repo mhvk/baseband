@@ -27,6 +27,8 @@ class TestVDIFMark5B(object):
                                                     bps=m5pl.bps)
         # Check all direct information is set correctly.
         assert all(m5h[key] == header[key] for key in m5h.keys())
+        assert header['mark5b_frame_nr'] == m5h['frame_nr']
+        assert header.kday == m5h.kday
         # As well as the time calculated from the header information.
         assert header.time == m5h.time
         # Check information on the payload is also correct.
@@ -37,10 +39,12 @@ class TestVDIFMark5B(object):
         assert header.size == 32
         assert header.payloadsize == m5h.payloadsize
         assert header.samples_per_frame == 10000 * 8 // m5pl.bps // m5pl.nchan
-        # A copy will remove any `kday` keywords set, but should still work
+        # A copy might remove any `kday` keywords set, but should still work
         # (Regression test for #34)
         header1 = header.copy()
         header1.verify()
+        # But it should not remove `kday` to start with (#35)
+        assert header1.kday == header.kday
 
     def test_payload(self):
         """Check Mark 5B payloads can used in a Mark5B VDIF payload."""

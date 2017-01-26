@@ -76,19 +76,19 @@ class Mark5BHeader(VLBIHeaderBase):
 
     kday = None
 
-    def __init__(self, words, ref_mjd=None, kday=None, verify=True):
-        if words is None:
-            self.words = [0, 0, 0, 0]
-        else:
-            self.words = words
+    def __init__(self, words, ref_mjd=None, kday=None, verify=True, **kwargs):
         if kday is not None:
             self.kday = kday
         elif ref_mjd is not None:
             ref_kday, ref_jday = divmod(ref_mjd, 1000)
-            self.kday = int(ref_kday +
-                            round((ref_jday - self.jday)/1000)) * 1000
-        if verify:
-            self.verify()
+            if words is None:
+                jday = 0.
+            else:
+                # self is not yet initialised, so get jday from words directly
+                jday = bcd_decode(
+                    self._header_parser.parsers['bcd_jday'](words))
+            self.kday = int(ref_kday + round((ref_jday - jday)/1000)) * 1000
+        super(Mark5BHeader, self).__init__(words, verify=verify, **kwargs)
 
     def verify(self):
         """Verify header integrity."""
@@ -97,8 +97,8 @@ class Mark5BHeader(VLBIHeaderBase):
                 self._header_parser.defaults['sync_pattern'])
         assert self.kday is None or (33000 < self.kday < 400000)
 
-    def copy(self):
-        return super(Mark5BHeader, self).copy(kday=self.kday)
+    def copy(self, **kwargs):
+        return super(Mark5BHeader, self).copy(kday=self.kday, **kwargs)
 
     def update(self, **kwargs):
         """Update the header by setting keywords or properties.
