@@ -603,6 +603,12 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         one can also calculates the offset using the current frame number by
         passing in a frame rate.
 
+        Furthermore, fractional seconds are stored only to 0.1 ms accuracy.
+        In the code, this is "unrounded" to give the exact time of the start
+        of the frame for any total bit rate below 512 Mbps.  For rates above
+        this value, it is no longer guaranteed that subsequent frames have
+        unique rates, and one should pass in an explicit frame rate instead.
+
         Set frame_nr=0 to just get the header time from ref_epoch and seconds.
 
         Parameters

@@ -178,7 +178,18 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @property
     def ns(self):
-        """Fractional seconds (in ns; decoded from 'bcd_fraction')."""
+        """Fractional seconds (in ns; decoded from 'bcd_fraction').
+
+        Note that the fraction is stored to 0.1 ms accuracy.  Following
+        mark5access, this is "unrounded" to give the exact time of the start
+        of the frame for any total bit rate below 512 Mbps.  For rates above
+        this value, it is no longer guaranteed that subsequent frames have
+        unique rates.
+
+        Note to the above: since a Mark5B frame contains 80000 buts, the total
+        bit rate for which times can be unique would in principle be 800 Mbps.
+        However, standard VLBI only uses bit rates that are powers of 2 in MHz.
+        """
         ns = bcd_decode(self['bcd_fraction']) * 100000
         # "unround" the nanoseconds
         return 156250 * ((ns+156249) // 156250)
@@ -200,6 +211,12 @@ class Mark5BHeader(VLBIHeaderBase):
 
         Note that some non-compliant files have 'frac_sec' not set.  For those,
         the time can still be retrieved using 'frame_nr' given a frame rate.
+
+        Furthermore, fractional seconds are stored only to 0.1 ms accuracy.
+        In the code, this is "unrounded" to give the exact time of the start
+        of the frame for any total bit rate below 512 Mbps.  For rates above
+        this value, it is no longer guaranteed that subsequent frames have
+        unique rates, and one should pass in an explicit frame rate instead.
 
         Parameters
         ----------
