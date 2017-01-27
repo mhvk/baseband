@@ -19,32 +19,49 @@ class TestVDIFMark5B(object):
         """Check Mark 5B header information can be stored in a VDIF header."""
         with open(SAMPLE_M5B, 'rb') as fh:
             # A rough start time is needed for Mark 5B to calculate time.
-            m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
+            ref_mjd = Time('2014-06-01').mjd
+            m5h1 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=ref_mjd)
             # For the payload, pass in how data is encoded.
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
-        # Create a VDIF header based on both the Mark 5B header and payload.
-        header = vdif.VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
-                                                    bps=m5pl.bps)
-        # Check all direct information is set correctly.
-        assert all(m5h[key] == header[key] for key in m5h.keys())
-        assert header['mark5b_frame_nr'] == m5h['frame_nr']
-        assert header.kday == m5h.kday
-        # As well as the time calculated from the header information.
-        assert header.time == m5h.time
-        # Check information on the payload is also correct.
-        assert header.nchan == 8
-        assert header.bps == 2
-        assert not header['complex_data']
-        assert header.framesize == 10032
-        assert header.size == 32
-        assert header.payloadsize == m5h.payloadsize
-        assert header.samples_per_frame == 10000 * 8 // m5pl.bps // m5pl.nchan
+            # A not-at-the-start header for checking times.
+            m5h2 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=ref_mjd)
+        # Create VDIF headers based on both the Mark 5B header and payload.
+        header1 = vdif.VDIFHeader.from_mark5b_header(m5h1, nchan=m5pl.nchan,
+                                                     bps=m5pl.bps)
+        header2 = vdif.VDIFHeader.from_mark5b_header(m5h2, nchan=m5pl.nchan,
+                                                     bps=m5pl.bps)
+        for i, (m5h, header) in enumerate(((m5h1, header1), (m5h2, header2))):
+            assert m5h['frame_nr'] == i
+            # Check all direct information is set correctly.
+            assert all(m5h[key] == header[key] for key in m5h.keys())
+            assert header['mark5b_frame_nr'] == m5h['frame_nr']
+            assert header.kday == m5h.kday
+            # As well as the time calculated from the header information.
+            assert header.time == m5h.time
+            # Check information on the payload is also correct.
+            assert header.nchan == 8
+            assert header.bps == 2
+            assert not header['complex_data']
+            assert header.framesize == 10032
+            assert header.size == 32
+            assert header.payloadsize == m5h.payloadsize
+            assert header.samples_per_frame == 10000*8//m5pl.bps//m5pl.nchan
+
         # A copy might remove any `kday` keywords set, but should still work
         # (Regression test for #34)
-        header1 = header.copy()
-        header1.verify()
+        header_copy = header2.copy()
+        assert header_copy == header2
+        header_copy.verify()
         # But it should not remove `kday` to start with (#35)
-        assert header1.kday == header.kday
+        assert header_copy.kday == header2.kday
+        # May as well check that with a corrupt 'bcd_fraction' we can still
+        # get the right time using the frame number.
+        header_copy['bcd_fraction'] = 0
+        # This is common enough that we should not fail verification.
+        header_copy.verify()
+        assert abs(header_copy.time - m5h2.time) > 1.*u.ns
+        assert abs(header_copy.get_time(framerate=32*u.MHz/m5pl.nsample) -
+                   m5h2.time) < 1.*u.ns
 
     def test_payload(self):
         """Check Mark 5B payloads can used in a Mark5B VDIF payload."""
@@ -74,8 +91,7 @@ class TestVDIFMark5B(object):
     def test_frame(self):
         """Check a whole Mark 5B frame can be translated to VDIF."""
         with mark5b.open(SAMPLE_M5B, 'rb') as fh:
-            # pick the second frame just to be different from header checks
-            # above.
+            # pick second frame just to be different from header checks above.
             fh.seek(10016)
             m5f = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
         assert m5f['frame_nr'] == 1
@@ -84,6 +100,9 @@ class TestVDIFMark5B(object):
         assert frame.shape == (5000, 8)
         assert np.all(frame.data == m5f.data)
         assert frame.time == m5f.time
+
+    def test_stream(self):
+        """Check we can encode a whole stream."""
 
 
 class TestVDIF0VDIF1(object):
