@@ -180,13 +180,12 @@ class Mark5BHeader(VLBIHeaderBase):
     def ns(self):
         """Fractional seconds (in ns; decoded from 'bcd_fraction').
 
-        Note that the fraction is stored to 0.1 ms accuracy.  Following
-        mark5access, this is "unrounded" to give the exact time of the start
-        of the frame for any total bit rate below 512 Mbps.  For rates above
-        this value, it is no longer guaranteed that subsequent frames have
-        unique rates.
+        The fraction is stored to 0.1 ms accuracy.  Following mark5access, this
+        is "unrounded" to give the exact time of the start of the frame for any
+        total bit rate below 512 Mbps.  For rates above this value, it is no
+        longer guaranteed that subsequent frames have unique rates.
 
-        Note to the above: since a Mark5B frame contains 80000 buts, the total
+        Note to the above: since a Mark5B frame contains 80000 bits, the total
         bit rate for which times can be unique would in principle be 800 Mbps.
         However, standard VLBI only uses bit rates that are powers of 2 in MHz.
         """
@@ -202,8 +201,7 @@ class Mark5BHeader(VLBIHeaderBase):
         self['bcd_fraction'] = bcd_encode(fraction)
 
     def get_time(self, framerate=None, frame_nr=None):
-        """
-        Convert year, BCD time code to Time object.
+        """Convert year, BCD time code to Time object.
 
         Uses bcd-encoded 'jday', 'seconds', and 'frac_sec', plus ``kday``
         from the initialisation to calculate the time.  See
