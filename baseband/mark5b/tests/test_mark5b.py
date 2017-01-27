@@ -93,8 +93,12 @@ class TestMark5B(object):
             header6.payloadsize = 9999
         with pytest.raises(ValueError):
             header6.framesize = 20
-        # Regression test
+        # Regression tests
         header7 = header.copy()
+        assert header7 == header  # This checks header.words
+        # Check kday gets copied as well
+        assert header7.kday == header.kday
+        # Check ns rounding works correctly.
         header7.time = Time('2016-09-10T12:26:40.000000000')
         assert header7.ns == 0
 
@@ -214,6 +218,19 @@ class TestMark5B(object):
                 header_time = frame.header.time
                 expected = time0 + frame.header['frame_nr'] * frame_duration
                 assert abs(header_time - expected) < 1. * u.ns
+
+        # On the last frame, also check one can recover the time if 'frac_sec'
+        # is not set.
+        header = frame.header.copy()
+        header['bcd_fraction'] = 0
+        # So, now recover first header time, which started on the second.
+        assert header.time == header0.time
+        # But if we pass in the correct framerate, it uses the frame_nr.
+        assert abs(header.get_time(frame_rate) - frame.header.time) < 1. * u.ns
+        assert abs(header.get_time(frame_rate, frame_nr=header['frame_nr']) -
+                   frame.header.time) < 1. * u.ns
+        # And if we pass in a frame_nr of zero, we get the integer second.
+        assert header.get_time(frame_rate, frame_nr=0) == header0.time
 
     def test_filestreamer(self):
         with open(SAMPLE_FILE, 'rb') as fh:

@@ -11,6 +11,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
+from astropy import units as u
 from astropy.time import Time
 
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, four_word_struct
@@ -75,19 +76,19 @@ class Mark5BHeader(VLBIHeaderBase):
 
     kday = None
 
-    def __init__(self, words, ref_mjd=None, kday=None, verify=True):
-        if words is None:
-            self.words = [0, 0, 0, 0]
-        else:
-            self.words = words
+    def __init__(self, words, ref_mjd=None, kday=None, verify=True, **kwargs):
         if kday is not None:
             self.kday = kday
         elif ref_mjd is not None:
             ref_kday, ref_jday = divmod(ref_mjd, 1000)
-            self.kday = int(ref_kday +
-                            round((ref_jday - self.jday)/1000)) * 1000
-        if verify:
-            self.verify()
+            if words is None:
+                jday = 0.
+            else:
+                # self is not yet initialised, so get jday from words directly
+                jday = bcd_decode(
+                    self._header_parser.parsers['bcd_jday'](words))
+            self.kday = int(ref_kday + round((ref_jday - jday)/1000)) * 1000
+        super(Mark5BHeader, self).__init__(words, verify=verify, **kwargs)
 
     def verify(self):
         """Verify header integrity."""
@@ -95,6 +96,9 @@ class Mark5BHeader(VLBIHeaderBase):
         assert (self['sync_pattern'] ==
                 self._header_parser.defaults['sync_pattern'])
         assert self.kday is None or (33000 < self.kday < 400000)
+
+    def copy(self, **kwargs):
+        return super(Mark5BHeader, self).copy(kday=self.kday, **kwargs)
 
     def update(self, **kwargs):
         """Update the header by setting keywords or properties.
@@ -174,7 +178,17 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @property
     def ns(self):
-        """Fractional seconds (in ns; decoded from 'bcd_fraction')."""
+        """Fractional seconds (in ns; decoded from 'bcd_fraction').
+
+        The fraction is stored to 0.1 ms accuracy.  Following mark5access, this
+        is "unrounded" to give the exact time of the start of the frame for any
+        total bit rate below 512 Mbps.  For rates above this value, it is no
+        longer guaranteed that subsequent frames have unique rates.
+
+        Note to the above: since a Mark5B frame contains 80000 bits, the total
+        bit rate for which times can be unique would in principle be 800 Mbps.
+        However, standard VLBI only uses bit rates that are powers of 2 in MHz.
+        """
         ns = bcd_decode(self['bcd_fraction']) * 100000
         # "unround" the nanoseconds
         return 156250 * ((ns+156249) // 156250)
@@ -186,16 +200,50 @@ class Mark5BHeader(VLBIHeaderBase):
         fraction = int(ns / 100000)
         self['bcd_fraction'] = bcd_encode(fraction)
 
-    def get_time(self):
-        """
-        Convert year, BCD time code to Time object.
+    def get_time(self, framerate=None, frame_nr=None):
+        """Convert year, BCD time code to Time object.
 
         Uses bcd-encoded 'jday', 'seconds', and 'frac_sec', plus ``kday``
         from the initialisation to calculate the time.  See
         http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+
+        Note that some non-compliant files have 'frac_sec' not set.  For those,
+        the time can still be retrieved using 'frame_nr' given a frame rate.
+
+        Furthermore, fractional seconds are stored only to 0.1 ms accuracy.
+        In the code, this is "unrounded" to give the exact time of the start
+        of the frame for any total bit rate below 512 Mbps.  For rates above
+        this value, it is no longer guaranteed that subsequent frames have
+        unique rates, and one should pass in an explicit frame rate instead.
+
+        Parameters
+        ----------
+        framerate : `~astropy.units.Quantity`, optional
+            For non-zero `frame_nr`, this is used to calculate the
+            corresponding offset.
+        frame_nr : int, optional
+            Can be used to override the ``frame_nr`` from the header.  If 0,
+            the routine returns the time to integer seconds.
+
+        Returns
+        -------
+        `~astropy.time.Time`
         """
-        return Time(self.kday + self.jday,
-                    (self.seconds + 1.e-9 * self.ns) / 86400,
+        if framerate is None and frame_nr is None:
+            offset = self.ns * 1.e-9
+        else:
+            if frame_nr is None:
+                frame_nr = self['frame_nr']
+
+            if frame_nr == 0:
+                offset = 0.
+            else:
+                if framerate is None:
+                    raise ValueError("calculating the time for a non-zero "
+                                     "frame number requires a frame rate. "
+                                     "Pass it in explicitly.")
+                offset = (frame_nr / framerate).to(u.s).value
+        return Time(self.kday + self.jday, (self.seconds + offset) / 86400,
                     format='mjd', scale='utc', precision=9)
 
     def set_time(self, time):

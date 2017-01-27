@@ -56,26 +56,32 @@ class VDIFHeader(VLBIHeaderBase):
                    'samples_per_frame', 'station', 'time')
     """Properties accessible/usable in initialisation for all VDIF headers."""
 
+    # These get set at the end.
+    _vdif_edv_header_classes = {}
+
     edv = None
 
-    def __new__(cls, words, edv=None, verify=True):
-        # is_legacy_header, get_header_edv, and vdif_header_classes are
-        # defined at the end of the file.
+    def __new__(cls, words, edv=None, verify=True, **kwargs):
+        # We use edv to define which class we return.
         if edv is None:
-            if is_legacy_header(words):
+            # If not given, we extract edv from the header words.  This uses
+            # parsers defined below, in VDIFBaseHeader.
+            base_parsers = VDIFBaseHeader._header_parser.parsers
+            if base_parsers['legacy_mode'](words):
                 edv = False
             else:
-                edv = get_header_edv(words)
+                edv = base_parsers['edv'](words)
 
         # Have to use key "-1" instead of "False" since the dict-lookup treats
         # 0 and False as identical.
-        cls = vdif_edv_headers.get(edv if edv is not False else -1,
-                                   VDIFBaseHeader)
+        cls = cls._vdif_edv_header_classes.get(edv if edv is not False else -1,
+                                               VDIFBaseHeader)
+        return super(VDIFHeader, cls).__new__(cls)
 
-        self = super(VDIFHeader, cls).__new__(cls)
-        self.edv = edv
-        # We intialise VDIFHeader subclasses, so their __init__ will be called.
-        return self
+    def __init__(self, words, edv=None, verify=True, **kwargs):
+        if edv is not None:
+            self.edv = edv
+        super(VDIFHeader, self).__init__(words, verify=verify, **kwargs)
 
     def copy(self):
         return super(VDIFHeader, self).copy(edv=self.edv)
@@ -325,13 +331,14 @@ class VDIFHeader(VLBIHeaderBase):
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
-    def set_time(self, time, framerate=None):
+    def set_time(self, time, framerate=None, frame_nr=None):
         """
         Convert Time object to ref_epoch, seconds, and frame_nr.
 
-        For non-integer seconds, the frame_nr will be calculated. This requires
-        the frame rate, which is calculated from the header.  It can be passed
-        on if this is not available (e.g., for a legacy VDIF header).
+        For non-integer seconds, the frame_nr will be calculated if not given
+        explicitly. This requires the frame rate, which is calculated from the
+        header.  It can be passed on if this is not available (e.g., for a
+        legacy VDIF header).
 
         Parameters
         ----------
@@ -341,30 +348,33 @@ class VDIFHeader(VLBIHeaderBase):
             For calculating the ``frame_nr`` from the fractional seconds.
             If not given, will try to calculate it from the sampling rate
             given in the header (but not all EDV contain this).
+        frame_nr : int, optional
+            An explicit frame number associated with the fractions of seconds.
         """
         assert time > ref_epochs[0]
         ref_index = np.searchsorted((ref_epochs - time).sec, 0) - 1
         self['ref_epoch'] = ref_index
         seconds = time - ref_epochs[ref_index]
         int_sec = int(seconds.sec)
-        frac_sec = seconds - int_sec * u.s
-        if abs(frac_sec) < 2. * u.ns:
-            frame_nr = 0
-        elif abs(1. * u.s - frac_sec) < 2. * u.ns:
-            int_sec += 1
-            frame_nr = 0
-        else:
-            if framerate is None:
-                try:
-                    framerate = self.framerate
-                except AttributeError:
-                    raise ValueError("Cannot calculate frame rate for this "
-                                     "header. Pass it in explicitly.")
-            frame_nr = int(round((frac_sec * framerate)
-                                 .to(u.dimensionless_unscaled).value))
-            if frame_nr == framerate.value:
+        if frame_nr is None:
+            frac_sec = seconds - int_sec * u.s
+            if abs(frac_sec) < 2. * u.ns:
                 frame_nr = 0
+            elif abs(1. * u.s - frac_sec) < 2. * u.ns:
                 int_sec += 1
+                frame_nr = 0
+            else:
+                if framerate is None:
+                    try:
+                        framerate = self.framerate
+                    except AttributeError:
+                        raise ValueError("Cannot calculate frame rate for "
+                                         "this header. Pass it in explicitly.")
+                frame_nr = int(round((frac_sec * framerate)
+                                     .to(u.dimensionless_unscaled).value))
+                if abs(frame_nr / framerate - 1. * u.s) < 1. * u.ns:
+                    frame_nr = 0
+                    int_sec += 1
 
         self['seconds'] = int_sec
         self['frame_nr'] = frame_nr
@@ -394,16 +404,8 @@ class VDIFLegacyHeader(VDIFHeader):
          ('bits_per_sample', (3, 26, 5)),
          ('thread_id', (3, 16, 10, 0x0)),
          ('station_id', (3, 0, 16))))
-
-    def __init__(self, words=None, edv=False, verify=True):
-        if words is None:
-            self.words = (0, 0, 0, 0)
-        else:
-            self.words = words
-        if edv is not None:
-            self.edv = edv
-        if verify:
-            self.verify()
+    # Set default
+    edv = False
 
     def verify(self):
         """Basic checks of header integrity."""
@@ -420,20 +422,10 @@ class VDIFBaseHeader(VDIFHeader):
         (('legacy_mode', (0, 30, 1, False)),  # Repeat, to change default.
          ('edv', (4, 24, 8))))
 
-    def __init__(self, words=None, edv=None, verify=True):
-        if words is None:
-            self.words = [0, 0, 0, 0, 0, 0, 0, 0]
-        else:
-            self.words = words
-        if edv is not None:
-            self.edv = edv
-        if verify:
-            self.verify()
-
     def verify(self):
         """Basic checks of header integrity."""
         assert not self['legacy_mode']
-        assert self.edv == self['edv']
+        assert self.edv is None or self.edv == self['edv']
         assert len(self.words) == 8
         if 'sync_pattern' in self.keys():
             assert (self['sync_pattern'] ==
@@ -445,6 +437,8 @@ class VDIFHeader0(VDIFBaseHeader):
 
     EDV=0 implies the extended user data fields are not used.
     """
+    edv = 0
+
     def verify(self):
         assert all(word == 0 for word in self.words[4:])
         super(VDIFHeader0, self).verify()
@@ -504,6 +498,7 @@ class VDIFHeader1(VDIFSampleRateHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0x01.pdf
     """
+    edv = 1
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('das_id', (6, 0, 64, 0x0)),))
 
@@ -513,6 +508,7 @@ class VDIFHeader3(VDIFSampleRateHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0x03.pdf
     """
+    edv = 3
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('frame_length', (2, 0, 24, 629)),  # Repeat, to set default.
          ('loif_tuning', (6, 0, 32, 0x0)),
@@ -535,7 +531,7 @@ class VDIFHeader4(VDIFSampleRateHeader):
 
     This is used for MWA according to Franz.  No extra header info?
     """
-    pass
+    edv = 4
 
 
 class VDIFHeader2(VDIFBaseHeader):
@@ -548,6 +544,7 @@ class VDIFHeader2(VDIFBaseHeader):
     This header is untested.  It may need to have subclasses, based on possible
     differentsync values.
     """
+    edv = 2
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
         (('complex_data', (3, 31, 1, 0x0)),  # Repeat, to set default.
          ('bits_per_sample', (3, 26, 5, 0x1)),  # Repeat, to set default.
@@ -569,38 +566,100 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
     """
+    edv = 0xab
     # Repeat 'frame_length' to set default.
     _header_parser = (VDIFBaseHeader._header_parser +
                       HeaderParser((('frame_length', (2, 0, 24, 1254)),)) +
-                      HeaderParser(tuple((k, (v[0]+4,) + v[1:]) for (k, v) in
-                                         Mark5BHeader._header_parser.items())))
+                      HeaderParser(tuple(
+                          ((k if k != 'frame_nr' else 'mark5b_frame_nr'),
+                           (v[0]+4,) + v[1:])
+                          for (k, v) in Mark5BHeader._header_parser.items())))
 
     def verify(self):
         super(VDIFMark5BHeader, self).verify()
         assert self['frame_length'] == 1254  # payload+header=10000+32 bytes/8
-        time = self.time
-        # Bit of a hack to ensure Mark5BHeader.get_time works.
-        # Seems pointless to do it in __init__ since this isn't really needed
-        # for anything but verification.
-        self.kday = int(time.mjd // 1000) * 1000
-        assert abs(self.time - Mark5BHeader.get_time(self)) < 1. * u.ns
+        assert self['frame_nr'] == self['mark5b_frame_nr']
+        # check consistency of time down to the second (since some Mark 5B
+        # headers do not store 'bcd_fraction').
+        day, seconds = divmod(self['seconds'], 86400)
+        assert seconds == self.seconds  # Latter decodes 'bcd_seconds'
+        ref_mjd = ref_epochs[self['ref_epoch']].mjd + day
+        assert ref_mjd % 1000 == self.jday  # Latter decodes 'bcd_jday'
+
+    def __setitem__(self, item, value):
+        super(VDIFMark5BHeader, self).__setitem__(item, value)
+        if item == 'frame_nr':
+            super(VDIFMark5BHeader, self).__setitem__('mark5b_frame_nr', value)
+
+    def get_time(self, framerate=None, frame_nr=None):
+        """
+        Convert ref_epoch, seconds, and fractional seconds to Time object.
+
+        Uses 'ref_epoch', which stores the number of half-years from 2000,
+        and 'seconds', from the VDIF part of the header, and the fractional
+        seconds from the Mark 5B part.
+
+        Since some Mark 5B headers do not store the fractional seconds,
+        one can also calculates the offset using the current frame number by
+        passing in a frame rate.
+
+        Furthermore, fractional seconds are stored only to 0.1 ms accuracy.
+        In the code, this is "unrounded" to give the exact time of the start
+        of the frame for any total bit rate below 512 Mbps.  For rates above
+        this value, it is no longer guaranteed that subsequent frames have
+        unique rates, and one should pass in an explicit frame rate instead.
+
+        Set frame_nr=0 to just get the header time from ref_epoch and seconds.
+
+        Parameters
+        ----------
+        framerate : `~astropy.units.Quantity`, optional
+            For non-zero `frame_nr`, this is used to calculate the
+            corresponding offset.
+        frame_nr : int, optional
+            Can be used to override the ``frame_nr`` from the header.  If 0,
+            the routine simply returns the time to the integer second.
+
+        Returns
+        -------
+        `~astropy.time.Time`
+        """
+        if framerate is None and frame_nr is None:
+            # Get fractional second from the Mark 5B part of the header.
+            offset = self.ns * 1.e-9
+        else:
+            if frame_nr is None:
+                frame_nr = self['frame_nr']
+
+            if frame_nr == 0:
+                offset = 0.
+            else:
+                if framerate is None:
+                    raise ValueError("calculating the time for a non-zero "
+                                     "frame number requires a frame rate. "
+                                     "Pass it in explicitly.")
+            offset = (frame_nr / framerate).to(u.s).value
+
+        return (ref_epochs[self['ref_epoch']] +
+                TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
     def set_time(self, time):
-        super(VDIFMark5BHeader, self).set_time(time)
         Mark5BHeader.set_time(self, time)
+        super(VDIFMark5BHeader, self).set_time(time, frame_nr=self['frame_nr'])
 
-    time = property(VDIFHeader.get_time, set_time)
+    time = property(get_time, set_time)
 
 
-is_legacy_header = VDIFBaseHeader._header_parser.parsers['legacy_mode']
-get_header_edv = VDIFBaseHeader._header_parser.parsers['edv']
+# For python >= 3.6, this could very easily be done with __init_subclass__,
+# but before it needs a metaclass, which seems to much trouble.
+VDIFHeader._vdif_edv_header_classes.update(
+    ((-1, VDIFLegacyHeader),
+     (0, VDIFHeader0),
+     (1, VDIFHeader1),
+     (2, VDIFHeader2),
+     (3, VDIFHeader3),
+     (4, VDIFHeader4),
+     (0xab, VDIFMark5BHeader)))
 
-vdif_edv_headers = {-1: VDIFLegacyHeader,
-                    0: VDIFHeader0,
-                    1: VDIFHeader1,
-                    2: VDIFHeader2,
-                    3: VDIFHeader3,
-                    4: VDIFHeader4,
-                    0xab: VDIFMark5BHeader}
-
-__all__ += [cls.__name__ for cls in vdif_edv_headers.values()]
+__all__ += [cls.__name__ for cls in
+            VDIFHeader._vdif_edv_header_classes.values()]
