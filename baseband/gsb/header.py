@@ -210,7 +210,7 @@ class GSBHeader(VLBIHeaderBase):
                 tuple(self.words) == tuple(other.words))
 
 
-if six.PY2:
+if six.PY2:  # pragma: py2
     def str_split(string):
         return str(string).split()
 else:

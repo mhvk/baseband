@@ -42,7 +42,7 @@ class GSBTimeStampIO(io.TextIOWrapper):
             If no header is given, these are used to initialize one.
         """
         if header is None:
-            header = GSBHeader(**kwargs)
+            header = GSBHeader.fromvalues(**kwargs)
         header.tofile(self)
 
 
@@ -157,6 +157,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             fh_ts, fh_raw, header0, nchan=nchan, bps=bps,
             complex_data=complex_data,
             thread_ids=thread_ids, samples_per_frame=samples_per_frame,
+            payloadsize=payloadsize,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
         self._frame_nr = None
 
@@ -260,11 +261,14 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
                  complex_data=None, samples_per_frame=None, payloadsize=None,
                  frames_per_second=None, sample_rate=None, **kwargs):
         if header is None:
-            header = GSBHeader.fromvalues(**kwargs)
+            mode = kwargs.pop('header_mode',
+                              'rawdump' if hasattr(fh_raw, 'read') else
+                              'phased')
+            header = GSBHeader.fromvalues(mode=mode, **kwargs)
         super(GSBStreamWriter, self).__init__(
             fh_ts, fh_raw, header, nchan=nchan, bps=bps,
             complex_data=complex_data,
-            payloadsize=payloadsize, samples_per_frame=samples_per_frame,
+            samples_per_frame=samples_per_frame, payloadsize=payloadsize,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
         self._data = np.zeros((self.samples_per_frame, self.nthread,
                                self.nchan), (np.complex64 if self.complex_data
@@ -376,8 +380,10 @@ def open(name, mode='rs', **kwargs):
         Header for the first frame, holding time information, etc.
     **kwargs
         If the header is not given, an attempt will be made to construct one
-        with any further keyword arguments.  See
-        :class:`~baseband.gsb.base.GSBStreamWriter`.
+        with any further keyword arguments.  If one requires to explicitly set
+        the mode of the GSB stream, use ``header_mode`` (if not given, it will
+        be 'rawdump' if only a single raw file is present, 'phased' otherwise).
+        See :class:`~baseband.gsb.base.GSBStreamWriter`.
 
     Returns
     -------
@@ -395,8 +401,8 @@ def open(name, mode='rs', **kwargs):
         if not hasattr(name, 'read' if 'r' in mode else 'write'):
             name = io.open(name, mode.replace('t', '')+'b')
         elif isinstance(name, io.TextIOBase):
-            raise ValueError("Only binary file handles can be used as buffer "
-                             "for timestamp files.")
+            raise TypeError("Only binary file handles can be used as buffer "
+                            "for timestamp files.")
         return GSBTimeStampIO(name)
 
     if 'b' in mode:
