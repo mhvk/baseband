@@ -372,7 +372,7 @@ class VDIFHeader(VLBIHeaderBase):
                                          "this header. Pass it in explicitly.")
                 frame_nr = int(round((frac_sec * framerate)
                                      .to(u.dimensionless_unscaled).value))
-                if frame_nr == framerate.value:
+                if abs(frame_nr / framerate - 1. * u.s) < 1. * u.ns:
                     frame_nr = 0
                     int_sec += 1
 
