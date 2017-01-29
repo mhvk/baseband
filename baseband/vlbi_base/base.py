@@ -2,7 +2,6 @@ import warnings
 import numpy as np
 from astropy import units as u
 from astropy.utils import lazyproperty
-from .utils import get_frame_rate
 
 
 __all__ = ['u_sample', 'VLBIStreamBase', 'VLBIStreamReaderBase',
@@ -115,6 +114,26 @@ class VLBIStreamBase(object):
                 "    {t}(start) time={s.time0.isot}>"
                 .format(s=self, t=('thread_ids={0}, '.format(self.thread_ids)
                                    if self.thread_ids else '')))
+
+
+def get_frame_rate(fh, header_class):
+    """Returns the number of frames in one second of data."""
+    fh.seek(0)
+    header = header_class.fromfile(fh)
+    assert header['frame_nr'] == 0
+    sec0 = header.seconds
+    while header['frame_nr'] == 0:
+        fh.seek(header.payloadsize, 1)
+        header = header_class.fromfile(fh)
+    while header['frame_nr'] > 0:
+        max_frame = header['frame_nr']
+        fh.seek(header.payloadsize, 1)
+        header = header_class.fromfile(fh)
+
+    if header.seconds != sec0 + 1:
+        warnings.warn("Header time changed by more than 1 second?")
+
+    return max_frame + 1
 
 
 class VLBIStreamReaderBase(VLBIStreamBase):

@@ -165,7 +165,7 @@ class HeaderPropertyGetter(object):
         self.__doc__ = doc or getter.__doc__
 
     def __get__(self, instance, owner_cls=None):
-        if instance is None:
+        if instance is None:  # pragma: no cover
             return self
         return HeaderProperty(instance, getattr(instance, self.getter),
                               doc=self.__doc__)
