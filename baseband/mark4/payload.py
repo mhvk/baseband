@@ -19,7 +19,7 @@ __all__ = ['reorder32', 'reorder64', 'init_luts', 'decode_8chan_2bit_fanout4',
            'encode_8chan_2bit_fanout4', 'Mark4Payload']
 
 #  2bit/fanout4 use the following in decoding 32 and 64 track data:
-if sys.byteorder == 'big':
+if sys.byteorder == 'big':  # pragma: no cover
     def reorder32(x):
         """Reorder 32-track bits to bring signs & magnitudes together."""
         return (((x & 0x55AA55AA)) |

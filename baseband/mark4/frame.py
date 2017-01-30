@@ -161,5 +161,7 @@ class Mark4Frame(VLBIFrameBase):
         if isinstance(item, six.string_types):
             return self.header.__getitem__(item)
         else:
+            # Need to learn how to deal with invalid data part!  Hence,
+            # we cannot just slice the payload like vlbi_base.frame.
             raise IndexError("{0} object can not be indexed or sliced yet."
                              .format(type(self)))

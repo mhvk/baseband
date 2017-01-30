@@ -87,10 +87,10 @@ class TestMark4(object):
         # Try initialising with properties instead of keywords.
         # Here, we let time imply the decade, bcd_unit_year, bcd_day, bcd_hour,
         # bcd_minute, bcd_second, bcd_fraction;
-        # and ntrack, fanout, bps define headstack_id, bcd_track_id,
+        # and ntrack, samples_per_frame, bps define headstack_id, bcd_track_id,
         # fan_out, magnitude_bit, and converter_id.
         header4 = mark4.Mark4Header.fromvalues(
-            ntrack=64, fanout=4, bps=2, time=header.time,
+            ntrack=64, samples_per_frame=80000, bps=2, time=header.time,
             bcd_headstack1=0x3344, bcd_headstack2=0x1122,
             lsb_output=True, system_id=108)
         assert header4 == header
@@ -138,8 +138,8 @@ class TestMark4(object):
         assert len(header7.time) == 64
         assert np.all(abs(header7.time - header.time -
                           np.arange(64) * 125 * u.ms) < 1.*u.ns)
-        with pytest.raises(ValueError):
-            header7.time = header.time - np.linspace(0, 20, 64) * u.year
+        with pytest.raises(ValueError):  # different decades
+            header7.time = header.time - (np.linspace(0, 20, 64) // 4) * 4*u.yr
         # Check slicing.
         header8 = header[:2]
         assert type(header8) is mark4.Mark4Header
@@ -287,6 +287,12 @@ class TestMark4(object):
         assert np.all(frame5.data == 0.)
         frame5.valid = True
         assert frame5 == frame
+        # check __getitem__
+        assert np.all(frame['magnitude_bit'] == header['magnitude_bit'])
+        # indexing with a slice should not (yet) work, since we cannot just
+        # take the slice of the payload.
+        with pytest.raises(IndexError):
+            frame[10:20]
 
     def test_header_times(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
@@ -307,7 +313,91 @@ class TestMark4(object):
                 expected = time0 + frame_nr * frame_duration
                 assert abs(header_time - expected) < 1. * u.ns
 
-    def test_filestreamer(self):
+    def test_find_header(self):
+        # Below, the tests set the file pointer to very close to a header,
+        # since otherwise they run *very* slow.  This is somehow related to
+        # pytest, since speed is not a big issue running stuff on its own.
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            header0 = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+            fh.seek(0)
+            header_0 = fh.find_header(template_header=header0)
+            assert fh.tell() == 0xa88
+            fh.seek(0xa89)
+            header_0xa89 = fh.find_header(template_header=header0)
+            assert fh.tell() == 0xa88 + header0.framesize
+            fh.seek(160000)
+            header_160000f = fh.find_header(template_header=header0,
+                                            forward=True)
+            assert fh.tell() == 0xa88 + header0.framesize
+            fh.seek(0xa87)
+            header_0xa87b = fh.find_header(template_header=header0,
+                                           forward=False)
+            assert header_0xa87b is None
+            assert fh.tell() == 0xa87
+            fh.seek(0xa88)
+            header_0xa88f = fh.find_header(template_header=header0)
+            assert fh.tell() == 0xa88
+            fh.seek(0xa88)
+            header_0xa88b = fh.find_header(template_header=header0,
+                                           forward=False)
+            assert fh.tell() == 0xa88
+            fh.seek(0xa88 + 100)
+            header_100b = fh.find_header(template_header=header0,
+                                         forward=False)
+            assert fh.tell() == 0xa88
+            fh.seek(-10000, 2)
+            header_m10000b = fh.find_header(template_header=header0,
+                                            forward=False)
+            assert fh.tell() == 0xa88 + 2*header0.framesize
+            fh.seek(-300, 2)
+            header_end = fh.find_header(template_header=header0, forward=True)
+            assert header_end is None
+        assert header_100b == header_0
+        assert header_0xa88f == header_0
+        assert header_0xa88b == header_0
+        assert header_0xa89 == header_160000f
+        assert abs(header_160000f.time - header_0.time - 2.5*u.ms) < 1.*u.ns
+        assert abs(header_m10000b.time - header_0.time - 5*u.ms) < 1.*u.ns
+        # test small file
+        with open(SAMPLE_FILE, 'rb') as fh:
+            # One that simply is too small altogether
+            with io.BytesIO() as s, mark4.open(s, 'rb') as fh_short:
+                s.write(fh.read(80000))
+                fh_short.seek(100)
+                assert fh_short.find_header(template_header=header0) is None
+                assert fh_short.tell() == 100
+                assert fh_short.find_header(template_header=header0,
+                                            forward=False) is None
+                assert fh_short.tell() == 100
+
+            # And one that could fit one frame, but doesn't.
+            with io.BytesIO() as s, mark4.open(s, 'rb') as fh_short:
+                fh.seek(0)
+                s.write(fh.read(162690))
+                fh_short.seek(200)
+                assert fh_short.find_header(template_header=header0) is None
+                assert fh_short.tell() == 200
+                assert fh_short.find_header(template_header=header0,
+                                            forward=False) is None
+                assert fh_short.tell() == 200
+
+            # now add enough that the file does include a complete header.
+            with io.BytesIO() as s, mark4.open(s, 'rb') as fh_short2:
+                fh.seek(0)
+                s.write(fh.read(163000))
+                s.seek(0)
+                fh_short2.seek(100)
+                header_100f = fh_short2.find_header(template_header=header0)
+                assert fh_short2.tell() == 0xa88
+                fh_short2.seek(-1000, 2)
+                header_m1000b = fh_short2.find_header(template_header=header0,
+                                                      forward=False)
+                assert fh_short2.tell() == 0xa88
+            assert header_100f == header0
+            assert header_m1000b == header0
+
+    def test_filestreamer(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
@@ -317,6 +407,8 @@ class TestMark4(object):
             assert header == fh.header0
             # Raw file should be just after frame 0.
             assert fh.fh_raw.tell() == 0xa88 + fh.header0.framesize
+            assert fh.samples_per_frame == 80000
+            assert fh.size == 2 * fh.samples_per_frame
             record = fh.read(642)
             assert fh.tell() == 642
             # regression test against #4, of incorrect frame offsets.
@@ -325,6 +417,10 @@ class TestMark4(object):
             assert fh.tell() == 80641
             # Raw file should be just after frame 1.
             assert fh.fh_raw.tell() == 0xa88 + 2 * fh.header0.framesize
+            # While we're at it, check in-place reading as well.
+            fh.seek(80000 + 639)
+            out = np.zeros_like(record2)
+            record3 = fh.read(out=out)
 
         assert record.shape == (642, 8)
         assert np.all(record[:640] == 0.)
@@ -335,28 +431,35 @@ class TestMark4(object):
         assert record2.shape == (2, 8)
         assert np.all(record2[0] == 0.)
         assert not np.any(record2[1] == 0.)
+        assert np.all(record3 == record2)
 
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz) as fh:
             time0 = fh.tell(unit='time')
-            record = fh.read(160000)
+            record = fh.read()
             fh_raw_tell1 = fh.fh_raw.tell()
             time1 = fh.tell(unit='time')
 
-        with io.BytesIO() as s, mark4.open(s, 'ws', sample_rate=32*u.MHz,
-                                           time=time0, ntrack=64, bps=2,
-                                           fanout=4) as fw:
-            fw.write(record)
+        # Get a file name in our temporary testing directory.
+        rewritten_file = str(tmpdir.join('rewritten.m4'))
+
+        with mark4.open(rewritten_file, 'ws', sample_rate=32*u.MHz,
+                        time=time0, ntrack=64, bps=2, fanout=4) as fw:
+            # write in bits and pieces and with some invalid data as well.
+            fw.write(record[:10])
+            fw.write(record[10])
+            fw.write(record[11:80000])
+            fw.write(record[80000:], invalid_data=True)
             assert fw.tell(unit='time') == time1
             fw.fh_raw.flush()
 
-            s.seek(0)
-            fh = mark4.open(s, 'rs', ntrack=64, decade=2010,
-                            sample_rate=32*u.MHz)
+        with mark4.open(rewritten_file, 'rs', ntrack=64, decade=2010,
+                        sample_rate=32*u.MHz, thread_ids=[3, 4]) as fh:
             assert fh.tell(unit='time') == time0
             record2 = fh.read(160000)
             assert fh.tell(unit='time') == time1
-            assert np.all(record2 == record)
+            assert np.all(record2[:80000] == record[:80000, 3:5])
+            assert np.all(record2[80000:] == 0.)
 
         # Check files can be made byte-for-byte identical.  Here, we use the
         # original header so we set stuff like head_stack, etc.
@@ -374,6 +477,10 @@ class TestMark4(object):
                 orig_bytes = fr.read(number_of_bytes)
                 conv_bytes = s.read()
                 assert conv_bytes == orig_bytes
+
+    def test_stream_invalid(self):
+        with pytest.raises(ValueError):
+            mark4.open('ts.dat', 's')
 
 
 def test_32track_file():
