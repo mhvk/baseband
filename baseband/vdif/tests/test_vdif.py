@@ -320,6 +320,91 @@ class TestVDIF(object):
             with pytest.raises(IOError):
                 fh.read_frameset(thread_ids=[1, 9])
 
+    def test_find_header(self):
+        # Below, the tests set the file pointer to very close to a header,
+        # since otherwise they run *very* slow.  This is somehow related to
+        # pytest, since speed is not a big issue running stuff on its own.
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
+            header0 = vdif.VDIFHeader.fromfile(fh)
+            fh.seek(0)
+            header_0 = fh.find_header(framesize=header0.framesize)
+            assert fh.tell() == 0
+            fh.seek(5000)
+            header_5000f = fh.find_header(framesize=header0.framesize,
+                                          forward=True)
+            assert fh.tell() == header0.framesize
+            # sample file has corrupted time in even threads; check this
+            # doesn't matter
+            fh.seek(15000)
+            header_15000f = fh.find_header(framesize=header0.framesize,
+                                           forward=True)
+            assert fh.tell() == 3 * header0.framesize
+            fh.seek(20128)
+            header_20128f = fh.find_header(template_header=header0,
+                                           forward=True)
+            assert fh.tell() == 4 * header0.framesize
+            fh.seek(16)
+            header_16b = fh.find_header(framesize=header0.framesize,
+                                        forward=False)
+            assert fh.tell() == 0
+            fh.seek(-10000, 2)
+            header_m10000b = fh.find_header(framesize=header0.framesize,
+                                            forward=False)
+            assert fh.tell() == 14*header0.framesize
+            fh.seek(-5000, 2)
+            header_m5000b = fh.find_header(framesize=header0.framesize,
+                                           forward=False)
+            assert fh.tell() == 15*header0.framesize
+            fh.seek(-20, 2)
+            header_end = fh.find_header(template_header=header0,
+                                        forward=True)
+            assert header_end is None
+        # thread order = 1,3,5,7,0,2,4,6
+        assert header_16b == header_0
+        # second frame
+        assert header_5000f['frame_nr'] == 0
+        assert header_5000f['thread_id'] == 3
+        # fourth frame
+        assert header_15000f['frame_nr'] == 0
+        assert header_15000f['thread_id'] == 7
+        # fifth frame
+        assert header_20128f['frame_nr'] == 0
+        assert header_20128f['thread_id'] == 0
+        # one but last frame
+        assert header_m10000b['frame_nr'] == 1
+        assert header_m10000b['thread_id'] == 4
+        # last frame
+        assert header_m5000b['frame_nr'] == 1
+        assert header_m5000b['thread_id'] == 6
+        # Make file with missing data.
+        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(5100))
+            f.seek(10000)
+            s.write(f.read())
+            with vdif.open(s, 'rb') as fh:
+                fh.seek(0)
+                header_0 = fh.find_header(template_header=header0)
+                assert fh.tell() == 0
+                fh.seek(5000)
+                header_5000ft = fh.find_header(template_header=header0,
+                                               forward=True)
+                assert fh.tell() == header0.framesize * 2 - 4900
+                header_5000f = fh.find_header(framesize=header0.framesize,
+                                              forward=True)
+                assert fh.tell() == header0.framesize * 2 - 4900
+        assert header_5000f['frame_nr'] == 0
+        assert header_5000f['thread_id'] == 5
+        assert header_5000ft == header_5000f
+        # for completeness, also check a really short file...
+        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(5040))
+            with vdif.open(s, 'rb') as fh:
+                fh.seek(10)
+                header_10 = fh.find_header(framesize=header0.framesize,
+                                           forward=False)
+                assert fh.tell() == 0
+            assert header_10 == header0
+
     def test_filestreamer(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
