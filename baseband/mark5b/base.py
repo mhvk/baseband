@@ -183,9 +183,9 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
 
     @property
     def size(self):
-        n_frames = round(
+        n_frames = int(round(
             (self.header1.time - self.header0.time).to(u.s).value *
-            self.frames_per_second) + 1
+            self.frames_per_second)) + 1
         return n_frames * self.samples_per_frame
 
     def read(self, count=None, fill_value=0., squeeze=True, out=None):
