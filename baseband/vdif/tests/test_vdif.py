@@ -430,6 +430,8 @@ class TestVDIF(object):
             assert fh.tell() == 12
             fh.seek(-s12, 1)
             assert fh.tell() == 0
+            with pytest.raises(ValueError):
+                fh.seek(0, 3)
             out = np.zeros((12, 8, 1))
             fh.read(out=out)
             assert fh.tell() == 12
@@ -454,19 +456,22 @@ class TestVDIF(object):
             complex_data=False, frame_nr=0, thread_id=0, samples_per_frame=16,
             station='me')
         with vdif.open(vdif_file, 'ws', header=header,
-                       nthread=2, frames_per_second=2000) as fw:
-            fw.write(data)
+                       nthread=2, frames_per_second=20) as fw:
+            for i in range(30):
+                fw.write(data)
 
-        with vdif.open(vdif_file, 'rs', frames_per_second=2000) as fh:
+        with vdif.open(vdif_file, 'rs') as fh:
             assert fh.header0.station == 'me'
-            assert fh.frames_per_second == 2000
+            assert fh.frames_per_second == 20
             assert fh.samples_per_frame == 16
             assert not fh.complex_data
             assert fh.header0.bps == 2
             assert fh.nchan == 2
             assert fh.nthread == 2
             assert fh.time0 == Time('2010-01-01')
-            record = fh.read()
+            assert fh.time1 == fh.time0 + 1.5 * u.s
+            fh.seek(16)
+            record = fh.read(16)
         assert np.all(record == data)
 
     def test_corrupt_stream(self):

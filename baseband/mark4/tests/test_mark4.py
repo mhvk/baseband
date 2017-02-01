@@ -478,6 +478,21 @@ class TestMark4(object):
                 conv_bytes = s.read()
                 assert conv_bytes == orig_bytes
 
+    def test_corrupt_stream(self):
+        with mark4.open(SAMPLE_FILE, 'rb') as fh, io.BytesIO() as s:
+            fh.seek(0xa88)
+            frame = fh.read_frame(ntrack=64, decade=2010)
+            frame.tofile(s)
+            # now add lots of data without headers.
+            for i in range(15):
+                frame.payload.tofile(s)
+            s.seek(0)
+            with mark4.open(s, 'rs', ntrack=64, decade=2010,
+                            sample_rate=32*u.MHz) as f2:
+                assert f2.header0 == frame.header
+                with pytest.raises(ValueError):
+                    f2.header1
+
     def test_stream_invalid(self):
         with pytest.raises(ValueError):
             mark4.open('ts.dat', 's')

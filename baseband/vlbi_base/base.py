@@ -28,12 +28,12 @@ class VLBIStreamBase(object):
         self.samples_per_frame = samples_per_frame
         if frames_per_second is None:
             frames_per_second = sample_rate.to(u.Hz).value / samples_per_frame
-            if frames_per_second % 1:
-                raise ValueError("Sampling rate {0} and samples per frame {1} "
-                                 "imply non-integer number of frames per "
-                                 "second".format(sample_rate,
-                                                 samples_per_frame))
-            frames_per_second = int(frames_per_second)
+            if frames_per_second % 1:  # pragma: no cover
+                warnings.warn("Sampling rate {0} and samples per frame {1} "
+                              "imply non-integer number of frames per "
+                              "second".format(sample_rate, samples_per_frame))
+            else:
+                frames_per_second = int(frames_per_second)
 
         self.frames_per_second = frames_per_second
         self.offset = 0
@@ -116,41 +116,39 @@ class VLBIStreamBase(object):
                                    if self.thread_ids else '')))
 
 
-def get_frame_rate(fh, header_class):
-    """Returns the number of frames in one second of data."""
-    fh.seek(0)
-    header = header_class.fromfile(fh)
-    frame_nr0 = header['frame_nr']
-    sec0 = header.seconds
-    while header['frame_nr'] == frame_nr0:
-        fh.seek(header.payloadsize, 1)
-        header = header_class.fromfile(fh)
-    while header['frame_nr'] > 0:
-        max_frame = header['frame_nr']
-        fh.seek(header.payloadsize, 1)
-        header = header_class.fromfile(fh)
-
-    if header.seconds != sec0 + 1:
-        warnings.warn("Header time changed by more than 1 second?")
-
-    return max_frame + 1
-
-
 class VLBIStreamReaderBase(VLBIStreamBase):
-    _find_frame = None
 
     def __init__(self, fh_raw, header0, nchan, bps, complex_data, thread_ids,
                  samples_per_frame, frames_per_second=None,
                  sample_rate=None):
+
         if frames_per_second is None and sample_rate is None:
-            oldpos = fh_raw.tell()
-            fh_raw.seek(0)
-            frames_per_second = get_frame_rate(fh_raw, type(header0))
-            fh_raw.seek(oldpos)
+            frames_per_second = self._get_frame_rate(fh_raw, type(header0))
 
         super(VLBIStreamReaderBase, self).__init__(
             fh_raw, header0, nchan, bps, complex_data, thread_ids,
             samples_per_frame, frames_per_second, sample_rate)
+
+    @staticmethod
+    def _get_frame_rate(fh, header_class):
+        """Returns the number of frames in one second of data."""
+        oldpos = fh.tell()
+        header = header_class.fromfile(fh)
+        frame_nr0 = header['frame_nr']
+        sec0 = header.seconds
+        while header['frame_nr'] == frame_nr0:
+            fh.seek(header.payloadsize, 1)
+            header = header_class.fromfile(fh)
+        while header['frame_nr'] > 0:
+            max_frame = header['frame_nr']
+            fh.seek(header.payloadsize, 1)
+            header = header_class.fromfile(fh)
+
+        if header.seconds != sec0 + 1:  # pragma: no cover
+            warnings.warn("Header time changed by more than 1 second?")
+
+        fh.seek(oldpos)
+        return max_frame + 1
 
     @lazyproperty
     def header1(self):
@@ -162,8 +160,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                                           forward=False)
         self.fh_raw.seek(raw_offset)
         if header1 is None:
-            raise TypeError("Corrupt VLBI frame? No frame in last {0} bytes."
-                            .format(10*self.header0.framesize))
+            raise ValueError("Corrupt VLBI frame? No frame in last {0} bytes."
+                             .format(10*self.header0.framesize))
         return header1
 
     @lazyproperty
