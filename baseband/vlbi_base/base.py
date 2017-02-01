@@ -120,9 +120,9 @@ def get_frame_rate(fh, header_class):
     """Returns the number of frames in one second of data."""
     fh.seek(0)
     header = header_class.fromfile(fh)
-    assert header['frame_nr'] == 0
+    frame_nr0 = header['frame_nr']
     sec0 = header.seconds
-    while header['frame_nr'] == 0:
+    while header['frame_nr'] == frame_nr0:
         fh.seek(header.payloadsize, 1)
         header = header_class.fromfile(fh)
     while header['frame_nr'] > 0:

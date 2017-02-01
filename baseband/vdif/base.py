@@ -165,8 +165,8 @@ class VDIFStreamBase(VLBIStreamBase):
         if frames_per_second is None and sample_rate is None:
             try:
                 frames_per_second = int(header0.framerate.to(u.Hz).value)
-            except:
-                pass
+            except AttributeError:
+                pass  # super below will scan file to get framerate.
 
         super(VDIFStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, nchan=header0.nchan,
@@ -237,16 +237,16 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         raw_size = self.fh_raw.tell()
         # Find first header with same thread_id going backward.
         found = False
+        maximum = 10.*self.header0.framesize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
             header1 = find_header(self.fh_raw, template_header=self.header0,
                                   maximum=10*self.header0.framesize,
                                   forward=False)
-            if header1 is None:
-                raise TypeError("Corrupt VDIF? No thread_id={0} frame in last "
-                                "{1} bytes."
-                                .format(self.header0['thread_id'],
-                                        raw_size - self.fh_raw.tell()))
+            if header1 is None or raw_size - self.fh_raw.tell() > maximum:
+                raise ValueError("Corrupt VDIF? No thread_id={0} frame in "
+                                 "last {1} bytes."
+                                 .format(self.header0['thread_id'], maximum))
 
             found = header1['thread_id'] == self.header0['thread_id']
 
@@ -371,9 +371,10 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
         super(VDIFStreamWriter, self).__init__(
             raw, header, range(nthread), frames_per_second=frames_per_second,
             sample_rate=sample_rate)
+        # Set framerate and thus bandwidth in the header, if not set already.
         try:
             header_framerate = self.header0.framerate
-        except:
+        except AttributeError:
             pass
         else:
             if header_framerate == 0:
