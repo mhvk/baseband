@@ -60,36 +60,42 @@ class Mark5BFileReader(io.BufferedReader):
             header = Mark5BHeader.fromfile(self, kday=kday, verify=True)
             self.seek(-header.size, 1)
             return header
-        except:
+        except AssertionError:
             pass
 
+        self.seek(0, 2)
+        size = self.tell()
         if forward:
-            iterate = range(file_pos, file_pos + maximum)
+            iterate = range(file_pos, min(file_pos + maximum - 16,
+                                          size - framesize))
         else:
-            iterate = range(file_pos, file_pos - maximum, -1)
+            iterate = range(min(file_pos, size - framesize),
+                            max(file_pos - maximum, -1), -1)
+
         for frame in iterate:
             try:
                 self.seek(frame)
                 header1 = Mark5BHeader.fromfile(self, kday=kday, verify=True)
             except AssertionError:
                 continue
-            except:
-                break
 
-            # get header from a frame further up or down and check those are
-            # consistent.
-            try:
-                self.seek(frame + (framesize if forward else -framesize))
-            except:  # we're a really short file; assume it is fine.
-                self.seek(frame)
-                return header1
+            # get header from a frame up and check it is consistent (we always
+            # check up since this checks that the payload has the right length)
+            next_frame = frame + framesize
+            if next_frame > size - 16:
+                # if we're too far ahead for there to be another header,
+                # at least the one below should be OK.
+                next_frame = frame - framesize
+                # except if there is only one frame in the first place.
+                if next_frame < 0:
+                    self.seek(frame)
+                    return header1
 
+            self.seek(next_frame)
             try:
                 header2 = Mark5BHeader.fromfile(self, kday=kday, verify=True)
             except AssertionError:
                 continue
-            except:
-                break
 
             if(header2.jday == header1.jday and
                abs(header2.seconds - header1.seconds) <= 1 and
@@ -177,9 +183,9 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
 
     @property
     def size(self):
-        n_frames = round(
+        n_frames = int(round(
             (self.header1.time - self.header0.time).to(u.s).value *
-            self.frames_per_second) + 1
+            self.frames_per_second)) + 1
         return n_frames * self.samples_per_frame
 
     def read(self, count=None, fill_value=0., squeeze=True, out=None):
@@ -296,7 +302,10 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
         if squeezed and data.ndim < 2:
             data = np.expand_dims(data, axis=1 if self.nthread == 1 else 0)
 
-        assert data.shape[1] == self.nthread
+        if data.ndim != 2 or data.shape[1] != self.nthread:
+            raise ValueError('cannot write an array with shape {0} to a '
+                             'stream with {1} threads'
+                             .format(data.shape, self.nthread))
 
         count = data.shape[0]
         sample = 0

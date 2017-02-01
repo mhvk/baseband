@@ -41,6 +41,7 @@ from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_MWA_VDIF as SAMPLE_MWA,
 
 
 class TestVDIF(object):
+
     def test_header(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
@@ -97,6 +98,18 @@ class TestVDIF(object):
         assert header5 != header
         with pytest.raises(TypeError):
             header['thread_id'] = 0
+        # Also test time setting
+        header5.time = header.time + 1.*u.s
+        assert abs(header5.time - header.time - 1.*u.s) < 1.*u.ns
+        assert header5['frame_nr'] == header['frame_nr']
+        header5.time = header.time + 1.*u.s + 1.1/header.framerate
+        assert abs(header5.time - header.time - 1.*u.s -
+                   1./header.framerate) < 1.*u.ns
+        assert header5['frame_nr'] == header['frame_nr'] + 1
+        # Check rounding in corner case.
+        header5.time = header.time + 1.*u.s - 0.01/header.framerate
+        assert abs(header5.time - header.time - 1.*u.s) < 1.*u.ns
+        assert header5['frame_nr'] == header['frame_nr']
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
@@ -220,6 +233,7 @@ class TestVDIF(object):
             frame.tofile(s)
             s.seek(0)
             frame2 = vdif.VDIFFrame.fromfile(s)
+
         assert frame2 == frame
         frame3 = vdif.VDIFFrame.fromdata(payload.data, header)
         assert frame3 == frame
@@ -231,6 +245,16 @@ class TestVDIF(object):
         assert np.all(frame5.data == 0.)
         frame5.valid = True
         assert frame5 == frame
+        # Also test binary file writer.
+        with io.BytesIO() as s, vdif.open(s, 'wb') as fw:
+            fw.write_frame(frame)
+            fw.write_frame(frame.data, header)
+            fw.flush()
+            s.seek(0)
+            frame6 = vdif.VDIFFrame.fromfile(s)
+            frame7 = vdif.VDIFFrame.fromfile(s)
+        assert frame6 == frame
+        assert frame7 == frame
 
     def test_frameset(self):
         with vdif.open(SAMPLE_FILE, 'rb') as fh:
@@ -296,6 +320,91 @@ class TestVDIF(object):
             with pytest.raises(IOError):
                 fh.read_frameset(thread_ids=[1, 9])
 
+    def test_find_header(self):
+        # Below, the tests set the file pointer to very close to a header,
+        # since otherwise they run *very* slow.  This is somehow related to
+        # pytest, since speed is not a big issue running stuff on its own.
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
+            header0 = vdif.VDIFHeader.fromfile(fh)
+            fh.seek(0)
+            header_0 = fh.find_header(framesize=header0.framesize)
+            assert fh.tell() == 0
+            fh.seek(5000)
+            header_5000f = fh.find_header(framesize=header0.framesize,
+                                          forward=True)
+            assert fh.tell() == header0.framesize
+            # sample file has corrupted time in even threads; check this
+            # doesn't matter
+            fh.seek(15000)
+            header_15000f = fh.find_header(framesize=header0.framesize,
+                                           forward=True)
+            assert fh.tell() == 3 * header0.framesize
+            fh.seek(20128)
+            header_20128f = fh.find_header(template_header=header0,
+                                           forward=True)
+            assert fh.tell() == 4 * header0.framesize
+            fh.seek(16)
+            header_16b = fh.find_header(framesize=header0.framesize,
+                                        forward=False)
+            assert fh.tell() == 0
+            fh.seek(-10000, 2)
+            header_m10000b = fh.find_header(framesize=header0.framesize,
+                                            forward=False)
+            assert fh.tell() == 14*header0.framesize
+            fh.seek(-5000, 2)
+            header_m5000b = fh.find_header(framesize=header0.framesize,
+                                           forward=False)
+            assert fh.tell() == 15*header0.framesize
+            fh.seek(-20, 2)
+            header_end = fh.find_header(template_header=header0,
+                                        forward=True)
+            assert header_end is None
+        # thread order = 1,3,5,7,0,2,4,6
+        assert header_16b == header_0
+        # second frame
+        assert header_5000f['frame_nr'] == 0
+        assert header_5000f['thread_id'] == 3
+        # fourth frame
+        assert header_15000f['frame_nr'] == 0
+        assert header_15000f['thread_id'] == 7
+        # fifth frame
+        assert header_20128f['frame_nr'] == 0
+        assert header_20128f['thread_id'] == 0
+        # one but last frame
+        assert header_m10000b['frame_nr'] == 1
+        assert header_m10000b['thread_id'] == 4
+        # last frame
+        assert header_m5000b['frame_nr'] == 1
+        assert header_m5000b['thread_id'] == 6
+        # Make file with missing data.
+        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(5100))
+            f.seek(10000)
+            s.write(f.read())
+            with vdif.open(s, 'rb') as fh:
+                fh.seek(0)
+                header_0 = fh.find_header(template_header=header0)
+                assert fh.tell() == 0
+                fh.seek(5000)
+                header_5000ft = fh.find_header(template_header=header0,
+                                               forward=True)
+                assert fh.tell() == header0.framesize * 2 - 4900
+                header_5000f = fh.find_header(framesize=header0.framesize,
+                                              forward=True)
+                assert fh.tell() == header0.framesize * 2 - 4900
+        assert header_5000f['frame_nr'] == 0
+        assert header_5000f['thread_id'] == 5
+        assert header_5000ft == header_5000f
+        # for completeness, also check a really short file...
+        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(5040))
+            with vdif.open(s, 'rb') as fh:
+                fh.seek(10)
+                header_10 = fh.find_header(framesize=header0.framesize,
+                                           forward=False)
+                assert fh.tell() == 0
+            assert header_10 == header0
+
     def test_filestreamer(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
@@ -321,6 +430,11 @@ class TestVDIF(object):
             assert fh.tell() == 12
             fh.seek(-s12, 1)
             assert fh.tell() == 0
+            with pytest.raises(ValueError):
+                fh.seek(0, 3)
+            out = np.zeros((12, 8, 1))
+            fh.read(out=out)
+            assert fh.tell() == 12
             assert fh.size == 40000
             assert abs(fh.time1 - fh.header1.time - u.s /
                        fh.frames_per_second) < 1. * u.ns
@@ -330,6 +444,53 @@ class TestVDIF(object):
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==
                       np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
+        assert np.all(out.squeeze() == record)
+
+    def test_stream_writer(self, tmpdir):
+        vdif_file = str(tmpdir.join('simple.vdif'))
+        # try writing a very simple file, using edv=0
+        data = np.ones((16, 2, 2))
+        data[5,0,0] = data[6,1,1] = -1.
+        header = vdif.VDIFHeader.fromvalues(
+            edv=0, time=Time('2010-01-01'), nchan=2, bps=2,
+            complex_data=False, frame_nr=0, thread_id=0, samples_per_frame=16,
+            station='me')
+        with vdif.open(vdif_file, 'ws', header=header,
+                       nthread=2, frames_per_second=20) as fw:
+            for i in range(30):
+                fw.write(data)
+
+        with vdif.open(vdif_file, 'rs') as fh:
+            assert fh.header0.station == 'me'
+            assert fh.frames_per_second == 20
+            assert fh.samples_per_frame == 16
+            assert not fh.complex_data
+            assert fh.header0.bps == 2
+            assert fh.nchan == 2
+            assert fh.nthread == 2
+            assert fh.time0 == Time('2010-01-01')
+            assert fh.time1 == fh.time0 + 1.5 * u.s
+            fh.seek(16)
+            record = fh.read(16)
+        assert np.all(record == data)
+
+    def test_corrupt_stream(self):
+        with vdif.open(SAMPLE_FILE, 'rb') as fh, io.BytesIO() as s:
+            frame = fh.read_frame()
+            frame.tofile(s)
+            # now add lots of the next frame, i.e., with a different thread_id
+            frame2 = fh.read_frame()
+            for i in range(15):
+                frame2.tofile(s)
+            s.seek(0)
+            with vdif.open(s, 'rs') as f2:
+                assert f2.header0 == frame.header
+                with pytest.raises(ValueError):
+                    f2.header1
+
+    def test_stream_invalid(self):
+        with pytest.raises(ValueError):
+            vdif.open('ts.dat', 's')
 
 
 def test_mwa_vdif():
@@ -343,6 +504,25 @@ def test_mwa_vdif():
 
 def test_arochime_vdif():
     """Test ARO CHIME format (uses EDV=0)"""
+    with open(SAMPLE_AROCHIME, 'rb') as fh:
+        header0 = vdif.VDIFHeader.fromfile(fh)
+    assert header0.edv == 0
+    assert header0.samples_per_frame == 1
+    assert header0['frame_nr'] == 308109
+    with pytest.raises(ValueError):
+        header0.time
+    assert abs(header0.get_time(framerate=390625*u.Hz) -
+               Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
+    # also check writing Time.
+    header1 = header0.copy()
+    with pytest.raises(ValueError):
+        header1.time = Time('2016-04-22T08:45:31.788759040')
+    header1.set_time(Time('2016-04-22T08:45:32.788759040'),
+                     framerate=0.390625*u.MHz)
+    assert abs(header1.get_time(framerate=390625*u.Hz) -
+               header0.get_time(framerate=390625*u.Hz) - 1. * u.s) < 1.*u.ns
+
+    # Now test the actual data stream.
     with vdif.open(SAMPLE_AROCHIME, 'rs', frames_per_second=390625) as fh:
         assert fh.samples_per_frame == 1
         t0 = fh.tell(unit='time')
@@ -357,6 +537,12 @@ def test_arochime_vdif():
         assert abs(t1 - fh.time1) < 1. * u.ns
         assert abs(t1 - t0 - u.s * (fh.size / fh.samples_per_frame /
                                     fh.frames_per_second)) < 1. * u.ns
+
+    # For this file, we cannot find a frame rate, so opening it without
+    # should fail.
+    with pytest.raises(EOFError):
+        with vdif.open(SAMPLE_AROCHIME, 'rs') as fh:
+            pass
 
 
 def test_legacy_vdif():

@@ -10,6 +10,14 @@ import numpy as np
 from astropy.tests.helper import pytest
 
 
+def encode_1bit(values):
+    return np.packbits(values.ravel())
+
+
+def decode_1bit(values):
+    return np.unpackbits(values.view(np.uint8)).astype(np.float32)
+
+
 def encode_8bit(values):
     return np.clip(np.round(values),
                    -128, 127).astype(np.int8)
@@ -20,8 +28,10 @@ def decode_8bit(values):
 
 
 class Payload(VLBIPayloadBase):
-    _encoders = {8: encode_8bit}
-    _decoders = {8: decode_8bit}
+    _encoders = {1: encode_1bit,
+                 8: encode_8bit}
+    _decoders = {1: decode_1bit,
+                 8: decode_8bit}
 
 
 class TestBCD(object):
@@ -70,6 +80,9 @@ class TestVLBIBase(object):
         self.payload = Payload(np.array([0x12345678, 0xffff0000],
                                         dtype=Payload._dtype_word),
                                bps=8, sample_shape=(2,), complex_data=False)
+        self.payload1bit = Payload(np.array([0x12345678]*5,
+                                            dtype=Payload._dtype_word),
+                                   bps=1, sample_shape=(5,), complex_data=True)
 
         class Frame(VLBIFrameBase):
             _header_class = Header
@@ -193,6 +206,15 @@ class TestVLBIBase(object):
         assert np.all(payload.data ==
                       self.payload.data[:, 0] + 1j * self.payload.data[:, 1])
 
+        assert self.payload1bit.complex_data is True
+        assert self.payload1bit.sample_shape == (5,)
+        assert self.payload1bit.bps == 1
+        assert self.payload1bit.shape == (16, 5)
+        assert self.payload1bit.size == 20
+        assert np.all(self.payload1bit.data.ravel() ==
+                      np.unpackbits(self.payload1bit.words.view(np.uint8))
+                      .astype(np.float32).view(np.complex64))
+
     @pytest.mark.parametrize('item', (2, slice(1, 3), (), slice(2, None),
                                       (2, 1), (slice(None), 0),
                                       (slice(1, 3), 1)))
@@ -221,6 +243,10 @@ class TestVLBIBase(object):
         check = payload.data
         check[item] = 1-sel_data
         assert np.all(payload.data == check)
+
+    def test_payload_bad_fbps(self):
+        with pytest.raises(TypeError):
+            self.payload1bit[10:11]
 
     def test_payload_empty_item(self):
         p11 = self.payload[1:1]
@@ -313,6 +339,8 @@ class TestVLBIBase(object):
         assert self.frame.shape == self.payload.shape
         assert np.all(self.frame.data == self.payload.data)
         assert np.all(np.array(self.frame) == np.array(self.payload))
+        assert np.all(np.array(self.frame, dtype=np.float64) ==
+                      np.array(self.payload))
         assert self.frame.valid is True
         frame = self.Frame(self.header, self.payload, valid=False)
         assert np.all(frame.data == 0.)
@@ -323,6 +351,20 @@ class TestVLBIBase(object):
         assert self.frame['x2_0_64'] == self.header['x2_0_64']
         for item in (3, (1, 1), slice(0, 2)):
             assert np.all(self.frame[item] == self.frame.payload[item])
+
+        frame2 = self.Frame(self.header.copy(),
+                            self.Payload.fromdata(self.payload.data,
+                                                  bps=self.payload.bps))
+
+        assert frame2.header == self.header
+        assert frame2.payload == self.payload
+        assert frame2 == self.frame
+        frame2['x2_0_64'] = 0x1
+        assert frame2['x2_0_64'] == 0x1
+        assert frame2.header != self.header
+        frame2[3, 1] = 5.
+        assert frame2[3, 1] == 5
+        assert frame2.payload != self.payload
 
     def test_frame_fromfile(self):
         with io.BytesIO() as s:

@@ -140,6 +140,9 @@ class TestMark5B(object):
 
         payload3 = mark5b.Mark5BPayload.fromdata(payload.data, bps=payload.bps)
         assert payload3 == payload
+        # complex data should fail
+        with pytest.raises(ValueError):
+            mark5b.Mark5BPayload(payload3.words, complex_data=True)
         with pytest.raises(ValueError):
             mark5b.Mark5BPayload.fromdata(np.zeros((5000, 8), np.complex64),
                                           bps=2)
@@ -231,6 +234,58 @@ class TestMark5B(object):
                    frame.header.time) < 1. * u.ns
         # And if we pass in a frame_nr of zero, we get the integer second.
         assert header.get_time(frame_rate, frame_nr=0) == header0.time
+        # Finally, without a frame rate we can only do it for frame_nr=0.
+        assert header.get_time(frame_nr=0) == header0.time
+        with pytest.raises(ValueError):
+            header.get_time(frame_nr=1)
+
+    def test_find_header(self):
+        # Below, the tests set the file pointer to very close to a header,
+        # since otherwise they run *very* slow.  This is somehow related to
+        # pytest, since speed is not a big issue running stuff on its own.
+        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
+            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
+            fh.seek(0)
+            header_0 = fh.find_header(template_header=header0)
+            assert fh.tell() == 0
+            fh.seek(10000)
+            header_10000f = fh.find_header(template_header=header0,
+                                           forward=True)
+            assert fh.tell() == header0.framesize
+            fh.seek(16)
+            header_16b = fh.find_header(template_header=header0, forward=False)
+            assert fh.tell() == 0
+            fh.seek(-10000, 2)
+            header_m10000b = fh.find_header(template_header=header0,
+                                            forward=False)
+            assert fh.tell() == 3*header0.framesize
+            fh.seek(-30, 2)
+            header_end = fh.find_header(template_header=header0, forward=True)
+            assert header_end is None
+        assert header_16b == header_0
+        assert header_10000f['frame_nr'] == 1
+        assert header_m10000b['frame_nr'] == 3
+        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(10040))
+            f.seek(20000)
+            s.write(f.read())
+            with mark5b.open(s, 'rb') as fh:
+                fh.seek(0)
+                header_0 = fh.find_header(template_header=header0)
+                assert fh.tell() == 0
+                fh.seek(10000)
+                header_10000f = fh.find_header(template_header=header0,
+                                               forward=True)
+                assert fh.tell() == header0.framesize * 2 - 9960
+        # for completeness, also check a really short file...
+        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(10018))
+            with mark5b.open(s, 'rb') as fh:
+                fh.seek(10)
+                header_10 = fh.find_header(template_header=header0,
+                                           forward=False)
+                assert fh.tell() == 0
+            assert header_10 == header0
 
     def test_filestreamer(self):
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -254,6 +309,13 @@ class TestMark5B(object):
                           (fh.time0 + 10002 / (32*u.MHz))) < 1. * u.ns
             fh.seek(fh.time0 + 1000 / (32*u.MHz))
             assert fh.tell() == 1000
+            fh.seek(-10, 2)
+            assert fh.tell() == fh.size - 10
+            record3 = fh.read()
+            # While we're at it, check in-place reading as well.
+            fh.seek(-10, 2)
+            out = np.zeros_like(record3)
+            record4 = fh.read(out=out)
 
         assert header1['frame_nr'] == 3
         assert header1['user'] == header['user']
@@ -271,7 +333,13 @@ class TestMark5B(object):
         assert np.all(record2.astype(int) ==
                       np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
                                 [-1, +1, -3, +3, -3, +1, +3, +1]]))
-
+        assert record3.shape == (10, 8)
+        assert np.all(record4 == record3)
+        # Read only some selected threads.
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2, thread_ids=[4, 5],
+                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
+            record5 = fh.read(12)
+        assert np.all(record5 == record[:, 4:6])
         # Read all data and check that it can be written out.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, ref_mjd=57000) as fh:
@@ -281,7 +349,15 @@ class TestMark5B(object):
 
         with io.BytesIO() as s, mark5b.open(s, 'ws', time=time0, nchan=8,
                                             bps=2, sample_rate=32*u.MHz) as fw:
-            fw.write(record)
+            # Write in pieces to ensure squeezed data can be handled,
+            # And add in an invalid frame for good measure.
+            fw.write(record[:10])
+            fw.write(record[10])
+            with pytest.raises(ValueError):
+                fw.write(record[10], squeezed=False)
+            fw.write(record[11:5000])
+            fw.write(record[5000:10000], invalid_data=True)
+            fw.write(record[10000:])
             assert fw.tell(unit='time') == time1
             fw.fh_raw.flush()
 
@@ -291,7 +367,9 @@ class TestMark5B(object):
             assert fh.tell(unit='time') == time0
             record2 = fh.read(20000)
             assert fh.tell(unit='time') == time1
-            assert np.all(record2 == record)
+            assert np.all(record2[:5000] == record[:5000])
+            assert np.all(record2[5000:10000] == 0.)
+            assert np.all(record2[10000:] == record[10000:])
 
         # Check files can be made byte-for-byte identical.
         with io.BytesIO() as s, mark5b.open(
@@ -305,3 +383,7 @@ class TestMark5B(object):
                 orig_bytes = fr.read()
                 conv_bytes = s.read()
                 assert conv_bytes == orig_bytes
+
+    def test_stream_invalid(self):
+        with pytest.raises(ValueError):
+            mark5b.open('ts.dat', 's')

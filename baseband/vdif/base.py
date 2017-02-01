@@ -12,8 +12,7 @@ from .frame import VDIFFrame, VDIFFrameSet
 
 
 __all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
-           'VDIFStreamReader', 'VDIFStreamWriter', 'open',
-           'find_header']
+           'VDIFStreamReader', 'VDIFStreamWriter', 'open']
 
 # Check code on 2015-MAY-30
 # 00000000  77 2c db 00 00 00 00 1c  75 02 00 20 fc ff 01 04  # header 0 - 3
@@ -106,6 +105,82 @@ class VDIFFileReader(io.BufferedReader):
         return VDIFFrameSet.fromfile(self, thread_ids, sort=sort, edv=edv,
                                      verify=verify)
 
+    def find_header(self, template_header=None, framesize=None, edv=None,
+                    maximum=None, forward=True):
+        """Look for the first occurrence of a header, from the current position.
+
+        Search for a valid header at a given position which is consistent with
+        ``template_header`` or with a header a framesize ahead.   Note that the
+        latter turns out to be an unexpectedly weak check on real data!
+        """
+        if template_header is not None:
+            edv = template_header.edv
+            # First check whether we are right at a frame marker (often true).
+            try:
+                header = VDIFHeader.fromfile(self, edv=edv, verify=True)
+            except(AssertionError, IOError, EOFError):
+                pass
+            else:
+                if template_header.same_stream(header):
+                    self.seek(-header.size, 1)
+                    return header
+            # Didn't work, so get searching.
+            framesize = template_header.framesize
+
+        if maximum is None:
+            maximum = 2 * framesize
+
+        file_pos = self.tell()
+        self.seek(0, 2)
+        size = self.tell()
+        if forward:
+            iterate = range(file_pos, min(file_pos + maximum - 32,
+                                          size - framesize))
+        else:
+            iterate = range(min(file_pos, size - framesize),
+                            max(file_pos - maximum, -1), -1)
+        # Loop over chunks to try to find the frame marker.
+        for frame in iterate:
+            self.seek(frame)
+            try:
+                header = VDIFHeader.fromfile(self, edv=edv, verify=True)
+            except AssertionError:
+                continue
+
+            if(header.framesize != framesize or
+               template_header and not template_header.same_stream(header)):
+                # CPython optimizations will make this as uncovered, even
+                # though it is. See
+                # https://bitbucket.org/ned/coveragepy/issues/198/continue-marked-as-not-covered
+                continue  # pragma: no cover
+
+            # Always also check header from a frame up.
+            next_frame = frame + framesize
+            if next_frame > size - 32:
+                # if we're too far ahead for there to be another header,
+                # check consistency with a frame below.
+                next_frame = frame - framesize
+                # But don't bother if we already checked with a template,
+                # or if there is only one frame in the first place.
+                if template_header is not None or next_frame < 0:
+                    self.seek(frame)
+                    return header
+
+            self.seek(next_frame)
+            try:
+                comparison = VDIFHeader.fromfile(self, edv=header.edv,
+                                                 verify=True)
+            except AssertionError:
+                continue
+
+            if comparison.same_stream(header):
+                self.seek(frame)
+                return header
+
+        # Didn't find any frame.
+        self.seek(file_pos)
+        return None
+
 
 class VDIFFileWriter(io.BufferedWriter):
     """Simple writer for VDIF files.
@@ -165,8 +240,8 @@ class VDIFStreamBase(VLBIStreamBase):
         if frames_per_second is None and sample_rate is None:
             try:
                 frames_per_second = int(header0.framerate.to(u.Hz).value)
-            except:
-                pass
+            except AttributeError:
+                pass  # super below will scan file to get framerate.
 
         super(VDIFStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, nchan=header0.nchan,
@@ -237,16 +312,16 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         raw_size = self.fh_raw.tell()
         # Find first header with same thread_id going backward.
         found = False
+        maximum = 10.*self.header0.framesize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
-            header1 = find_header(self.fh_raw, template_header=self.header0,
-                                  maximum=10*self.header0.framesize,
-                                  forward=False)
-            if header1 is None:
-                raise TypeError("Corrupt VDIF? No thread_id={0} frame in last "
-                                "{1} bytes."
-                                .format(self.header0['thread_id'],
-                                        raw_size - self.fh_raw.tell()))
+            header1 = self.fh_raw.find_header(
+                template_header=self.header0,
+                maximum=10*self.header0.framesize, forward=False)
+            if header1 is None or raw_size - self.fh_raw.tell() > maximum:
+                raise ValueError("Corrupt VDIF? No thread_id={0} frame in "
+                                 "last {1} bytes."
+                                 .format(self.header0['thread_id'], maximum))
 
             found = header1['thread_id'] == self.header0['thread_id']
 
@@ -371,9 +446,10 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
         super(VDIFStreamWriter, self).__init__(
             raw, header, range(nthread), frames_per_second=frames_per_second,
             sample_rate=sample_rate)
+        # Set framerate and thus bandwidth in the header, if not set already.
         try:
             header_framerate = self.header0.framerate
-        except:
+        except AttributeError:
             pass
         else:
             if header_framerate == 0:
@@ -482,66 +558,3 @@ def open(name, mode='rs', *args, **kwargs):
     else:
         raise ValueError("Only support opening VDIF file for reading "
                          "or writing (mode='r' or 'w').")
-
-
-def find_header(fh, template_header=None, framesize=None, maximum=None,
-                forward=True):
-    """Look for the first occurrence of a header, from the current position.
-
-    Search for a valid header at a given position which is consistent with
-    ``template_header`` or with a header a framesize ahead.   Note that the
-    latter turns out to be an unexpectedly weak check on real data!
-    """
-    if template_header:
-        framesize = template_header.framesize
-
-    if maximum is None:
-        maximum = 2 * framesize
-    # Loop over chunks to try to find the frame marker.
-    file_pos = fh.tell()
-    # First check whether we are right at a frame marker (usually true).
-    if template_header:
-        try:
-            header = VDIFHeader.fromfile(fh, verify=True)
-            if template_header.same_stream(header):
-                fh.seek(-header.size, 1)
-                return header
-        except:
-            pass
-
-    if forward:
-        iterate = range(file_pos, file_pos + maximum)
-    else:
-        iterate = range(file_pos, file_pos - maximum, -1)
-    for frame in iterate:
-        fh.seek(frame)
-        try:
-            header1 = VDIFHeader.fromfile(fh, verify=True)
-        except(AssertionError, IOError, EOFError):
-            continue
-
-        if template_header:
-            if template_header.same_stream(header1):
-                fh.seek(frame)
-                return header1
-            continue
-
-        # if no comparison header given, get header from a frame further up or
-        # down and check those are consistent.
-        fh.seek(frame + (framesize if forward else -framesize))
-        try:
-            header2 = VDIFHeader.fromfile(fh, verify=True)
-        except AssertionError:
-            continue
-        except:
-            break
-
-        if(header2.same_stream(header1) and
-           abs(header2.seconds - header1.seconds) <= 1 and
-           abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
-            fh.seek(frame)
-            return header1
-
-    # Didn't find any frame.
-    fh.seek(file_pos)
-    return None

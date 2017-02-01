@@ -264,10 +264,7 @@ class VDIFHeader(VLBIHeaderBase):
         values_per_word = 32 // self.bps // (2 if self['complex_data'] else 1)
         # units of frame length are 8 bytes, i.e., 2 words.
         values_per_long = values_per_word * 2
-        longs, extra = divmod(samples_per_frame * self.nchan, values_per_long)
-        if extra:
-            longs += 1
-
+        longs = (samples_per_frame * self.nchan - 1) // values_per_long + 1
         self['frame_length'] = int(longs) + self.size // 8
 
     @property
@@ -555,7 +552,7 @@ class VDIFHeader2(VDIFBaseHeader):
          ('PIC_status', (5, 0, 32)),
          ('PSN', (6, 0, 64))))
 
-    def verify(self):
+    def verify(self):  # pragma: no cover
         super(VDIFHeader2, self).verify()
         assert self['frame_length'] == 629 or self['frame_length'] == 1004
         assert self.bps == 2 and not self['complex_data']
@@ -638,7 +635,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                     raise ValueError("calculating the time for a non-zero "
                                      "frame number requires a frame rate. "
                                      "Pass it in explicitly.")
-            offset = (frame_nr / framerate).to(u.s).value
+                offset = (frame_nr / framerate).to(u.s).value
 
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))

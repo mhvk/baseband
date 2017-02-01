@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 
-__all__ = ['bcd_decode', 'bcd_encode', 'get_frame_rate', 'CRC']
+__all__ = ['bcd_decode', 'bcd_encode', 'CRC']
 
 
 def bcd_decode(value):
@@ -120,23 +120,3 @@ class CRC(object):
         for i in range(0, len(stream) - len(self)):
             stream[i:i+pol_bin.size] ^= (pol_bin & stream[i])
         return stream[-len(self):]
-
-
-def get_frame_rate(fh, header_class):
-    """Returns the number of frames in one second of data."""
-    fh.seek(0)
-    header = header_class.fromfile(fh)
-    assert header['frame_nr'] == 0
-    sec0 = header.seconds
-    while header['frame_nr'] == 0:
-        fh.seek(header.payloadsize, 1)
-        header = header_class.fromfile(fh)
-    while header['frame_nr'] > 0:
-        max_frame = header['frame_nr']
-        fh.seek(header.payloadsize, 1)
-        header = header_class.fromfile(fh)
-
-    if header.seconds != sec0 + 1:
-        warnings.warn("Header time changed by more than 1 second?")
-
-    return max_frame + 1

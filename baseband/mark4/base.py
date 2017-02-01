@@ -49,8 +49,12 @@ class Mark4FileReader(io.BufferedReader):
         The search is for the following pattern:
 
         * 32*tracks bits set at offset bytes
+        * 1*tracks bits unset before offset
         * 32*tracks bits set at offset+2500*tracks bytes
-        * 1*tracks bits unset before offset+2500*tracks bytes
+
+        This reflects 'sync_pattern' of 0xffffffff for a given header and one
+        a frame ahead, which is in word 2, plus the lsb of word 1, which is
+        'system_id'.
 
         Parameters
         ----------
@@ -68,43 +72,73 @@ class Mark4FileReader(io.BufferedReader):
         """
         nset = np.ones(32 * ntrack // 8, dtype=np.int16)
         nunset = np.ones(ntrack // 8, dtype=np.int16)
-        b = ntrack * 2500
-        a = b - ntrack // 8
-        if maximum is None:
-            maximum = 2 * ntrack * 20000 // 8
-        # Loop over chunks to try to find the frame marker.
-        step = b // 25
+        framesize = ntrack * 2500
         file_pos = self.tell()
-        if forward:
-            iterate = range(file_pos, file_pos + maximum, step)
-        else:
-            iterate = range(file_pos - b - step - len(nset),
-                            file_pos - b - step - len(nset) - maximum, -step)
-        for frame in iterate:
-            try:
-                self.seek(frame)
-            except OSError:
-                break
+        self.seek(0, 2)
+        filesize = self.tell()
+        if filesize < framesize:
+            self.seek(file_pos)
+            return None
 
-            data = np.fromstring(self.read(b+step+len(nset)),
-                                 dtype=np.uint8)
-            if len(data) < b + step + len(nset):
-                break
-            databits1 = nbits[data[:step+len(nset)]]
-            lownotset = np.convolve(databits1 < 6, nset, 'valid')
-            databits2 = nbits[data[b:]]
-            highnotset = np.convolve(databits2 < 6, nset, 'valid')
-            databits3 = nbits[data[a:a+step+len(nunset)]]
-            highnotunset = np.convolve(databits3 > 1, nunset, 'valid')
-            wrong = lownotset + highnotset + highnotunset
-            try:
-                extra = np.where(wrong == 0)[0][0 if forward else -1]
-            except IndexError:
+        if maximum is None:
+            maximum = 2 * framesize
+        # Loop over chunks to try to find the frame marker.
+        step = framesize // 2
+        # read a bit more at every step to ensure we don't miss a "split"
+        # header
+        block = step + 160 * ntrack // 8
+        if forward:
+            iterate = range(max(min(file_pos, filesize - block), 0),
+                            max(min(file_pos + maximum, filesize - block + 1),
+                                1),
+                            step)
+        else:
+            iterate = range(min(max(file_pos - step, 0), filesize - block),
+                            min(max(file_pos - step - maximum - 1, -1),
+                                filesize - block),
+                            -step)
+        for frame in iterate:
+            self.seek(frame)
+
+            data = np.fromstring(self.read(block), dtype=np.uint8)
+            assert len(data) == block
+            # Find header pattern.
+            databits1 = nbits[data]
+            nosync = np.convolve(databits1[len(nunset):] < 6, nset, 'valid')
+            nolow = np.convolve(databits1[:-len(nset)] > 1, nunset, 'valid')
+            wrong = nosync + nolow
+            possibilities = np.where(wrong == 0)[0]
+            # check candidates by seeing whether there is a sync word
+            # a framesize ahead. (Note: loop can be empty)
+            for possibility in possibilities[::1 if forward else -1]:
+                # real start of possible header.
+                frame_start = frame + possibility - 63 * ntrack // 8
+                if (forward and frame_start < file_pos or
+                        not forward and frame_start > file_pos):
+                    continue
+                # check there is a header following this.
+                check = frame_start + framesize
+                if check >= filesize - 32 * 2 * ntrack // 8 - len(nunset):
+                    # but do before this one if we're beyond end of file.
+                    check = frame_start - framesize
+                    if check < 0:  # assume OK if only one frame fits in file.
+                        if frame_start + framesize > filesize:
+                            continue
+                        else:
+                            break
+
+                self.seek(check + 32 * 2 * ntrack // 8)
+                check_data = np.fromstring(self.read(len(nunset)),
+                                           dtype=np.uint8)
+                databits2 = nbits[check_data]
+                if np.all(databits2 >= 6):
+                    break  # got it!
+
+            else:  # None of them worked, so do next block
                 continue
-            else:
-                frame_start = frame + extra - 32 * 2 * ntrack // 8
-                self.seek(frame_start)
-                return frame_start
+
+            self.seek(frame_start)
+            return frame_start
 
         self.seek(file_pos)
         return None
@@ -323,7 +357,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
 
             if invalid_data:
                 # Mark whole frame as invalid data.
-                self._header.val['communication_error'] = True
+                self._header['communication_error'] = True
 
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample_end = sample_offset + nsample

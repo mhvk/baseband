@@ -62,6 +62,10 @@ class TestVDIFMark5B(object):
         assert abs(header_copy.time - m5h2.time) > 1.*u.ns
         assert abs(header_copy.get_time(framerate=32*u.MHz/m5pl.nsample) -
                    m5h2.time) < 1.*u.ns
+        # Also check two special cases:
+        assert abs(header_copy.get_time(frame_nr=0) == m5h1.time)
+        with pytest.raises(ValueError):  # needs frame rate
+            header_copy.get_time(frame_nr=1)
 
     def test_payload(self):
         """Check Mark 5B payloads can used in a Mark5B VDIF payload."""
