@@ -1,5 +1,10 @@
+# Licensed under the GPLv3 - see LICENSE.rst
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
 import io
 from bisect import bisect
+import numpy as np
 
 
 class MultiFileReader(object):
@@ -81,6 +86,34 @@ class MultiFileReader(object):
             count -= len(extra)
 
         return data
+
+    def memmap(self, dtype=np.uint8, mode='r', offset=None, shape=None,
+               order='C'):
+        """Map part of the file in memory.  Cannnot span file boundaries."""
+        if offset is None:
+            offset = self.offset
+
+        if shape is None:
+            count = self.size - offset
+            dtype = np.dtype(dtype)
+            if count % dtype.itemsize:
+                raise ValueError("Size of available data is not a "
+                                 "multiple of the data-type size.")
+            shape = (count // dtype.itemsize,)
+        else:
+            if not isinstance(shape, tuple):
+                shape = (shape,)
+            count = 1
+            for k in shape:
+                count *= k
+
+        # move to correct file and offset.
+        self.seek(offset)
+        file_offset = offset - self.file_offsets[self.file_nr]
+        if file_offset + count > self.file_sizes[self.file_nr]:
+            raise ValueError('mmap length is greater than file size')
+
+        return np.memmap(self.fh, dtype, mode, file_offset, shape, order)
 
     def close(self):
         self.fh.close()

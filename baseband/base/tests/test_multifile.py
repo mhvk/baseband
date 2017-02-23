@@ -2,13 +2,16 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import numpy as np
 from astropy.tests.helper import pytest
+
 from .. import multifile as mf
 
 
 class TestMultiFileReader(object):
     def setup(self):
         self.data = b'abcdefghijklmnopqrstuvwxyz'
+        self.uint8_data = np.fromstring(self.data, dtype=np.uint8)
         self.size = len(self.data)
         self.files = ['file{:1d}.raw'.format(i) for i in range(3)]
         self.max_file_size = 10
@@ -106,3 +109,25 @@ class TestMultiFileReader(object):
             assert fh.read(2) == self.data[23:25]
             fh.seek(-10, 2)
             assert fh.read() == self.data[-10:]
+
+    def test_memmap(self):
+        with mf.open(self.files) as fh:
+            mm = fh.memmap(mode='r', offset=0, shape=(5,))
+            assert (mm == self.uint8_data[:5]).all()
+            mm = fh.memmap(mode='r', offset=5, shape=(5,))
+            assert (mm == self.uint8_data[5:10]).all()
+            with pytest.raises(ValueError):
+                fh.memmap(mode='r', offset=7, shape=(5,))
+            offset = self.offsets[1]
+            fh.seek(offset)
+            mm = fh.memmap(mode='r', shape=(5,))
+            assert (mm == self.uint8_data[offset:offset+5]).all()
+            fh.seek(-2, 2)
+            mm = fh.memmap(mode='r')
+            assert (mm == self.uint8_data[-2:]).all()
+            fh.seek(-4, 2)
+            mm = fh.memmap(mode='r', dtype=np.uint16)
+            assert (mm == self.uint8_data[-4:].view(np.uint16)).all()
+            fh.seek(-3, 2)
+            with pytest.raises(ValueError):
+                fh.memmap(mode='r', dtype=np.uint16)
