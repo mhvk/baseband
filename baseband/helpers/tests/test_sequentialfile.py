@@ -9,6 +9,14 @@ from astropy.tests.helper import pytest
 from .. import sequentialfile as sf
 
 
+class Sequencer(object):
+    def __init__(self, template):
+        self.template = template
+
+    def __getitem__(self, item):
+        return self.template.format(item)
+
+
 class TestSequentialFileReader(object):
     def setup(self):
         self.data = b'abcdefghijklmnopqrstuvwxyz'
@@ -51,12 +59,10 @@ class TestSequentialFileReader(object):
     def test_attributes(self):
         with sf.open(self.files) as fh:
             assert fh.files == self.files
-            assert fh.nfiles == len(self.files)
-            assert fh.file_sizes == self.sizes
-            assert fh.file_offsets == self.offsets
-            assert fh.size == self.size
-            assert fh.offset == 0
             assert fh.tell() == 0
+            assert fh.size == self.size
+            assert fh._file_sizes == self.sizes
+            assert fh._file_offsets == self.offsets
 
     def test_seek(self):
         with sf.open(self.files) as fh:
@@ -72,7 +78,7 @@ class TestSequentialFileReader(object):
             assert fh.file_nr == 2
             fh.seek(self.size)
             assert fh.file_nr == 2
-            fh.seek(self.size + 10)
+            fh.seek(10, 2)
             assert fh.file_nr == 2
             assert fh.tell() == self.size + 10
             with pytest.raises(OSError):
@@ -121,14 +127,17 @@ class TestSequentialFileReader(object):
             assert fh.read(2) == self.data[23:25]
             fh.seek(-10, 2)
             assert fh.read() == self.data[-10:]
+            fh.seek(10, 2)
+            assert fh.read() == b''
+            assert fh.read(10) == b''
 
     def test_memmap(self):
         with sf.open(self.files) as fh:
             mm = fh.memmap(offset=0, shape=(5,))
-            assert fh.offset == 5
+            assert fh.tell() == 5
             assert (mm == self.uint8_data[:5]).all()
             mm = fh.memmap(shape=(5,))
-            assert fh.offset == 10
+            assert fh.tell() == 10
             assert (mm == self.uint8_data[5:10]).all()
             with pytest.raises(ValueError):
                 fh.memmap(offset=7, shape=(5,))
@@ -164,8 +173,6 @@ class TestSequentialFileWriter(object):
         self._setup(tmpdir)
         fh = sf.open(self.files, 'wb', file_size=10)
         assert fh.writable()
-        assert not fh.readable()
-        assert not fh.seekable()
         assert not fh.closed
         fh.close()
         assert fh.closed
@@ -175,8 +182,6 @@ class TestSequentialFileWriter(object):
         self._setup(tmpdir)
         with sf.open(self.files, 'wb', file_size=10) as fh:
             assert fh.writable()
-            assert not fh.readable()
-            assert not fh.seekable()
             assert not fh.closed
 
         assert fh.closed
@@ -187,7 +192,6 @@ class TestSequentialFileWriter(object):
         with sf.open(self.files, 'wb', file_size=10) as fh:
             assert fh.files == self.files
             assert fh.file_size == 10
-            assert fh.offset == 0
             assert fh.tell() == 0
 
     def test_write(self, tmpdir):
@@ -228,10 +232,23 @@ class TestSequentialFileWriter(object):
         with sf.open(self.files, 'rb') as fh:
             assert fh.read() == self.data
 
+    def test_simple_sequencer(self, tmpdir):
+        self._setup(tmpdir)
+
+        sequencer = Sequencer(str(tmpdir.join('file{:03d}.raw')))
+        with sf.open(sequencer, 'wb', file_size=8) as fh:
+            fh.write(self.data)
+            assert fh.file_nr == 3
+
+        with sf.open(sequencer, 'rb') as fh:
+            check = fh.read()
+            assert check == self.data
+            assert fh._file_sizes == [8, 8, 8, 2]
+
     def test_memmap(self, tmpdir):
         self._setup(tmpdir)
         data = self.uint8_data
-        with sf.open(self.files, 'wb', file_size=10) as fh:
+        with sf.open(self.files, 'w+b', file_size=10) as fh:
             mm = fh.memmap(shape=(5,))
             assert fh.tell() == 5
             mm[:] = data[:5]
@@ -256,3 +273,9 @@ class TestSequentialFileWriter(object):
         assert check[:9] == self.data[:9]
         assert check[9] == self.data[-1]
         assert check[10:] == self.data[10:19]
+
+    def test_memmap_fail(self, tmpdir):
+        self._setup(tmpdir)
+        with sf.open(self.files, 'wb', file_size=10) as fh:
+            with pytest.raises(ValueError):
+                fh.memmap(shape=(5,))
