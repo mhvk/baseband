@@ -7,7 +7,8 @@ from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
 from ..header import Mark4TrackHeader
 from ..payload import reorder32, reorder64
 from ...data import (SAMPLE_MARK4 as SAMPLE_FILE,
-                     SAMPLE_MARK4_32TRACK as SAMPLE_32TRACK)
+                     SAMPLE_MARK4_32TRACK as SAMPLE_32TRACK,
+                     SAMPLE_MARK4_32TRACK_FANOUT2 as SAMPLE_32TRACK_FANOUT2)
 
 # Results from mark5access on 2015-JAN-22.
 # m5d evn/Ar/gp052d_ar_no0021 MKIV1_4-512-8-2 1000
@@ -498,7 +499,7 @@ class TestMark4(object):
             mark4.open('ts.dat', 's')
 
 
-def test_32track_file():
+def test_32track_fanout4_file():
     with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
         assert fh.find_frame(ntrack=32) == 9656
 
@@ -538,6 +539,53 @@ def test_32track_file():
         s.seek(0)
         with open(SAMPLE_32TRACK, 'rb') as fr:
             fr.seek(9656)
+            orig_bytes = fr.read(number_of_bytes)
+            conv_bytes = s.read()
+            assert conv_bytes == orig_bytes
+
+        fh.close()
+
+
+def test_32track_fanout2_file():
+    with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
+        assert fh.find_frame(ntrack=32) == 17436
+
+    with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rs', ntrack=32, decade=2010,
+                    frames_per_second=400) as fh:
+        header0 = fh.header0
+        assert fh.samples_per_frame == 40000
+        time0 = fh.time0
+        assert time0.yday == '2017:063:04:42:26.02500'
+        record = fh.read(80000)
+        fh_raw_tell1 = fh.fh_raw.tell()
+        assert fh_raw_tell1 == 160000 + 17436
+
+    assert np.all(record[:320] == 0.)
+    # Compare with: m5d vlbi_b1133/gk049c_ar_no0011.m5a MKIV1_2-128-8-2 700
+    assert np.all(record[320:324].astype(int) == np.array(
+        [[-1, -1, 3, 1, 3, 3, 1, 1],
+         [-3, -3, 1, -1, -1, 3, -3, -1],
+         [-1, -1, -3, -1, 1, 1, -1, 1],
+         [-1, -3, -1, 1, -1, 1, -1, 1]]))
+
+    with io.BytesIO() as s, mark4.open(s, 'ws', header=header0,
+                                       frames_per_second=400) as fw:
+        fw.write(record)
+        fw.fh_raw.flush()
+        number_of_bytes = s.tell()
+        assert number_of_bytes == fh_raw_tell1 - 17436
+
+        s.seek(0)
+        # Note: this test would not work if we wrote only a single record.
+        fh = mark4.open(s, 'rs', ntrack=32, decade=2010,
+                        frames_per_second=400)
+        assert fh.tell(unit='time').yday == time0.yday
+        record2 = fh.read(1000)
+        assert np.all(record2 == record[:1000])
+
+        s.seek(0)
+        with open(SAMPLE_32TRACK_FANOUT2, 'rb') as fr:
+            fr.seek(17436)
             orig_bytes = fr.read(number_of_bytes)
             conv_bytes = s.read()
             assert conv_bytes == orig_bytes

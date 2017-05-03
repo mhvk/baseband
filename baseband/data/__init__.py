@@ -19,7 +19,14 @@ SAMPLE_MARK4_32TRACK = full_path('sample_32track.m4')
 """Mark 4 sample.  ntrack=32, fanout=4, bps=2.
 
 Created from a Arecibo observation simultaneous with RadioAstron using
-dd if=ar/rg10a_ar_no0014 of=sample_32track.m4 bs=10000 count=17
+dd if=rg10a_ar_no0014 of=sample_32track.m4 bs=10000 count=17
+"""
+
+SAMPLE_MARK4_32TRACK_FANOUT2 = full_path('sample_32track_fanout2.m4')
+"""Mark 4 sample.  ntrack=32, fanout=2, bps=2.
+
+Created from a Arecibo observation of PSR B1133+16 using
+dd if=gk049c_ar_no0011.m5a of=sample_32track_fanout2.m4 bs=10000 count=18
 """
 
 SAMPLE_MARK5B = full_path('sample.m5b')

@@ -122,6 +122,37 @@ def encode_4chan_2bit_fanout4(values):
     return reorder32(out)
 
 
+def decode_8chan_2bit_fanout2(frame):
+    """Decode payload for 8 channels using 2 bits, fan-out 4 (32 tracks)."""
+    # After reshape: byte 0: ch0/s0, ch4/s0, ch0/s1, ch4/s1
+    #                byte 1: ch1/s0, ch5/s0, ch1/s1, ch5/s1
+    #                byte 2: ch2/s0, ch6/s0, ch2/s1, ch6/s1
+    #                byte 3: ch3/s0, ch7/s0, ch3/s1, ch7/s1
+    frame = frame.view(np.uint8).reshape(-1, 4)
+    # The look-up table splits each data word into the above 16 measurements.
+    # the first reshape means one gets time, channel&0x3, sample, channel&0x4
+    # the transpose makes this channel&0x4, channel&0x3, time, sample.
+    # the second reshape (which makes a copy) gets one just channel, time,
+    # and the final transpose time, channel.
+    return (lut2bit3.take(frame, axis=0).reshape(-1, 4, 2, 2)
+            .transpose(3, 1, 0, 2).reshape(8, -1).T)
+
+
+def encode_8chan_2bit_fanout2(values):
+    """Encode payload for 8 channels using 2 bits, fan-out 2 (32 tracks)."""
+    # words encode 16 values (see above) in order ch&0x3, sample, ch&0x4
+    values = (values.reshape(-1, 2, 2, 4).transpose(0, 3, 1, 2)
+              .reshape(-1, 4, 4))
+    bitvalues = encode_2bit_base(values)
+    # values are -3, -1, +1, 3 -> 00, 01, 10, 11;
+    # get first bit (sign) as 1, second bit (magnitude) as 16
+    reorder_bits = np.array([0, 16, 1, 17], dtype=np.uint8)
+    reorder_bits.take(bitvalues, out=bitvalues)
+    bitvalues <<= np.array([0, 1, 2, 3], dtype=np.uint8)
+    out = np.bitwise_or.reduce(bitvalues, axis=-1).ravel().view(np.uint32)
+    return out
+
+
 def decode_8chan_2bit_fanout4(frame):
     """Decode payload for 8 channels using 2 bits, fan-out 4 (64 tracks)."""
     # Bitwise reordering of tracks, to align sign and magnitude bits,
@@ -172,8 +203,10 @@ class Mark4Payload(VLBIPayloadBase):
     _dtype_word = np.dtype('<u8')
     # Decoders keyed by (nchan, nbit, fanout).
     _encoders = {(4, 2, 4): encode_4chan_2bit_fanout4,
+                 (8, 2, 2): encode_8chan_2bit_fanout2,
                  (8, 2, 4): encode_8chan_2bit_fanout4}
     _decoders = {(4, 2, 4): decode_4chan_2bit_fanout4,
+                 (8, 2, 2): decode_8chan_2bit_fanout2,
                  (8, 2, 4): decode_8chan_2bit_fanout4}
 
     def __init__(self, words, header=None, nchan=1, bps=2, fanout=1):
