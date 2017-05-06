@@ -20,7 +20,7 @@ __all__ = ['CRC12', 'crc12', 'stream2words', 'words2stream',
            'Mark4TrackHeader', 'Mark4Header']
 
 
-MARK4_DTYPES = {8: 'u1',
+MARK4_DTYPES = {8: '<u1',  # this needs to start with '<' for words2stream.
                 16: '<u2',
                 32: '<u4',
                 64: '<u8'}
@@ -153,7 +153,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
         assert len(self.words) == 5
         assert np.all(self['sync_pattern'] ==
                       self._header_parser.defaults['sync_pattern'])
-        assert np.all(self['bcd_fraction'] & 0xf) % 5 != 4
+        assert np.all((self['bcd_fraction'] & 0xf) % 5 != 4)
         assert self.decade is not None and (1950 < self.decade < 3000)
 
     @property
@@ -246,8 +246,40 @@ class Mark4Header(Mark4TrackHeader):
     _track_header = Mark4TrackHeader
     _properties = (Mark4TrackHeader._properties +
                    ('ntrack', 'framesize', 'payloadsize', 'fanout',
-                    'samples_per_frame', 'bps', 'nchan'))
+                    'samples_per_frame', 'bps', 'converters', 'nchan'))
     _dtypes = MARK4_DTYPES
+
+    # keyed with bps, fanout; Tables 10-14 in reference documentation:
+    # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+    # rows are channels with Sign, Mag for each for bps=2, columns fanout.
+    # So for bps=2, fanout=4 (abbreviating channel a Sign, Mag as aS, aM):
+    # Channel a has samples (aS, aM) in tracks (2, 10), (4,12), etc.
+    #         b             (bS, bM) in        (3, 11), etc.
+    # We subtract two and reshape as (fanout, nchan, bps) since that is how
+    # it is used internally.
+    _track_assignments = {
+        (2, 4): np.array(  # rows=aS, aM, bS, bM, cS, cM, dS, dM; cols=fanout.
+            [[2, 10, 3, 11, 18, 26, 19, 27],
+             [4, 12, 5, 13, 20, 28, 21, 29],
+             [6, 14, 7, 15, 22, 30, 23, 31],
+             [8, 16, 9, 17, 24, 32, 25, 33]]).reshape(4, 4, 2) - 2,
+        (1, 4): np.array(  # rows=aS, bS, ..., hS; cols=fanout.
+            [[2, 3, 10, 11, 18, 19, 26, 27],
+             [4, 5, 12, 13, 20, 21, 28, 29],
+             [6, 7, 14, 15, 22, 23, 30, 31],
+             [8, 9, 16, 17, 24, 25, 32, 33]]).reshape(4, 8, 1) - 2,
+        (2, 2): (np.array(  # rows=aS, aM, bS, bM, ..., hS, hM; cols=fanout.
+            [[2, 6, 3, 7, 10, 14, 11, 15, 18, 22, 19, 23, 26, 30, 27, 31],
+             [4, 8, 5, 9, 12, 16, 13, 17, 20, 24, 21, 25, 28, 32, 29, 33]])
+                 .reshape(2, 8, 2) - 2),
+        (1, 2): (np.array(  # rows=aS, bS, ..., pS; cols=fanout.
+            [[2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30, 31],
+             [4, 5, 8, 9, 12, 13, 16, 17, 20, 21, 24, 25, 28, 29, 32, 33]])
+                 .reshape(2, 16, 1) - 2),
+        (2, 1): (np.array(  # rows=aS, aM, bS, bM, ..., pS, pM; no fanout.
+            [[2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32,
+              3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33]])
+                 .reshape(1, 16, 2) - 2)}
 
     def __init__(self, words, ntrack=None, decade=None, verify=True):
         if words is None:
@@ -272,7 +304,40 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def stream_dtype(self):
-        return self.__class__._stream_dtype(self.ntrack)
+        """Stream dtype required to hold this header's number of tracks."""
+        return self._stream_dtype(self.ntrack)
+
+    @classmethod
+    def _track_assignment(cls, ntrack, bps, fanout):
+        try:
+            ta = cls._track_assignments[(bps, fanout)]
+        except KeyError:
+            raise ValueError("Mark 4 reader does not support bps={0}, "
+                             "fanout={1}; supported are {2}".format(
+                                 bps, fanout, cls._track_assignments.keys()))
+
+        if ntrack == 64:
+            # double up the number of tracks and channels.
+            return np.concatenate((ta, ta + 32), axis=1)
+        elif ntrack == 32:
+            return ta
+        else:
+            raise ValueError("Have mark 4 track assignments only for "
+                             "ntrack=32 or 64, not {0}".format(ntrack))
+
+    @property
+    def track_assignment(self):
+        """Assignments of tracks to channels and fanout items.
+
+        The assignments are inferred from tables 10-14 in
+        http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        except that 2 has been subtracted so that tracks start at 0,
+        and that for 64 tracks the arrays are suitably enlarged by adding
+        another set of channels.
+
+        The returned array has shape ``(fanout, nchan, bps)``.
+        """
+        return self._track_assignment(self.ntrack, self.bps, self.fanout)
 
     @classmethod
     def fromfile(cls, fh, ntrack, decade=None, verify=True):
@@ -298,8 +363,7 @@ class Mark4Header(Mark4TrackHeader):
         except (ValueError, AssertionError):
             raise EOFError("Could not read full Mark 4 Header.")
 
-        words = stream2words(stream,
-                             track=np.arange(ntrack, dtype=stream.dtype))
+        words = stream2words(stream)
         self = cls(words, decade=decade, verify=verify)
         self.mutable = False
         return self
@@ -331,7 +395,8 @@ class Mark4Header(Mark4TrackHeader):
         --- Header keywords : (minimum for a complete header)
 
         time : `~astropy.time.Time` instance
-            Sets bcd-encoded unit year, day, hour, minute, second.
+            Sets bcd-encoded unit year, day, hour, minute, second, fraction,
+            as well as the decade.
         bps : int
             Bits per sample.
         fanout : int
@@ -343,7 +408,7 @@ class Mark4Header(Mark4TrackHeader):
         kwargs['ntrack'] = ntrack
         return super(Mark4Header, cls).fromvalues(ntrack, decade, **kwargs)
 
-    def update(self, *args, **kwargs):
+    def update(self, crc=None, verify=True, **kwargs):
         """Update the header by setting keywords or properties.
 
         Here, any keywords matching header keys are applied first, and any
@@ -359,42 +424,49 @@ class Mark4Header(Mark4TrackHeader):
         **kwargs
             Arguments used to set keywords and properties.
         """
-        calculate_crc = kwargs.get('crc', None) is None
-        if calculate_crc:
-            kwargs.pop('crc', None)
-            verify = kwargs.pop('verify', True)
-            kwargs['verify'] = False
-
-        super(Mark4Header, self).update(**kwargs)
-        if calculate_crc:
+        if crc is None:
+            super(Mark4Header, self).update(verify=False, **kwargs)
             stream = words2stream(self.words)
             stream[-12:] = crc12(stream[:-12])
             self.words = stream2words(stream)
             if verify:
                 self.verify()
+        else:
+            super(Mark4Header, self).update(verify=verify, crc=crc, **kwargs)
 
     @property
     def ntrack(self):
+        """Number of tracks of the stream described by this header.
+
+        If set, this will also update ``headstack_id`` and ``track_id``.
+        """
         return self.words.shape[1]
 
     @ntrack.setter
     def ntrack(self, ntrack):
-        assert ntrack == self.words.shape[1]
+        if ntrack != self.words.shape[1]:
+            raise ValueError("Cannot change ntrack from {0}."
+                             .format(self.words.shape[1]))
         if ntrack == 64:
             self['headstack_id'] = np.repeat(np.arange(2), 32)
-            self.track_id = np.repeat(np.arange(2, 34)[np.newaxis, :],
-                                      2, axis=0).ravel()
+            self.track_id = np.tile(np.arange(2, 34), 2)
+        elif ntrack == 32:
+            self['headstack_id'] = np.zeros(32, dtype=int)
+            self.track_id = np.arange(2, 34)
         else:
-            raise ValueError("Only can set ntrack=64 so far.")
+            raise ValueError("Only can set ntrack=64 or 32 so far.")
 
     @property
     def size(self):
-        """Header size, in bytes."""
+        """Size of the header in bytes."""
         return self.ntrack * 160 // 8
 
     @property
     def framesize(self):
-        """Frame size, in bytes."""
+        """Size of the whole frame (header + payload) in bytes.
+
+        If set, this will be used to infer and set ``ntrack``.
+        """
         return self.ntrack * PAYLOADSIZE // 8
 
     @framesize.setter
@@ -404,7 +476,11 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def payloadsize(self):
-        """Payload size, in bytes; missing pieces are the header bytes."""
+        """Size of the payload in bytes.
+
+        Note that the payloads miss pieces overwritten by the header.
+        If set, this will be used to set and infer ``ntrack``.
+        """
         return self.framesize - self.size
 
     @payloadsize.setter
@@ -413,21 +489,31 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def fanout(self):
+        """Number of samples stored in one payload item of size ntrack.
+
+        If set, will update ``fan_out`` for each track.
+        """
         return np.max(self['fan_out']) + 1
 
     @fanout.setter
     def fanout(self, fanout):
-        assert fanout in (1, 2, 4)
-        # fanout = 4: (0,0,1,1,2,2,3,3) * 8
-        # fanout = 2: (0,0,1,1) * 16
-        # fanout = 1: (0,0) * 32
-        self['fan_out'] = np.repeat(
-            np.repeat(np.arange(fanout), 2)[np.newaxis, :],
-            self.ntrack // 2 // fanout, axis=0).ravel()
+        if fanout not in (1, 2, 4):
+            raise ValueError("Mark 4 data only supports fanout=1, 2, or 4, "
+                             "not {0}.".format(fanout))
+        # In principle, one would like to go through track_assignments, but
+        # we may not have bps set here yet, so just infer from tables:
+        # fanout = 4: (0,0,1,1,2,2,3,3) * ntrack / 2 / 4
+        # fanout = 2: (0,0,1,1) * ntrack / 2 / 2
+        # fanout = 1: (0,0) * ntrack / 2
+        self['fan_out'] = np.tile(np.repeat(np.arange(fanout), 2),
+                                  self.ntrack // 2 // fanout)
 
     @property
     def samples_per_frame(self):
-        """Number of samples per channel encoded in frame."""
+        """Number of samples per channel encoded in frame.
+
+        If set, this uses the number of tracks to infer and set ``fanout``.
+        """
         # Header overwrites part of payload, so we need framesize.
         # framesize * 8 // bps // nchan, but use ntrack and fanout, as these
         # are more basic; ntrack / fanout by definition equals bps * nchan.
@@ -439,32 +525,84 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def bps(self):
-        return 1 if not np.any(self['magnitude_bit']) else 2
+        """Number of bits per sample (either 1 or 2).
+
+        If set, combined with ``fanout`` and ``ntrack`` to updates
+        ``magnitude_bit`` for all tracks, and with ``lsb_output`` to set
+        ``converters`` (which should be set explicitly to override this).
+        """
+        return 2 if self['magnitude_bit'].any() else 1
 
     @bps.setter
     def bps(self, bps):
         if bps == 1:
             self['magnitude_bit'] = False
         elif bps == 2:
-            self['magnitude_bit'] = np.repeat(
-                np.repeat(np.array([False, True]),
-                          self.fanout * 2)[np.newaxis, :],
-                self.ntrack // 4 // self.fanout, axis=0).ravel()
+            # Note: cannot assign to slice of header property, so go via array.
+            ta = self._track_assignment(self.ntrack, bps, self.fanout)
+            magnitude_bit = np.empty(self.ntrack, dtype=bool)
+            magnitude_bit[ta] = [False, True]
+            self['magnitude_bit'] = magnitude_bit
         else:
-            raise ValueError("Mark 4 data only supports 1 or 2 bits/sample")
+            raise ValueError("Mark 4 data can only have bps=1 or 2, "
+                             "not {0}".format(bps))
 
-        nchan = self.ntrack // self.fanout // bps
-        self['converter_id'] = np.repeat(
-            np.arange(nchan).reshape(-1, 2, 2).transpose(0, 2, 1),
-            self.ntrack // nchan, axis=1).ravel()
+        # set default converters; can be overridden if needed.
+        sb = self['lsb_output']
+        nsb = 1 if (sb == sb[0]).all() else 2
+        nconverter = self.ntrack // (self.fanout * bps * nsb)
+        converters = np.arange(nconverter)
+        if nconverter > 2:
+            converters = (converters.reshape(-1, 2, 2)
+                          .transpose(0, 2, 1).ravel())
+        self.converters = converters
+
+    @property
+    def converters(self):
+        """Converted IDs used for each channel.
+
+        Two channels can share a converter if both side bands are used.
+        """
+        # TODO: also add lsb property which returns array with same shape.
+        # Maybe easier to also define nconverter and nsb?
+        return self['converter_id'][self.track_assignment[0, :, 0]]
+
+    @converters.setter
+    def converters(self, converters):
+        # set converters, duplicating over fanout, lsb, magnitude bit.
+        ta = self.track_assignment
+        sb = self['lsb_output']
+        nsb = 1 if (sb == sb[0]).all() else 2
+        if len(converters) != ta.shape[1] // nsb:
+            raise ValueError('Mark 4 file with bps={0}, fanout={1} and {2} '
+                             'needs to define {3} converters'
+                             .format(self.bps, self.fanout,
+                                     ('a single sideband' if nsb == 1
+                                      else 'two sidebands'),
+                                     ta.shape[1] // nsb))
+
+        if nsb == 2:
+            c = np.empty(ta.shape[1], dtype=int)
+            sb0 = sb[ta[0, :, 0]]
+            c[sb0] = c[~sb0] = converters
+            converters = c
+
+        # Note: cannot assign to slice of header property, so go via array.
+        converter_id = np.empty(self.ntrack, dtype=int)
+        converter_id[ta] = converters[:, np.newaxis]
+        self['converter_id'] = converter_id
 
     @property
     def nchan(self):
-        return self.ntrack // self.fanout // self.bps
+        """Number of independent baseband channels.
+
+        If set, it is combined with ``ntrack`` and ``fanout`` to infer ``bps``.
+        """
+        return self.ntrack // (self.fanout * self.bps)
 
     @nchan.setter
     def nchan(self, nchan):
-        self.bps = self.ntrack // self.fanout // nchan
+        self.bps = self.ntrack // (self.fanout * nchan)
 
     def get_time(self):
         """

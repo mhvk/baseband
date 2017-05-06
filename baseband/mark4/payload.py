@@ -127,6 +127,12 @@ def encode_4chan_2bit_fanout4(values):
 
 def decode_8chan_2bit_fanout2(frame):
     """Decode payload for 8 channels using 2 bits, fan-out 4 (32 tracks)."""
+    # header['magnitude_bit'] = 00001111,00001111,00001111,00001111
+    # makes sense with lut2bit3
+    # header['fan_out'] = 00110011,00110011,00110011,00110011
+    # i.e., s0s0,s1s1,s0s0,s1s1 for each byte
+    # header['converter_id'] = 02020202,13131313,02020202,13131313
+    # header['lsb_output'] =   00000000,00000000,11111111,11111111
     # After reshape: byte 0: ch0/s0, ch4/s0, ch0/s1, ch4/s1
     #                byte 1: ch1/s0, ch5/s0, ch1/s1, ch5/s1
     #                byte 2: ch2/s0, ch6/s0, ch2/s1, ch6/s1
