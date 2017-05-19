@@ -1,4 +1,4 @@
-.. _vlbi_base:
+.. _helpers:
 
 ****************
 Baseband Helpers
