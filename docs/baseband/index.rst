@@ -15,8 +15,9 @@ Specific file formats
    mark4/index
    dada/index
    gsb/index
+   helpers/index
    vlbi_base/index
-	       
+
 
 Reference/API
 =============

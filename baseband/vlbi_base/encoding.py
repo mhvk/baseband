@@ -75,8 +75,8 @@ def encode_4bit_base(values):
     It does not do the merging of samples together.
 
     Here, levels are linear between 0 and 15, with values first scaled by
-    `~baseband.vlbi_base.encoding.FOUR_BIT_1_SIGMA` (2.95) and then 8 added.
-    Some sample output levels are:
+    ``FOUR_BIT_1_SIGMA=2.95`` and then 8 added. Some sample output levels are:
+
       ========================= ======
       Input range               Output
       ========================= ======
