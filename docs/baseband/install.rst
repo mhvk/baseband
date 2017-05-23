@@ -34,13 +34,13 @@ using::
 
     git clone git@github.com:mhvk/baseband.git
 
-Of course, even better to fork it on github, and then clone your own
+Of course, it is even better to fork it on GitHub, and then clone your own
 repository, so that you can more easily contribute!
 
 Running code without installing
 -------------------------------
 
-As baseband is pure python, it can be used without being built or installed,
+As baseband is pure Python, it can be used without being built or installed,
 by appending the directory it is located in to the ``PYTHON_PATH`` environment
 variable.  Alternatively, you can use ``sys.path`` within Python to append the
 path::
@@ -76,7 +76,7 @@ successfully be run on your system::
 
     python3 setup.py test
 
-or, inside of python::
+or, inside of Python::
 
     import baseband
     baseband.test()
@@ -98,7 +98,7 @@ Building documentation
     documentation is available online at `baseband.readthedocs.io 
     <https://baseband.readthedocs.io>`_.
 
-The ``baseband`` documentation can be build again using ``setup.py`` from the
+The ``baseband`` documentation can be built again using ``setup.py`` from the
 root directory::
 
     python3 setup.py build_docs
