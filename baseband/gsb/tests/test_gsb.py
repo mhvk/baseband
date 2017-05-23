@@ -1,7 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE.rst
 import io
+import pytest
 import numpy as np
-from astropy.tests.helper import pytest
 import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import assert_quantity_allclose

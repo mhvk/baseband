@@ -1,7 +1,10 @@
+# Licensed under the GPLv3 - see LICENSE.rst
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 import io
+import pytest
 import numpy as np
 from astropy import units as u
-from astropy.tests.helper import pytest
 from astropy.time import Time
 from ... import mark5b
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH

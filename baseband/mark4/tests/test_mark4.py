@@ -1,7 +1,10 @@
+# Licensed under the GPLv3 - see LICENSE.rst
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 import io
+import pytest
 import numpy as np
 from astropy import units as u
-from astropy.tests.helper import pytest
 from ... import mark4
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
 from ..header import Mark4TrackHeader
