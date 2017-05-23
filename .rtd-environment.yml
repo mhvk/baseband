@@ -1,0 +1,8 @@
+name: baseband
+
+channels:
+    - astropy
+
+dependencies:
+    - astropy
+    - numpy
