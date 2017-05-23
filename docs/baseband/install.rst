@@ -8,9 +8,10 @@ Requirements
 
 Baseband requires:
 
-    - `Astropy`_ v1.3.2 or later
-    - `NumPy <http://www.numpy.org/>`_ v1.12 or later
+    - `Astropy`_ v1.0.4 or later
+    - `Numpy <http://www.numpy.org/>`_ v1.9 or later
 
+.. _installation:
 
 Installing baseband
 ===================
@@ -21,120 +22,86 @@ Installing baseband
    Baseband currently cannot be built with `pip <http://www.pip-installer.org/en/latest/>`_,
    but eventually...
 
-.. _pipbuildtest:
-
-Testing an install
-------------------
-
-As with astropy, you can test if an install has been successful by running the
-:meth:`baseband.test` function::
-
-    import baseband
-    baseband.test()
-
-Building from source
-====================
+Currently, baseband can only be installed by getting its source code,
+and either running it directly or installing it.
 
 Obtaining source code
 ---------------------
 
-Development repository
-^^^^^^^^^^^^^^^^^^^^^^
-
-The latest development version of baseband can found on `its GitHub repo <https://github.com/mhvk/baseband>`_;
-to clone, use::
+The source code and latest development version of baseband can found on `its
+GitHub repo <https://github.com/mhvk/baseband>`_.  You can get your own clone
+using::
 
     git clone git@github.com:mhvk/baseband.git
+
+Of course, even better to fork it on github, and then clone your own
+repository, so that you can more easily contribute!
 
 Running code without installing
 -------------------------------
 
-Baseband can be used without being built or installed, by appending the system
-path to include the directory it's located in.  In bash, use
-
-.. code-block:: bash
-
-    export PYTHONPATH="${PYTHONPATH}:BASEBAND_PATH"
-
-and in tcsh, use
-
-.. code-block:: tcsh
-
-    setenv PYTHONPATH ${PYTHONPATH}:BASEBAND_PATH
-
-Alternatively, you can use ``sys.path`` within Python to append the path::
+As baseband is pure python, it can be used without being built or installed,
+by appending the directory it is located in to the ``PYTHON_PATH`` environment
+variable.  Alternatively, you can use ``sys.path`` within Python to append the
+path::
 
     import sys
     sys.path.append(BASEBAND_PATH)
 
-``BASEBAND_PATH`` is the directory you downloaded or cloned baseband into.
-
+where ``BASEBAND_PATH`` is the directory you downloaded or cloned baseband into.
 
 Installing source code
 ----------------------
 
-To get baseband loaded into your Python working directory, use ``setup.py`` in
+If you want baseband to be more broadly available, either to all users on a
+system, or within, say, a virtual environment, use ``setup.py`` in
 the root directory by calling::
 
     python3 setup.py install
 
-To view baseband-specific options, use ``python3 setup.py --help-commands``.  
 For general information on ``setup.py``, see `its documentation
-<https://docs.python.org/3.5/install/index.html#install-index>`_ . Some of the 
-install options are inherited from Astropy (specifically, from `Astropy-
-affiliated package manager <https://github.com/astropy/package-template>`_) and 
-are described further in `Astropy's installation documentation 
+<https://docs.python.org/3.5/install/index.html#install-index>`_ . Many of the
+``setup.py`` options are inherited from Astropy (specifically, from `Astropy-
+affiliated package manager <https://github.com/astropy/package-template>`_) and
+are described further in `Astropy's installation documentation
 <https://astropy.readthedocs.io/en/stable/install.html>`_ .
+
+.. _sourcebuildtest:
+
+Testing the installation
+========================
+
+The root directory ``setup.py`` can also be used to test if baseband can
+successfully be run on your system::
+
+    python3 setup.py test
+
+or, inside of python::
+
+    import baseband
+    baseband.test()
+
+These tests require `pytest <http://pytest.org>`_ to be installed. Further
+documentation can be found on the `Astropy running tests documentation
+<https://astropy.readthedocs.io/en/stable/development/testguide.html#running-tests>`_
+.
 
 .. _builddocs:
 
 Building documentation
-----------------------
+======================
 
 .. note::
 
     As with Astropy, building the documentation is unnecessary unless you
     are writing new documentation or do not have internet access, as baseband's
     documentation is available online at `baseband.readthedocs.io 
-    <https://baseband.readthedocs.io>`_ .
+    <https://baseband.readthedocs.io>`_.
 
-Building the documentation requires the Baseband source code (above) and:
-
-    - `Sphinx <http://sphinx.pocoo.org>`_ (and its dependencies) 1.5
-
-There are two ways to build the Astropy documentation. The first is using
-``setup.py`` in the root directory::
+The ``baseband`` documentation can be build again using ``setup.py`` from the
+root directory::
 
     python3 setup.py build_docs
 
-The documentation will be built in ``docs/_build/html``, with the main page 
-as ``docs/_build/html/index.html``.  To generate LaTeX instead, use::
-
-    python3 setup.py build_docs -b latex
-
-The LaTeX file ``baseband.tex`` will then be created in the 
-``docs/_build/latex`` directory.
-
-Using ``setup.py`` builds documentation from source.  To build documentation
-using the installed version of baseband (which requires building it, above):
-::
-
-    cd docs
-    make html
-
-.. _sourcebuildtest:
-
-Testing source code build of baseband
--------------------------------------
-
-The root directory ``setup.py`` can also be used to test if baseband can
-successfully be run on your system (regardless of whether or not it's 
-installed).  Use::
-
-    python3 setup.py test
-
-These tests require `pytest <http://pytest.org>`_ to be installed.  They are
-the same tests as in pipbuildtest_.  Further documentation can be found on
-the `Astropy running tests documentation
-<https://astropy.readthedocs.io/en/stable/development/testguide.html#running-tests>`_ .
-
+This requires to have `Sphinx <http://sphinx.pocoo.org>`_ installed (and its
+dependencies; version 1.5 recommended).
