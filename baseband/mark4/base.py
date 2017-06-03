@@ -3,7 +3,8 @@ import io
 
 import numpy as np
 
-from ..vlbi_base.base import VLBIStreamReaderBase, VLBIStreamWriterBase
+from ..vlbi_base.base import (VLBIFileBase,
+                              VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import Mark4Header
 from .frame import Mark4Frame
 
@@ -16,11 +17,10 @@ nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
          .sum(1).astype(np.int16))
 
 
-class Mark4FileReader(io.BufferedReader):
+class Mark4FileReader(VLBIFileBase):
     """Simple reader for Mark 4 files.
 
-    Adds ``read_frame`` and ``find_frame`` methods to the basic binary file
-    reader :class:`~io.BufferedReader`.
+    Adds ``read_frame`` and ``find_frame`` methods to the VLBI file wrapper.
     """
 
     def read_frame(self, ntrack, decade):
@@ -41,7 +41,7 @@ class Mark4FileReader(io.BufferedReader):
             :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
             respectively.
         """
-        return Mark4Frame.fromfile(self, ntrack=ntrack, decade=decade)
+        return Mark4Frame.fromfile(self.fh, ntrack=ntrack, decade=decade)
 
     def find_frame(self, ntrack, maximum=None, forward=True):
         """Look for the first occurrence of a frame, from the current position.
@@ -70,14 +70,15 @@ class Mark4FileReader(io.BufferedReader):
         -------
         offset : int
         """
+        fh = self.fh
         nset = np.ones(32 * ntrack // 8, dtype=np.int16)
         nunset = np.ones(ntrack // 8, dtype=np.int16)
         framesize = ntrack * 2500
-        file_pos = self.tell()
-        self.seek(0, 2)
-        filesize = self.tell()
+        file_pos = fh.tell()
+        fh.seek(0, 2)
+        filesize = fh.tell()
         if filesize < framesize:
-            self.seek(file_pos)
+            fh.seek(file_pos)
             return None
 
         if maximum is None:
@@ -98,9 +99,9 @@ class Mark4FileReader(io.BufferedReader):
                                 filesize - block),
                             -step)
         for frame in iterate:
-            self.seek(frame)
+            fh.seek(frame)
 
-            data = np.fromstring(self.read(block), dtype=np.uint8)
+            data = np.fromstring(fh.read(block), dtype=np.uint8)
             assert len(data) == block
             # Find header pattern.
             databits1 = nbits[data]
@@ -127,8 +128,8 @@ class Mark4FileReader(io.BufferedReader):
                         else:
                             break
 
-                self.seek(check + 32 * 2 * ntrack // 8)
-                check_data = np.fromstring(self.read(len(nunset)),
+                fh.seek(check + 32 * 2 * ntrack // 8)
+                check_data = np.fromstring(fh.read(len(nunset)),
                                            dtype=np.uint8)
                 databits2 = nbits[check_data]
                 if np.all(databits2 >= 6):
@@ -137,10 +138,10 @@ class Mark4FileReader(io.BufferedReader):
             else:  # None of them worked, so do next block
                 continue
 
-            self.seek(frame_start)
+            fh.seek(frame_start)
             return frame_start
 
-        self.seek(file_pos)
+        fh.seek(file_pos)
         return None
 
     def find_header(self, template_header=None, ntrack=None, decade=None,
@@ -156,16 +157,15 @@ class Mark4FileReader(io.BufferedReader):
         offset = self.find_frame(ntrack, maximum, forward)
         if offset is None:
             return None
-        header = Mark4Header.fromfile(self, ntrack=ntrack, decade=decade)
+        header = Mark4Header.fromfile(self.fh, ntrack=ntrack, decade=decade)
         self.seek(offset)
         return header
 
 
-class Mark4FileWriter(io.BufferedWriter):
+class Mark4FileWriter(VLBIFileBase):
     """Simple writer for Mark 4 files.
 
-    Adds ``write_frame`` method to the basic binary file writer
-    :class:`~io.BufferedWriter`.
+    Adds ``write_frame`` method to the VLBI binary file wrapper.
     """
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
@@ -184,7 +184,7 @@ class Mark4FileWriter(io.BufferedWriter):
         """
         if not isinstance(data, Mark4Frame):
             data = Mark4Frame.fromdata(data, header, **kwargs)
-        return data.tofile(self)
+        return data.tofile(self.fh)
 
 
 class Mark4StreamReader(VLBIStreamReaderBase):

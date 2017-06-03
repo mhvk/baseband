@@ -3,7 +3,8 @@ import io
 import numpy as np
 from astropy import units as u
 
-from ..vlbi_base.base import VLBIStreamReaderBase, VLBIStreamWriterBase
+from ..vlbi_base.base import (VLBIFileBase,
+                              VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import Mark5BHeader
 from .frame import Mark5BFrame
 
@@ -12,11 +13,10 @@ __all__ = ['Mark5BFileReader', 'Mark5BFileWriter', 'Mark5BStreamReader',
            'Mark5BStreamWriter', 'open']
 
 
-class Mark5BFileReader(io.BufferedReader):
+class Mark5BFileReader(VLBIFileBase):
     """Simple reader for Mark 5B files.
 
-    Adds ``read_frame`` and ``find_header`` methods to the basic binary file
-    reader :class:`~io.BufferedReader`.
+    Adds ``read_frame`` and ``find_header`` methods to the VLBI file wrapper.
     """
 
     def read_frame(self, ref_mjd, nchan, bps=2):
@@ -38,7 +38,7 @@ class Mark5BFileReader(io.BufferedReader):
             With ``header`` and ``data`` properties that return the
             Mark5BHeader and data encoded in the frame, respectively.
         """
-        return Mark5BFrame.fromfile(self, nchan=nchan, bps=bps,
+        return Mark5BFrame.fromfile(self.fh, nchan=nchan, bps=bps,
                                     ref_mjd=ref_mjd)
 
     def find_header(self, template_header=None, kday=None, framesize=None,
@@ -48,23 +48,24 @@ class Mark5BFileReader(io.BufferedReader):
         Search is from the current position.  If given, a template_header
         is used to initialize the framesize, as well as kday in the header.
         """
+        fh = self.fh
         if template_header:
             kday = template_header.kday
             framesize = template_header.framesize
         if maximum is None:
             maximum = 2 * framesize
         # Loop over chunks to try to find the frame marker.
-        file_pos = self.tell()
+        file_pos = fh.tell()
         # First check whether we are right at a frame marker (usually true).
         try:
-            header = Mark5BHeader.fromfile(self, kday=kday, verify=True)
-            self.seek(-header.size, 1)
+            header = Mark5BHeader.fromfile(fh, kday=kday, verify=True)
+            fh.seek(-header.size, 1)
             return header
         except AssertionError:
             pass
 
-        self.seek(0, 2)
-        size = self.tell()
+        fh.seek(0, 2)
+        size = fh.tell()
         if forward:
             iterate = range(file_pos, min(file_pos + maximum - 16,
                                           size - framesize))
@@ -74,8 +75,8 @@ class Mark5BFileReader(io.BufferedReader):
 
         for frame in iterate:
             try:
-                self.seek(frame)
-                header1 = Mark5BHeader.fromfile(self, kday=kday, verify=True)
+                fh.seek(frame)
+                header1 = Mark5BHeader.fromfile(fh, kday=kday, verify=True)
             except AssertionError:
                 continue
 
@@ -88,31 +89,30 @@ class Mark5BFileReader(io.BufferedReader):
                 next_frame = frame - framesize
                 # except if there is only one frame in the first place.
                 if next_frame < 0:
-                    self.seek(frame)
+                    fh.seek(frame)
                     return header1
 
-            self.seek(next_frame)
+            fh.seek(next_frame)
             try:
-                header2 = Mark5BHeader.fromfile(self, kday=kday, verify=True)
+                header2 = Mark5BHeader.fromfile(fh, kday=kday, verify=True)
             except AssertionError:
                 continue
 
             if(header2.jday == header1.jday and
                abs(header2.seconds - header1.seconds) <= 1 and
                abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
-                self.seek(frame)
+                fh.seek(frame)
                 return header1
 
         # Didn't find any frame.
-        self.seek(file_pos)
+        fh.seek(file_pos)
         return None
 
 
-class Mark5BFileWriter(io.BufferedWriter):
+class Mark5BFileWriter(VLBIFileBase):
     """Simple writer for Mark 5B files.
 
-    Adds ``write_frame`` method to the basic binary file writer
-    :class:`~io.BufferedWriter`.
+    Adds ``write_frame`` method to the VLBI binary file wrapper.
     """
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
@@ -139,7 +139,7 @@ class Mark5BFileWriter(io.BufferedWriter):
         if not isinstance(data, Mark5BFrame):
             data = Mark5BFrame.fromdata(data, header, bps=bps, valid=valid,
                                         **kwargs)
-        return data.tofile(self)
+        return data.tofile(self.fh)
 
 
 class Mark5BStreamReader(VLBIStreamReaderBase):

@@ -5,8 +5,8 @@ import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
 
-from ..vlbi_base.base import (VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase)
+from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
+                              VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 
@@ -61,11 +61,11 @@ __all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
 # -> array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
 
-class VDIFFileReader(io.BufferedReader):
+class VDIFFileReader(VLBIFileBase):
     """Simple reader for VDIF files.
 
-    Adds ``read_frame`` and ``read_frameset`` methods to the basic binary
-    file reader :class:`~io.BufferedReader`.
+    Adds ``read_frame`` and ``read_frameset`` methods on top of a binary
+    file reader (which is wrapped as ``self.fh``).
     """
     def read_frame(self):
         """Read a single frame (header plus payload).
@@ -77,7 +77,7 @@ class VDIFFileReader(io.BufferedReader):
             :class:`~baseband.vdif.VDIFHeader` and data encoded in the frame,
             respectively.
         """
-        return VDIFFrame.fromfile(self)
+        return VDIFFrame.fromfile(self.fh)
 
     def read_frameset(self, thread_ids=None, sort=True, edv=None, verify=True):
         """Read a single frame (header plus payload).
@@ -102,7 +102,7 @@ class VDIFFileReader(io.BufferedReader):
             :class:`~baseband.vdif.VDIFHeaders` and the data encoded in the
             frame set, respectively.
         """
-        return VDIFFrameSet.fromfile(self, thread_ids, sort=sort, edv=edv,
+        return VDIFFrameSet.fromfile(self.fh, thread_ids, sort=sort, edv=edv,
                                      verify=verify)
 
     def find_header(self, template_header=None, framesize=None, edv=None,
@@ -113,20 +113,19 @@ class VDIFFileReader(io.BufferedReader):
         ``template_header`` or with a header a framesize ahead.   Note that the
         latter turns out to be an unexpectedly weak check on real data!
         """
-
+        fh = self.fh
         # Obtain current pointer position.
-        file_pos = self.tell()
-
+        file_pos = fh.tell()
         if template_header is not None:
             edv = template_header.edv
             # First check whether we are right at a frame marker (often true).
             try:
-                header = VDIFHeader.fromfile(self, edv=edv, verify=True)
+                header = VDIFHeader.fromfile(fh, edv=edv, verify=True)
             except(AssertionError, IOError, EOFError):
                 pass
             else:
                 if template_header.same_stream(header):
-                    self.seek(file_pos)
+                    fh.seek(file_pos)
                     return header
             # If we're not at frame marker, obtain framesize and get searching.
             framesize = template_header.framesize
@@ -135,8 +134,9 @@ class VDIFFileReader(io.BufferedReader):
             maximum = 2 * framesize
 
         # Determine file size.
-        self.seek(0, 2)
-        size = self.tell()
+        file_pos = fh.tell()
+        fh.seek(0, 2)
+        size = fh.tell()
         # Generate file pointer positions to test.
         if forward:
             iterate = range(file_pos, min(file_pos + maximum - 31,
@@ -146,9 +146,9 @@ class VDIFFileReader(io.BufferedReader):
                             max(file_pos - maximum, -1), -1)
         # Loop over chunks to try to find the frame marker.
         for frame in iterate:
-            self.seek(frame)
+            fh.seek(frame)
             try:
-                header = VDIFHeader.fromfile(self, edv=edv, verify=True)
+                header = VDIFHeader.fromfile(fh, edv=edv, verify=True)
             except AssertionError:
                 continue
 
@@ -168,30 +168,30 @@ class VDIFFileReader(io.BufferedReader):
                 # But don't bother if we already checked with a template,
                 # or if there is only one frame in the first place.
                 if template_header is not None or next_frame < 0:
-                    self.seek(frame)
+                    fh.seek(frame)
                     return header
 
-            self.seek(next_frame)
+            fh.seek(next_frame)
             try:
-                comparison = VDIFHeader.fromfile(self, edv=header.edv,
+                comparison = VDIFHeader.fromfile(fh, edv=header.edv,
                                                  verify=True)
             except AssertionError:
                 continue
 
             if comparison.same_stream(header):
-                self.seek(frame)
+                fh.seek(frame)
                 return header
 
         # Didn't find any frame.
-        self.seek(file_pos)
+        fh.seek(file_pos)
         return None
 
 
-class VDIFFileWriter(io.BufferedWriter):
+class VDIFFileWriter(VLBIFileBase):
     """Simple writer for VDIF files.
 
-    Adds ``write_frame`` and ``write_frameset`` methods to the basic binary
-    file writer :class:`~io.BufferedWriter`.
+    Adds ``write_frame`` and ``write_frameset`` methods to the basic VLBI
+    binary file wrapper.
     """
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
@@ -210,7 +210,7 @@ class VDIFFileWriter(io.BufferedWriter):
         """
         if not isinstance(data, VDIFFrame):
             data = VDIFFrame.fromdata(data, header, **kwargs)
-        return data.tofile(self)
+        return data.tofile(self.fh)
 
     def write_frameset(self, data, header=None, **kwargs):
         """Write a frame set (headers plus payloads).
@@ -232,7 +232,7 @@ class VDIFFileWriter(io.BufferedWriter):
         """
         if not isinstance(data, VDIFFrameSet):
             data = VDIFFrameSet.fromdata(data, header, **kwargs)
-        return data.tofile(self)
+        return data.tofile(self.fh)
 
 
 class VDIFStreamBase(VLBIStreamBase):

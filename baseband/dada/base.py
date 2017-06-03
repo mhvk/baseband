@@ -7,8 +7,8 @@ import numpy as np
 from astropy.extern import six
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase)
+from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
+                              VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import DADAHeader
 from .payload import DADAPayload
 from .frame import DADAFrame
@@ -93,12 +93,11 @@ class DADAFileNameSequencer:
         return frame_nr
 
 
-class DADAFileReader(io.BufferedReader):
+class DADAFileReader(VLBIFileBase):
     """Simple reader for DADA files.
 
-    Adds a ``read_frame`` method to the basic binary file reader
-    :class:`~io.BufferedReader`.  By default, the payload is mapped
-    rather than fully read into physical memory.
+    Adds a ``read_frame`` method to the basic VLBI binary file wrapper. By
+    default, the payload is mapped rather than fully read into physical memory.
     """
     def read_frame(self, memmap=True):
         """Read the frame header and read or map the corresponding payload.
@@ -117,15 +116,15 @@ class DADAFileReader(io.BufferedReader):
             be too large to fit in memory, it may be better to access the
             parts of interest by slicing the frame.
         """
-        return DADAFrame.fromfile(self, memmap=memmap)
+        return DADAFrame.fromfile(self.fh, memmap=memmap)
 
 
-class DADAFileWriter(io.BufferedRandom):
+class DADAFileWriter(VLBIFileBase):
     """Simple writer/mapper for DADA files.
 
-    Adds ``write_frame`` and ``memmap_frame`` methods to the basic file
-    reader/writer :class:`~io.BufferedRandom`.  The latter allows one to
-    encode data in pieces, writing to disk as needed.
+    Adds ``write_frame`` and ``memmap_frame`` methods to the VLBI binary file
+    wrapper.  The latter allows one to encode data in pieces, writing to disk
+    as needed.
     """
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
@@ -143,7 +142,7 @@ class DADAFileWriter(io.BufferedRandom):
         """
         if not isinstance(data, DADAFrame):
             data = DADAFrame.fromdata(data, header, **kwargs)
-        return data.tofile(self)
+        return data.tofile(self.fh)
 
     def memmap_frame(self, header=None, **kwargs):
         """Get frame by writing the header to disk and mapping its payload.
@@ -165,8 +164,8 @@ class DADAFileWriter(io.BufferedRandom):
         """
         if header is None:
             header = DADAHeader.fromvalues(**kwargs)
-        header.tofile(self)
-        payload = DADAPayload.fromfile(self, memmap=True, header=header)
+        header.tofile(self.fh)
+        payload = DADAPayload.fromfile(self.fh, memmap=True, header=header)
         return DADAFrame(header, payload)
 
 

@@ -10,6 +10,35 @@ __all__ = ['u_sample', 'VLBIStreamBase', 'VLBIStreamReaderBase',
 u_sample = u.def_unit('sample', doc='One sample from a data stream')
 
 
+class VLBIFileBase(object):
+    """VLBI file wrapper, used to add frame methods to a binary data file.
+
+    The underlying file is stored in ``fh`` and all attributes that do not
+    exist on the class itself are looked up on it.
+    """
+    def __init__(self, fh):
+        self.fh = fh
+
+    def __getattr__(self, attr):
+        """Try to get things on the current open file if it is not on self."""
+        if not attr.startswith('_'):
+            try:
+                return getattr(self.fh, attr)
+            except AttributeError:
+                pass
+        return self.__getattribute__(attr)
+
+    def __enter__(self):
+        self.fh.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.fh.__exit__(exc_type, exc_val, exc_tb)
+
+    def __repr__(self):
+        return "{0}(fh={1})".format(self.__class__.__name__, self.fh)
+
+
 class VLBIStreamBase(object):
     """VLBI file wrapper, allowing access as a stream of data."""
 

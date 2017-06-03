@@ -5,7 +5,7 @@ import io
 import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
-from ..vlbi_base.base import (VLBIStreamBase,
+from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import GSBHeader
 from .payload import GSBPayload
@@ -46,11 +46,10 @@ class GSBTimeStampIO(io.TextIOWrapper):
         header.tofile(self)
 
 
-class GSBFileReader(io.BufferedReader):
+class GSBFileReader(VLBIFileBase):
     """Simple reader for GSB data files.
 
-    Adds ``read_payload`` method to the basic binary file reader
-    :class:`~io.BufferedReader`.
+    Adds ``read_payload`` method to the basic VLBI binary file wrapper.
     """
     def read_payload(self, payloadsize, nchan=1, bps=4, complex_data=False):
         """Read a single block.
@@ -72,16 +71,15 @@ class GSBFileReader(io.BufferedReader):
         frame : `~baseband.gsb.GSBPayload`
             With a ``.data`` property that returns the data encoded.
         """
-        return GSBPayload.fromfile(self, payloadsize=payloadsize,
+        return GSBPayload.fromfile(self.fh, payloadsize=payloadsize,
                                    nchan=nchan, bps=bps,
                                    complex_data=complex_data)
 
 
-class GSBFileWriter(io.BufferedWriter):
+class GSBFileWriter(VLBIFileBase):
     """Simple writer for GSB data files.
 
-    Adds ``write_payload`` method to the basic binary file writer
-    :class:`~io.BufferedWriter`.
+    Adds ``write_payload`` method to the basic VLBI binary file wrapper.
     """
     def write_payload(self, data, bps=4):
         """Write single data block.
@@ -96,7 +94,7 @@ class GSBFileWriter(io.BufferedWriter):
         """
         if not isinstance(data, GSBPayload):
             data = GSBPayload.fromdata(data, bps=bps)
-        return data.tofile(self)
+        return data.tofile(self.fh)
 
 
 class GSBStreamBase(VLBIStreamBase):
