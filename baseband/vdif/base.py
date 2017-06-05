@@ -312,6 +312,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         raw_size = self.fh_raw.tell()
         # Find first header with same thread_id going backward.
         found = False
+        # Set maximum as twice number of frames in frameset.
         maximum = 2*self.nthread*self.header0.framesize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
