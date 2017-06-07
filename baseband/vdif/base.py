@@ -113,6 +113,10 @@ class VDIFFileReader(io.BufferedReader):
         ``template_header`` or with a header a framesize ahead.   Note that the
         latter turns out to be an unexpectedly weak check on real data!
         """
+
+        # Obtain current pointer position.
+        file_pos = self.tell()
+
         if template_header is not None:
             edv = template_header.edv
             # First check whether we are right at a frame marker (often true).
@@ -122,20 +126,21 @@ class VDIFFileReader(io.BufferedReader):
                 pass
             else:
                 if template_header.same_stream(header):
-                    self.seek(-header.size, 1)
+                    self.seek(file_pos)
                     return header
-            # Didn't work, so get searching.
+            # If we're not at frame marker, obtain framesize and get searching.
             framesize = template_header.framesize
 
         if maximum is None:
             maximum = 2 * framesize
 
-        file_pos = self.tell()
+        # Determine file size.
         self.seek(0, 2)
         size = self.tell()
+        # Generate file pointer positions to test.
         if forward:
-            iterate = range(file_pos, min(file_pos + maximum - 32,
-                                          size - framesize))
+            iterate = range(file_pos, min(file_pos + maximum - 31,
+                                          size - framesize + 1))
         else:
             iterate = range(min(file_pos, size - framesize),
                             max(file_pos - maximum, -1), -1)
