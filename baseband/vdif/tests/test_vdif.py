@@ -479,6 +479,8 @@ class TestVDIF(object):
             frame = fh.read_frame()
             frame.tofile(s)
             # now add lots of the next frame, i.e., with a different thread_id
+            # and different frame_nr
+            fh.seek(-frame.header.framesize, 2)
             frame2 = fh.read_frame()
             for i in range(15):
                 frame2.tofile(s)

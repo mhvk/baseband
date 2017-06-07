@@ -271,7 +271,7 @@ class VDIFStreamBase(VLBIStreamBase):
 class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     """VLBI VDIF format reader.
 
-    This wrapper is allows one to access a VDIF file as a continues series of
+    This wrapper allows one to access a VDIF file as a continues series of
     samples.  Invalid data are marked, but possible gaps in the data stream
     are not yet filled in.
 
@@ -312,12 +312,13 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         raw_size = self.fh_raw.tell()
         # Find first header with same thread_id going backward.
         found = False
-        maximum = 10.*self.header0.framesize
+        # Set maximum as twice number of frames in frameset.
+        maximum = 2*self.nthread*self.header0.framesize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
             header1 = self.fh_raw.find_header(
                 template_header=self.header0,
-                maximum=10*self.header0.framesize, forward=False)
+                maximum=maximum, forward=False)
             if header1 is None or raw_size - self.fh_raw.tell() > maximum:
                 raise ValueError("Corrupt VDIF? No thread_id={0} frame in "
                                  "last {1} bytes."
