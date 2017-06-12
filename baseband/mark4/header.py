@@ -7,8 +7,7 @@ the information therein.
 For the specification, see
 http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from __future__ import absolute_import, division, print_function
 
 import numpy as np
 from astropy.time import Time
@@ -50,7 +49,7 @@ def stream2words(stream, track=None):
         track = np.arange(stream.dtype.itemsize * 8, dtype=stream.dtype)
 
     track_sel = ((stream.reshape(-1, 32, 1) >> track) & 1).astype(np.uint32)
-    track_sel <<= np.arange(31, -1, -1, dtype=np.uint32).reshape(1, 32, 1)
+    track_sel <<= np.arange(31, -1, -1, dtype=np.uint32).reshape(-1, 1)
     words = np.bitwise_or.reduce(track_sel, axis=1)
     return words.squeeze()
 
@@ -67,13 +66,15 @@ def words2stream(words):
     stream : array of int
         For each int, every bit corresponds to a particular track.
     """
-    dtype = np.dtype('<u{:1d}'.format(words.shape[1] // 8))
-    bit = np.arange(words.shape[1], dtype=dtype)
-    track = np.arange(31, -1, -1, dtype=words.dtype).reshape(-1, 1)
+    ntrack = words.shape[1]
+    dtype = Mark4Header._dtypes[ntrack]
+    nbits = words.dtype.itemsize * 8
+    bit = np.arange(nbits-1, -1, -1, dtype=words.dtype).reshape(-1, 1)
 
-    track_sel = ((words[:, np.newaxis, :] >> track) & 1).astype(dtype)
-    track_sel <<= bit
-    words = np.bitwise_or.reduce(track_sel, axis=2)
+    bit_sel = ((words[:, np.newaxis, :] >> bit) & 1).astype(dtype[1:])
+    bit_sel <<= np.arange(ntrack, dtype=dtype[1:])
+    words = np.empty(bit_sel.shape[:2], dtype)
+    words = np.bitwise_or.reduce(bit_sel, axis=2, out=words)
     return words.ravel()
 
 
