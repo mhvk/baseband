@@ -13,6 +13,7 @@ import sys
 import numpy as np
 from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
+from .header import MARK4_DTYPES
 
 
 __all__ = ['reorder32', 'reorder64', 'init_luts', 'decode_8chan_2bit_fanout4',
@@ -199,8 +200,7 @@ class Mark4Payload(VLBIPayloadBase):
     The total number of tracks is `nchan` * `bps` * `fanout`.
     """
 
-    # Ensure that words can hold up to maximum number of channels.
-    _dtype_word = np.dtype('<u8')
+    _dtype_word = None
     # Decoders keyed by (nchan, nbit, fanout).
     _encoders = {(4, 2, 4): encode_4chan_2bit_fanout4,
                  (8, 2, 2): encode_8chan_2bit_fanout2,
@@ -215,6 +215,7 @@ class Mark4Payload(VLBIPayloadBase):
             bps = header.bps
             fanout = header.fanout
             self._size = header.payloadsize
+        self._dtype_word = MARK4_DTYPES[nchan * bps * fanout]
         self.fanout = fanout
         super(Mark4Payload, self).__init__(words, bps=bps,
                                            sample_shape=(nchan,),

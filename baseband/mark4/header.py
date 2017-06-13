@@ -19,6 +19,12 @@ from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
 __all__ = ['stream2words', 'words2stream', 'Mark4TrackHeader', 'Mark4Header']
 
 
+MARK4_DTYPES = {8: 'u1',
+                16: '<u2',
+                32: '<u4',
+                64: '<u8'}
+"""Integer dtype used to encode a given number of tracks."""
+
 PAYLOADSIZE = 20000
 """Number of bits per track per frame."""
 
@@ -67,7 +73,7 @@ def words2stream(words):
         For each int, every bit corresponds to a particular track.
     """
     ntrack = words.shape[1]
-    dtype = Mark4Header._dtypes[ntrack]
+    dtype = MARK4_DTYPES[ntrack]
     nbits = words.dtype.itemsize * 8
     bit = np.arange(nbits-1, -1, -1, dtype=words.dtype).reshape(-1, 1)
 
@@ -240,13 +246,7 @@ class Mark4Header(Mark4TrackHeader):
     _properties = (Mark4TrackHeader._properties +
                    ('ntrack', 'framesize', 'payloadsize', 'fanout',
                     'samples_per_frame', 'bps', 'nchan'))
-    _dtypes = {1: 'b',
-               2: 'u1',
-               4: 'u1',
-               8: 'u1',
-               16: '<u2',
-               32: '<u4',
-               64: '<u8'}
+    _dtypes = MARK4_DTYPES
 
     def __init__(self, words, ntrack=None, decade=None, verify=True):
         if words is None:
