@@ -203,7 +203,7 @@ class TestVDIF(object):
         assert np.all(-vdif.payload.lut4bit[0x11] ==
                       vdif.payload.lut4bit[0xff])
         aint = np.arange(0, 256, dtype=np.uint8)
-        words = aint.view(np.uint32)
+        words = aint.view('<u4')
         areal = np.linspace(-127.5, 127.5, 256).reshape(-1, 1) / 35.5
         acmplx = areal[::2] + 1j * areal[1::2]
         payload1 = vdif.VDIFPayload(words, bps=8, complex_data=False)
