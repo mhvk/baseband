@@ -647,9 +647,59 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
     time = property(get_time, set_time)
 
 
+def UpdateVDIFSubclasses(subclasses, override=False):
+    """
+    Updates `~baseband.vdif.header.VDIFHeader` repository of subclasses, 
+    and amends `~baseband.vdif.header.__all__`.
+
+    Parameters
+    ----------
+    subclasses : dict/iterable
+        Dictionary or dict-convertible iterable of EDV values and 
+        corresponding VDIF EDV subclasses.
+    override : bool
+        If True, overrides EDVs (keys) already in subclasses repository.
+        (Names can be duplicated so that two EDVs point to the same name.)
+    """
+    subclasses = dict(subclasses)
+
+    # Determine overlap between update EDVs and ones already in VDIFHeader.
+    subclass_edv = set(subclasses.keys())
+    vdifh_edv = set(VDIFHeader._vdif_edv_header_classes.keys())
+    common_edv = set(subclass_edv).intersection(vdifh_edv)
+
+    # If we can't override and there are EDVs in common, throw exception.
+    if len(common_edv) and not override:
+        raise ValueError("Subclass EDVs ", common_edv,
+                         "already exist in  "
+                         "Pass it in explicitly.")
+
+    # Update will overwrite keys already defined.    
+    VDIFHeader._vdif_edv_header_classes.update(subclasses)
+
+    # Update only new classes
+    subclass_names = set([cls.__name__ for cls in subclasses.values()])
+    vdifh_names = set([cls.__name__ for cls in
+            VDIFHeader._vdif_edv_header_classes.values()])
+    new_names = set(subclass_names).difference(vdifh_names)
+    __all__ += list(new_names)
+    
+
 # For python >= 3.6, this could very easily be done with __init_subclass__,
 # but before it needs a metaclass, which seems to much trouble.
-VDIFHeader._vdif_edv_header_classes.update(
+#VDIFHeader._vdif_edv_header_classes.update(
+#    ((-1, VDIFLegacyHeader),
+#     (0, VDIFHeader0),
+#     (1, VDIFHeader1),
+#     (2, VDIFHeader2),
+#     (3, VDIFHeader3),
+#     (4, VDIFHeader4),
+#     (0xab, VDIFMark5BHeader)))
+
+#__all__ += [cls.__name__ for cls in
+#            VDIFHeader._vdif_edv_header_classes.values()]
+
+UpdateVDIFSubclasses(
     ((-1, VDIFLegacyHeader),
      (0, VDIFHeader0),
      (1, VDIFHeader1),
@@ -657,6 +707,3 @@ VDIFHeader._vdif_edv_header_classes.update(
      (3, VDIFHeader3),
      (4, VDIFHeader4),
      (0xab, VDIFMark5BHeader)))
-
-__all__ += [cls.__name__ for cls in
-            VDIFHeader._vdif_edv_header_classes.values()]
