@@ -10,7 +10,6 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 import astropy.units as u
-from six import with_metaclass
 
 from astropy.time import Time, TimeDelta
 
@@ -19,27 +18,14 @@ from ..vlbi_base.header import (four_word_struct, eight_word_struct,
 from ..mark5b.header import Mark5BHeader
 
 
-__all__ = ['VDIFHeader', 'VDIFBaseHeader', 'VDIFSampleRateHeader',
-           'VDIFLegacyHeader', 'VDIFHeader0', 'VDIFHeader1',
-           'VDIFHeader2', 'VDIFHeader3', 'VDIFHeader4',
-           'VDIFMark5BHeader']
-
+__all__ = ['VDIFHeader', 'VDIFBaseHeader', 'VDIFSampleRateHeader']
+# This gets updated with all EDV headers at the end.
 
 ref_max = int(2. * (Time.now().jyear - 2000.)) + 1
 ref_epochs = Time(['{y:04d}-{m:02d}-01'.format(y=2000 + ref // 2,
                                                m=1 if ref % 2 == 0 else 7)
                    for ref in range(ref_max)], format='isot', scale='utc',
                   precision=9)
-
-
-class _VDIFHeaderRegistry(type):
-    """
-    Metaclass registry of VDIF Header EDV types.  Checks for keyword and
-    subclass conflicts.
-    """
-
-    def __init__(cls, name, bases, dct):
-        
 
 
 class VDIFHeader(VLBIHeaderBase):
@@ -393,7 +379,7 @@ class VDIFHeader(VLBIHeaderBase):
     time = property(get_time, set_time)
 
 
-class VDIFLegacyHeader(with_metaclass(_VDIFHeaderRegistry, VDIFHeader)):
+class VDIFLegacyHeader(VDIFHeader):
     """Legacy VDIF header that uses only 4 32-bit words.
 
     See Section 6 of
@@ -443,7 +429,7 @@ class VDIFBaseHeader(VDIFHeader):
                     self._header_parser.defaults['sync_pattern'])
 
 
-class VDIFHeader0(with_metaclass(_VDIFHeaderRegistry, VDIFBaseHeader)):
+class VDIFHeader0(VDIFBaseHeader):
     """VDIF Header for EDV=0.
 
     EDV=0 implies the extended user data fields are not used.
@@ -504,7 +490,7 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
                           (1 if self['complex_data'] else 2))
 
 
-class VDIFHeader1(with_metaclass(_VDIFHeaderRegistry, VDIFSampleRateHeader)):
+class VDIFHeader1(VDIFSampleRateHeader):
     """VDIF Header for EDV=1.
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0x01.pdf
@@ -514,7 +500,7 @@ class VDIFHeader1(with_metaclass(_VDIFHeaderRegistry, VDIFSampleRateHeader)):
         (('das_id', (6, 0, 64, 0x0)),))
 
 
-class VDIFHeader3(with_metaclass(_VDIFHeaderRegistry, VDIFSampleRateHeader)):
+class VDIFHeader3(VDIFSampleRateHeader):
     """VDIF Header for EDV=3.
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0x03.pdf
@@ -537,7 +523,7 @@ class VDIFHeader3(with_metaclass(_VDIFHeaderRegistry, VDIFSampleRateHeader)):
         assert self['frame_length'] == 629
 
 
-class VDIFHeader4(with_metaclass(_VDIFHeaderRegistry, VDIFSampleRateHeader)):
+class VDIFHeader4(VDIFSampleRateHeader):
     """VDIF Header for EDV=4.
 
     This is used for MWA according to Franz.  No extra header info?
@@ -545,7 +531,7 @@ class VDIFHeader4(with_metaclass(_VDIFHeaderRegistry, VDIFSampleRateHeader)):
     edv = 4
 
 
-class VDIFHeader2(with_metaclass(_VDIFHeaderRegistry, VDIFBaseHeader)):
+class VDIFHeader2(VDIFBaseHeader):
     """VDIF Header for EDV=2.
 
     See http://www.vlbi.org/vdif/docs/alma-vdif-edv.pdf
@@ -572,8 +558,7 @@ class VDIFHeader2(with_metaclass(_VDIFHeaderRegistry, VDIFBaseHeader)):
         assert self.bps == 2 and not self['complex_data']
 
 
-class VDIFMark5BHeader(with_metaclass(_VDIFHeaderRegistry, 
-                            VDIFBaseHeader, Mark5BHeader)):
+class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
     """Mark 5B over VDIF (EDV=0xab).
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
@@ -662,16 +647,55 @@ class VDIFMark5BHeader(with_metaclass(_VDIFHeaderRegistry,
     time = property(get_time, set_time)
 
 
-## For python >= 3.6, this could very easily be done with __init_subclass__,
-## but before it needs a metaclass, which seems to much trouble.
-#VDIFHeader._vdif_edv_header_classes.update(
-#    ((-1, VDIFLegacyHeader),
-#     (0, VDIFHeader0),
-#     (1, VDIFHeader1),
-#     (2, VDIFHeader2),
-#     (3, VDIFHeader3),
-#     (4, VDIFHeader4),
-#     (0xab, VDIFMark5BHeader)))
+# For python >= 3.6, this could very easily be done with __init_subclass__,
+# but before it needs a metaclass, which seems too much trouble.
+def UpdateVDIFSubclasses(subclasses, override=False):
+    """
+    Updates `~baseband.vdif.header.VDIFHeader` repository of subclasses, 
+    and amends `~baseband.vdif.header.__all__`.
 
-#__all__ += [cls.__name__ for cls in
-#            VDIFHeader._vdif_edv_header_classes.values()]
+    Parameters
+    ----------
+    subclasses : dict/iterable
+        Dictionary or dict-convertible iterable of EDV values and 
+        corresponding VDIF EDV subclasses.
+    override : bool
+        If True, overrides EDVs (keys) already in subclasses repository.
+        (Names can be duplicated so that two EDVs point to the same name.)
+    """
+    subclasses = dict(subclasses)
+
+    # Determine overlap between update EDVs and ones already in VDIFHeader.
+    subclass_edv = set(subclasses.keys())
+    vdifh_edv = set(VDIFHeader._vdif_edv_header_classes.keys())
+    common_edv = set(subclass_edv).intersection(vdifh_edv)
+
+    # If we can't override and there are EDVs in common, throw exception.
+    if len(common_edv) and not override:
+        raise ValueError("Subclass EDVs ", common_edv,
+                         "already exist in  "
+                         "Pass it in explicitly.")
+
+    # Update will overwrite keys already defined.    
+    VDIFHeader._vdif_edv_header_classes.update(subclasses)
+
+    # Update only new classes
+    subclass_names = set([cls.__name__ for cls in subclasses.values()])
+    vdifh_names = set([cls.__name__ for cls in
+            VDIFHeader._vdif_edv_header_classes.values()])
+    new_names = set(subclass_names).difference(vdifh_names)
+    global __all__
+    __all__ += list(new_names)
+
+
+UpdateVDIFSubclasses(
+    ((-1, VDIFLegacyHeader),
+     (0, VDIFHeader0),
+     (1, VDIFHeader1),
+     (2, VDIFHeader2),
+     (3, VDIFHeader3),
+     (4, VDIFHeader4),
+     (0xab, VDIFMark5BHeader)))
+
+__all__ += [cls.__name__ for cls in
+            VDIFHeader._vdif_edv_header_classes.values()]
