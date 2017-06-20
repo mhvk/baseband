@@ -132,7 +132,7 @@ class TestVDIF(object):
                              vlbi_base.header.HeaderParser(
                                     (('nonsense_0', (6, 0, 32, 0x0)),
                                      ('nonsense_1', (7, 0, 8, None)),
-                                     ('nonsense_2', (7, 1, 24, 0x1))))
+                                     ('nonsense_2', (7, 8, 24, 0x1))))
 
             def verify(self):
                 super(VDIFHeaderX, self).verify()
@@ -149,7 +149,7 @@ class TestVDIF(object):
             station=header.station, bandwidth=header.bandwidth,
             bps=header.bps, complex_data=header['complex_data'],
             thread_id=header['thread_id'], nonsense_0=2000000000,
-            nonsense_1=100, nonsense_2=1)
+            nonsense_1=100, nonsense_2=10000000)
 
         # Write to dummy file, then re-read.
         with io.BytesIO() as s:
@@ -176,7 +176,7 @@ class TestVDIF(object):
         assert headerX.mutable is False
         assert headerX.nonsense_0 == 2000000000
         assert headerX.nonsense_1 == 100
-        assert headerX.nonsense_2 == 1
+        assert headerX.nonsense_2 == 10000000
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
