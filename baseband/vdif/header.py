@@ -37,9 +37,27 @@ class _VDIFHeaderRegistry(type):
     Metaclass registry of VDIF Header EDV types.  Checks for keyword and
     subclass conflicts.
     """
+    reg = {}
 
     def __init__(cls, name, bases, dct):
+
+        # Dump edv from class; convert to -1 if edv == False (VDIFLegacy)
+        edv = cls.edv
+        if edv is False:
+            edv = -1
+
+        # Check if EDV is already registered (edv == None is invalid).
+        if edv is None:
+            raise ValueError("edv cannot be None!")
+        elif edv in _VDIFHeaderRegistry.reg:
+            raise ValueError("EDV == " + str(cls.edv) + " already registered"
+                             " in _VDIFHeaderRegistry.reg.keys() = " +
+                             str(_VDIFHeaderRegistry.reg.keys()) + "!  "
+                             "(EDV == False is converted to -1 in registry.)")
+
+        _VDIFHeaderRegistry.reg.update({edv: cls})
         
+        super(_VDIFHeaderRegistry, cls).__init__(name, bases, dct)
 
 
 class VDIFHeader(VLBIHeaderBase):
@@ -70,9 +88,6 @@ class VDIFHeader(VLBIHeaderBase):
                    'samples_per_frame', 'station', 'time')
     """Properties accessible/usable in initialisation for all VDIF headers."""
 
-    # These get set at the end.
-    _vdif_edv_header_classes = {}
-
     edv = None
 
     def __new__(cls, words, edv=None, verify=True, **kwargs):
@@ -88,7 +103,7 @@ class VDIFHeader(VLBIHeaderBase):
 
         # Have to use key "-1" instead of "False" since the dict-lookup treats
         # 0 and False as identical.
-        cls = cls._vdif_edv_header_classes.get(edv if edv is not False else -1,
+        cls = _VDIFHeaderRegistry.reg.get(edv if edv is not False else -1,
                                                VDIFBaseHeader)
         return super(VDIFHeader, cls).__new__(cls)
 
@@ -660,18 +675,3 @@ class VDIFMark5BHeader(with_metaclass(_VDIFHeaderRegistry,
         super(VDIFMark5BHeader, self).set_time(time, frame_nr=self['frame_nr'])
 
     time = property(get_time, set_time)
-
-
-## For python >= 3.6, this could very easily be done with __init_subclass__,
-## but before it needs a metaclass, which seems to much trouble.
-#VDIFHeader._vdif_edv_header_classes.update(
-#    ((-1, VDIFLegacyHeader),
-#     (0, VDIFHeader0),
-#     (1, VDIFHeader1),
-#     (2, VDIFHeader2),
-#     (3, VDIFHeader3),
-#     (4, VDIFHeader4),
-#     (0xab, VDIFMark5BHeader)))
-
-#__all__ += [cls.__name__ for cls in
-#            VDIFHeader._vdif_edv_header_classes.values()]
