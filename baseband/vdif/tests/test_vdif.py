@@ -123,6 +123,11 @@ class TestVDIF(object):
             class VDIFHeaderZ(with_metaclass(vdif.header._VDIFHeaderRegistry, 
                                      vdif.header.VDIFBaseHeader)):
                 edv = None
+        # Custom header that fails to subclass VDIFHeader
+        with pytest.raises(TypeError):
+            class VDIFHeaderW(with_metaclass(vdif.header._VDIFHeaderRegistry, 
+                              vlbi_base.header.VLBIHeaderBase)):
+                edv = 47
 
         # Working header with nonsense data in the last two words.
         class VDIFHeaderX(with_metaclass(vdif.header._VDIFHeaderRegistry, 

@@ -41,7 +41,11 @@ class _VDIFHeaderRegistry(type):
 
     def __init__(cls, name, bases, dct):
 
-        # Dump edv from class; convert to -1 if edv == False (VDIFLegacy)
+        # Check that class is subclass of VDIFHeader
+        if not issubclass(cls, VDIFHeader):
+            raise TypeError(cls.__name__ + " is not a subclass of VDIFHeader!")
+
+        # Extract edv from class; convert to -1 if edv == False (VDIFLegacy)
         edv = cls.edv
         if edv is False:
             edv = -1

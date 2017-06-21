@@ -651,19 +651,32 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
 # but before it needs a metaclass, which seems too much trouble.
 def UpdateVDIFSubclasses(subclasses, override=False):
     """
-    Updates `~baseband.vdif.header.VDIFHeader` repository of subclasses, 
-    and amends `~baseband.vdif.header.__all__`.
+    Updates `~baseband.vdif.header.VDIFHeader` repository of subclasses.
 
     Parameters
     ----------
-    subclasses : dict/iterable
-        Dictionary or dict-convertible iterable of EDV values and 
-        corresponding VDIF EDV subclasses.
+    subclasses : listlike
+        Listlike of VDIF EDV subclasses.
     override : bool
         If True, overrides EDVs (keys) already in subclasses repository.
         (Names can be duplicated so that two EDVs point to the same name.)
     """
-    subclasses = dict(subclasses)
+    # Extract edvs from subclasses and create list
+    edvs = []
+    for item in subclasses:
+        # Check if subclass is actually subclass of VDIFHeader
+        if not issubclass(item, VDIFHeader):
+            raise TypeError(item.__name__ + " is not a subclass of VDIFHeader!")
+        edv = item.edv
+        if edv is False:
+            edv = -1
+        edvs.append(edv)
+    # Check edvs don't repeat
+    if len(set(edvs)) != len(edvs):
+        raise ValueError("Subclass EDVs ", edvs, " contain repeated keys!")
+
+    # Merge edvs and subclasses together
+    subclasses = dict(zip(edvs, subclasses))
 
     # Determine overlap between update EDVs and ones already in VDIFHeader.
     subclass_edv = set(subclasses.keys())
@@ -673,29 +686,29 @@ def UpdateVDIFSubclasses(subclasses, override=False):
     # If we can't override and there are EDVs in common, throw exception.
     if len(common_edv) and not override:
         raise ValueError("Subclass EDVs ", common_edv,
-                         "already exist in  "
+                         "already exist in  ", vdifh_edv, ".  "
                          "Pass it in explicitly.")
 
     # Update will overwrite keys already defined.    
     VDIFHeader._vdif_edv_header_classes.update(subclasses)
 
     # Update only new classes
-    subclass_names = set([cls.__name__ for cls in subclasses.values()])
-    vdifh_names = set([cls.__name__ for cls in
-            VDIFHeader._vdif_edv_header_classes.values()])
-    new_names = set(subclass_names).difference(vdifh_names)
-    global __all__
-    __all__ += list(new_names)
+    #subclass_names = set([cls.__name__ for cls in subclasses.values()])
+    #vdifh_names = set([cls.__name__ for cls in
+    #        VDIFHeader._vdif_edv_header_classes.values()])
+    #new_names = set(subclass_names).difference(vdifh_names)
+    #global __all__
+    #__all__ += list(new_names)
 
 
 UpdateVDIFSubclasses(
-    ((-1, VDIFLegacyHeader),
-     (0, VDIFHeader0),
-     (1, VDIFHeader1),
-     (2, VDIFHeader2),
-     (3, VDIFHeader3),
-     (4, VDIFHeader4),
-     (0xab, VDIFMark5BHeader)))
+    [VDIFLegacyHeader,
+     VDIFHeader0,
+     VDIFHeader1,
+     VDIFHeader2,
+     VDIFHeader3,
+     VDIFHeader4,
+     VDIFMark5BHeader])
 
 __all__ += [cls.__name__ for cls in
             VDIFHeader._vdif_edv_header_classes.values()]
