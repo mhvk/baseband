@@ -29,17 +29,20 @@ class VLBIFileBase(object):
         return self.__getattribute__(attr)
 
     def __enter__(self):
-        self.fh_raw.__enter__()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
         self.fh_raw.__exit__(exc_type, exc_val, exc_tb)
+
+    def close(self):
+        self.fh_raw.close()
 
     def __repr__(self):
         return "{0}(fh_raw={1})".format(self.__class__.__name__, self.fh_raw)
 
 
-class VLBIStreamBase(object):
+class VLBIStreamBase(VLBIFileBase):
     """VLBI file wrapper, allowing access as a stream of data."""
 
     _frame_class = None
@@ -47,7 +50,7 @@ class VLBIStreamBase(object):
     def __init__(self, fh_raw, header0, nchan, bps, complex_data, thread_ids,
                  samples_per_frame, frames_per_second=None,
                  sample_rate=None):
-        self.fh_raw = fh_raw
+        super(VLBIStreamBase, self).__init__(fh_raw)
         self.header0 = header0
         self.nchan = nchan
         self.bps = bps
@@ -66,16 +69,6 @@ class VLBIStreamBase(object):
 
         self.frames_per_second = frames_per_second
         self.offset = 0
-
-    # Providing normal File IO properties.
-    def readable(self):
-        return self.fh_raw.readable()
-
-    def writable(self):
-        return self.fh_raw.writable()
-
-    def seekable(self):
-        return self.fh_raw.readable()
 
     def _get_time(self, header):
         """Get time from a header."""
@@ -119,22 +112,9 @@ class VLBIStreamBase(object):
         dt, frame_nr = divmod(full_frame_nr, self.frames_per_second)
         return int(dt), int(frame_nr), extra
 
-    def close(self):
-        return self.fh_raw.close()
-
-    @property
-    def closed(self):
-        return self.fh_raw.closed
-
-    @property
-    def name(self):
-        return self.fh_raw.name
-
     def __enter__(self):
+        super(VLBIStreamBase, self).__enter__()
         return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
@@ -184,9 +164,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek(-self.header0.framesize, 2)
-        header1 = self.fh_raw.find_header(template_header=self.header0,
-                                          maximum=10*self.header0.framesize,
-                                          forward=False)
+        header1 = self.find_header(template_header=self.header0,
+                                   maximum=10*self.header0.framesize,
+                                   forward=False)
         self.fh_raw.seek(raw_offset)
         if header1 is None:
             raise ValueError("Corrupt VLBI frame? No frame in last {0} bytes."

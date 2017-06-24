@@ -273,7 +273,7 @@ class VDIFStreamBase(VLBIStreamBase):
                 .format(s=self, h=self.header0))
 
 
-class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
+class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
     """VLBI VDIF format reader.
 
     This wrapper allows one to access a VDIF file as a continues series of
@@ -282,7 +282,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
     Parameters
     ----------
-    raw : `~baseband.vdif.VDIFFileReader` instance
+    fh_raw : `~baseband.vdif.VDIFFileReader` instance
         file handle of the raw VDIF stream
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
@@ -292,20 +292,23 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each channel in each thread is sampled.
     """
-    def __init__(self, raw, thread_ids=None, frames_per_second=None,
+    def __init__(self, fh_raw, thread_ids=None, frames_per_second=None,
                  sample_rate=None):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
-        header = VDIFHeader.fromfile(raw)
+        header = VDIFHeader.fromfile(fh_raw)
         # Now also read the first frameset, since we need to know how many
-        # threads there are, and what the frameset size is.
-        raw.seek(0)
-        self._frameset = raw.read_frameset(thread_ids)
+        # threads there are, and what the frameset size is. For this purpose,
+        # pre-attach the file handle (it will just get reset anyway).
+        # TODO: make this a bit less ugly. Can we not just super first?
+        fh_raw.seek(0)
+        self.fh_raw = fh_raw
+        self._frameset = self.read_frameset(thread_ids)
         if thread_ids is None:
             thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
-        self._framesetsize = raw.tell()
-        super(VDIFStreamReader, self).__init__(raw, header, thread_ids,
+        self._framesetsize = fh_raw.tell()
+        super(VDIFStreamReader, self).__init__(fh_raw, header, thread_ids,
                                                frames_per_second, sample_rate)
 
     @lazyproperty
@@ -321,7 +324,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         maximum = 2*self.nthread*self.header0.framesize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
-            header1 = self.fh_raw.find_header(
+            header1 = self.find_header(
                 template_header=self.header0,
                 maximum=maximum, forward=False)
             if header1 is None or raw_size - self.fh_raw.tell() > maximum:
@@ -395,12 +398,12 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     def _read_frame_set(self, fill_value=0.):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._framesetsize)
-        self._frameset = self.fh_raw.read_frameset(self.thread_ids,
-                                                   edv=self.header0.edv)
+        self._frameset = self.read_frameset(self.thread_ids,
+                                            edv=self.header0.edv)
         self._frameset.invalid_data_value = fill_value
 
 
-class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
+class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     """VLBI VDIF format writer.
 
     Parameters
@@ -496,7 +499,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
             sample = self.offset - offset0
             frame[sample_offset:sample_end] = data[sample:sample + nsample]
             if sample_end == self.samples_per_frame:
-                self.fh_raw.write_frameset(self._data, self._header)
+                self.write_frameset(self._data, self._header)
 
             self.offset += nsample
             count -= nsample
@@ -555,8 +558,10 @@ def open(name, mode='rs', *args, **kwargs):
         if not hasattr(name, 'write'):
             name = io.open(name, 'wb')
         try:
-            fh = VDIFFileWriter(name)
-            return fh if 'b' in mode else VDIFStreamWriter(fh, *args, **kwargs)
+            if 'b' in mode:
+                return VDIFFileWriter(name)
+            else:
+                return VDIFStreamWriter(name, *args, **kwargs)
         except Exception:
             name.close()
             raise
@@ -564,8 +569,10 @@ def open(name, mode='rs', *args, **kwargs):
         if not hasattr(name, 'read'):
             name = io.open(name, 'rb')
         try:
-            fh = VDIFFileReader(name)
-            return fh if 'b' in mode else VDIFStreamReader(fh, *args, **kwargs)
+            if 'b' in mode:
+                return VDIFFileReader(name)
+            else:
+                return VDIFStreamReader(name, *args, **kwargs)
         except Exception:
             name.close()
             raise

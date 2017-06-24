@@ -158,7 +158,7 @@ class Mark4FileReader(VLBIFileBase):
         if offset is None:
             return None
         header = Mark4Header.fromfile(self.fh_raw, ntrack=ntrack, decade=decade)
-        self.seek(offset)
+        self.fh_raw.seek(offset)
         return header
 
 
@@ -187,7 +187,7 @@ class Mark4FileWriter(VLBIFileBase):
         return data.tofile(self.fh_raw)
 
 
-class Mark4StreamReader(VLBIStreamReaderBase):
+class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     """VLBI Mark 4 format reader.
 
     This wrapper is allows one to access a Mark 4 file as a continues series
@@ -196,7 +196,7 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
     Parameters
     ----------
-    raw : `~baseband.mark4.Mark4FileReader`
+    fh_raw : `~baseband.mark4.Mark4FileReader`
         file handle to the raw Mark 4 data stream.
     ntrack : int
         Number of tracks used to store the data.
@@ -214,15 +214,18 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
     _frame_class = Mark4Frame
 
-    def __init__(self, raw, ntrack, decade=None, thread_ids=None,
+    def __init__(self, fh_raw, ntrack, decade=None, thread_ids=None,
                  frames_per_second=None, sample_rate=None):
-        self.offset0 = raw.find_frame(ntrack=ntrack)
-        self._frame = raw.read_frame(ntrack, decade)
+        # Pre-set fh_raw, so FileReader methods work
+        # TODO: move this to StreamReaderBase?
+        self.fh_raw = fh_raw
+        self.offset0 = self.find_frame(ntrack=ntrack)
+        self._frame = self.read_frame(ntrack, decade)
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
         super(Mark4StreamReader, self).__init__(
-            fh_raw=raw, header0=header, nchan=header.nchan, bps=header.bps,
+            fh_raw, header0=header, nchan=header.nchan, bps=header.bps,
             complex_data=False, thread_ids=thread_ids,
             samples_per_frame=header.samples_per_frame,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
@@ -283,14 +286,14 @@ class Mark4StreamReader(VLBIStreamReaderBase):
     def _read_frame(self):
         frame_nr = self.offset // self.samples_per_frame
         self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
-        self._frame = self.fh_raw.read_frame(ntrack=self.header0.ntrack,
-                                             decade=self.header0.decade)
+        self._frame = self.read_frame(ntrack=self.header0.ntrack,
+                                      decade=self.header0.decade)
         # Convert payloads to data array.
         self._frame_data = self._frame.data
         self._frame_nr = frame_nr
 
 
-class Mark4StreamWriter(VLBIStreamWriterBase):
+class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
     """VLBI Mark 4 format writer.
 
     Parameters
@@ -364,7 +367,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
             sample = self.offset - offset0
             frame[sample_offset:sample_end] = data[sample:sample + nsample]
             if sample_end == self.samples_per_frame:
-                self.fh_raw.write_frame(self._data, self._header)
+                self.write_frame(self._data, self._header)
 
             self.offset += nsample
             count -= nsample
@@ -424,13 +427,17 @@ def open(name, mode='rs', **kwargs):
     if 'w' in mode:
         if not hasattr(name, 'write'):
             name = io.open(name, 'wb')
-        fh = Mark4FileWriter(name)
-        return fh if 'b' in mode else Mark4StreamWriter(fh, **kwargs)
+        if 'b' in mode:
+            return Mark4FileWriter(name)
+        else:
+            return Mark4StreamWriter(name, **kwargs)
     elif 'r' in mode:
         if not hasattr(name, 'read'):
             name = io.open(name, 'rb')
-        fh = Mark4FileReader(name)
-        return fh if 'b' in mode else Mark4StreamReader(fh, **kwargs)
+        if 'b' in mode:
+            return Mark4FileReader(name)
+        else:
+            return Mark4StreamReader(name, **kwargs)
     else:
         raise ValueError("Only support opening Mark 4 file for reading "
                          "or writing (mode='r' or 'w').")

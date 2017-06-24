@@ -220,7 +220,7 @@ class DADAStreamBase(VLBIStreamBase):
     def _open_file(self, frame_nr, mode):
         if self.fh_raw:
             self.fh_raw.close()
-        self.fh_raw = open(self.files[frame_nr], mode)
+        self.fh_raw = io.open(self.files[frame_nr], mode)
 
     def _unsqueeze(self, data):
         if data.ndim < 3 and self.nthread == 1:
@@ -230,7 +230,7 @@ class DADAStreamBase(VLBIStreamBase):
         return data
 
 
-class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
+class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     """DADA format stream reader.
 
     This wrapper allows one to access a DADA file as a continues series of
@@ -238,7 +238,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
 
     Parameters
     ----------
-    raw : filehandle
+    fh_raw : filehandle
         file handle of the (first) raw DADA stream.
     thread_ids : list of int, optional
         Specific threads to read.  By default, all threads are read.
@@ -251,12 +251,12 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         something like '2013-07-02-01:37:40_{obs_offset:016d}.000000.dada'.
         For details, see :class:`~baseband.dada.base.DADAFileNameSequencer`.
     """
-    def __init__(self, raw, thread_ids=None, files=None, template=None):
-        header = DADAHeader.fromfile(raw)
-        super(DADAStreamReader, self).__init__(raw, header, thread_ids,
+    def __init__(self, fh_raw, thread_ids=None, files=None, template=None):
+        header = DADAHeader.fromfile(fh_raw)
+        super(DADAStreamReader, self).__init__(fh_raw, header, thread_ids,
                                                files=files, template=template)
         if self.files is None:
-            self._frame = DADAFrame(header, DADAPayload.fromfile(raw, header,
+            self._frame = DADAFrame(header, DADAPayload.fromfile(fh_raw, header,
                                                                  memmap=True))
             self._frame_nr = 0
         else:
@@ -326,13 +326,13 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
 
     def _get_frame(self, frame_nr):
         self._open_file(frame_nr, 'rb')
-        self._frame = self.fh_raw.read_frame(memmap=True)
+        self._frame = self.read_frame(memmap=True)
         assert (self._frame.header['OBS_OFFSET'] ==
                 self.header0['OBS_OFFSET'] + frame_nr *
                 self.header0.payloadsize)
 
 
-class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
+class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
     """DADA format writer.
 
     Parameters
@@ -384,7 +384,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
         super(DADAStreamWriter, self).__init__(raw, header, files=files,
                                                template=template)
         if self.files is None:
-            self._frame = self.fh_raw.memmap_frame(header)
+            self._frame = self.memmap_frame(header)
             self._frame_nr = 0
         else:
             self._get_frame(0)
@@ -434,12 +434,12 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
             count -= nsample
 
     def _get_frame(self, frame_nr):
-        self._open_file(frame_nr, 'wb')
+        self._open_file(frame_nr, 'w+b')
         # set up header for new frame.
         header = self.header0.copy()
         header.update(obs_offset=self.header0['OBS_OFFSET'] +
                       frame_nr * self.header0.payloadsize)
-        self._frame = self.fh_raw.memmap_frame(header)
+        self._frame = self.memmap_frame(header)
         self._frame_nr = frame_nr
 
 
@@ -520,8 +520,10 @@ def open(name, mode='rs', *args, **kwargs):
         if not hasattr(name, 'write'):
             name = io.open(name, 'w+b')
         try:
-            fh = DADAFileWriter(name)
-            return fh if 'b' in mode else DADAStreamWriter(fh, *args, **kwargs)
+            if 'b' in mode:
+                return DADAFileWriter(name)
+            else:
+                return DADAStreamWriter(name, *args, **kwargs)
         except Exception:
             name.close()
             raise
@@ -529,8 +531,10 @@ def open(name, mode='rs', *args, **kwargs):
         if not hasattr(name, 'read'):
             name = io.open(name, 'rb')
         try:
-            fh = DADAFileReader(name)
-            return fh if 'b' in mode else DADAStreamReader(fh, *args, **kwargs)
+            if 'b' in mode:
+                return DADAFileReader(name)
+            else:
+                return DADAStreamReader(name, *args, **kwargs)
         except Exception:
             name.close()
             raise
