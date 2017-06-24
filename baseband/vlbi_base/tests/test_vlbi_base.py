@@ -5,10 +5,12 @@ from copy import copy
 import io
 import numpy as np
 import pytest
+from astropy.tests.helper import catch_warnings
 from ..utils import bcd_encode, bcd_decode, CRC
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
 from ..frame import VLBIFrameBase
+from ..base import VLBIFileBase
 
 
 def encode_1bit(values):
@@ -167,6 +169,13 @@ class TestVLBIBase(object):
         assert header.words[2:] == [1, 0]
         header['x2_0_64'] = None
         assert header.words[2:] == [0, 1]
+        # Also check update method.
+        header.update(x1_0_32=0x5678, x2_0_64= 1)
+        assert header.words == [0x923f5678, 0x5678, 1, 0]
+        with catch_warnings(UserWarning) as w:
+            header.update(bla=10)
+        assert 'unused' in str(w[0].message)
+        assert 'bla' in str(w[0].message)
 
     def test_header_parser_class(self):
         header_parser = self.header_parser
@@ -383,6 +392,36 @@ class TestVLBIBase(object):
         frame2 = self.Frame.fromdata(self.frame.data, self.header,
                                      bps=8, valid=False)
         assert np.all(frame2.data == 0.)
+
+    def test_vlbi_file_base(self, tmpdir):
+        # This is probably too basic to show that the wrapper works.
+        filename = str(tmpdir.join('test.dat'))
+        with io.open(filename, 'wb') as fw:
+            fh = VLBIFileBase(fw)
+            assert fh.fh_raw is fw
+            assert not fh.readable()
+            assert fh.writable()
+            assert not fh.closed
+            with pytest.raises(AttributeError):
+                fh.bla
+            assert repr(fh).startswith('VLBIFileBase(fh_raw')
+            fh.write(b'abcd')
+            fh.close()
+            assert fh.closed
+            assert fh.fh_raw.closed
+        with io.open(filename, 'rb') as fr:
+            fh = VLBIFileBase(fr)
+            assert fh.fh_raw is fr
+            assert fh.readable()
+            assert not fh.writable()
+            assert not fh.closed
+            with pytest.raises(AttributeError):
+                fh.bla
+            assert repr(fh).startswith('VLBIFileBase(fh_raw')
+            assert fh.read() == b'abcd'
+            fh.close()
+            assert fh.closed
+            assert fh.fh_raw.closed
 
 
 def test_crc():

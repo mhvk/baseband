@@ -564,8 +564,12 @@ class TestVDIF(object):
                 with pytest.raises(ValueError):
                     f2.header1
 
-    def test_stream_invalid(self):
+    def test_io_invalid(self):
+        with pytest.raises(TypeError):
+            # extra argument
+            vdif.open('ts.dat', 'rb', bla=10)
         with pytest.raises(ValueError):
+            # missing w or r
             vdif.open('ts.dat', 's')
 
 

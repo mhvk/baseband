@@ -322,6 +322,10 @@ class TestGSB(object):
                 header2 = fh_r.read_timestamp()
                 assert header2 == header
 
+        # check that extra arguments raise TypeError
+        with pytest.raises(TypeError):
+            gsb.open(tmpfile, 'rt', raw='bla')
+
     def test_rawfile_io(self, tmpdir):
         payload = gsb.GSBPayload.fromdata(self.data, bps=4)
         tmpfile = str(tmpdir.join('payload.bin'))
@@ -337,30 +341,35 @@ class TestGSB(object):
                     complex_data=payload.complex_data)
                 assert payload2 == payload
 
-    def test_raw_stream(self):
+        # check that extra arguments raise TypeError
+        with pytest.raises(TypeError):
+            gsb.open(tmpfile, 'rb', bps=2)
+
+    def test_raw_stream(self, tmpdir):
         header = gsb.GSBHeader(self.rawdump_ts.split())
         payload = gsb.GSBPayload.fromdata(self.data, bps=4)
-        with io.BytesIO() as s, gsb.open(s, 'wt') as sh, io.BytesIO() as sp:
+        # Test on files here, file handles below
+        ts_file = str(tmpdir.join('ts.dat'))
+        raw_file = str(tmpdir.join('raw0.dat'))
+        with gsb.open(ts_file, 'wt') as sh:
             sh.write_timestamp(header)
-            sh.flush()
+        with io.open(raw_file, 'wb') as sp:
             payload.tofile(sp)
-            sp.flush()
-            s.seek(0)
-            sp.seek(0)
-            # Open here with payloadsize given, below with samples_per_frame
-            with gsb.open(s, mode='rs', raw=sp, payloadsize=payload.size,
-                          frames_per_second=1) as fh_r:
-                assert fh_r.header0 == header
-                data = fh_r.read()
-                assert fh_r.tell() == len(data)
-                assert_quantity_allclose(fh_r.tell(unit=u.s), 1. * u.s)
-                assert fh_r.header1 == header
-                # recheck with output array given
-                out = np.zeros_like(self.data)
-                fh_r.seek(0)
-                fh_r.read(out=out)
-            assert np.all(data == self.data.ravel())
-            assert np.all(out == self.data)
+
+        # Open here with payloadsize given, below with samples_per_frame
+        with gsb.open(ts_file, mode='rs', raw=raw_file,
+                      payloadsize=payload.size, frames_per_second=1) as fh_r:
+            assert fh_r.header0 == header
+            data = fh_r.read()
+            assert fh_r.tell() == len(data)
+            assert_quantity_allclose(fh_r.tell(unit=u.s), 1. * u.s)
+            assert fh_r.header1 == header
+            # recheck with output array given
+            out = np.zeros_like(self.data)
+            fh_r.seek(0)
+            fh_r.read(out=out)
+        assert np.all(data == self.data.ravel())
+        assert np.all(out == self.data)
 
         with io.BytesIO() as sh, io.BytesIO() as sp, gsb.open(
                 sh, 'ws', raw=sp, sample_rate=4096*u.Hz,
@@ -382,20 +391,30 @@ class TestGSB(object):
                     u.s/fh_r.frames_per_second)
             assert np.all(data.reshape(2, -1) == self.data.ravel())
 
+        # Test that opening that raises an exception correctly handles
+        # file closing. (Note that the timestamp file always gets closed).
+        with io.BytesIO() as sh, io.BytesIO() as sp:
+            with pytest.raises(u.UnitsError):
+                gsb.open(sh, 'ws', raw=sp, sample_rate=4096*u.m,
+                         samples_per_frame=payload.nsample, **header)
+            assert not sp.closed
+
     @pytest.mark.parametrize('bps', (4, 8))
-    def test_phased_stream(self, bps):
+    def test_phased_stream(self, bps, tmpdir):
         with gsb.open(SAMPLE_HEADER, 'rt') as fh:
             header = gsb.GSBHeader.fromfile(fh, verify=True)
         # Single polarisation
         cmplx = self.data[::2] + 1j * self.data[1::2]
         onepol = cmplx.reshape(-1, 1, 16)
-        with io.BytesIO() as sh, \
-                io.BytesIO() as sp0, io.BytesIO() as sp1, \
-                gsb.open(sh, 'ws', raw=(sp0, sp1),
-                         bps=bps, sample_rate=256*u.Hz,
-                         samples_per_frame=onepol.shape[0] // 2,
-                         nchan=onepol.shape[2], nthread=1,
-                         complex_data=True, header=header) as fh_w:
+        # Test on files here, file handles below
+        ts_file = str(tmpdir.join('ts.dat'))
+        raw0_file = str(tmpdir.join('raw0.dat'))
+        raw1_file = str(tmpdir.join('raw1.dat'))
+        with gsb.open(ts_file, 'ws', raw=(raw0_file, raw1_file),
+                      bps=bps, sample_rate=256*u.Hz,
+                      samples_per_frame=onepol.shape[0] // 2,
+                      nchan=onepol.shape[2], nthread=1,
+                      complex_data=True, header=header) as fh_w:
             # Write data twice.
             fh_w.write(onepol)
             fh_w.write(onepol[::-1])
@@ -403,23 +422,23 @@ class TestGSB(object):
             assert_quantity_allclose(fh_w.tell(unit=u.s), 0.5 * u.s)
             assert fh_w._header['seq_nr'] == fh_w.header0['seq_nr'] + 3
             fh_w.flush()
-            assert sp0.tell() == 2048 * bps // 8
-            for fh in sh, sp0, sp1:
-                fh.seek(0)
-            with gsb.open(sh, mode='rs', raw=(sp0, sp1),
-                          bps=bps, samples_per_frame=onepol.shape[0] // 2,
-                          nchan=onepol.shape[2]) as fh_r:
-                assert fh_r.header0 == header
-                assert np.isclose(fh_r.frames_per_second, 8.)
-                data = fh_r.read(onepol.shape[0] * 2)
-                assert fh_r.tell() == onepol.shape[0] * 2
-                assert (fh_r._frame.header['seq_nr'] ==
-                        fh_r.header0['seq_nr'] + 3)
-                assert_quantity_allclose(fh_r.tell(unit=u.s), 0.5 * u.s)
-                assert sp0.tell() == 2048 * bps // 8
-                assert fh_r._frame.header == fh_r.header1
-            assert np.all(data[:onepol.shape[0]] == onepol.squeeze())
-            assert np.all(data[onepol.shape[0]:] == onepol[::-1].squeeze())
+            assert fh_w.fh_raw[0][0].tell() == 2048 * bps // 8
+
+        with gsb.open(ts_file, mode='rs', raw=(raw0_file, raw1_file),
+                      bps=bps, samples_per_frame=onepol.shape[0] // 2,
+                      nchan=onepol.shape[2]) as fh_r:
+            assert fh_r.header0 == header
+            assert np.isclose(fh_r.frames_per_second, 8.)
+            data = fh_r.read(onepol.shape[0] * 2)
+            assert fh_r.tell() == onepol.shape[0] * 2
+            assert (fh_r._frame.header['seq_nr'] ==
+                    fh_r.header0['seq_nr'] + 3)
+            assert_quantity_allclose(fh_r.tell(unit=u.s), 0.5 * u.s)
+            assert fh_r.fh_raw[0][0].tell() == 2048 * bps // 8
+            assert fh_r._frame.header == fh_r.header1
+
+        assert np.all(data[:onepol.shape[0]] == onepol.squeeze())
+        assert np.all(data[onepol.shape[0]:] == onepol[::-1].squeeze())
         # Two polarisations, 16 channels
         twopol = cmplx.reshape(-1, 2, 16)
         with io.BytesIO() as sh, \
@@ -455,8 +474,14 @@ class TestGSB(object):
             assert np.all(data[:twopol.shape[0]] == twopol)
             assert np.all(data[twopol.shape[0]:] == twopol[::-1])
 
-    def test_stream_invalid(self):
+    def test_stream_invalid(self, tmpdir):
         with pytest.raises(ValueError):
+            # no r or w in mode
             gsb.open('ts.dat', 's')
         with pytest.raises(TypeError), io.TextIOBase() as s:
+            # TextIOBase for fh
             gsb.open(s, 'rt')
+        with pytest.raises(IOError):
+            # non-existing file
+            gsb.open(str(tmpdir.join('ts.bla')),
+                     raw=str(tmpdir.join('raw.bla')))
