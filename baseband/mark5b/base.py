@@ -38,7 +38,7 @@ class Mark5BFileReader(VLBIFileBase):
             With ``header`` and ``data`` properties that return the
             Mark5BHeader and data encoded in the frame, respectively.
         """
-        return Mark5BFrame.fromfile(self.fh, nchan=nchan, bps=bps,
+        return Mark5BFrame.fromfile(self.fh_raw, nchan=nchan, bps=bps,
                                     ref_mjd=ref_mjd)
 
     def find_header(self, template_header=None, kday=None, framesize=None,
@@ -48,7 +48,7 @@ class Mark5BFileReader(VLBIFileBase):
         Search is from the current position.  If given, a template_header
         is used to initialize the framesize, as well as kday in the header.
         """
-        fh = self.fh
+        fh = self.fh_raw
         if template_header:
             kday = template_header.kday
             framesize = template_header.framesize
@@ -139,7 +139,7 @@ class Mark5BFileWriter(VLBIFileBase):
         if not isinstance(data, Mark5BFrame):
             data = Mark5BFrame.fromdata(data, header, bps=bps, valid=valid,
                                         **kwargs)
-        return data.tofile(self.fh)
+        return data.tofile(self.fh_raw)
 
 
 class Mark5BStreamReader(VLBIStreamReaderBase):

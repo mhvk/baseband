@@ -41,7 +41,7 @@ class Mark4FileReader(VLBIFileBase):
             :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
             respectively.
         """
-        return Mark4Frame.fromfile(self.fh, ntrack=ntrack, decade=decade)
+        return Mark4Frame.fromfile(self.fh_raw, ntrack=ntrack, decade=decade)
 
     def find_frame(self, ntrack, maximum=None, forward=True):
         """Look for the first occurrence of a frame, from the current position.
@@ -70,7 +70,7 @@ class Mark4FileReader(VLBIFileBase):
         -------
         offset : int
         """
-        fh = self.fh
+        fh = self.fh_raw
         nset = np.ones(32 * ntrack // 8, dtype=np.int16)
         nunset = np.ones(ntrack // 8, dtype=np.int16)
         framesize = ntrack * 2500
@@ -157,7 +157,7 @@ class Mark4FileReader(VLBIFileBase):
         offset = self.find_frame(ntrack, maximum, forward)
         if offset is None:
             return None
-        header = Mark4Header.fromfile(self.fh, ntrack=ntrack, decade=decade)
+        header = Mark4Header.fromfile(self.fh_raw, ntrack=ntrack, decade=decade)
         self.seek(offset)
         return header
 
@@ -184,7 +184,7 @@ class Mark4FileWriter(VLBIFileBase):
         """
         if not isinstance(data, Mark4Frame):
             data = Mark4Frame.fromdata(data, header, **kwargs)
-        return data.tofile(self.fh)
+        return data.tofile(self.fh_raw)
 
 
 class Mark4StreamReader(VLBIStreamReaderBase):

@@ -71,7 +71,7 @@ class GSBFileReader(VLBIFileBase):
         frame : `~baseband.gsb.GSBPayload`
             With a ``.data`` property that returns the data encoded.
         """
-        return GSBPayload.fromfile(self.fh, payloadsize=payloadsize,
+        return GSBPayload.fromfile(self.fh_raw, payloadsize=payloadsize,
                                    nchan=nchan, bps=bps,
                                    complex_data=complex_data)
 
@@ -94,7 +94,7 @@ class GSBFileWriter(VLBIFileBase):
         """
         if not isinstance(data, GSBPayload):
             data = GSBPayload.fromdata(data, bps=bps)
-        return data.tofile(self.fh)
+        return data.tofile(self.fh_raw)
 
 
 class GSBStreamBase(VLBIStreamBase):

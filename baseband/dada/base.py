@@ -116,7 +116,7 @@ class DADAFileReader(VLBIFileBase):
             be too large to fit in memory, it may be better to access the
             parts of interest by slicing the frame.
         """
-        return DADAFrame.fromfile(self.fh, memmap=memmap)
+        return DADAFrame.fromfile(self.fh_raw, memmap=memmap)
 
 
 class DADAFileWriter(VLBIFileBase):
@@ -142,7 +142,7 @@ class DADAFileWriter(VLBIFileBase):
         """
         if not isinstance(data, DADAFrame):
             data = DADAFrame.fromdata(data, header, **kwargs)
-        return data.tofile(self.fh)
+        return data.tofile(self.fh_raw)
 
     def memmap_frame(self, header=None, **kwargs):
         """Get frame by writing the header to disk and mapping its payload.
@@ -164,8 +164,8 @@ class DADAFileWriter(VLBIFileBase):
         """
         if header is None:
             header = DADAHeader.fromvalues(**kwargs)
-        header.tofile(self.fh)
-        payload = DADAPayload.fromfile(self.fh, memmap=True, header=header)
+        header.tofile(self.fh_raw)
+        payload = DADAPayload.fromfile(self.fh_raw, memmap=True, header=header)
         return DADAFrame(header, payload)
 
 

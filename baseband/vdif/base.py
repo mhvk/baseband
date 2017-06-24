@@ -65,7 +65,7 @@ class VDIFFileReader(VLBIFileBase):
     """Simple reader for VDIF files.
 
     Adds ``read_frame`` and ``read_frameset`` methods on top of a binary
-    file reader (which is wrapped as ``self.fh``).
+    file reader (which is wrapped as ``self.fh_raw``).
     """
     def read_frame(self):
         """Read a single frame (header plus payload).
@@ -77,7 +77,7 @@ class VDIFFileReader(VLBIFileBase):
             :class:`~baseband.vdif.VDIFHeader` and data encoded in the frame,
             respectively.
         """
-        return VDIFFrame.fromfile(self.fh)
+        return VDIFFrame.fromfile(self.fh_raw)
 
     def read_frameset(self, thread_ids=None, sort=True, edv=None, verify=True):
         """Read a single frame (header plus payload).
@@ -102,8 +102,8 @@ class VDIFFileReader(VLBIFileBase):
             :class:`~baseband.vdif.VDIFHeaders` and the data encoded in the
             frame set, respectively.
         """
-        return VDIFFrameSet.fromfile(self.fh, thread_ids, sort=sort, edv=edv,
-                                     verify=verify)
+        return VDIFFrameSet.fromfile(self.fh_raw, thread_ids, sort=sort,
+                                     edv=edv, verify=verify)
 
     def find_header(self, template_header=None, framesize=None, edv=None,
                     maximum=None, forward=True):
@@ -113,7 +113,7 @@ class VDIFFileReader(VLBIFileBase):
         ``template_header`` or with a header a framesize ahead.   Note that the
         latter turns out to be an unexpectedly weak check on real data!
         """
-        fh = self.fh
+        fh = self.fh_raw
         # Obtain current pointer position.
         file_pos = fh.tell()
         if template_header is not None:
@@ -210,7 +210,7 @@ class VDIFFileWriter(VLBIFileBase):
         """
         if not isinstance(data, VDIFFrame):
             data = VDIFFrame.fromdata(data, header, **kwargs)
-        return data.tofile(self.fh)
+        return data.tofile(self.fh_raw)
 
     def write_frameset(self, data, header=None, **kwargs):
         """Write a frame set (headers plus payloads).
@@ -232,7 +232,7 @@ class VDIFFileWriter(VLBIFileBase):
         """
         if not isinstance(data, VDIFFrameSet):
             data = VDIFFrameSet.fromdata(data, header, **kwargs)
-        return data.tofile(self.fh)
+        return data.tofile(self.fh_raw)
 
 
 class VDIFStreamBase(VLBIStreamBase):

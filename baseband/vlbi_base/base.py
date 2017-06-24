@@ -16,27 +16,27 @@ class VLBIFileBase(object):
     The underlying file is stored in ``fh`` and all attributes that do not
     exist on the class itself are looked up on it.
     """
-    def __init__(self, fh):
-        self.fh = fh
+    def __init__(self, fh_raw):
+        self.fh_raw = fh_raw
 
     def __getattr__(self, attr):
         """Try to get things on the current open file if it is not on self."""
         if not attr.startswith('_'):
             try:
-                return getattr(self.fh, attr)
+                return getattr(self.fh_raw, attr)
             except AttributeError:
                 pass
         return self.__getattribute__(attr)
 
     def __enter__(self):
-        self.fh.__enter__()
+        self.fh_raw.__enter__()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.fh.__exit__(exc_type, exc_val, exc_tb)
+        self.fh_raw.__exit__(exc_type, exc_val, exc_tb)
 
     def __repr__(self):
-        return "{0}(fh={1})".format(self.__class__.__name__, self.fh)
+        return "{0}(fh_raw={1})".format(self.__class__.__name__, self.fh_raw)
 
 
 class VLBIStreamBase(object):
