@@ -302,20 +302,18 @@ class GSBPhasedHeader(GSBRawdumpHeader):
         seq = self['seq_nr']
         ndseq = len(str(seq))
         # Find the sequence/subint number we're trying to reach.
-        seq_sub_targ = seq * 8 + self['sub_int'] + n
+        seq_sub_targ = seq + n
         # And get number of digits for the target sequence number.
-        ndtarg = len(str(seq_sub_targ // 8))
-        # If numbers not the same, correct appropriately.  The multiplication
-        # with 8 is to account for the fact that each sequence has 8 sub
-        # integrations.
+        ndtarg = len(str(seq_sub_targ))
+        # If numbers not the same, correct appropriately.
         while ndseq != ndtarg:
             if n > 0:
                 next_power_of_ten = int('1' + ndseq * '0')
-                guess += seq_sub_targ - next_power_of_ten * 8
+                guess += seq_sub_targ - next_power_of_ten
                 ndseq += 1
             else:
                 next_power_of_ten = int('1' + (ndseq - 1) * '0')
-                guess += next_power_of_ten * 8 - seq_sub_targ
+                guess += next_power_of_ten - seq_sub_targ
                 ndseq -= 1
 
         return guess
