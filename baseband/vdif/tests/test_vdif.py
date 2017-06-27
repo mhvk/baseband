@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from astropy.time import Time
 import astropy.units as u
-from six import with_metaclass
+from astropy.extern import six
 from ... import vdif, vlbi_base
 from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_MWA_VDIF as SAMPLE_MWA,
                      SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME)
@@ -115,24 +115,24 @@ class TestVDIF(object):
     def test_custom_header(self):
         # Custom header with an EDV that already exists
         with pytest.raises(ValueError):
-            class VDIFHeaderY(with_metaclass(vdif.header._VDIFHeaderRegistry, 
-                                             vdif.header.VDIFBaseHeader)):
-                edv = 4
+            @six.add_metaclass(vdif.header._VDIFHeaderRegistry)
+            class VDIFHeaderY(vdif.header.VDIFBaseHeader):
+                _edv = 4
         # Custom header with an invalid EDV
         with pytest.raises(ValueError):
-            class VDIFHeaderZ(with_metaclass(vdif.header._VDIFHeaderRegistry, 
-                                     vdif.header.VDIFBaseHeader)):
-                edv = None
+            @six.add_metaclass(vdif.header._VDIFHeaderRegistry)
+            class VDIFHeaderZ(vdif.header.VDIFBaseHeader):
+                _edv = None
         # Custom header that fails to subclass VDIFHeader
         with pytest.raises(TypeError):
-            class VDIFHeaderW(with_metaclass(vdif.header._VDIFHeaderRegistry, 
-                              vlbi_base.header.VLBIHeaderBase)):
-                edv = 47
+            @six.add_metaclass(vdif.header._VDIFHeaderRegistry)
+            class VDIFHeaderW(vlbi_base.header.VLBIHeaderBase):
+                _edv = 47
 
         # Working header with nonsense data in the last two words.
-        class VDIFHeaderX(with_metaclass(vdif.header._VDIFHeaderRegistry, 
-                                         vdif.header.VDIFSampleRateHeader)):
-            edv = 0x1a
+        @six.add_metaclass(vdif.header._VDIFHeaderRegistry)
+        class VDIFHeaderX(vdif.header.VDIFSampleRateHeader):
+            _edv = 0x1a
             _header_parser = vdif.header.VDIFSampleRateHeader._header_parser + \
                              vlbi_base.header.HeaderParser(
                                     (('nonsense_0', (6, 0, 32, 0x0)),
@@ -142,7 +142,8 @@ class TestVDIF(object):
             def verify(self):
                 super(VDIFHeaderX, self).verify()
 
-        assert vdif.header._VDIFHeaderRegistry.reg[0x1a] == VDIFHeaderX
+        assert vdif.header._VDIFHeaderRegistry._vdif_edv_header_classes[0x1a] \
+                == VDIFHeaderX
 
         # Read in a header, and hack a copy 0x1a header with its info
         with open(SAMPLE_FILE, 'rb') as fh:
