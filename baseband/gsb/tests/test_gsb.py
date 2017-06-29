@@ -7,6 +7,7 @@ from astropy.time import Time
 from astropy.tests.helper import assert_quantity_allclose
 from ... import gsb
 from ..payload import decode_4bit, encode_4bit
+from ...data import SAMPLE_GSB_HEADER as SAMPLE_HEADER
 
 
 # Test on 2016-AUG-19, using GMRT crab data
@@ -25,23 +26,26 @@ from ..payload import decode_4bit, encode_4bit
 class TestGSB(object):
     def setup(self):
         self.rawdump_ts = '2015 04 27 18 45 00 0.000000240'
-        self.phased_ts = ('2014 01 20 02 28 10 0.811174 '
-                          '2014 01 20 02 28 10 0.622453760 5049 1')
+#        self.phased_ts = ('2014 01 20 02 28 10 0.811174 '
+#                          '2014 01 20 02 28 10 0.622453760 5049 1')
         self.data = np.clip(np.round(np.random.uniform(-8.5, 7.5, size=2048)),
                             -8, 7).reshape(-1, 1)
 
     def test_header(self):
-        header = gsb.GSBHeader(tuple(self.phased_ts.split()))
+        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
+            header = gsb.GSBHeader.fromfile(fh, verify=True)
+            fh.seek(0)
+            h_raw = fh.readline().strip()
         assert header.mode == 'phased'
-        assert header['pc'] == self.phased_ts[:28]
-        assert header['gps'] == self.phased_ts[29:60]
-        assert header['seq_nr'] == 5049
-        assert header['sub_int'] == 1
+        assert header['pc'] == h_raw[:28]
+        assert header['gps'] == h_raw[29:60]
+        assert header['seq_nr'] == 9980
+        assert header['sub_int'] == 4
         assert abs(header.pc_time -
-                   Time('2014-01-19T20:58:10.811174')) < 1.*u.ns
+                   Time('2013-07-25T19:32:51.733965')) < 1.*u.ns
         assert header.gps_time == header.time
         assert abs(header.time -
-                   Time('2014-01-19T20:58:10.622453760')) < 1.*u.ns
+                   Time('2013-07-25T19:32:51.5492352')) < 1.*u.ns
         assert header.mutable is False
         with pytest.raises(TypeError):
             header['sub_int'] = 0
@@ -49,7 +53,7 @@ class TestGSB(object):
         with io.StringIO() as s:
             header.tofile(s)
             s.seek(0)
-            assert s.readline().strip() == self.phased_ts
+            assert s.readline().strip() == h_raw
             s.seek(0)
             header2 = gsb.GSBHeader.fromfile(s)
         assert header == header2
@@ -113,34 +117,73 @@ class TestGSB(object):
         assert header.seek_offset(10) == 10 * header_size
 
     def test_phased_header_seek_offset(self):
-        header = gsb.GSBHeader(tuple(self.phased_ts.split()))
-        header_size = len(self.phased_ts) + 1
-        assert header.seek_offset(1) == header_size
-        # seq_nr=5049, sub_int=1
-        n_1000_0 = 1000 * 8 - (5049 * 8 + 1)
-        offset_to_1000_0 = header.seek_offset(n_1000_0)
+        fh = gsb.open(SAMPLE_HEADER, 'rt')
+        header1 = gsb.GSBHeader.fromfile(fh, verify=True)
+        fh.seek(0)
+        header_size = len(fh.readline())
+        # Sample file contains trailing white space
+        assert header_size - header1.seek_offset(1) == 1
+        # Check that seek_offset is working properly
+        n_1000_0 = 1000 - 9980
+        offset_to_1000_0 = header1.seek_offset(n_1000_0, size=header_size)
         assert offset_to_1000_0 == n_1000_0 * header_size
-        # Go to 999 7
-        assert (header.seek_offset(n_1000_0 - 1) ==
+        # Go to 1000
+        assert (header1.seek_offset(n_1000_0 - 1, size=header_size) ==
                 (n_1000_0 - 1) * header_size + 1)
-        # Go to 100 0
-        assert (header.seek_offset(n_1000_0 - 900 * 8) ==
-                (n_1000_0 - 900 * 8) * header_size + 900 * 8)
-        # Go to 99 7
-        assert (header.seek_offset(n_1000_0 - 900 * 8 - 1) ==
-                (n_1000_0 - 900 * 8 - 1) * header_size + 900 * 8 + 2)
-        # Go to 10001 5
-        assert (header.seek_offset(n_1000_0 + 9001 * 8 + 5) ==
-                (n_1000_0 + 9001 * 8 + 5) * header_size + 1 * 8 + 5)
+        # Go to 100 (header decreases by 1 chr)
+        assert (header1.seek_offset(n_1000_0 - 900, size=header_size) ==
+                (n_1000_0 - 900) * header_size + 900)
+        # Go to 99 (header decreases by 2 chr)
+        assert (header1.seek_offset(n_1000_0 - 901, size=header_size) ==
+                (n_1000_0 - 901) * header_size + 902)
+        # Go to 100001
+        assert (header1.seek_offset(n_1000_0 + 99001, size=header_size) ==
+                (n_1000_0 + 99001) * header_size + 90002)
+
+        # Try retrieving headers using seek_offset
+        fh.seek(header1.seek_offset(10, size=header_size))
+        header2 = gsb.GSBHeader.fromfile(fh, verify=True)
+        fh.seek(10 * header_size)
+        h2_raw = fh.readline().strip()
+        assert header2.mode == 'phased'
+        assert header2['pc'] == h2_raw[:28]
+        assert header2['gps'] == h2_raw[29:60]
+        assert header2['seq_nr'] == 9990
+        assert header2['sub_int'] == 6
+        assert abs(header2.pc_time -
+                   Time('2013-07-25T19:32:54.250583')) < 1.*u.ns
+        assert header2.gps_time == header2.time
+        assert abs(header2.time -
+                   Time('2013-07-25T19:32:54.0658176')) < 1.*u.ns
+
+        # Retrieve beyond sequence number 10000
+        fh.seek(header1.seek_offset(33, size=header_size))
+        header3 = gsb.GSBHeader.fromfile(fh, verify=True)
+        fh.seek(33 * header_size + 13)
+        h3_raw = fh.readline().strip()
+        assert header3.mode == 'phased'
+        assert header3['pc'] == h3_raw[:28]
+        assert header3['gps'] == h3_raw[29:60]
+        assert header3['seq_nr'] == 10013
+        assert header3['sub_int'] == 5
+        assert abs(header3.pc_time -
+                   Time('2013-07-25T19:33:00.038495')) < 1.*u.ns
+        assert header3.gps_time == header3.time
+        assert abs(header3.time -
+                   Time('2013-07-25T19:32:59.85395712')) < 1.*u.ns
+
+        fh.close()
 
     def test_header_non_gmrt(self):
-        header = gsb.GSBHeader(tuple(self.phased_ts.split()),
-                               utc_offset=0.*u.hr)
+        # Assume file is non-GMRT
+        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
+            header = gsb.GSBHeader.fromfile(fh, verify=True,
+                                            utc_offset=0.*u.hr)
         assert abs(header.pc_time -
-                   Time('2014-01-20T02:28:10.811174')) < 1.*u.ns
+                   Time('2013-07-26T01:02:51.733965')) < 1.*u.ns
         assert header.gps_time == header.time
         assert abs(header.time -
-                   Time('2014-01-20T02:28:10.622453760')) < 1.*u.ns
+                   Time('2013-07-26T01:02:51.5492352')) < 1.*u.ns
 
     def test_decoding(self):
         """Check that 4-bit encoding works."""
@@ -218,7 +261,8 @@ class TestGSB(object):
 
     def test_phased_frame(self):
         data = self.data.reshape(-1, 1, 2)
-        header1 = gsb.GSBHeader(self.phased_ts.split())
+        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
+            header1 = gsb.GSBHeader.fromfile(fh, verify=True)
         frame1 = gsb.GSBFrame.fromdata(data, header1, bps=4)
         assert frame1.shape == data.shape
         assert np.all(frame1.data == data)
@@ -268,7 +312,8 @@ class TestGSB(object):
         assert frame5 == frame4
 
     def test_timestamp_io(self, tmpdir):
-        header = gsb.GSBHeader(tuple(self.phased_ts.split()))
+        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
+            header = gsb.GSBHeader.fromfile(fh, verify=True)
         tmpfile = str(tmpdir.join('timestamps.txt'))
         with gsb.open(tmpfile, 'wt') as fh_w:
             fh_w.write_timestamp(header)
@@ -341,7 +386,8 @@ class TestGSB(object):
 
     @pytest.mark.parametrize('bps', (4, 8))
     def test_phased_stream(self, bps):
-        header = gsb.GSBHeader(self.phased_ts.split())
+        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
+            header = gsb.GSBHeader.fromfile(fh, verify=True)
         # Single polarisation
         cmplx = self.data[::2] + 1j * self.data[1::2]
         onepol = cmplx.reshape(-1, 1, 16)

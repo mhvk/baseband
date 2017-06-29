@@ -50,6 +50,11 @@ SAMPLE_AROCHIME_VDIF = full_path('sample_arochime.vdif')
 SAMPLE_DADA = full_path('sample.dada')
 """DADA sample from Effelsberg, with header adapted to shortened size."""
 
+SAMPLE_GSB_HEADER = full_path('sample_gsb.timestamp')
+"""GSB header sample from 2013/07/26 GMRT observations of PSR J1810+1744,
+adapted to shortened size.
+"""
+
 # Clean up namespace
 del os
 del full_path

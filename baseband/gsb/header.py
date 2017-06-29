@@ -301,9 +301,9 @@ class GSBPhasedHeader(GSBRawdumpHeader):
         # Get number of digits of current sequence number.
         seq = self['seq_nr']
         ndseq = len(str(seq))
-        # Find the sequence/subint number we're trying to reach.
+        # Find the sequence number we're trying to reach.
         seq_sub_targ = seq + n
-        # And get number of digits for the target sequence number.
+        # And get number of digits for this value.
         ndtarg = len(str(seq_sub_targ))
         # If numbers not the same, correct appropriately.
         while ndseq != ndtarg:
