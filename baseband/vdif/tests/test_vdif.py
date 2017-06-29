@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from astropy.time import Time
 import astropy.units as u
-from astropy.extern import six
+
 from ... import vdif, vlbi_base
 from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_MWA_VDIF as SAMPLE_MWA,
                      SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME)
@@ -111,26 +111,22 @@ class TestVDIF(object):
         header5.time = header.time + 1.*u.s - 0.01/header.framerate
         assert abs(header5.time - header.time - 1.*u.s) < 1.*u.ns
         assert header5['frame_nr'] == header['frame_nr']
+        # Check requesting non-existent EDV returns VDIFBaseHeader instance
+        header6 = vdif.header.VDIFHeader.fromvalues(edv=100)
+        assert isinstance(header6, vdif.header.VDIFBaseHeader)
+        assert header6['edv'] == 100
 
     def test_custom_header(self):
         # Custom header with an EDV that already exists
         with pytest.raises(ValueError):
-            @six.add_metaclass(vdif.header._VDIFHeaderRegistry)
             class VDIFHeaderY(vdif.header.VDIFBaseHeader):
                 _edv = 4
-        # Custom header with an invalid EDV
+        # Custom header that has neglected to override _edv
         with pytest.raises(ValueError):
-            @six.add_metaclass(vdif.header._VDIFHeaderRegistry)
             class VDIFHeaderZ(vdif.header.VDIFBaseHeader):
-                _edv = None
-        # Custom header that fails to subclass VDIFHeader
-        with pytest.raises(TypeError):
-            @six.add_metaclass(vdif.header._VDIFHeaderRegistry)
-            class VDIFHeaderW(vlbi_base.header.VLBIHeaderBase):
-                _edv = 47
+                pass
 
         # Working header with nonsense data in the last two words.
-        @six.add_metaclass(vdif.header._VDIFHeaderRegistry)
         class VDIFHeaderX(vdif.header.VDIFSampleRateHeader):
             _edv = 0x1a
             _header_parser = vdif.header.VDIFSampleRateHeader._header_parser + \
@@ -142,10 +138,9 @@ class TestVDIF(object):
             def verify(self):
                 super(VDIFHeaderX, self).verify()
 
-        assert vdif.header._VDIFHeaderRegistry._vdif_edv_header_classes[0x1a] \
-                == VDIFHeaderX
+        assert vdif.header.VDIF_HEADER_CLASSES[0x1a] is VDIFHeaderX
 
-        # Read in a header, and hack a copy 0x1a header with its info
+        # Read in a header, and hack an 0x1a header with its info
         with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
 
@@ -157,6 +152,11 @@ class TestVDIF(object):
             thread_id=header['thread_id'], nonsense_0=2000000000,
             nonsense_1=100, nonsense_2=10000000)
 
+        # Check that headerX_dummy is indeed VDIFHeaderX class, with 
+        # the correct EDV
+        assert isinstance(headerX_dummy, VDIFHeaderX)
+        assert headerX_dummy.edv == 0x1a
+
         # Write to dummy file, then re-read.
         with io.BytesIO() as s:
             headerX_dummy.tofile(s)
@@ -166,8 +166,9 @@ class TestVDIF(object):
         # Ensure values have been copied and re-read properly - only
         # edv, mutability and nonsense values should have changed or
         # been added.
+        assert isinstance(headerX, VDIFHeaderX)
         assert headerX.size == header.size
-        assert headerX.edv == 26
+        assert headerX.edv == 0x1a
         mjd, frac = divmod(header.time.mjd, 1)
         assert mjd == 56824
         assert round(frac * 86400) == 21367
