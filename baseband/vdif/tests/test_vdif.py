@@ -128,9 +128,9 @@ class TestVDIF(object):
 
         # Working header with nonsense data in the last two words.
         class VDIFHeaderX(vdif.header.VDIFSampleRateHeader):
-            _edv = 0x1a
-            _header_parser = vdif.header.VDIFSampleRateHeader._header_parser + \
-                             vlbi_base.header.HeaderParser(
+            _edv = 0x58
+            _header_parser = vdif.header.VDIFSampleRateHeader._header_parser +\
+                vlbi_base.header.HeaderParser(
                                     (('nonsense_0', (6, 0, 32, 0x0)),
                                      ('nonsense_1', (7, 0, 8, None)),
                                      ('nonsense_2', (7, 8, 24, 0x1))))
@@ -138,24 +138,24 @@ class TestVDIF(object):
             def verify(self):
                 super(VDIFHeaderX, self).verify()
 
-        assert vdif.header.VDIF_HEADER_CLASSES[0x1a] is VDIFHeaderX
+        assert vdif.header.VDIF_HEADER_CLASSES[0x58] is VDIFHeaderX
 
-        # Read in a header, and hack an 0x1a header with its info
+        # Read in a header, and hack an 0x58 header with its info
         with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
 
         headerX_dummy = vdif.VDIFHeader.fromvalues(
-            edv=0x1a, time=header.time,
+            edv=0x58, time=header.time,
             samples_per_frame=header.samples_per_frame,
             station=header.station, bandwidth=header.bandwidth,
             bps=header.bps, complex_data=header['complex_data'],
             thread_id=header['thread_id'], nonsense_0=2000000000,
             nonsense_1=100, nonsense_2=10000000)
 
-        # Check that headerX_dummy is indeed VDIFHeaderX class, with 
+        # Check that headerX_dummy is indeed VDIFHeaderX class, with
         # the correct EDV
         assert isinstance(headerX_dummy, VDIFHeaderX)
-        assert headerX_dummy.edv == 0x1a
+        assert headerX_dummy.edv == 0x58
 
         # Write to dummy file, then re-read.
         with io.BytesIO() as s:
@@ -168,7 +168,7 @@ class TestVDIF(object):
         # been added.
         assert isinstance(headerX, VDIFHeaderX)
         assert headerX.size == header.size
-        assert headerX.edv == 0x1a
+        assert headerX.edv == 0x58
         mjd, frac = divmod(header.time.mjd, 1)
         assert mjd == 56824
         assert round(frac * 86400) == 21367

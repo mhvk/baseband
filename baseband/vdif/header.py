@@ -35,6 +35,7 @@ ref_epochs = Time(['{y:04d}-{m:02d}-01'.format(y=2000 + ref // 2,
 VDIF_HEADER_CLASSES = {}
 """Dict for storing pairs of VDIF EDV and header classes."""
 
+
 class VDIFHeaderMeta(type):
     """
     Registry of VDIF Header EDV types, using the ``VDIF_HEADER_CLASSES``
@@ -45,9 +46,10 @@ class VDIFHeaderMeta(type):
     def __init__(cls, name, bases, dct):
 
         # Ignore VDIFHeader and VDIFBaseHeader, register others
-        if name not in ('VDIFHeader', 'VDIFBaseHeader', 'VDIFSampleRateHeader'):
+        if name not in ('VDIFHeader', 'VDIFBaseHeader',
+                        'VDIFSampleRateHeader'):
 
-            # Extract edv from class; convert to -1 if edv == False 
+            # Extract edv from class; convert to -1 if edv == False
             # for VDIFLegacy
             edv = cls._edv
             if edv is False:
@@ -62,7 +64,7 @@ class VDIFHeaderMeta(type):
                                  "VDIF_HEADER_CLASSES".format(edv))
 
             VDIFHeaderMeta._registry.update({edv: cls})
-        
+
         super(VDIFHeaderMeta, cls).__init__(name, bases, dct)
 
 
@@ -110,8 +112,8 @@ class VDIFHeader(VLBIHeaderBase):
 
         # Have to use key "-1" instead of "False" since the dict-lookup treats
         # 0 and False as identical.
-        cls = VDIF_HEADER_CLASSES.get(edv if edv is not False else -1, 
-                                                                VDIFBaseHeader)
+        cls = VDIF_HEADER_CLASSES.get(edv if edv is not False else -1,
+                                      VDIFBaseHeader)
         return super(VDIFHeader, cls).__new__(cls)
 
     def __init__(self, words, edv=None, verify=True, **kwargs):
