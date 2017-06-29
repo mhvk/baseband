@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 from astropy.time import Time
 import astropy.units as u
+
 from ... import vdif, vlbi_base
 from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_MWA_VDIF as SAMPLE_MWA,
                      SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME)
@@ -110,6 +111,79 @@ class TestVDIF(object):
         header5.time = header.time + 1.*u.s - 0.01/header.framerate
         assert abs(header5.time - header.time - 1.*u.s) < 1.*u.ns
         assert header5['frame_nr'] == header['frame_nr']
+        # Check requesting non-existent EDV returns VDIFBaseHeader instance
+        header6 = vdif.header.VDIFHeader.fromvalues(edv=100)
+        assert isinstance(header6, vdif.header.VDIFBaseHeader)
+        assert header6['edv'] == 100
+
+    def test_custom_header(self):
+        # Custom header with an EDV that already exists
+        with pytest.raises(ValueError):
+            class VDIFHeaderY(vdif.header.VDIFBaseHeader):
+                _edv = 4
+        # Custom header that has neglected to override _edv
+        with pytest.raises(ValueError):
+            class VDIFHeaderZ(vdif.header.VDIFBaseHeader):
+                pass
+
+        # Working header with nonsense data in the last two words.
+        class VDIFHeaderX(vdif.header.VDIFSampleRateHeader):
+            _edv = 0x58
+            _header_parser = vdif.header.VDIFSampleRateHeader._header_parser +\
+                vlbi_base.header.HeaderParser(
+                                    (('nonsense_0', (6, 0, 32, 0x0)),
+                                     ('nonsense_1', (7, 0, 8, None)),
+                                     ('nonsense_2', (7, 8, 24, 0x1))))
+
+            def verify(self):
+                super(VDIFHeaderX, self).verify()
+
+        assert vdif.header.VDIF_HEADER_CLASSES[0x58] is VDIFHeaderX
+
+        # Read in a header, and hack an 0x58 header with its info
+        with open(SAMPLE_FILE, 'rb') as fh:
+            header = vdif.VDIFHeader.fromfile(fh)
+
+        headerX_dummy = vdif.VDIFHeader.fromvalues(
+            edv=0x58, time=header.time,
+            samples_per_frame=header.samples_per_frame,
+            station=header.station, bandwidth=header.bandwidth,
+            bps=header.bps, complex_data=header['complex_data'],
+            thread_id=header['thread_id'], nonsense_0=2000000000,
+            nonsense_1=100, nonsense_2=10000000)
+
+        # Check that headerX_dummy is indeed VDIFHeaderX class, with
+        # the correct EDV
+        assert isinstance(headerX_dummy, VDIFHeaderX)
+        assert headerX_dummy.edv == 0x58
+
+        # Write to dummy file, then re-read.
+        with io.BytesIO() as s:
+            headerX_dummy.tofile(s)
+            s.seek(0)
+            headerX = vdif.VDIFHeader.fromfile(s)
+
+        # Ensure values have been copied and re-read properly - only
+        # edv, mutability and nonsense values should have changed or
+        # been added.
+        assert isinstance(headerX, VDIFHeaderX)
+        assert headerX.size == header.size
+        assert headerX.edv == 0x58
+        mjd, frac = divmod(header.time.mjd, 1)
+        assert mjd == 56824
+        assert round(frac * 86400) == 21367
+        assert headerX.payloadsize == header.payloadsize
+        assert headerX.framesize == header.framesize
+        assert headerX['thread_id'] == header['thread_id']
+        assert headerX.framerate.value == header.framerate.value
+        assert headerX.samples_per_frame == header.samples_per_frame
+        assert headerX.nchan == header.nchan
+        assert headerX.bps == header.bps
+        assert not headerX['complex_data']
+        assert headerX.mutable is False
+        assert headerX.nonsense_0 == 2000000000
+        assert headerX.nonsense_1 == 100
+        assert headerX.nonsense_2 == 10000000
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""

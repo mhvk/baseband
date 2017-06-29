@@ -10,6 +10,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 import astropy.units as u
+from astropy.extern import six
 
 from astropy.time import Time, TimeDelta
 
@@ -18,8 +19,11 @@ from ..vlbi_base.header import (four_word_struct, eight_word_struct,
 from ..mark5b.header import Mark5BHeader
 
 
-__all__ = ['VDIFHeader', 'VDIFBaseHeader', 'VDIFSampleRateHeader']
-# This gets updated with all EDV headers at the end.
+__all__ = ['VDIFHeader', 'VDIFBaseHeader', 'VDIFSampleRateHeader',
+           'VDIFLegacyHeader', 'VDIFHeader0', 'VDIFHeader1',
+           'VDIFHeader2', 'VDIFHeader3', 'VDIFHeader4',
+           'VDIFMark5BHeader']
+
 
 ref_max = int(2. * (Time.now().jyear - 2000.)) + 1
 ref_epochs = Time(['{y:04d}-{m:02d}-01'.format(y=2000 + ref // 2,
@@ -28,6 +32,43 @@ ref_epochs = Time(['{y:04d}-{m:02d}-01'.format(y=2000 + ref // 2,
                   precision=9)
 
 
+VDIF_HEADER_CLASSES = {}
+"""Dict for storing pairs of VDIF EDV and header classes."""
+
+
+class VDIFHeaderMeta(type):
+    """
+    Registry of VDIF Header EDV types, using the ``VDIF_HEADER_CLASSES``
+    dict.  Checks for keyword and subclass conflicts before registering.
+    """
+    _registry = VDIF_HEADER_CLASSES
+
+    def __init__(cls, name, bases, dct):
+
+        # Ignore VDIFHeader and VDIFBaseHeader, register others
+        if name not in ('VDIFHeader', 'VDIFBaseHeader',
+                        'VDIFSampleRateHeader'):
+
+            # Extract edv from class; convert to -1 if edv == False
+            # for VDIFLegacy
+            edv = cls._edv
+            if edv is False:
+                edv = -1
+
+            # Check if EDV is already registered (edv == None is invalid).
+            if edv is None:
+                raise ValueError("EDV cannot be None.  It should be "
+                                 "overridden by the subclass.")
+            elif edv in VDIFHeaderMeta._registry:
+                raise ValueError("EDV {0} already registered in "
+                                 "VDIF_HEADER_CLASSES".format(edv))
+
+            VDIFHeaderMeta._registry.update({edv: cls})
+
+        super(VDIFHeaderMeta, cls).__init__(name, bases, dct)
+
+
+@six.add_metaclass(VDIFHeaderMeta)
 class VDIFHeader(VLBIHeaderBase):
     """VDIF Header, supporting different Extended Data Versions.
 
@@ -56,10 +97,7 @@ class VDIFHeader(VLBIHeaderBase):
                    'samples_per_frame', 'station', 'time')
     """Properties accessible/usable in initialisation for all VDIF headers."""
 
-    # These get set at the end.
-    _vdif_edv_header_classes = {}
-
-    edv = None
+    _edv = None
 
     def __new__(cls, words, edv=None, verify=True, **kwargs):
         # We use edv to define which class we return.
@@ -74,13 +112,13 @@ class VDIFHeader(VLBIHeaderBase):
 
         # Have to use key "-1" instead of "False" since the dict-lookup treats
         # 0 and False as identical.
-        cls = cls._vdif_edv_header_classes.get(edv if edv is not False else -1,
-                                               VDIFBaseHeader)
+        cls = VDIF_HEADER_CLASSES.get(edv if edv is not False else -1,
+                                      VDIFBaseHeader)
         return super(VDIFHeader, cls).__new__(cls)
 
     def __init__(self, words, edv=None, verify=True, **kwargs):
         if edv is not None:
-            self.edv = edv
+            self._edv = edv
         super(VDIFHeader, self).__init__(words, verify=verify, **kwargs)
 
     def copy(self):
@@ -211,6 +249,11 @@ class VDIFHeader(VLBIHeaderBase):
                               **kwargs)
 
     # properties common to all VDIF headers.
+    @property
+    def edv(self):
+        """VDIF Extended Data Version (EDV)."""
+        return self._edv
+
     @property
     def framesize(self):
         """Size of a frame, in bytes."""
@@ -402,7 +445,7 @@ class VDIFLegacyHeader(VDIFHeader):
          ('thread_id', (3, 16, 10, 0x0)),
          ('station_id', (3, 0, 16))))
     # Set default
-    edv = False
+    _edv = False
 
     def verify(self):
         """Basic checks of header integrity."""
@@ -434,7 +477,7 @@ class VDIFHeader0(VDIFBaseHeader):
 
     EDV=0 implies the extended user data fields are not used.
     """
-    edv = 0
+    _edv = 0
 
     def verify(self):
         assert all(word == 0 for word in self.words[4:])
@@ -495,7 +538,7 @@ class VDIFHeader1(VDIFSampleRateHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0x01.pdf
     """
-    edv = 1
+    _edv = 1
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('das_id', (6, 0, 64, 0x0)),))
 
@@ -505,7 +548,7 @@ class VDIFHeader3(VDIFSampleRateHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0x03.pdf
     """
-    edv = 3
+    _edv = 3
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('frame_length', (2, 0, 24, 629)),  # Repeat, to set default.
          ('loif_tuning', (6, 0, 32, 0x0)),
@@ -528,7 +571,7 @@ class VDIFHeader4(VDIFSampleRateHeader):
 
     This is used for MWA according to Franz.  No extra header info?
     """
-    edv = 4
+    _edv = 4
 
 
 class VDIFHeader2(VDIFBaseHeader):
@@ -541,7 +584,7 @@ class VDIFHeader2(VDIFBaseHeader):
     This header is untested.  It may need to have subclasses, based on possible
     differentsync values.
     """
-    edv = 2
+    _edv = 2
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
         (('complex_data', (3, 31, 1, 0x0)),  # Repeat, to set default.
          ('bits_per_sample', (3, 26, 5, 0x1)),  # Repeat, to set default.
@@ -563,7 +606,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
 
     See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
     """
-    edv = 0xab
+    _edv = 0xab
     # Repeat 'frame_length' to set default.
     _header_parser = (VDIFBaseHeader._header_parser +
                       HeaderParser((('frame_length', (2, 0, 24, 1254)),)) +
@@ -645,18 +688,3 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         super(VDIFMark5BHeader, self).set_time(time, frame_nr=self['frame_nr'])
 
     time = property(get_time, set_time)
-
-
-# For python >= 3.6, this could very easily be done with __init_subclass__,
-# but before it needs a metaclass, which seems to much trouble.
-VDIFHeader._vdif_edv_header_classes.update(
-    ((-1, VDIFLegacyHeader),
-     (0, VDIFHeader0),
-     (1, VDIFHeader1),
-     (2, VDIFHeader2),
-     (3, VDIFHeader3),
-     (4, VDIFHeader4),
-     (0xab, VDIFMark5BHeader)))
-
-__all__ += [cls.__name__ for cls in
-            VDIFHeader._vdif_edv_header_classes.values()]
