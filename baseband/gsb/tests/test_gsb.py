@@ -26,8 +26,6 @@ from ...data import SAMPLE_GSB_HEADER as SAMPLE_HEADER
 class TestGSB(object):
     def setup(self):
         self.rawdump_ts = '2015 04 27 18 45 00 0.000000240'
-#        self.phased_ts = ('2014 01 20 02 28 10 0.811174 '
-#                          '2014 01 20 02 28 10 0.622453760 5049 1')
         self.data = np.clip(np.round(np.random.uniform(-8.5, 7.5, size=2048)),
                             -8, 7).reshape(-1, 1)
 
