@@ -47,7 +47,7 @@ class TestMark4(object):
     def test_header_stream(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
-            stream = np.fromfile(fh, dtype=np.uint64, count=5 * 32)
+            stream = np.fromfile(fh, dtype='<u8', count=5 * 32)
         # check sync words in right place
         assert np.all(stream[64:80] == 0xffffffffffffffff)
         assert mark4.header.crc12.check(stream)
@@ -190,10 +190,10 @@ class TestMark4(object):
 
     def test_payload_reorder(self):
         """Test that bit reordering is consistent with mark5access."""
-        check = np.array([738811025863578102], dtype=np.uint64)
-        expected = np.array([118, 209, 53, 244, 148, 217, 64, 10], np.uint8)
+        check = np.array([738811025863578102], dtype='<u8').view('u8')
+        expected = np.array([118, 209, 53, 244, 148, 217, 64, 10])
         assert np.all(reorder64(check).view(np.uint8) == expected)
-        assert np.all(reorder32(check.view(np.uint32)).view(np.uint8) ==
+        assert np.all(reorder32(check.view('u4')).view(np.uint8) ==
                       expected)
 
     def test_payload(self):
@@ -220,6 +220,8 @@ class TestMark4(object):
                 mark4.Mark4Payload.fromfile(s, header)
         payload3 = mark4.Mark4Payload.fromdata(payload.data, header)
         assert payload3 == payload
+        payload4 = mark4.Mark4Payload(payload.words, nchan=8, bps=2, fanout=4)
+        assert payload4 == payload
         with pytest.raises(ValueError):
             # Wrong number of channels.
             mark4.Mark4Payload.fromdata(np.empty((payload.shape[0], 2)),
@@ -232,6 +234,15 @@ class TestMark4(object):
             # Wrong data type
             mark4.Mark4Payload.fromdata(np.zeros((5000, 8), np.complex64),
                                         header)
+        with pytest.raises(ValueError):
+            # Wrong encoded data type for implied number of tracks of 32.
+            mark4.Mark4Payload(payload.words, nchan=4, bps=2, fanout=4)
+        with pytest.raises(ValueError):
+            # Not little-endian encoded data.
+            mark4.Mark4Payload(payload.words.astype('>u8'), header)
+        with pytest.raises(ValueError):
+            # Wrong number of tracks in encoded data.
+            mark4.Mark4Payload(payload.words.view('<u4'), header)
 
     @pytest.mark.parametrize('item', (2, (), -1, slice(1, 3), slice(2, 4),
                                       slice(2, 4), slice(-3, None),

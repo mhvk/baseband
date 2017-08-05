@@ -203,6 +203,8 @@ class TestVLBIBase(object):
         payload = self.Payload(self.payload.words, bps=4)
         with pytest.raises(KeyError):
             payload.data
+        with pytest.raises(ValueError):
+            self.Payload(self.payload.words.astype('>u4'), bps=4)
         payload = self.Payload(self.payload.words, bps=8, complex_data=True)
         assert np.all(payload.data ==
                       self.payload.data[:, 0] + 1j * self.payload.data[:, 1])

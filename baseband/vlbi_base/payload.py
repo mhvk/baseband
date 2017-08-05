@@ -55,6 +55,9 @@ class VLBIPayloadBase(object):
         if self._size is not None and self._size != self.size:
             raise ValueError("Encoded data should have length {0}"
                              .format(self._size))
+        if words.dtype != self._dtype_word:
+            raise ValueError("Encoded data should have dtype {0}"
+                             .format(self._dtype_word))
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):

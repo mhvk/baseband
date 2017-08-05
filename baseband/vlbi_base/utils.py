@@ -12,7 +12,7 @@ def bcd_decode(value):
         if not isinstance(value, np.ndarray):
             raise ValueError("Invalid BCD encoded value {0}={1}."
                              .format(value, hex(value)))
-    except:  # Might still be an array (newer python versions)
+    except TypeError:  # Might still be an array (newer python versions)
         if not isinstance(value, np.ndarray):
             raise
 
@@ -36,7 +36,7 @@ def bcd_encode(value):
     try:
         # Far faster than my routine for scalars
         return int('{:d}'.format(value), base=16)
-    except:  # Maybe an array?
+    except Exception:  # Maybe an array?
         if not isinstance(value, np.ndarray):
             raise
 
