@@ -150,7 +150,7 @@ def encode_8chan_2bit_fanout2(values):
     reorder_bits = np.array([0, 16, 1, 17], dtype=np.uint8)
     reorder_bits.take(bitvalues, out=bitvalues)
     bitvalues <<= np.array([0, 1, 2, 3], dtype=np.uint8)
-    out = np.bitwise_or.reduce(bitvalues, axis=-1).ravel().view(np.uint32)
+    out = np.bitwise_or.reduce(bitvalues, axis=-1).ravel().view('<u4')
     return out
 
 
