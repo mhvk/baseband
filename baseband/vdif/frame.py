@@ -259,6 +259,7 @@ class VDIFFrameSet(object):
 
         if sort:
             frames.sort(key=lambda frame: frame['thread_id'])
+            header0 = frames[0].header
 
         return cls(frames, header0)
 
