@@ -554,13 +554,21 @@ def open(name, mode='rs', *args, **kwargs):
     if 'w' in mode:
         if not hasattr(name, 'write'):
             name = io.open(name, 'wb')
-        fh = VDIFFileWriter(name)
-        return fh if 'b' in mode else VDIFStreamWriter(fh, *args, **kwargs)
+        try:
+            fh = VDIFFileWriter(name)
+            return fh if 'b' in mode else VDIFStreamWriter(fh, *args, **kwargs)
+        except Exception:
+            name.close()
+            raise
     elif 'r' in mode:
         if not hasattr(name, 'read'):
             name = io.open(name, 'rb')
-        fh = VDIFFileReader(name)
-        return fh if 'b' in mode else VDIFStreamReader(fh, *args, **kwargs)
+        try:
+            fh = VDIFFileReader(name)
+            return fh if 'b' in mode else VDIFStreamReader(fh, *args, **kwargs)
+        except Exception:
+            name.close()
+            raise
     else:
         raise ValueError("Only support opening VDIF file for reading "
                          "or writing (mode='r' or 'w').")

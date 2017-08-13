@@ -195,9 +195,11 @@ class TestMark5B(object):
         assert frame2 == frame
         frame3 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2)
         assert frame3 == frame
+        # todo: this should take ref_mjd
         frame4 = mark5b.Mark5BFrame.fromdata(payload.data, bps=2,
-                                             ref_mjd=57000, **header)
+                                             kday=56000, **header)
         assert frame4 == frame
+        assert frame4.time == frame.time
         frame5 = mark5b.Mark5BFrame(header, payload, valid=False)
         assert frame5.valid is False
         assert np.all(frame5.data == 0.)

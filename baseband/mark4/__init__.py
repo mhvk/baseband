@@ -21,6 +21,7 @@ those numbers cannot be inferred from the data themselves.
 >>> frame = fh.read_frame(ntrack=64, decade=2010)
 >>> frame.shape
 (80000, 8)
+>>> fh.close()
 
 
 Opening in stream mode wraps the low-level routines such that reading and
@@ -39,6 +40,7 @@ can be calculated (for longer files, this can be calculated from the file).
 (6400, 8)
 >>> d[635:645, 0].astype(int)  # first thread
 array([ 0,  0,  0,  0,  0, -1,  1,  3,  1, -1])
+>>> fh.close()
 
 Note that the first 640 elements of every frame are set to zero, as those data
 were overwritten by the header.
@@ -62,6 +64,7 @@ captured in one frame.
 >>> d2 = fr.read()
 >>> np.all(d == d2)
 True
+>>> fr.close()
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)

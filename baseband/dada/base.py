@@ -520,13 +520,21 @@ def open(name, mode='rs', *args, **kwargs):
     if 'w' in mode:
         if not hasattr(name, 'write'):
             name = io.open(name, 'w+b')
-        fh = DADAFileWriter(name)
-        return fh if 'b' in mode else DADAStreamWriter(fh, *args, **kwargs)
+        try:
+            fh = DADAFileWriter(name)
+            return fh if 'b' in mode else DADAStreamWriter(fh, *args, **kwargs)
+        except Exception:
+            name.close()
+            raise
     elif 'r' in mode:
         if not hasattr(name, 'read'):
             name = io.open(name, 'rb')
-        fh = DADAFileReader(name)
-        return fh if 'b' in mode else DADAStreamReader(fh, *args, **kwargs)
+        try:
+            fh = DADAFileReader(name)
+            return fh if 'b' in mode else DADAStreamReader(fh, *args, **kwargs)
+        except Exception:
+            name.close()
+            raise
     else:
         raise ValueError("Only support opening DADA file for reading "
                          "or writing (mode='r' or 'w').")

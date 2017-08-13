@@ -16,6 +16,7 @@ consist of just a single header and payload, such frames contain all the data.
 array([[ -38.-38.j,  -38.-38.j],
        [ -38.-38.j,  -40. +0.j],
        [-105.+60.j,   85.-15.j]], dtype=complex64)
+>>> fh.close()
 
 Since the files can be quite large, the payload is mapped, so that if one
 accesses part of the data, only the corresponding parts of the encoded payload
@@ -37,6 +38,7 @@ writing is in units of samples, and one has access to header information.
 array([[ -38.-38.j,  -38.-38.j],
        [ -38.-38.j,  -40. +0.j],
        [-105.+60.j,   85.-15.j]], dtype=complex64)
+>>> fh.close()
 
 To set up a file for writing as a stream is possible as well.  Here, we use an
 even smaller size of the payload, to show how one can define multiple files.
@@ -57,6 +59,7 @@ even smaller size of the payload, to show how one can define multiple files.
 >>> d2 = fr.read()
 >>> (d == d2).all()
 True
+>>> fr.close()
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
