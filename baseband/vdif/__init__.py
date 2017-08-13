@@ -20,7 +20,7 @@ binary mode provides a normal file reader but extended with methods to read a
 >>> fs = fh.read_frameset()
 >>> fs.data.shape
 (8, 20000, 1)
-
+>>> fh.close()
 
 Opening in stream mode wraps the low-level routines such that reading
 and writing is in units of samples.  It also provides access to header
@@ -37,6 +37,7 @@ information.
 (12, 8)
 >>> d[:, 0].astype(int)  # first thread
 array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
+>>> fh.close()
 
 One can pick specific threads:
 
@@ -44,6 +45,7 @@ One can pick specific threads:
 >>> d = fh.read(20000)
 >>> d.shape
 (20000, 2)
+>>> fh.close()
 
 To set up a file for writing needs quite a bit of header information. Not
 coincidentally, what is given by the reader above suffices:
@@ -60,7 +62,7 @@ coincidentally, what is given by the reader above suffices:
 >>> d2 = fh.read(12)
 >>> np.all(d[:12] == d2)
 True
-
+>>> fh.close()
 
 Example to copy a VDIF file.  Here, we use the ``sort=False`` option to ensure
 the frames are written exactly in the same order, so the files should be
