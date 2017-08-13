@@ -26,6 +26,7 @@ class VLBIFileBase(object):
                 return getattr(self.fh_raw, attr)
             except AttributeError:
                 pass
+        #  __getattribute__ to raise appropriate error.
         return self.__getattribute__(attr)
 
     def __enter__(self):
@@ -33,7 +34,6 @@ class VLBIFileBase(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-        self.fh_raw.__exit__(exc_type, exc_val, exc_tb)
 
     def close(self):
         self.fh_raw.close()
@@ -111,10 +111,6 @@ class VLBIStreamBase(VLBIFileBase):
         full_frame_nr, extra = divmod(offset, self.samples_per_frame)
         dt, frame_nr = divmod(full_frame_nr, self.frames_per_second)
         return int(dt), int(frame_nr), extra
-
-    def __enter__(self):
-        super(VLBIStreamBase, self).__enter__()
-        return self
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"

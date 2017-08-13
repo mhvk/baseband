@@ -131,9 +131,6 @@ class GSBStreamBase(VLBIStreamBase):
             frames_per_second=frames_per_second, sample_rate=sample_rate)
         self._payloadsize = payloadsize
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
     def close(self):
         self.fh_ts.close()
         try:
@@ -148,7 +145,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     # TODO: right now cannot inherit from GSBFileReader, unlike for other
     # baseband classes, since we need to access multiple files.  Can this
     # be solved with FileWriter/FileReader classes that handle timestamps and
-    # multiple blocks, combining these into a frame.
+    # multiple blocks, combining these into a frame?
     def __init__(self, fh_ts, fh_raw, thread_ids=None,
                  nchan=None, bps=None, complex_data=None,
                  samples_per_frame=None, payloadsize=None,
