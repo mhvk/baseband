@@ -3,7 +3,8 @@ import io
 
 import numpy as np
 
-from ..vlbi_base.base import VLBIStreamReaderBase, VLBIStreamWriterBase
+from ..vlbi_base.base import (VLBIFileBase,
+                              VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import Mark4Header
 from .frame import Mark4Frame
 
@@ -16,11 +17,10 @@ nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
          .sum(1).astype(np.int16))
 
 
-class Mark4FileReader(io.BufferedReader):
+class Mark4FileReader(VLBIFileBase):
     """Simple reader for Mark 4 files.
 
-    Adds ``read_frame`` and ``find_frame`` methods to the basic binary file
-    reader :class:`~io.BufferedReader`.
+    Adds ``read_frame`` and ``find_frame`` methods to the VLBI file wrapper.
     """
 
     def read_frame(self, ntrack, decade):
@@ -41,7 +41,7 @@ class Mark4FileReader(io.BufferedReader):
             :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
             respectively.
         """
-        return Mark4Frame.fromfile(self, ntrack=ntrack, decade=decade)
+        return Mark4Frame.fromfile(self.fh_raw, ntrack=ntrack, decade=decade)
 
     def find_frame(self, ntrack, maximum=None, forward=True):
         """Look for the first occurrence of a frame, from the current position.
@@ -70,14 +70,15 @@ class Mark4FileReader(io.BufferedReader):
         -------
         offset : int
         """
+        fh = self.fh_raw
         nset = np.ones(32 * ntrack // 8, dtype=np.int16)
         nunset = np.ones(ntrack // 8, dtype=np.int16)
         framesize = ntrack * 2500
-        file_pos = self.tell()
-        self.seek(0, 2)
-        filesize = self.tell()
+        file_pos = fh.tell()
+        fh.seek(0, 2)
+        filesize = fh.tell()
         if filesize < framesize:
-            self.seek(file_pos)
+            fh.seek(file_pos)
             return None
 
         if maximum is None:
@@ -98,9 +99,9 @@ class Mark4FileReader(io.BufferedReader):
                                 filesize - block),
                             -step)
         for frame in iterate:
-            self.seek(frame)
+            fh.seek(frame)
 
-            data = np.fromstring(self.read(block), dtype=np.uint8)
+            data = np.fromstring(fh.read(block), dtype=np.uint8)
             assert len(data) == block
             # Find header pattern.
             databits1 = nbits[data]
@@ -127,8 +128,8 @@ class Mark4FileReader(io.BufferedReader):
                         else:
                             break
 
-                self.seek(check + 32 * 2 * ntrack // 8)
-                check_data = np.fromstring(self.read(len(nunset)),
+                fh.seek(check + 32 * 2 * ntrack // 8)
+                check_data = np.fromstring(fh.read(len(nunset)),
                                            dtype=np.uint8)
                 databits2 = nbits[check_data]
                 if np.all(databits2 >= 6):
@@ -137,10 +138,10 @@ class Mark4FileReader(io.BufferedReader):
             else:  # None of them worked, so do next block
                 continue
 
-            self.seek(frame_start)
+            fh.seek(frame_start)
             return frame_start
 
-        self.seek(file_pos)
+        fh.seek(file_pos)
         return None
 
     def find_header(self, template_header=None, ntrack=None, decade=None,
@@ -156,16 +157,15 @@ class Mark4FileReader(io.BufferedReader):
         offset = self.find_frame(ntrack, maximum, forward)
         if offset is None:
             return None
-        header = Mark4Header.fromfile(self, ntrack=ntrack, decade=decade)
-        self.seek(offset)
+        header = Mark4Header.fromfile(self.fh_raw, ntrack=ntrack, decade=decade)
+        self.fh_raw.seek(offset)
         return header
 
 
-class Mark4FileWriter(io.BufferedWriter):
+class Mark4FileWriter(VLBIFileBase):
     """Simple writer for Mark 4 files.
 
-    Adds ``write_frame`` method to the basic binary file writer
-    :class:`~io.BufferedWriter`.
+    Adds ``write_frame`` method to the VLBI binary file wrapper.
     """
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
@@ -184,10 +184,10 @@ class Mark4FileWriter(io.BufferedWriter):
         """
         if not isinstance(data, Mark4Frame):
             data = Mark4Frame.fromdata(data, header, **kwargs)
-        return data.tofile(self)
+        return data.tofile(self.fh_raw)
 
 
-class Mark4StreamReader(VLBIStreamReaderBase):
+class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     """VLBI Mark 4 format reader.
 
     This wrapper is allows one to access a Mark 4 file as a continues series
@@ -196,7 +196,7 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
     Parameters
     ----------
-    raw : `~baseband.mark4.Mark4FileReader`
+    fh_raw : `~baseband.mark4.Mark4FileReader`
         file handle to the raw Mark 4 data stream.
     ntrack : int
         Number of tracks used to store the data.
@@ -214,15 +214,18 @@ class Mark4StreamReader(VLBIStreamReaderBase):
 
     _frame_class = Mark4Frame
 
-    def __init__(self, raw, ntrack, decade=None, thread_ids=None,
+    def __init__(self, fh_raw, ntrack, decade=None, thread_ids=None,
                  frames_per_second=None, sample_rate=None):
-        self.offset0 = raw.find_frame(ntrack=ntrack)
-        self._frame = raw.read_frame(ntrack, decade)
+        # Pre-set fh_raw, so FileReader methods work
+        # TODO: move this to StreamReaderBase?
+        self.fh_raw = fh_raw
+        self.offset0 = self.find_frame(ntrack=ntrack)
+        self._frame = self.read_frame(ntrack, decade)
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
         super(Mark4StreamReader, self).__init__(
-            fh_raw=raw, header0=header, nchan=header.nchan, bps=header.bps,
+            fh_raw, header0=header, nchan=header.nchan, bps=header.bps,
             complex_data=False, thread_ids=thread_ids,
             samples_per_frame=header.samples_per_frame,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
@@ -283,14 +286,14 @@ class Mark4StreamReader(VLBIStreamReaderBase):
     def _read_frame(self):
         frame_nr = self.offset // self.samples_per_frame
         self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
-        self._frame = self.fh_raw.read_frame(ntrack=self.header0.ntrack,
-                                             decade=self.header0.decade)
+        self._frame = self.read_frame(ntrack=self.header0.ntrack,
+                                      decade=self.header0.decade)
         # Convert payloads to data array.
         self._frame_data = self._frame.data
         self._frame_nr = frame_nr
 
 
-class Mark4StreamWriter(VLBIStreamWriterBase):
+class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
     """VLBI Mark 4 format writer.
 
     Parameters
@@ -364,7 +367,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase):
             sample = self.offset - offset0
             frame[sample_offset:sample_end] = data[sample:sample + nsample]
             if sample_end == self.samples_per_frame:
-                self.fh_raw.write_frame(self._data, self._header)
+                self.write_frame(self._data, self._header)
 
             self.offset += nsample
             count -= nsample
@@ -424,13 +427,17 @@ def open(name, mode='rs', **kwargs):
     if 'w' in mode:
         if not hasattr(name, 'write'):
             name = io.open(name, 'wb')
-        fh = Mark4FileWriter(name)
-        return fh if 'b' in mode else Mark4StreamWriter(fh, **kwargs)
+        if 'b' in mode:
+            return Mark4FileWriter(name)
+        else:
+            return Mark4StreamWriter(name, **kwargs)
     elif 'r' in mode:
         if not hasattr(name, 'read'):
             name = io.open(name, 'rb')
-        fh = Mark4FileReader(name)
-        return fh if 'b' in mode else Mark4StreamReader(fh, **kwargs)
+        if 'b' in mode:
+            return Mark4FileReader(name)
+        else:
+            return Mark4StreamReader(name, **kwargs)
     else:
         raise ValueError("Only support opening Mark 4 file for reading "
                          "or writing (mode='r' or 'w').")

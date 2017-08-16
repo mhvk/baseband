@@ -5,7 +5,7 @@ import io
 import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
-from ..vlbi_base.base import (VLBIStreamBase,
+from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import GSBHeader
 from .payload import GSBPayload
@@ -15,12 +15,16 @@ __all__ = ['GSBFileReader', 'GSBFileWriter', 'GSBStreamReader',
            'GSBStreamWriter', 'open']
 
 
-class GSBTimeStampIO(io.TextIOWrapper):
+class GSBTimeStampIO(VLBIFileBase):
     """Simple reader/writer for GSB time stamp files.
 
-    Adds ``read_timestamp`` and ``write_timestamp`` methods to the basic text
-    file wrapper :class:`~io.TextIOWrapper`.
+    Adds ``read_timestamp`` and ``write_timestamp`` methods to the basic vlbi
+    file wrapper. To be used with a text file.
     """
+    def __init__(self, fh_raw):
+        fh_raw = io.TextIOWrapper(fh_raw)
+        super(GSBTimeStampIO, self).__init__(fh_raw)
+
     def read_timestamp(self):
         """Read a single timestamp.
 
@@ -29,7 +33,7 @@ class GSBTimeStampIO(io.TextIOWrapper):
         frame : `~baseband.gsb.GSBHeader`
             With a ``.time`` property that returns the time encoded.
         """
-        return GSBHeader.fromfile(self)
+        return GSBHeader.fromfile(self.fh_raw)
 
     def write_timestamp(self, header=None, **kwargs):
         """Write a single timestamp.
@@ -43,14 +47,13 @@ class GSBTimeStampIO(io.TextIOWrapper):
         """
         if header is None:
             header = GSBHeader.fromvalues(**kwargs)
-        header.tofile(self)
+        header.tofile(self.fh_raw)
 
 
-class GSBFileReader(io.BufferedReader):
+class GSBFileReader(VLBIFileBase):
     """Simple reader for GSB data files.
 
-    Adds ``read_payload`` method to the basic binary file reader
-    :class:`~io.BufferedReader`.
+    Adds ``read_payload`` method to the basic VLBI binary file wrapper.
     """
     def read_payload(self, payloadsize, nchan=1, bps=4, complex_data=False):
         """Read a single block.
@@ -72,16 +75,15 @@ class GSBFileReader(io.BufferedReader):
         frame : `~baseband.gsb.GSBPayload`
             With a ``.data`` property that returns the data encoded.
         """
-        return GSBPayload.fromfile(self, payloadsize=payloadsize,
+        return GSBPayload.fromfile(self.fh_raw, payloadsize=payloadsize,
                                    nchan=nchan, bps=bps,
                                    complex_data=complex_data)
 
 
-class GSBFileWriter(io.BufferedWriter):
+class GSBFileWriter(VLBIFileBase):
     """Simple writer for GSB data files.
 
-    Adds ``write_payload`` method to the basic binary file writer
-    :class:`~io.BufferedWriter`.
+    Adds ``write_payload`` method to the basic VLBI binary file wrapper.
     """
     def write_payload(self, data, bps=4):
         """Write single data block.
@@ -96,7 +98,7 @@ class GSBFileWriter(io.BufferedWriter):
         """
         if not isinstance(data, GSBPayload):
             data = GSBPayload.fromdata(data, bps=bps)
-        return data.tofile(self)
+        return data.tofile(self.fh_raw)
 
 
 class GSBStreamBase(VLBIStreamBase):
@@ -140,6 +142,10 @@ class GSBStreamBase(VLBIStreamBase):
 
 
 class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
+    # TODO: right now cannot inherit from GSBFileReader, unlike for other
+    # baseband classes, since we need to access multiple files.  Can this
+    # be solved with FileWriter/FileReader classes that handle timestamps and
+    # multiple blocks, combining these into a frame?
     def __init__(self, fh_ts, fh_raw, thread_ids=None,
                  nchan=None, bps=None, complex_data=None,
                  samples_per_frame=None, payloadsize=None,
@@ -393,6 +399,8 @@ def open(name, mode='rs', **kwargs):
         :class:`~baseband.gsb.base.GSBStreamReader` or
         :class:`~baseband.gsb.base.GSBStreamWriter` instance (stream)
     """
+    # TODO: think whether the inheritance of StreamReader from FileReader
+    # can be made to work (or from TimeStampIO?).
     if not ('r' in mode or 'w' in mode):
         raise ValueError("Only support opening GSB file for reading "
                          "or writing (mode='r' or 'w').")

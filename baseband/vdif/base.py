@@ -5,8 +5,8 @@ import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
 
-from ..vlbi_base.base import (VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase)
+from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
+                              VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 
@@ -61,11 +61,11 @@ __all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
 # -> array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
 
-class VDIFFileReader(io.BufferedReader):
+class VDIFFileReader(VLBIFileBase):
     """Simple reader for VDIF files.
 
-    Adds ``read_frame`` and ``read_frameset`` methods to the basic binary
-    file reader :class:`~io.BufferedReader`.
+    Adds ``read_frame`` and ``read_frameset`` methods on top of a binary
+    file reader (which is wrapped as ``self.fh_raw``).
     """
     def read_frame(self):
         """Read a single frame (header plus payload).
@@ -77,7 +77,7 @@ class VDIFFileReader(io.BufferedReader):
             :class:`~baseband.vdif.VDIFHeader` and data encoded in the frame,
             respectively.
         """
-        return VDIFFrame.fromfile(self)
+        return VDIFFrame.fromfile(self.fh_raw)
 
     def read_frameset(self, thread_ids=None, sort=True, edv=None, verify=True):
         """Read a single frame (header plus payload).
@@ -102,8 +102,8 @@ class VDIFFileReader(io.BufferedReader):
             :class:`~baseband.vdif.VDIFHeaders` and the data encoded in the
             frame set, respectively.
         """
-        return VDIFFrameSet.fromfile(self, thread_ids, sort=sort, edv=edv,
-                                     verify=verify)
+        return VDIFFrameSet.fromfile(self.fh_raw, thread_ids, sort=sort,
+                                     edv=edv, verify=verify)
 
     def find_header(self, template_header=None, framesize=None, edv=None,
                     maximum=None, forward=True):
@@ -113,20 +113,19 @@ class VDIFFileReader(io.BufferedReader):
         ``template_header`` or with a header a framesize ahead.   Note that the
         latter turns out to be an unexpectedly weak check on real data!
         """
-
+        fh = self.fh_raw
         # Obtain current pointer position.
-        file_pos = self.tell()
-
+        file_pos = fh.tell()
         if template_header is not None:
             edv = template_header.edv
             # First check whether we are right at a frame marker (often true).
             try:
-                header = VDIFHeader.fromfile(self, edv=edv, verify=True)
+                header = VDIFHeader.fromfile(fh, edv=edv, verify=True)
             except(AssertionError, IOError, EOFError):
                 pass
             else:
                 if template_header.same_stream(header):
-                    self.seek(file_pos)
+                    fh.seek(file_pos)
                     return header
             # If we're not at frame marker, obtain framesize and get searching.
             framesize = template_header.framesize
@@ -135,8 +134,9 @@ class VDIFFileReader(io.BufferedReader):
             maximum = 2 * framesize
 
         # Determine file size.
-        self.seek(0, 2)
-        size = self.tell()
+        file_pos = fh.tell()
+        fh.seek(0, 2)
+        size = fh.tell()
         # Generate file pointer positions to test.
         if forward:
             iterate = range(file_pos, min(file_pos + maximum - 31,
@@ -146,9 +146,9 @@ class VDIFFileReader(io.BufferedReader):
                             max(file_pos - maximum, -1), -1)
         # Loop over chunks to try to find the frame marker.
         for frame in iterate:
-            self.seek(frame)
+            fh.seek(frame)
             try:
-                header = VDIFHeader.fromfile(self, edv=edv, verify=True)
+                header = VDIFHeader.fromfile(fh, edv=edv, verify=True)
             except AssertionError:
                 continue
 
@@ -168,30 +168,30 @@ class VDIFFileReader(io.BufferedReader):
                 # But don't bother if we already checked with a template,
                 # or if there is only one frame in the first place.
                 if template_header is not None or next_frame < 0:
-                    self.seek(frame)
+                    fh.seek(frame)
                     return header
 
-            self.seek(next_frame)
+            fh.seek(next_frame)
             try:
-                comparison = VDIFHeader.fromfile(self, edv=header.edv,
+                comparison = VDIFHeader.fromfile(fh, edv=header.edv,
                                                  verify=True)
             except AssertionError:
                 continue
 
             if comparison.same_stream(header):
-                self.seek(frame)
+                fh.seek(frame)
                 return header
 
         # Didn't find any frame.
-        self.seek(file_pos)
+        fh.seek(file_pos)
         return None
 
 
-class VDIFFileWriter(io.BufferedWriter):
+class VDIFFileWriter(VLBIFileBase):
     """Simple writer for VDIF files.
 
-    Adds ``write_frame`` and ``write_frameset`` methods to the basic binary
-    file writer :class:`~io.BufferedWriter`.
+    Adds ``write_frame`` and ``write_frameset`` methods to the basic VLBI
+    binary file wrapper.
     """
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
@@ -210,7 +210,7 @@ class VDIFFileWriter(io.BufferedWriter):
         """
         if not isinstance(data, VDIFFrame):
             data = VDIFFrame.fromdata(data, header, **kwargs)
-        return data.tofile(self)
+        return data.tofile(self.fh_raw)
 
     def write_frameset(self, data, header=None, **kwargs):
         """Write a frame set (headers plus payloads).
@@ -232,7 +232,7 @@ class VDIFFileWriter(io.BufferedWriter):
         """
         if not isinstance(data, VDIFFrameSet):
             data = VDIFFrameSet.fromdata(data, header, **kwargs)
-        return data.tofile(self)
+        return data.tofile(self.fh_raw)
 
 
 class VDIFStreamBase(VLBIStreamBase):
@@ -273,7 +273,7 @@ class VDIFStreamBase(VLBIStreamBase):
                 .format(s=self, h=self.header0))
 
 
-class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
+class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
     """VLBI VDIF format reader.
 
     This wrapper allows one to access a VDIF file as a continues series of
@@ -282,7 +282,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
     Parameters
     ----------
-    raw : `~baseband.vdif.VDIFFileReader` instance
+    fh_raw : `~baseband.vdif.VDIFFileReader` instance
         file handle of the raw VDIF stream
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
@@ -292,20 +292,23 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each channel in each thread is sampled.
     """
-    def __init__(self, raw, thread_ids=None, frames_per_second=None,
+    def __init__(self, fh_raw, thread_ids=None, frames_per_second=None,
                  sample_rate=None):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
-        header = VDIFHeader.fromfile(raw)
+        header = VDIFHeader.fromfile(fh_raw)
         # Now also read the first frameset, since we need to know how many
-        # threads there are, and what the frameset size is.
-        raw.seek(0)
-        self._frameset = raw.read_frameset(thread_ids)
+        # threads there are, and what the frameset size is. For this purpose,
+        # pre-attach the file handle (it will just get reset anyway).
+        # TODO: make this a bit less ugly. Can we not just super first?
+        fh_raw.seek(0)
+        self.fh_raw = fh_raw
+        self._frameset = self.read_frameset(thread_ids)
         if thread_ids is None:
             thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
-        self._framesetsize = raw.tell()
-        super(VDIFStreamReader, self).__init__(raw, header, thread_ids,
+        self._framesetsize = fh_raw.tell()
+        super(VDIFStreamReader, self).__init__(fh_raw, header, thread_ids,
                                                frames_per_second, sample_rate)
 
     @lazyproperty
@@ -321,7 +324,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         maximum = 2*self.nthread*self.header0.framesize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
-            header1 = self.fh_raw.find_header(
+            header1 = self.find_header(
                 template_header=self.header0,
                 maximum=maximum, forward=False)
             if header1 is None or raw_size - self.fh_raw.tell() > maximum:
@@ -395,12 +398,12 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     def _read_frame_set(self, fill_value=0.):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._framesetsize)
-        self._frameset = self.fh_raw.read_frameset(self.thread_ids,
-                                                   edv=self.header0.edv)
+        self._frameset = self.read_frameset(self.thread_ids,
+                                            edv=self.header0.edv)
         self._frameset.invalid_data_value = fill_value
 
 
-class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
+class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     """VLBI VDIF format writer.
 
     Parameters
@@ -496,7 +499,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
             sample = self.offset - offset0
             frame[sample_offset:sample_end] = data[sample:sample + nsample]
             if sample_end == self.samples_per_frame:
-                self.fh_raw.write_frameset(self._data, self._header)
+                self.write_frameset(self._data, self._header)
 
             self.offset += nsample
             count -= nsample
@@ -555,8 +558,10 @@ def open(name, mode='rs', *args, **kwargs):
         if not hasattr(name, 'write'):
             name = io.open(name, 'wb')
         try:
-            fh = VDIFFileWriter(name)
-            return fh if 'b' in mode else VDIFStreamWriter(fh, *args, **kwargs)
+            if 'b' in mode:
+                return VDIFFileWriter(name)
+            else:
+                return VDIFStreamWriter(name, *args, **kwargs)
         except Exception:
             name.close()
             raise
@@ -564,8 +569,10 @@ def open(name, mode='rs', *args, **kwargs):
         if not hasattr(name, 'read'):
             name = io.open(name, 'rb')
         try:
-            fh = VDIFFileReader(name)
-            return fh if 'b' in mode else VDIFStreamReader(fh, *args, **kwargs)
+            if 'b' in mode:
+                return VDIFFileReader(name)
+            else:
+                return VDIFStreamReader(name, *args, **kwargs)
         except Exception:
             name.close()
             raise

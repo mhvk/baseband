@@ -3,7 +3,8 @@ import io
 import numpy as np
 from astropy import units as u
 
-from ..vlbi_base.base import VLBIStreamReaderBase, VLBIStreamWriterBase
+from ..vlbi_base.base import (VLBIFileBase,
+                              VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import Mark5BHeader
 from .frame import Mark5BFrame
 
@@ -12,11 +13,10 @@ __all__ = ['Mark5BFileReader', 'Mark5BFileWriter', 'Mark5BStreamReader',
            'Mark5BStreamWriter', 'open']
 
 
-class Mark5BFileReader(io.BufferedReader):
+class Mark5BFileReader(VLBIFileBase):
     """Simple reader for Mark 5B files.
 
-    Adds ``read_frame`` and ``find_header`` methods to the basic binary file
-    reader :class:`~io.BufferedReader`.
+    Adds ``read_frame`` and ``find_header`` methods to the VLBI file wrapper.
     """
 
     def read_frame(self, ref_mjd, nchan, bps=2):
@@ -38,7 +38,7 @@ class Mark5BFileReader(io.BufferedReader):
             With ``header`` and ``data`` properties that return the
             Mark5BHeader and data encoded in the frame, respectively.
         """
-        return Mark5BFrame.fromfile(self, nchan=nchan, bps=bps,
+        return Mark5BFrame.fromfile(self.fh_raw, nchan=nchan, bps=bps,
                                     ref_mjd=ref_mjd)
 
     def find_header(self, template_header=None, kday=None, framesize=None,
@@ -48,23 +48,24 @@ class Mark5BFileReader(io.BufferedReader):
         Search is from the current position.  If given, a template_header
         is used to initialize the framesize, as well as kday in the header.
         """
+        fh = self.fh_raw
         if template_header:
             kday = template_header.kday
             framesize = template_header.framesize
         if maximum is None:
             maximum = 2 * framesize
         # Loop over chunks to try to find the frame marker.
-        file_pos = self.tell()
+        file_pos = fh.tell()
         # First check whether we are right at a frame marker (usually true).
         try:
-            header = Mark5BHeader.fromfile(self, kday=kday, verify=True)
-            self.seek(-header.size, 1)
+            header = Mark5BHeader.fromfile(fh, kday=kday, verify=True)
+            fh.seek(-header.size, 1)
             return header
         except AssertionError:
             pass
 
-        self.seek(0, 2)
-        size = self.tell()
+        fh.seek(0, 2)
+        size = fh.tell()
         if forward:
             iterate = range(file_pos, min(file_pos + maximum - 16,
                                           size - framesize))
@@ -74,8 +75,8 @@ class Mark5BFileReader(io.BufferedReader):
 
         for frame in iterate:
             try:
-                self.seek(frame)
-                header1 = Mark5BHeader.fromfile(self, kday=kday, verify=True)
+                fh.seek(frame)
+                header1 = Mark5BHeader.fromfile(fh, kday=kday, verify=True)
             except AssertionError:
                 continue
 
@@ -88,31 +89,30 @@ class Mark5BFileReader(io.BufferedReader):
                 next_frame = frame - framesize
                 # except if there is only one frame in the first place.
                 if next_frame < 0:
-                    self.seek(frame)
+                    fh.seek(frame)
                     return header1
 
-            self.seek(next_frame)
+            fh.seek(next_frame)
             try:
-                header2 = Mark5BHeader.fromfile(self, kday=kday, verify=True)
+                header2 = Mark5BHeader.fromfile(fh, kday=kday, verify=True)
             except AssertionError:
                 continue
 
             if(header2.jday == header1.jday and
                abs(header2.seconds - header1.seconds) <= 1 and
                abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
-                self.seek(frame)
+                fh.seek(frame)
                 return header1
 
         # Didn't find any frame.
-        self.seek(file_pos)
+        fh.seek(file_pos)
         return None
 
 
-class Mark5BFileWriter(io.BufferedWriter):
+class Mark5BFileWriter(VLBIFileBase):
     """Simple writer for Mark 5B files.
 
-    Adds ``write_frame`` method to the basic binary file writer
-    :class:`~io.BufferedWriter`.
+    Adds ``write_frame`` method to the VLBI binary file wrapper.
     """
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
@@ -139,10 +139,10 @@ class Mark5BFileWriter(io.BufferedWriter):
         if not isinstance(data, Mark5BFrame):
             data = Mark5BFrame.fromdata(data, header, bps=bps, valid=valid,
                                         **kwargs)
-        return data.tofile(self)
+        return data.tofile(self.fh_raw)
 
 
-class Mark5BStreamReader(VLBIStreamReaderBase):
+class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     """VLBI Mark 5B format reader.
 
     This wrapper is allows one to access a Mark 5B file as a continues series
@@ -150,7 +150,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
 
     Parameters
     ----------
-    raw : `~baseband.mark5b.base.Mark5BFileReader` instance
+    fh_raw : `~baseband.mark5b.base.Mark5BFileReader` instance
         file handle of the raw Mark 5B stream
     nchan : int
         Number of threads/channels stored in the file.
@@ -170,13 +170,16 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
 
     _frame_class = Mark5BFrame
 
-    def __init__(self, raw, nchan, bps=2, ref_mjd=None, thread_ids=None,
+    def __init__(self, fh_raw, nchan, bps=2, ref_mjd=None, thread_ids=None,
                  frames_per_second=None, sample_rate=None):
-        self._frame = raw.read_frame(ref_mjd=ref_mjd, nchan=nchan, bps=bps)
+        # Pre-set fh_raw, so FileReader methods work
+        # TODO: move this to StreamReaderBase?
+        self.fh_raw = fh_raw
+        self._frame = self.read_frame(ref_mjd=ref_mjd, nchan=nchan, bps=bps)
         self._frame_data = None
         header = self._frame.header
         super(Mark5BStreamReader, self).__init__(
-            raw, header0=header, nchan=nchan, bps=bps, complex_data=False,
+            fh_raw, header0=header, nchan=nchan, bps=bps, complex_data=False,
             thread_ids=thread_ids,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
@@ -247,13 +250,13 @@ class Mark5BStreamReader(VLBIStreamReaderBase):
     def _read_frame(self):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
-        self._frame = self.fh_raw.read_frame(ref_mjd=self.header0.kday,
-                                             nchan=self.nchan, bps=self.bps)
+        self._frame = self.read_frame(ref_mjd=self.header0.kday,
+                                      nchan=self.nchan, bps=self.bps)
         # Convert payloads to data array.
         self._frame_data = self._frame.data
 
 
-class Mark5BStreamWriter(VLBIStreamWriterBase):
+class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
     """VLBI Mark 5B format writer.
 
     Parameters
@@ -328,8 +331,8 @@ class Mark5BStreamWriter(VLBIStreamWriterBase):
             sample = self.offset - offset0
             frame[sample_offset:sample_end] = data[sample:sample + nsample]
             if sample_end == self.samples_per_frame:
-                self.fh_raw.write_frame(self._data, self._header,
-                                        bps=self.bps, valid=self._valid)
+                self.write_frame(self._data, self._header,
+                                 bps=self.bps, valid=self._valid)
                 self._valid = True
 
             self.offset += nsample
@@ -400,13 +403,17 @@ def open(name, mode='rs', **kwargs):
     if 'w' in mode:
         if not hasattr(name, 'write'):
             name = io.open(name, 'wb')
-        fh = Mark5BFileWriter(name)
-        return fh if 'b' in mode else Mark5BStreamWriter(fh, **kwargs)
+        if 'b' in mode:
+            return Mark5BFileWriter(name)
+        else:
+            return Mark5BStreamWriter(name, **kwargs)
     elif 'r' in mode:
         if not hasattr(name, 'read'):
             name = io.open(name, 'rb')
-        fh = Mark5BFileReader(name)
-        return fh if 'b' in mode else Mark5BStreamReader(fh, **kwargs)
+        if 'b' in mode:
+            return Mark5BFileReader(name)
+        else:
+            return Mark5BStreamReader(name, **kwargs)
     else:
         raise ValueError("Only support opening Mark 5B file for reading "
                          "or writing (mode='r' or 'w').")
