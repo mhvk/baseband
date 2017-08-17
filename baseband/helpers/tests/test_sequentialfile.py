@@ -45,8 +45,15 @@ class TestSequentialFileReader(object):
         assert fh.seekable()
         assert not fh.writable()
         assert not fh.closed
+        assert repr(fh).startswith('SequentialFileReader(files=')
         fh.close()
         assert fh.closed
+        with pytest.raises(ValueError):
+            # wrong mode: no r or w
+            sf.open(self.files, 'b')
+        with pytest.raises(TypeError):
+            # cannot pass in file_size for reading
+            sf.open(self.files, 'rb', file_size=10)
 
     def test_context(self):
         with sf.open(self.files) as fh:
@@ -63,6 +70,8 @@ class TestSequentialFileReader(object):
             assert fh.size == self.size
             assert fh._file_sizes == self.sizes
             assert fh._file_offsets == self.offsets
+            with pytest.raises(AttributeError):
+                fh.bla
 
     def test_seek(self):
         with sf.open(self.files) as fh:
@@ -143,7 +152,7 @@ class TestSequentialFileReader(object):
                 fh.memmap(offset=7, shape=(5,))
             offset = self.offsets[1]
             fh.seek(offset)
-            mm = fh.memmap(shape=(5,))
+            mm = fh.memmap(shape=5)
             assert (mm == self.uint8_data[offset:offset+5]).all()
             fh.seek(-2, 2)
             mm = fh.memmap()

@@ -401,42 +401,63 @@ def open(name, mode='rs', **kwargs):
     """
     # TODO: think whether the inheritance of StreamReader from FileReader
     # can be made to work (or from TimeStampIO?).
+    # TODO: this partially replicates the default opener in vlbi_base;
+    # can some parts be factored out?
     if not ('r' in mode or 'w' in mode):
         raise ValueError("Only support opening GSB file for reading "
                          "or writing (mode='r' or 'w').")
+    fh_attr = 'read' if 'r' in mode else 'write'
+    if 't' in mode or 'b' in mode:
+        if kwargs:
+            raise TypeError('got unexpected arguments {}'.format(kwargs.keys()))
 
-    if 't' in mode:
-        if not hasattr(name, 'read' if 'r' in mode else 'write'):
-            name = io.open(name, mode.replace('t', '')+'b')
+        opened_files = []
+        if not hasattr(name, fh_attr):
+            name = io.open(name, mode.replace('t', '').replace('b', '')+'b')
+            opened_files = [name]
         elif isinstance(name, io.TextIOBase):
-            raise TypeError("Only binary file handles can be used as buffer "
-                            "for timestamp files.")
-        return GSBTimeStampIO(name)
-
-    if 'b' in mode:
-        if 'w' in mode:
-            if not hasattr(name, 'write'):
-                name = io.open(name, 'wb')
-            return GSBFileWriter(name)
+            raise TypeError("Only binary file handles can be used (even for "
+                            "for timestamp files).")
+        if 't' in mode:
+            cls = GSBTimeStampIO
         else:
-            if not hasattr(name, 'read'):
-                name = io.open(name, 'rb')
-            return GSBFileReader(name)
+            cls = GSBFileWriter if 'w' in mode else GSBFileReader
+    else:
+        # stream mode.
+        name = open(name, mode.replace('s', '') + 't')
+        opened_files = [name]
+        # Single or multiple files.
+        raw = kwargs.pop('raw')
+        if not isinstance(raw, (list, tuple)):
+            if hasattr(raw, fh_attr):
+                fh_raw = raw
+            else:
+                fh_raw = io.open(raw, mode.replace('s', '')+'b')
+                opened_files.append(raw)
+        else:
+            if not isinstance(raw[0], (list, tuple)):
+                raw = (raw,)
+            fh_raw = []
+            for pol in raw:
+                raw_pol = []
+                for p in pol:
+                    if hasattr(p, fh_attr):
+                        raw_pol.append(p)
+                    else:
+                        raw_pol.append(io.open(p, mode.replace('s', '') + 'b'))
+                        opened_files.append(p)
+                fh_raw.append(raw_pol)
 
-    # stream mode.
-    fh_ts = open(name, mode.replace('s', '') + 't')
-    # Single of multiple files.
-    raw = kwargs.pop('raw')
-    if not isinstance(raw, (list, tuple)):
-        fh_raw = (raw if hasattr(raw, 'read' if 'r' in mode else 'write')
-                  else io.open(raw, mode.replace('s', '')+'b'))
-    else:
-        if not isinstance(raw[0], (list, tuple)):
-            raw = (raw,)
-        fh_raw = tuple(tuple((p if hasattr(p, 'read' if 'r' in mode else 'w')
-                              else open(p, mode.replace('s', '') + 'b'))
-                             for p in pol) for pol in raw)
-    if 'w' in mode:
-        return GSBStreamWriter(fh_ts, fh_raw, **kwargs)
-    else:
-        return GSBStreamReader(fh_ts, fh_raw, **kwargs)
+        kwargs['fh_raw'] = fh_raw
+        cls = GSBStreamWriter if 'w' in mode else GSBStreamReader
+
+    try:
+        return cls(name, **kwargs)
+    except Exception as exc:
+        if opened_files:
+            try:
+                for name in opened_files:
+                    name.close()
+            except Exception:  # pragma: no cover
+                pass
+        raise exc

@@ -1,11 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE.rst
-import io
-
 import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
 
-from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
+from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
@@ -505,77 +503,37 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
             count -= nsample
 
 
-def open(name, mode='rs', *args, **kwargs):
-    """Open VLBI VDIF format file for reading or writing.
+open = make_opener('VDIF', globals(), doc="""
+--- For reading : (see :class:`VDIFStreamReader`)
 
-    Opened as a binary file, one gets a standard file handle, but with
-    methods to read/write a frame or frameset.  Opened as a stream, the file
-    handler is wrapped, allowing access to it as a series of samples.
+thread_ids : list of int, optional
+    Specific threads to read.  By default, all threads are read.
+frames_per_second : int
+    Needed to calculate timestamps. If not given, will be inferred from
+    ``sample_rate``, EDV bandwidth, or by scanning the file.
+sample_rate : `~astropy.units.Quantity`, optional
+    Rate at which each channel in each thread is sampled.
 
-    Parameters
-    ----------
-    name : str
-        File name
-    mode : {'rb', 'wb', 'rs', or 'ws'}, optional
-        Whether to open for reading or writing, and as a regular binary file
-        or as a stream (default is reading a stream).
-    **kwargs :
-        Additional arguments when opening the file as a stream
+--- For writing : (see :class:`VDIFStreamWriter`)
 
-    --- For reading : (see :class:`VDIFStreamReader`)
+nthread : int
+    Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
+frames_per_second : int, optional
+    Needed to calculate timestamps. Can also give ``sample_rate``.
+    Only needed if the EDV does not have bandwidth information.
+sample_rate : `~astropy.units.Quantity`, optional
+    Rate at which each channel in each thread is sampled.
+header : `~baseband.vdif.VDIFHeader`, optional
+    Header for the first frame, holding time information, etc.
+**kwargs
+    If the header is not given, an attempt will be made to construct one
+    with any further keyword arguments.  See :class:`VDIFStreamWriter`.
 
-    thread_ids : list of int, optional
-        Specific threads to read.  By default, all threads are read.
-    frames_per_second : int
-        Needed to calculate timestamps. If not given, will be inferred from
-        ``sample_rate``, EDV bandwidth, or by scanning the file.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each channel in each thread is sampled.
-
-    --- For writing : (see :class:`VDIFStreamWriter`)
-
-    nthread : int
-        Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
-    frames_per_second : int, optional
-        Needed to calculate timestamps. Can also give ``sample_rate``.
-        Only needed if the EDV does not have bandwidth information.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each channel in each thread is sampled.
-    header : `~baseband.vdif.VDIFHeader`, optional
-        Header for the first frame, holding time information, etc.
-    **kwargs
-        If the header is not given, an attempt will be made to construct one
-        with any further keyword arguments.  See :class:`VDIFStreamWriter`.
-
-    Returns
-    -------
-    Filehandle
-        A :class:`VDIFFileReader` or :class:`VDIFFileWriter` instance (binary),
-        or a :class:`VDIFStreamReader` or :class:`VDIFStreamWriter` instance
-        (stream).
-    """
-    if 'w' in mode:
-        if not hasattr(name, 'write'):
-            name = io.open(name, 'wb')
-        try:
-            if 'b' in mode:
-                return VDIFFileWriter(name)
-            else:
-                return VDIFStreamWriter(name, *args, **kwargs)
-        except Exception:
-            name.close()
-            raise
-    elif 'r' in mode:
-        if not hasattr(name, 'read'):
-            name = io.open(name, 'rb')
-        try:
-            if 'b' in mode:
-                return VDIFFileReader(name)
-            else:
-                return VDIFStreamReader(name, *args, **kwargs)
-        except Exception:
-            name.close()
-            raise
-    else:
-        raise ValueError("Only support opening VDIF file for reading "
-                         "or writing (mode='r' or 'w').")
+Returns
+-------
+Filehandle
+    :class:`~baseband.vdif.base.VDIFFileReader` or
+    :class:`~baseband.vdif.base.VDIFFileWriter` instance (binary), or
+    :class:`~baseband.vdif.base.VDIFStreamReader` or
+    :class:`~baseband.vdif.base.VDIFStreamWriter` instance (stream).
+""")
