@@ -38,7 +38,9 @@ class VDIFFrame(VLBIFrameBase):
         (e.g., that channel information and whether or not data are complex
         are consistent between header and data).  Default: `True`
 
-    The Frame can also be read instantiated using class methods:
+    Notes
+    -----
+    The Frame can also be instantiated using class methods:
 
       fromfile : read header and payload from a filehandle
 

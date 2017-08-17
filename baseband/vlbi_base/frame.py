@@ -30,7 +30,6 @@ class VLBIFrameBase(object):
 
     Notes
     -----
-
     The Frame can also be instantiated using class methods:
 
       fromfile : read header and payload from a filehandle
