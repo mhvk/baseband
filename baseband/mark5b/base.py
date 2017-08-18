@@ -277,7 +277,7 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
         If no header is give, an attempt is made to construct the header from
         these.  For a standard header, the following suffices.
 
-    --- Header keywords : (see :meth:`~baseband.mark5b.Mark5BHeader.fromvalues`)
+    --- Header kwargs : (see :meth:`~baseband.mark5b.Mark5BHeader.fromvalues`)
 
     time : `~astropy.time.Time` instance
         Sets bcd-encoded unit day, hour, minute, second, and fraction, as

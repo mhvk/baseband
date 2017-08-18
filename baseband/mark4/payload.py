@@ -90,6 +90,7 @@ def init_luts():
                                  (b >> m & 1)]
     return lut1bit, lut2bit1, lut2bit2, lut2bit3
 
+
 lut1bit, lut2bit1, lut2bit2, lut2bit3 = init_luts()
 
 # Look-up table for the number of bits in a byte.

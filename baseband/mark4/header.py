@@ -16,7 +16,7 @@ from astropy.extern import six
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase
 from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
 
-__all__ = ['CRC12', 'crc12', 'stream2words', 'words2stream', 
+__all__ = ['CRC12', 'crc12', 'stream2words', 'words2stream',
            'Mark4TrackHeader', 'Mark4Header']
 
 

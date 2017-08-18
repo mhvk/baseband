@@ -155,7 +155,8 @@ class Mark4FileReader(VLBIFileBase):
         offset = self.find_frame(ntrack, maximum, forward)
         if offset is None:
             return None
-        header = Mark4Header.fromfile(self.fh_raw, ntrack=ntrack, decade=decade)
+        header = Mark4Header.fromfile(self.fh_raw, ntrack=ntrack,
+                                      decade=decade)
         self.fh_raw.seek(offset)
         return header
 

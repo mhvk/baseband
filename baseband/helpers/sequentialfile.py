@@ -10,6 +10,7 @@ from astropy.utils import lazyproperty
 
 __all__ = ['SequentialFileReader', 'SequentialFileWriter', 'open']
 
+
 class SequentialFileBase(object):
     """Deal with several files as if they were one contiguous one.
 

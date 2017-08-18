@@ -281,7 +281,7 @@ class VLBIHeaderBase(object):
 
     def __init__(self, words, verify=True):
         if words is None:
-            self.words = [0,] * (self._struct.size // 4)
+            self.words = [0] * (self._struct.size // 4)
         else:
             self.words = words
         if verify:

@@ -1,4 +1,3 @@
-import warnings
 import numpy as np
 
 __all__ = ['bcd_decode', 'bcd_encode', 'CRC']

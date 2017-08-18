@@ -1,5 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE.rst
-
 """
 Reading and writing VLBI and other radio baseband files.
 
