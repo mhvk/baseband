@@ -81,11 +81,15 @@ class DADAPayload(VLBIPayloadBase):
                                                     payloadsize=payloadsize,
                                                     **kwargs)
 
-        mode = fh.mode.replace('b', '')
-        offset = fh.tell()
-        words = np.memmap(fh, mode=mode, dtype=cls._dtype_word, offset=offset,
-                          shape=(None if payloadsize is None else
-                                 (payloadsize // cls._dtype_word.itemsize,)))
-        self = cls(words, header=header, **kwargs)
-        fh.seek(offset + self.size)
-        return self
+        if hasattr(fh, 'memmap'):
+            words = fh.memmap(dtype=cls._dtype_word,
+                              shape=None if payloadsize is None else
+                              (payloadsize // cls._dtype_word.itemsize,))
+        else:
+            mode = fh.mode.replace('b', '')
+            offset = fh.tell()
+            words = np.memmap(fh, mode=mode, dtype=cls._dtype_word,
+                              offset=offset, shape=None if payloadsize is None
+                              else (payloadsize // cls._dtype_word.itemsize,))
+            fh.seek(offset + words.size * words.dtype.itemsize)
+        return cls(words, header=header, **kwargs)

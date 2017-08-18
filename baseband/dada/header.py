@@ -167,12 +167,10 @@ class DADAHeader(OrderedDict):
         verify: bool
             Whether to do basic checks on whether the header is valid.
         """
-        if fh.tell() > 0:
-            raise ValueError("DADA header should be at the start of a file.")
-
+        start_pos = fh.tell()
         hdr_size = 4096
         lines = []
-        while fh.tell() < hdr_size:
+        while fh.tell() - start_pos < hdr_size:
             line = fh.readline().decode('ascii')
             if line == '' or line[0] == '#' and 'end of header' in line:
                 break
@@ -182,11 +180,11 @@ class DADAHeader(OrderedDict):
 
             lines.append(line)
 
-        if fh.tell() > hdr_size:
+        if fh.tell() - start_pos > hdr_size:
             warnings.warn("Odd, read {0} bytes while the header size is {1}"
                           .format(fh.tell(), hdr_size))
         else:
-            fh.seek(hdr_size)
+            fh.seek(start_pos + hdr_size)
 
         return cls(cls._fromlines(lines), verify=verify, mutable=False)
 
@@ -194,10 +192,10 @@ class DADAHeader(OrderedDict):
         """Write DADA file header to filehandle.
 
         Parts of the header beyond the ascii lines are filled with 0x00.
-        Note that file should be at the start.
+        Note that file should in principle be at the start, but we don't check
+        for that since that would break SequentialFileWriter.
         """
-        if fh.tell() > 0:
-            raise ValueError("should write header at start of file.")
+        start_pos = fh.tell()
         with io.BytesIO() as s:
             for line in self._tolines():
                 s.write((line + '\n').encode('ascii'))
@@ -210,7 +208,7 @@ class DADAHeader(OrderedDict):
             fh.write(s.read())
             if extra:
                 fh.write(b'\00' * extra)
-            assert fh.tell() == self.size
+            assert fh.tell() - start_pos == self.size
 
     @classmethod
     def fromkeys(cls, *args, **kwargs):

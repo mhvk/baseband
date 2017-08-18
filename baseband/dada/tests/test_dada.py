@@ -49,21 +49,11 @@ class TestDADA(object):
             assert header2 == header
             assert header2.mutable is False
             assert s.tell() == header.size
-            # headers should be at the start of a file.
-            with pytest.raises(ValueError):
-                dada.DADAHeader.fromfile(s)
 
         with io.BytesIO() as s:
-            s.write(b'         ')
-            with pytest.raises(ValueError):
-                header.tofile(s)
-            s.seek(0)
-            # check it does write fine if we go back to start.
-            header.tofile(s)
             # now create header with wrong HDR_SIZE in file
             bad_header = header.copy()
             bad_header['HDR_SIZE'] = 1000
-            s.seek(0)
             with pytest.raises(ValueError):
                 bad_header.tofile(s)
             # now write header explicitly, skipping the check in tofile,
@@ -280,7 +270,7 @@ class TestDADA(object):
                           (time0 + 10002 / (16*u.MHz))) < 1. * u.ns
             fh.seek(fh.time0 + 1000 / (16*u.MHz))
             assert fh.tell() == 1000
-            assert fh.header1 is fh.header0
+            assert fh.header1 == fh.header0
             assert np.abs(fh.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         assert record1.shape == (12, 2)
@@ -420,19 +410,24 @@ class TestDADA(object):
         with pytest.raises(KeyError):
             dada.open(template, 'rs')
 
-        name0 = template.format(utc_start=header['UTC_START'],
-                                obs_offset=header['OBS_OFFSET'])
-        with dada.open(name0, 'rs', template=template) as fr:
-            assert fr.tell(unit='time') == time0
+        kwargs = dict(UTC_START=header['UTC_START'],
+                      OBS_OFFSET=header['OBS_OFFSET'] +
+                      3 * header.payloadsize,
+                      FILE_SIZE=header['FILE_SIZE'])
+        with dada.open(template, 'rs', **kwargs) as fr:
+            assert np.abs(fr.tell(unit='time') -
+                          (time0 + 6000 / (16.*u.MHz))) < 1.*u.ns
             data2 = fr.read()
             assert fr.tell(unit='time') == fr.time1
             assert np.abs(fr.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
-        assert np.all(data2 == data)
+        assert np.all(data2 == data[6000:])
+
         # just to check internal checks are OK.
-        with pytest.raises(TypeError):
-            dada.open(name0, 'rs', files=(name0,), template=template)
         with pytest.raises(ValueError):
-            dada.open(name0, 's')
+            dada.open(name3, 's')
+        with pytest.raises(TypeError):
+            # extraneous argument
+            dada.open(name3, 'rs', files=(name3,))
 
 
 class TestDADAFileNameSequencer(object):

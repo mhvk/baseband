@@ -7,6 +7,7 @@ import numpy as np
 from astropy.extern import six
 from astropy.utils import lazyproperty
 
+from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import DADAHeader
@@ -192,8 +193,7 @@ class DADAStreamBase(VLBIStreamBase):
         :class:`~baseband.dada.base.DADAFileNameSequencer`.
     """
 
-    def __init__(self, fh_raw, header0, thread_ids=None, files=None,
-                 template=None):
+    def __init__(self, fh_raw, header0, thread_ids=None):
         frames_per_second = (1. / (header0['TSAMP'] * 1e-6) /
                              header0.samples_per_frame)
         if thread_ids is None:
@@ -204,23 +204,10 @@ class DADAStreamBase(VLBIStreamBase):
             thread_ids=thread_ids,
             samples_per_frame=header0.samples_per_frame,
             frames_per_second=frames_per_second)
-        if files and template:
-            raise TypeError('cannot pass in both template and file list.')
-
-        if template:
-            self.files = DADAFileNameSequencer(template, header0)
-        else:
-            self.files = files
-        self._frame_nr = None
 
     def _frame_info(self):
         """Convert offset to file number and offset into that file."""
         return divmod(self.offset, self.samples_per_frame)
-
-    def _open_file(self, frame_nr, mode):
-        if self.fh_raw:
-            self.fh_raw.close()
-        self.fh_raw = io.open(self.files[frame_nr], mode)
 
     def _unsqueeze(self, data):
         if data.ndim < 3 and self.nthread == 1:
@@ -242,32 +229,18 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         file handle of the (first) raw DADA stream.
     thread_ids : list of int, optional
         Specific threads to read.  By default, all threads are read.
-    files : list or tuple of str, optional
-        Should contain the names of all files of a given observation,
-        in time-order.
-    template : str, optional
-        A template string that can be formatted using 'frame_nr', 'obs_offset',
-        and other header keywords.  Many series of dada files can be read with
-        something like '2013-07-02-01:37:40_{obs_offset:016d}.000000.dada'.
-        For details, see :class:`~baseband.dada.base.DADAFileNameSequencer`.
     """
-    def __init__(self, fh_raw, thread_ids=None, files=None, template=None):
+    def __init__(self, fh_raw, thread_ids=None):
         header = DADAHeader.fromfile(fh_raw)
-        super(DADAStreamReader, self).__init__(fh_raw, header, thread_ids,
-                                               files=files, template=template)
-        if self.files is None:
-            self._frame = DADAFrame(header, DADAPayload.fromfile(fh_raw, header,
-                                                                 memmap=True))
-            self._frame_nr = 0
-        else:
-            self._get_frame(0)
+        super(DADAStreamReader, self).__init__(fh_raw, header, thread_ids)
+        self._get_frame(0)
 
     @lazyproperty
     def header1(self):
         """Header of the last file for this stream."""
-        if self.files:
-            self._get_frame(len(self.files) - 1)
-        return self._frame.header
+        self.fh_raw.seek(-self.header0.framesize, 2)
+        frame1 = self.read_frame(memmap=True)
+        return frame1.header
 
     def read(self, count=None, squeeze=True, out=None):
         """Read count samples.
@@ -325,8 +298,9 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         return out
 
     def _get_frame(self, frame_nr):
-        self._open_file(frame_nr, 'rb')
+        self.fh_raw.seek(frame_nr * self.header0.framesize)
         self._frame = self.read_frame(memmap=True)
+        self._frame_nr = frame_nr
         assert (self._frame.header['OBS_OFFSET'] ==
                 self.header0['OBS_OFFSET'] + frame_nr *
                 self.header0.payloadsize)
@@ -340,54 +314,14 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
     raw : filehandle
         For writing the header and raw data.  This can be `None` if ``files``
         or ``template`` is passed in.
-    header : :class:`~baseband.dada.DADAHeader`, optional
+    header : :class:`~baseband.dada.DADAHeader`
         Header for the file, holding time information, etc.
-    files : list or tuple of str, optional
-        Should contain the names of all files to be used to write the data,
-        in time-order.
-    template : str, optional
-        A template string that can be formatted using 'frame_nr', 'obs_offset',
-        and other header keywords.  To reproduce what is used by some other
-        implementations, use '{utc_start}_{obs_offset:016d}.000000.dada'.
-        For details, see :class:`~baseband.dada.base.DADAFileNameSequencer`.
-    **kwargs
-        Used to construct a header if none is passed in explicitly.
-        For a standard header, this would include the following.
-
-    --- Header keywords : (see :meth:`~baseband.dada.DADAHeader.fromvalues`)
-
-    time : `~astropy.time.Time`
-        The start time of this file.
-    offset : `~astropy.units.Quantity`
-        A possible time offset from the start of the whole observation.
-    npol : int, optional
-        Number of polarizations (and thus threads; default 1).
-    nchan : int, optional
-        Number of FFT channels within stream (default 1).
-        Note: that different # of channels per thread is not supported.
-    complex_data : bool
-        Whether data is complex
-    bps : int
-        Bits per sample (or real, imaginary component).
-    samples_per_frame : int
-        Number of complete samples in a given frame.
-    bandwidth : `~astropy.units.Quantity`
-        Bandwidth spanned by the data.  Used to infer the sample rate and
-        thus to calculate times.
     """
-    def __init__(self, raw, header=None, files=None, template=None, **kwargs):
-        if header is None:
-            if 'nthread' in kwargs:
-                kwargs.setdefault('npol', kwargs.pop('nthread'))
-            header = DADAHeader.fromvalues(**kwargs)
+    def __init__(self, fh_raw, header):
         assert header.get('OBS_OVERLAP', 0) == 0
-        super(DADAStreamWriter, self).__init__(raw, header, files=files,
-                                               template=template)
-        if self.files is None:
-            self._frame = self.memmap_frame(header)
-            self._frame_nr = 0
-        else:
-            self._get_frame(0)
+        super(DADAStreamWriter, self).__init__(fh_raw, header)
+        self._frame = self.memmap_frame(header)
+        self._frame_nr = 0
 
     def write(self, data, squeezed=True, invalid_data=False):
         """Write data, using multiple files as needed.
@@ -434,8 +368,6 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
             count -= nsample
 
     def _get_frame(self, frame_nr):
-        self._open_file(frame_nr, 'w+b')
-        # set up header for new frame.
         header = self.header0.copy()
         header.update(obs_offset=self.header0['OBS_OFFSET'] +
                       frame_nr * self.header0.payloadsize)
@@ -460,6 +392,27 @@ header : `~baseband.dada.DADAHeader`, optional
     with any further keyword arguments.  See
     :class:`~baseband.dada.base.DADAStreamWriter`.
 
+--- Header keywords : (see :meth:`~baseband.dada.DADAHeader.fromvalues`)
+
+time : `~astropy.time.Time`
+    The start time of this file.
+offset : `~astropy.units.Quantity`
+    A possible time offset from the start of the whole observation.
+npol : int, optional
+    Number of polarizations (and thus threads; default 1).
+nchan : int, optional
+    Number of FFT channels within stream (default 1).
+    Note: that different # of channels per thread is not supported.
+complex_data : bool
+    Whether data is complex
+bps : int
+    Bits per sample (or real, imaginary component).
+samples_per_frame : int
+    Number of complete samples in a given frame.
+bandwidth : `~astropy.units.Quantity`
+    Bandwidth spanned by the data.  Used to infer the sample rate and
+    thus to calculate times.
+
 Returns
 -------
 Filehandle
@@ -471,26 +424,52 @@ Filehandle
 
 
 # Need to wrap the opener to be able to deal with file lists or templates.
-def open(name, mode='rs', **kwargs):
+# TODO: move this up to the opener??
+def open(name, mode='rs', thread_ids=None, header=None, **kwargs):
+    is_template = isinstance(name, six.string_types) and ('{' in name and
+                                                          '}' in name)
+    is_sequence = isinstance(name, (tuple, list))
+
     if 'b' not in mode:
-        if isinstance(name, (tuple, list)):
-            kwargs['files'] = name
-            name = name[0]
-        elif isinstance(name, six.string_types) and ('{' in name and
-                                                     '}' in name):
-            kwargs['template'] = name
+        if header is None:
             if 'w' in mode:
-                return DADAStreamWriter(None, **kwargs)
-            try:
-                name = name.format(frame_nr=0, file_nr=0, obs_offset=0)
-            except KeyError:
-                raise KeyError(
-                    "For reading, a template for file names can only contain "
-                    "'file_nr', 'frame_nr', or 'obs_offset', since the header "
-                    "is not available for the first file. One can pass in a "
-                    "full file name and use 'template={0}'".format(name))
+                # For writing a header is required.
+                if 'nthread' in kwargs:
+                    kwargs.setdefault('npol', kwargs.pop('nthread'))
+                header = DADAHeader.fromvalues(**kwargs)
+                kwargs = {}
+
+            elif is_template and 'OBS_OFFSET' in name or 'obs_offset' in name:
+                # for reading try reading header from first file if needed.
+                # we make a temporary file sequencer for this, as the real one
+                # will need the header file size.
+                kwargs = {key.upper(): value for key, value in kwargs.items()}
+                for key in ('FILE_NR', 'FRAME_NR', 'OBS_OFFSET', 'FILE_SIZE'):
+                    kwargs.setdefault(key, 0)
+                first_file = (DADAFileNameSequencer(name, kwargs)
+                              [kwargs['FRAME_NR']])
+                with io.open(first_file, 'rb') as fh:
+                    header = DADAHeader.fromfile(fh)
+                kwargs = {}
+            else:
+                header = {}
+
+        if is_template:
+            name = DADAFileNameSequencer(name, header)
+
+        if is_template or is_sequence:
+            if 'r' in mode:
+                name = sf.open(name, 'rb')
+            else:
+                name = sf.open(name, 'w+b', file_size=header.framesize)
+
+        if header and 'w' in mode:
+            kwargs['header'] = header
+        if thread_ids and 'r' in mode:
+            kwargs['thread_ids'] = thread_ids
 
     return opener(name, mode, **kwargs)
+
 
 open.__doc__ = opener.__doc__ + """\n
 Notes
@@ -508,5 +487,5 @@ have to pass in the date explicitly, since the template is used to get the
 first file name, before any header is read, and therefore the only keywords
 available are 'frame_nr', 'file_nr', and 'obs_offset', all of which are
 assumed to be zero for the first file. To avoid this restriction, pass in
-the first file name directly, and use the ``template`` keyword argument.
+keyword arguments with values appropriate for the first file.
 """
