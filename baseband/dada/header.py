@@ -48,7 +48,8 @@ class DADAHeader(OrderedDict):
 
     or, to also keep the comments::
 
-        DADAHeader(((key, (header[key], header.comments[key])) for key in header))
+        DADAHeader(((key, (header[key], header.comments[key]))
+                   for key in header))
     """
 
     _properties = ('payloadsize', 'framesize', 'bps', 'complex_data',

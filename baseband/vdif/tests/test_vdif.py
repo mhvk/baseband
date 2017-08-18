@@ -129,11 +129,11 @@ class TestVDIF(object):
         # Working header with nonsense data in the last two words.
         class VDIFHeaderX(vdif.header.VDIFSampleRateHeader):
             _edv = 0x58
-            _header_parser = vdif.header.VDIFSampleRateHeader._header_parser +\
-                vlbi_base.header.HeaderParser(
-                                    (('nonsense_0', (6, 0, 32, 0x0)),
-                                     ('nonsense_1', (7, 0, 8, None)),
-                                     ('nonsense_2', (7, 8, 24, 0x1))))
+            _header_parser = (vdif.header.VDIFSampleRateHeader._header_parser +
+                              vlbi_base.header.HeaderParser(
+                                  (('nonsense_0', (6, 0, 32, 0x0)),
+                                   ('nonsense_1', (7, 0, 8, None)),
+                                   ('nonsense_2', (7, 8, 24, 0x1)))))
 
             def verify(self):
                 super(VDIFHeaderX, self).verify()
@@ -524,7 +524,7 @@ class TestVDIF(object):
         vdif_file = str(tmpdir.join('simple.vdif'))
         # try writing a very simple file, using edv=0
         data = np.ones((16, 2, 2))
-        data[5,0,0] = data[6,1,1] = -1.
+        data[5, 0, 0] = data[6, 1, 1] = -1.
         header = vdif.VDIFHeader.fromvalues(
             edv=0, time=Time('2010-01-01'), nchan=2, bps=2,
             complex_data=False, frame_nr=0, thread_id=0, samples_per_frame=16,

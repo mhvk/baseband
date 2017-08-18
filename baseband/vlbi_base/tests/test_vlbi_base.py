@@ -108,11 +108,11 @@ class TestVLBIBase(object):
 
     def test_header_basics(self):
         header = self.Header(None)
-        assert header.words == [0,] * 4
+        assert header.words == [0] * 4
         with pytest.raises(Exception):
-            self.Header([1,]*5)
+            self.Header([1]*5)
         with pytest.raises(Exception):
-            self.Header([1,]*3)
+            self.Header([1]*3)
         header = self.header.copy()
         assert header == self.header
         assert header is not self.header
@@ -170,7 +170,7 @@ class TestVLBIBase(object):
         header['x2_0_64'] = None
         assert header.words[2:] == [0, 1]
         # Also check update method.
-        header.update(x1_0_32=0x5678, x2_0_64= 1)
+        header.update(x1_0_32=0x5678, x2_0_64=1)
         assert header.words == [0x923f5678, 0x5678, 1, 0]
         with catch_warnings(UserWarning) as w:
             header.update(bla=10)

@@ -273,9 +273,10 @@ def make_opener(fmt, classes, doc='', append_doc=True):
         than override it.
     """
     module = classes.get('__name__', None)
-    classes = {cls_type : classes[fmt + cls_type]
+    classes = {cls_type: classes[fmt + cls_type]
                for cls_type in ('FileReader', 'FileWriter',
                                 'StreamReader', 'StreamWriter')}
+
     def open(name, mode='rs', **kwargs):
         if 'b' in mode:
             cls_type = 'File'

@@ -38,6 +38,7 @@ def init_luts():
     lut4bit = decoder_levels[4][(b >> i) & 0xf]
     return lut1bit, lut2bit, lut4bit
 
+
 lut1bit, lut2bit, lut4bit = init_luts()
 
 

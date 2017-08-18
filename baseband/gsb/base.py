@@ -409,7 +409,8 @@ def open(name, mode='rs', **kwargs):
     fh_attr = 'read' if 'r' in mode else 'write'
     if 't' in mode or 'b' in mode:
         if kwargs:
-            raise TypeError('got unexpected arguments {}'.format(kwargs.keys()))
+            raise TypeError('got unexpected arguments {}'
+                            .format(kwargs.keys()))
 
         opened_files = []
         if not hasattr(name, fh_attr):

@@ -62,6 +62,7 @@ def init_luts():
     lut2bit = decoder_levels[2][l]
     return lut1bit, lut2bit
 
+
 lut1bit, lut2bit = init_luts()
 
 
@@ -85,6 +86,7 @@ def encode_2bit(values):
     reorder.take(bitvalues, out=bitvalues)
     bitvalues <<= shift2bit
     return np.bitwise_or.reduce(bitvalues, axis=-1)
+
 
 encode_2bit.__doc__ = encode_2bit_base.__doc__
 
