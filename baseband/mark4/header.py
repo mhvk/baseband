@@ -4,8 +4,11 @@ Definitions for VLBI Mark 4 Headers.
 Implements a Mark4Header class used to store header words, and decode/encode
 the information therein.
 
-For the specification, see
+For the specification of tape Mark 4 format, see
 http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+
+A little bit on the disk representation is at
+http://adsabs.harvard.edu/abs/2003ASPC..306..123W
 """
 from __future__ import absolute_import, division, print_function
 
@@ -245,8 +248,8 @@ class Mark4Header(Mark4TrackHeader):
 
     _track_header = Mark4TrackHeader
     _properties = (Mark4TrackHeader._properties +
-                   ('ntrack', 'framesize', 'payloadsize', 'fanout',
-                    'samples_per_frame', 'bps', 'converters', 'nchan'))
+                   ('fanout', 'samples_per_frame', 'bps', 'converters',
+                    'nchan'))
     _dtypes = MARK4_DTYPES
 
     # keyed with bps, fanout; Tables 10-14 in reference documentation:
@@ -404,8 +407,13 @@ class Mark4Header(Mark4TrackHeader):
             with ``ntrack`` and ``bps``, this defines ``headstack_id``,
             ``track_id``, ``fan_out``, ``magnitude_bit``, and ``converter_id``.
         """
-        # Need to pass on ntrack also as keyword, since the setter is useful.
-        kwargs['ntrack'] = ntrack
+        # set defaults based on ntrack for cases where it is known.
+        if ntrack == 64:
+            kwargs.setdefault('headstack_id', np.repeat(np.arange(2), 32))
+            kwargs.setdefault('track_id', np.tile(np.arange(2, 34), 2))
+        elif ntrack == 32:
+            kwargs.setdefault('headstack_id', np.zeros(32, dtype=int))
+            kwargs.setdefault('track_id', np.arange(2, 34))
         return super(Mark4Header, cls).fromvalues(ntrack, decade, **kwargs)
 
     def update(self, crc=None, verify=True, **kwargs):
@@ -436,25 +444,8 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def ntrack(self):
-        """Number of tracks of the stream described by this header.
-
-        If set, this will also update ``headstack_id`` and ``track_id``.
-        """
+        """Number of tracks of the stream described by this header."""
         return self.words.shape[1]
-
-    @ntrack.setter
-    def ntrack(self, ntrack):
-        if ntrack != self.words.shape[1]:
-            raise ValueError("Cannot change ntrack from {0}."
-                             .format(self.words.shape[1]))
-        if ntrack == 64:
-            self['headstack_id'] = np.repeat(np.arange(2), 32)
-            self.track_id = np.tile(np.arange(2, 34), 2)
-        elif ntrack == 32:
-            self['headstack_id'] = np.zeros(32, dtype=int)
-            self.track_id = np.arange(2, 34)
-        else:
-            raise ValueError("Only can set ntrack=64 or 32 so far.")
 
     @property
     def size(self):
@@ -463,29 +454,16 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def framesize(self):
-        """Size of the whole frame (header + payload) in bytes.
-
-        If set, this will be used to infer and set ``ntrack``.
-        """
+        """Size of the whole frame (header + payload) in bytes."""
         return self.ntrack * PAYLOADSIZE // 8
-
-    @framesize.setter
-    def framesize(self, framesize):
-        assert framesize * 8 % PAYLOADSIZE == 0
-        self.ntrack = framesize * 8 // PAYLOADSIZE
 
     @property
     def payloadsize(self):
         """Size of the payload in bytes.
 
         Note that the payloads miss pieces overwritten by the header.
-        If set, this will be used to set and infer ``ntrack``.
         """
         return self.framesize - self.size
-
-    @payloadsize.setter
-    def payloadsize(self, payloadsize):
-        self.framesize = payloadsize + self.size
 
     @property
     def fanout(self):

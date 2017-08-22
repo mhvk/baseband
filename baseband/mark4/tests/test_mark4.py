@@ -127,14 +127,12 @@ class TestMark4(object):
         assert not np.all(~header7['magnitude_bit'])
         with pytest.raises(ValueError):
             header7.bps = 4
-        with pytest.raises(Exception):
+        with pytest.raises(AttributeError):
             header7.ntrack = 51
-        with pytest.raises(AssertionError):
-            header7.framesize = header.framesize - 1
-        with pytest.raises(AssertionError):
-            header7.payloadsize = header.payloadsize - 1
-        with pytest.raises(Exception):
-            header7.framesize = header.framesize * 2  # implied ntrack=128
+        with pytest.raises(AttributeError):
+            header7.framesize = header.framesize
+        with pytest.raises(AttributeError):
+            header7.payloadsize = header.payloadsize
         header7.nchan = 16
         assert header7.nchan == 16 and header7.bps == 1
         # OK, this is silly, but why not...
@@ -162,10 +160,19 @@ class TestMark4(object):
             header[65]
         with pytest.raises(ValueError):
             header[np.array([[0, 1], [2, 3]])]
+        # check that one can construct crazy headers, even if not much works.
         header12 = mark4.Mark4Header(None, ntrack=53, decade=2010,
                                      verify=False)
-        with pytest.raises(ValueError):
-            header12.ntrack = 53
+        header12.time = header.time
+        assert header12.ntrack == 53
+        assert abs(header12.time - header.time) < 1. * u.ns
+        # with fromvalues, need to use ntrack covered by MARK4_DTYPES,
+        # otherwise crc generation fails. Still, use verify=False since many
+        # other things are not set.
+        header13 = mark4.Mark4Header.fromvalues(ntrack=16, time=header.time,
+                                                verify=False)
+        assert header13.ntrack == 16
+        assert abs(header13.time - header.time) < 1. * u.ns
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
