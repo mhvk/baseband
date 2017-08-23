@@ -1,13 +1,3 @@
-Except where explicitly noted otherwise, the usage of baseband and all
-of its routines is governed by the GPL v3 public license (see below
-for full draft of the license), like the C library by Walter Brisken
-which inspired it.
-
-Marten van Kerkwijk, Oct 14, 2015
-
-.............................................................................
-
-
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
