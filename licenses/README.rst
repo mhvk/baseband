@@ -2,7 +2,7 @@ Licenses
 ========
 
 Except where explicitly noted otherwise, the usage of baseband and all of its
-routines is governed by the GPL v3 public license (see LICENSE.rst in the top
+routines is governed by the GPL v3 public license (see LICENSE in the top
 package directory), like the C library by Walter Brisken which inspired it.
 
 This directory holds license and credit information for works baseband is
