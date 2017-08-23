@@ -152,7 +152,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         ``_get_frame_rate`` is called when the number of frames
         per second is not user-provided or deducable from header
-        information.  Starting from the file pointer's current 
+        information.  Starting from the file pointer's current
         position, it cycles through headers trying to find the next
         frame whose ``frame_nr`` is zero, while keeping track
         of the largest frame number yet found.
