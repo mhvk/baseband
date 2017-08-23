@@ -133,12 +133,11 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 frames_per_second = self._get_frame_rate(fh_raw,
                                                          type(header0))
             except Exception as exc:
-                exc.args += ("_get_frame_rate raised {e.__class__.__name__} "
-                             "error before reading one second of data.  File "
-                             "may have less than one second of data, in "
-                             "which case framerate must manually be passed "
-                             "to file opener.  File could also be "
-                             "corrupt.".format(e=exc),)
+                exc.args += ("the frame rate could not be auto-detected. "
+                             "This can happen if the file has less than "
+                             "one second of data, or because it is "
+                             "corrupted.  Try passing in an explicit "
+                             "'frames_per_second'.",)
                 raise
 
         super(VLBIStreamReaderBase, self).__init__(
@@ -147,20 +146,19 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
     @staticmethod
     def _get_frame_rate(fh, header_class):
-        """
-        Returns the number of frames in one second of data.
+        """Returns the number of frames in one second of data.
+
+        The function cycles through headers, starting from the file
+        pointer's current position, to find the next frame whose
+        frame number is zero while keeping track of the largest frame
+        number yet found.
 
         ``_get_frame_rate`` is called when the number of frames
         per second is not user-provided or deducable from header
-        information.  Starting from the file pointer's current
-        position, it cycles through headers trying to find the next
-        frame whose ``frame_nr`` is zero, while keeping track
-        of the largest frame number yet found.
-
-        If less than one second of data exists in the file,
-        function will raise an EOFError.  Function also assumes
-        frames are in order; if they are not, an incorrect framerate
-        will be returned.
+        information.  If less than one second of data exists in the
+        file, the function will raise an EOFError.  It also returns
+        an error if any header cannot be read or does not verify as
+        correct.
         """
         oldpos = fh.tell()
         header = header_class.fromfile(fh)
@@ -169,8 +167,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         while header['frame_nr'] == frame_nr0:
             fh.seek(header.payloadsize, 1)
             header = header_class.fromfile(fh)
+        max_frame = frame_nr0
         while header['frame_nr'] > 0:
-            max_frame = header['frame_nr']
+            max_frame = max(header['frame_nr'], max_frame)
             fh.seek(header.payloadsize, 1)
             header = header_class.fromfile(fh)
 
