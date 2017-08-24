@@ -98,6 +98,7 @@ class VDIFHeader(VLBIHeaderBase):
     """Properties accessible/usable in initialisation for all VDIF headers."""
 
     _edv = None
+    _struct = eight_word_struct
 
     def __new__(cls, words, edv=None, verify=True, **kwargs):
         # We use edv to define which class we return.
@@ -456,7 +457,6 @@ class VDIFLegacyHeader(VDIFHeader):
 
 class VDIFBaseHeader(VDIFHeader):
     """Base for non-legacy VDIF headers that use 8 32-bit words."""
-    _struct = eight_word_struct
 
     _header_parser = VDIFLegacyHeader._header_parser + HeaderParser(
         (('legacy_mode', (0, 30, 1, False)),  # Repeat, to change default.
@@ -564,14 +564,6 @@ class VDIFHeader3(VDIFSampleRateHeader):
     def verify(self):
         super(VDIFHeader3, self).verify()
         assert self['frame_length'] == 629
-
-
-class VDIFHeader4(VDIFSampleRateHeader):
-    """VDIF Header for EDV=4.
-
-    This is used for MWA according to Franz.  No extra header info?
-    """
-    _edv = 4
 
 
 class VDIFHeader2(VDIFBaseHeader):
