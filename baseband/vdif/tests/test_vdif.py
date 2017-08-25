@@ -120,7 +120,7 @@ class TestVDIF(object):
         # Custom header with an EDV that already exists
         with pytest.raises(ValueError):
             class VDIFHeaderY(vdif.header.VDIFBaseHeader):
-                _edv = 4
+                _edv = 3
         # Custom header that has neglected to override _edv
         with pytest.raises(ValueError):
             class VDIFHeaderZ(vdif.header.VDIFBaseHeader):
