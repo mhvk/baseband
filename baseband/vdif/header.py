@@ -21,8 +21,7 @@ from ..mark5b.header import Mark5BHeader
 
 __all__ = ['VDIFHeader', 'VDIFBaseHeader', 'VDIFSampleRateHeader',
            'VDIFLegacyHeader', 'VDIFHeader0', 'VDIFHeader1',
-           'VDIFHeader2', 'VDIFHeader3', 'VDIFHeader4',
-           'VDIFMark5BHeader']
+           'VDIFHeader2', 'VDIFHeader3', 'VDIFMark5BHeader']
 
 
 ref_max = int(2. * (Time.now().jyear - 2000.)) + 1
