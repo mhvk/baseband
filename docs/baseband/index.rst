@@ -1,11 +1,18 @@
-*****
-Usage
-*****
+******************
+User Documentation
+******************
 
-This is the documentation for the baseband package.
+Baseband Package
+================
+
+Baseband's code is subdivided into its supported file formats.  The following
+sections contain tutorials on how to use Baseband for each format.  Also
+included is Baseband's API for each format, as well as the sequential
+file opener and the set of core utility functions and classes located in
+:mod:`~baseband.vlbi_base`.
 
 Specific file formats
-=====================
+---------------------
 
 .. toctree::
    :maxdepth: 1
@@ -15,16 +22,24 @@ Specific file formats
    mark4/index
    dada/index
    gsb/index
+
+Core framework and utilities
+----------------------------
+
+.. toctree::
+   :maxdepth: 1
+
    helpers/index
    vlbi_base/index
 
 
-Reference/API
-=============
+Developer documentation
+=======================
 
-.. automodapi:: baseband.vdif
-.. automodapi:: baseband.mark5b
-.. automodapi:: baseband.mark4
-.. automodapi:: baseband.dada
-.. automodapi:: baseband.gsb
-.. automodapi:: baseband
+The developer documentation contain tutorials for supporting new VDIF EDV
+formats, and entirely new file formats, within Baseband.
+
+.. toctree::
+   :maxdepth: 1
+
+   new_edv_tutorial

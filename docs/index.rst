@@ -12,8 +12,8 @@ Documentation
 .. toctree::
   :maxdepth: 2
 
-  baseband/install.rst
+  baseband/install
 
-  baseband/index.rst
+  baseband/index
 
   authors_for_sphinx

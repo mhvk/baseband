@@ -21,7 +21,8 @@ from ..mark5b.header import Mark5BHeader
 
 __all__ = ['VDIFHeader', 'VDIFBaseHeader', 'VDIFSampleRateHeader',
            'VDIFLegacyHeader', 'VDIFHeader0', 'VDIFHeader1',
-           'VDIFHeader2', 'VDIFHeader3', 'VDIFMark5BHeader']
+           'VDIFHeader2', 'VDIFHeader3', 'VDIFMark5BHeader',
+           'VDIF_HEADER_CLASSES']
 
 
 ref_max = int(2. * (Time.now().jyear - 2000.)) + 1
@@ -32,7 +33,7 @@ ref_epochs = Time(['{y:04d}-{m:02d}-01'.format(y=2000 + ref // 2,
 
 
 VDIF_HEADER_CLASSES = {}
-"""Dict for storing pairs of VDIF EDV and header classes."""
+"""Dict for storing VDIF header class definitions, indexed by their EDV."""
 
 
 class VDIFHeaderMeta(type):

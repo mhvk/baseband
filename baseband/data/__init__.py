@@ -55,3 +55,10 @@ SAMPLE_GSB_HEADER = _full_path('sample_gsb.timestamp')
 """GSB header sample from 2013/07/26 GMRT observations of PSR J1810+1744,
 adapted to shortened size.
 """
+
+SAMPLE_DRAO_CORRUPT = _full_path('sample_drao_corrupted.vdif')
+"""Corrupted VDIF sample. bps=4.
+
+First ten frames extracted from b0329 DRAO corrupted raw data file
+0059000.dat.
+"""
