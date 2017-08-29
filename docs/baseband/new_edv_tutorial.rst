@@ -355,8 +355,8 @@ We override ``verify`` because :class:`~!baseband.vdif.header.VDIFHeader0`'s
 the ``fromfile`` class method such that the ``bits_per_sample`` property
 is reset to its proper value whenever a header is read from file.
 
-We can now read in the corrupt file.  We can do this either by manually
-reading in the header, then the payload::
+We can now read in the corrupt file by manually reading in the header, then
+the payload, of each frame::
 
     >>> fh = vdif.open(SAMPLE_DRAO_CORRUPT, 'rb')
     >>> header0 = DRAOVDIFHeader.fromfile(fh)
@@ -368,14 +368,19 @@ reading in the header, then the payload::
     >>> payload0.shape == (header0.samples_per_frame, header0.nchan)
     True
 
-or by modifying :class:`~!baseband.vdif.frame.VDIFFrame` such that
-``VDIFFrame._header_class = DRAOVDIFHeader`` before using :func:`~!baseband.vdif.open`.
-This is so that header files are read using ``DRAOVDIFHeader.fromfile``
-rather than :meth:`~!baseband.vdif.frame.VDIFFrame.fromfile`.
+Reading a frame using :class:`~!baseband.vdif.frame.VDIFFrame` will still fail,
+since its ``_header_class`` is :class:`~!baseband.vdif.header.VDIFHeader`,
+and so :meth:`VDIFHeader.fromfile <!baseband.vdif.header.VDIFHeader.fromfile>`,
+rather than the function we defined, is used to read in headers.  If we
+wanted to use :class:`~!baseband.vdif.frame.VDIFFrame`, we would need to set
 
-An alternate solution that is compatible with :class:`~!baseband.vdif.base.VDIFStreamReader`
-without hacking :class:`~!baseband.vdif.frame.VDIFFrame`, but assumes these
-headers are only ever instantiated from file, involves modifying the
+    ``VDIFFrame._header_class = DRAOVDIFHeader``
+
+before using :func:`~!baseband.vdif.open`, so that header files are read
+using ``DRAOVDIFHeader.fromfile``.
+
+A more elegant solution that is compatible with :class:`~!baseband.vdif.base.VDIFStreamReader`
+without hacking :class:`~!baseband.vdif.frame.VDIFFrame` involves modifying the
 bits-per-sample code within ``__init__()``.  Let's remove our previous custom
 class, then define a replacement::
 
@@ -403,8 +408,6 @@ class, then define a replacement::
     ...                 words, verify=False, **kwargs)
     ...         self.mutable = True
     ...         self['bits_per_sample'] = 3
-    ...         if verify:
-    ...             self.verify()
     ...
     ...     def verify(self):
     ...         pass
@@ -417,3 +420,11 @@ We can then use the stream reader without further modification::
     >>> np.array_equal(fh2.read(1), payload0[0])
     True
 
+Reading frames using :meth:`VDIFFileReader.read_frame
+<!baseband.vdif.base.VDIFFileReader.read_frame>` will now work as well, but
+reading frame sets using :meth:`VDIFFileReader.read_frameset 
+<!baseband.vdif.base.VDIFFileReader.read_frameset>` will still fail.  
+This is because the frame and thread numbers that function relies on
+are meaningless for these headers, and grouping threads together using
+the  ``link``, ``slot`` and ``eud2`` values should be manually performed
+by the user.
