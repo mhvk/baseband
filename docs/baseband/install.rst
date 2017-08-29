@@ -22,7 +22,7 @@ Installing Baseband
    Baseband currently cannot be built with `pip <http://www.pip-installer.org/en/latest/>`_,
    but eventually...
 
-Currently, baseband can only be installed by getting its source code,
+Currently, Baseband can only be installed by getting its source code,
 and either running it directly or installing it.
 
 Obtaining source code

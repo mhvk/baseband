@@ -8,7 +8,7 @@ Users may encounter VDIF files with unusual headers not currently supported
 by Baseband.  These may either have novel EDV, or they may purport to be a
 supported EDV but not conform to its specification on the 
 `VDIF website <http://www.vlbi.org/vdif/>`_.  Baseband supports easy
-implementation of new EDVs and overriding of exisiting EDVs, without
+implementation of new EDVs and overriding of existing EDVs, without
 the need to modify Baseband's source code, to handle such situations.
 
 The tutorials below assumes the following modules have been imported::
@@ -136,7 +136,7 @@ where
 - ``bit_index``: index to the starting bit of the part used
   for the key
 - ``bit_length``: number of bits used by the key
-- ``default``: (optional) default value to use in initialisation
+- ``default``: (optional) default value to use in initialization
 
 For further details, see the :class:`~baseband.vlbi_base.header.HeaderParser`
 documentation.
@@ -293,8 +293,8 @@ And then modify the ``_edv`` attribute in ``VDIFHeader4Enhanced``::
     EDV mismatch when ``verify`` is called during header initialization.
 
 This can also be used to override :class:`~!baseband.vdif.header.VDIFHeader`'s
-behavior *even for EDVs that are natively supported by Baseband*, which may
-prove useful when reading data with corrupted or mislabeled headers.  To
+behavior *even for EDVs that are supported by Baseband*, which may
+prove useful when reading data with corrupted or mislabelled headers.  To
 illustrate this, we attempt to read in a corrupted VDIF file originally
 from the Dominion Radio Astrophysical Observatory.  This file can be
 imported from the baseband data directory::
@@ -308,7 +308,7 @@ Naively opening the file with
 will lead to an AssertionError.  This is because while the headers of the
 file purport to be EDV = 0, it deviates from that EDV standard by storing
 "link" and "slot" parameters in word 3, byte 3 instead of the thread ID, and an
-"eud2" parameter in word 5.  The former indicates the data aquisition
+"eud2" parameter in word 5.  The former indicates the data acquisition
 computer node that wrote the data to disk - equivalent to a thread ID -
 while the latter indicates data taken over the same time segment.  Meanwhile,
 the frame number is meaningless, and the bits-per-sample code is incorrect
