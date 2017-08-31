@@ -164,8 +164,8 @@ EOFError encountered in ``_get_frame_rate`` when reading
 
 When the number of frames per second is not input by the user and cannot be
 deduced from header information (if EDV = 1, 3 or 4, the frame rate can be
-derived from the sampling rate found in the header), it is tried to determine
-the frame rate using the private method ``_get_frame_rate`` in
+derived from the sampling rate found in the header), Baseband tries to
+determine the frame rate using the private method ``_get_frame_rate`` in
 :class:`~baseband.vlbi_base.base.VLBIStreamReaderBase`.  This function raises
 `EOFError` if the file contains less than one second of data, or is corrupt.
 In either case the file can be opened still by explicitly passing in the frame

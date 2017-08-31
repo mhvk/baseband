@@ -222,7 +222,7 @@ entries in :obj:`~!baseband.vdif.header.VDIF_HEADER_CLASSES`.  If we had used
 
 We shall see how to override header classes in the next section.  Except for
 the EDV, ``VDIFHeader4Enhanced``'s header structure is identical
-to ``VDIFHeader4``.  It also contains an extra few extra functions to enhance the
+to ``VDIFHeader4``.  It also contains a few extra functions to enhance the
 header's usability.
 
 The ``verify`` function is an optional function that runs upon header

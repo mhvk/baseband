@@ -15,7 +15,9 @@ Usage
 All files should be opened using :func:`~baseband.dada.open`.  Single files can
 be opened in binary mode, which provides a normal file reader but extended with
 methods to read a :class:`~baseband.dada.DADAFrame`.  For dada files, which
-consist of just a single header and payload, such frames contain all the data.::
+consist of just a single header and payload, such frames contain all the data.
+
+::
 
     >>> from baseband import dada
     >>> from baseband.data import SAMPLE_DADA
@@ -35,7 +37,9 @@ are loaded into memory (since the sample file is encoded using 8 bits, the
 above example thus loads 12 bytes into memory).
 
 Opening in stream mode wraps the low-level routines such that reading and
-writing is in units of samples, and one has access to header information.::
+writing is in units of samples, and one has access to header information.
+
+::
 
     >>> fh = dada.open(SAMPLE_DADA, 'rs')
     >>> fh
@@ -52,7 +56,9 @@ writing is in units of samples, and one has access to header information.::
     >>> fh.close()
 
 To set up a file for writing as a stream is possible as well.  Here, we use an
-even smaller size of the payload, to show how one can define multiple files.::
+even smaller size of the payload, to show how one can define multiple files.
+
+::
 
     >>> from astropy.time import Time
     >>> import astropy.units as u
