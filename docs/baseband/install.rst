@@ -28,7 +28,7 @@ and either running it directly or installing it.
 Obtaining source code
 ---------------------
 
-The source code and latest development version of baseband can found on `its
+The source code and latest development version of Baseband can found on `its
 GitHub repo <https://github.com/mhvk/baseband>`_.  You can get your own clone
 using::
 
@@ -40,7 +40,7 @@ repository, so that you can more easily contribute!
 Running code without installing
 -------------------------------
 
-As baseband is purely Python, it can be used without being built or installed,
+As Baseband is purely Python, it can be used without being built or installed,
 by appending the directory it is located in to the ``PYTHON_PATH`` environment
 variable.  Alternatively, you can use :obj:`sys.path` within Python to append 
 the path::
@@ -48,12 +48,12 @@ the path::
     import sys
     sys.path.append(BASEBAND_PATH)
 
-where ``BASEBAND_PATH`` is the directory you downloaded or cloned baseband into.
+where ``BASEBAND_PATH`` is the directory you downloaded or cloned Baseband into.
 
 Installing source code
 ----------------------
 
-If you want baseband to be more broadly available, either to all users on a
+If you want Baseband to be more broadly available, either to all users on a
 system, or within, say, a virtual environment, use :file:`setup.py` in
 the root directory by calling::
 
@@ -71,7 +71,7 @@ are described further in `Astropy's installation documentation
 Testing the installation
 ========================
 
-The root directory :file:`setup.py` can also be used to test if baseband can
+The root directory :file:`setup.py` can also be used to test if Baseband can
 successfully be run on your system::
 
     python3 setup.py test
@@ -94,14 +94,14 @@ Building documentation
 .. note::
 
     As with Astropy, building the documentation is unnecessary unless you
-    are writing new documentation or do not have internet access, as baseband's
+    are writing new documentation or do not have internet access, as Baseband's
     documentation is available online at `baseband.readthedocs.io 
     <https://baseband.readthedocs.io>`_.
 
-The baseband documentation can be built again using :file:`setup.py` from 
+The Baseband documentation can be built again using :file:`setup.py` from 
 the root directory::
 
     python3 setup.py build_docs
 
 This requires to have `Sphinx <http://sphinx.pocoo.org>`_ installed (and its
-dependencies; version 1.5 recommended).
+dependencies).

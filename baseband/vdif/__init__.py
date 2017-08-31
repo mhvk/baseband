@@ -8,8 +8,9 @@
 #     \/     |_____/  |_| |__|
 #
 #
-"""VLBI Data Interchange Format (VDIF) readers, providing both low-level
-and higher-level access.
+"""VLBI Data Interchange Format (VDIF) reader/writer
+
+For the VDIF specification, see http://www.vlbi.org/vdif
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)

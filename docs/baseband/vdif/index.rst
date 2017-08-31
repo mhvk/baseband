@@ -4,11 +4,6 @@
 VDIF
 ****
 
-.. _vdif_intro:
-
-Introduction
-============
-
 The `VLBI Data Interchange Format (VDIF) <http://www.vlbi.org/vdif/>`_ was
 introduced in 2009 to standardize VLBI data transfer and storage.  Detailed
 specifications are found in VDIF's `specification document
@@ -53,7 +48,6 @@ Usage
 The examples below use the small sample VDIF file :file:`baseband/data/sample.vdif`,
 and assumes the following modules have been imported::
 
-    >>> import io
     >>> import numpy as np
     >>> from baseband import vdif
 
@@ -73,9 +67,7 @@ methods to read a :class:`~baseband.vdif.VDIFFrame` (or
 
 Opening in stream mode wraps the low-level routines such that reading
 and writing is in units of samples.  It also provides access to header
-information.
-
-::
+information::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> fh
@@ -102,7 +94,7 @@ To set up a file for writing needs quite a bit of header information. Not
 coincidentally, what is given by the reader above suffices::
 
     >>> from astropy.time import Time
-    >>> import astropy.units as u, numpy as np
+    >>> import astropy.units as u
     >>> fw = vdif.open('try.vdif', 'ws',
     ...                nthread=2, samples_per_frame=20000, nchan=1,
     ...                frames_per_second=1600, complex_data=False, bps=2, edv=3,
@@ -117,9 +109,7 @@ coincidentally, what is given by the reader above suffices::
 
 Example to copy a VDIF file.  Here, we use the ``sort=False`` option to ensure
 the frames are written exactly in the same order, so the files should be
-identical.
-
-::
+identical.::
 
     >>> with vdif.open(SAMPLE_VDIF, 'rb') as fr, vdif.open('try.vdif', 'wb') as fw:
     ...     while True:
@@ -148,10 +138,9 @@ cases, it may still be possible to read in the data.  Below, we provide a
 few solutions and workarounds to do so.
 
 .. note::
-
-    This list is certainly incomplete, and will be updated on a regular
-    basis.   If you have an issue (solved or otherwise) you believe should
-    be on this list, please e-mail the :ref:`contributors <contributors>`.
+    This list is certainly incomplete.   If you have an issue (solved
+    or otherwise) you believe should be on this list, please e-mail
+    the :ref:`contributors <contributors>`.
 
 AssertionError when checking EDV in header ``verify`` function
 --------------------------------------------------------------
@@ -170,17 +159,17 @@ best solution is to create a custom header class, then override the
 subclass selector in :class:`~baseband.vdif.header.VDIFHeader`.  Tutorials
 for doing either can be found :ref:`here <new_edv>`.
 
-EOFError encountered in `_get_frame_rate` when reading
-------------------------------------------------------
+EOFError encountered in ``_get_frame_rate`` when reading
+--------------------------------------------------------
 
-:class:`VLBIStreamReaderBase<baseband.vlbi_base.base.VLBIStreamReaderBase>`._get_frame_rate()
-is used when the number of frames per second is not input by
-the user and cannot be deduced from header information (if EDV = 1,
-3 or 4, the frame rate can be derived from the sampling rate found in
-the header).  This function returns an `EOFError` if the file contains less
-than one second of data, or is corrupt.  In either case the file can
-be read in by passing the frame rate to :func:`~baseband.vdif.open` via
-the `frames_per_second` argument.
+When the number of frames per second is not input by the user and cannot be
+deduced from header information (if EDV = 1, 3 or 4, the frame rate can be
+derived from the sampling rate found in the header), it is tried to determine
+the frame rate using the private method ``_get_frame_rate`` in
+:class:`~baseband.vlbi_base.base.VLBIStreamReaderBase`.  This function raises
+`EOFError` if the file contains less than one second of data, or is corrupt.
+In either case the file can be opened still by explicitly passing in the frame
+rate to :func:`~baseband.vdif.open` via the `frames_per_second` argument.
 
 .. _vdif_api:
 

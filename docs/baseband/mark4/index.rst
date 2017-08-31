@@ -4,11 +4,6 @@
 MARK 4
 ******
 
-.. _mark4_intro:
-
-Introduction
-============
-
 The Mark 4 VLBI format is described in the `Mark IIIA/IV/VLBA documentation
 <http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf>`_.
 
@@ -22,9 +17,7 @@ binary mode provides a normal file reader but extended with methods to read a
 :class:`~baseband.mark4.Mark4Frame`.  For Mark 4 data, the files often do not
 start at a frame boundary, so one has to seek the first frame.  One also has
 to pass in the number of tracks used, and the decade the data were taken, since
-those numbers cannot be inferred from the data themselves.
-
-::
+those numbers cannot be inferred from the data themselves::
 
     >>> from baseband import mark4
     >>> from baseband.data import SAMPLE_MARK4
@@ -40,9 +33,7 @@ those numbers cannot be inferred from the data themselves.
 Opening in stream mode wraps the low-level routines such that reading and
 writing is in units of samples.  It also provides access to header information.
 Here, we need to pass in the frame rate so that times for individual samples
-can be calculated (for longer files, this can be calculated from the file).
-
-::
+can be calculated (for longer files, this can be calculated from the file)::
 
     >>> fh = mark4.open(SAMPLE_MARK4, 'rs', ntrack=64, decade=2010,
     ...                 frames_per_second=400)
@@ -63,9 +54,7 @@ were overwritten by the header.
 To set up a file for writing as a stream is possible as well, although
 probably one would prefer to use VDIF file instead.  Here, we set the number of
 samples per frame to 640, so that the invalid parts of the mark4 data are all
-captured in one frame.
-
-::
+captured in one frame::
 
     >>> from astropy.time import Time
     >>> import astropy.units as u, numpy as np

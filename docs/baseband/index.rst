@@ -1,9 +1,6 @@
-******************
-User Documentation
-******************
-
-Baseband Package
-================
+*************
+Documentation
+*************
 
 Baseband's code is subdivided into its supported file formats.  The following
 sections contain tutorials on how to use Baseband for each format.  Also
@@ -12,7 +9,7 @@ file opener and the set of core utility functions and classes located in
 :mod:`~baseband.vlbi_base`.
 
 Specific file formats
----------------------
+=====================
 
 .. toctree::
    :maxdepth: 1
@@ -24,7 +21,7 @@ Specific file formats
    gsb/index
 
 Core framework and utilities
-----------------------------
+============================
 
 .. toctree::
    :maxdepth: 1
@@ -36,10 +33,10 @@ Core framework and utilities
 Developer documentation
 =======================
 
-The developer documentation contain tutorials for supporting new VDIF EDV
-formats, and entirely new file formats, within Baseband.
+The developer documentation contain tutorials for supporting new formats or format
+extensions such as VDIF EDV in Baseband.
 
 .. toctree::
    :maxdepth: 1
 
-   new_edv_tutorial
+   tutorials/new_edv
