@@ -24,7 +24,7 @@ class VLBIPayloadBase(object):
 
     Parameters
     ----------
-    words : ndarray
+    words : `numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
     bps : int
@@ -91,7 +91,7 @@ class VLBIPayloadBase(object):
 
         Parameters
         ----------
-        data : ndarray
+        data : `numpy.ndarray`
             Data to be encoded. The last dimension is taken as the number of
             channels.
         bps : int
@@ -139,11 +139,33 @@ class VLBIPayloadBase(object):
         return np.dtype(np.complex64 if self.complex_data else np.float32)
 
     def _item_to_slices(self, item):
-        """Get word and data slices required to get given item.
+        """Get word and data slices required to retrieve sample(s)
+        specified by ``item``.
 
-        Returns ``words_slice`` and ``data_slice`` such that if one decodes
-        ``self.words[words_slice]`` the returned data is the smallest possible
-        array that includes the requested item or slice (as ``data_slice``).
+        Parameters
+        ----------
+        item : int, slice, or tuple
+            Sample indices.  Int represents a single sample, slice
+            a sample range, and tuple of ints/slices a range for
+            multi-channel data.
+
+        Returns
+        -------
+        words_slice : slice
+            Slice such that if one decodes ``ds = self.words[words_slice]``,
+            ``ds`` is the smallest possible array that includes all
+            of the requested ``item``.
+        data_slice : int or slice
+            Int or slice such that ``ds[data_slice]`` is the requested
+            ``item``.
+
+        Notes
+        -----
+        Since ``item`` is restricted to (tuples of) ints or slices, cannot
+        access non-contiguous samples using fancy indexing.  If ``item``
+        is a slice, cannot use a negative increment.  Unable to parse
+        payloads whose words have unused space (eg. VDIF files with 20
+        bits/sample).
         """
         if isinstance(item, tuple):
             word_slice, data_slice = self._item_to_slices(item[0])
@@ -222,7 +244,9 @@ class VLBIPayloadBase(object):
             words_slice, data_slice = self._item_to_slices(item)
 
         data = np.asanyarray(data)
-        # Avoid decoding if possible.
+        # Check if new data spans entire word and is correctly shaped.  If
+        # so, can skip decoding.  If not, decode appropriate words and
+        # insert new data.
         if not (data_slice == slice(None) and
                 data.shape[-len(self.sample_shape):] == self.sample_shape and
                 data.dtype.kind == self.dtype.kind):

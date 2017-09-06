@@ -4,7 +4,8 @@ Definitions for VLBI VDIF payloads.
 Implements a VDIFPayload class used to store payload words, and decode to
 or encode from a data array.
 
-For the VDIF specification, see http://www.vlbi.org/vdif
+See the `VDIF specification page <http://www.vlbi.org/vdif>`_ for payload
+specifications.
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -14,17 +15,42 @@ from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.encoding import (encode_2bit_base, encode_4bit_base,
                                   decoder_levels, decode_8bit, encode_8bit)
 
-__all__ = ['init_luts', 'decode_2bit', 'encode_2bit',
-           'VDIFPayload']
+__all__ = ['init_luts', 'decode_2bit', 'decode_4bit', 'encode_2bit',
+           'encode_4bit', 'VDIFPayload']
 
 
 def init_luts():
-    """Set up the look-up tables for levels as a function of input byte.
+    """Sets up the look-up tables for levels as a function of input
+    byte.
 
-    S10. in http://vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf
-    states that samples are encoded by offset-binary, such that all 0 bits is
-    lowest and all 1 bits is highest.  I.e., for 2-bit sampling, the order is
-    00, 01, 10, 11.
+    Returns
+    -------
+    lut1bit : `~numpy.ndarray`
+        Look-up table for decoding bytes to 1-bit samples.
+    lut2bit : `~numpy.ndarray`
+        As `lut1bit1`, but for 2-bit samples.
+    lut4bit : `~numpy.ndarray`
+        As `lut1bit1`, but for 4-bit samples.
+
+    Notes
+    -----
+
+    Look-up tables are two-dimensional arrays whose first axis is indexed
+    by byte value (in uint8 form) and whose second axis represents sample
+    temporal order.  Table values are decoded sample values.  Sec. 10 in
+    the `VDIF Specification
+    <http://vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf>`_
+    states that samples are encoded by offset-binary, such that all 0
+    bits is lowest and all 1 bits is highest.  I.e., for 2-bit sampling,
+    the order is 00, 01, 10, 11.  These are decoded using
+    `~baseband.vlbi_base.encoding.decoder_levels`.
+
+    For example, the 2-bit sample sequence ``-1, -1, 1, 1`` is encoded
+    as ``0b10100101`` (or ``165`` in uint8 form).  To translate this back
+    to sample values, access ``lut2bit`` using the byte as the key::
+
+        >>> lut2bit[0b10100101]
+        array([-1., -1.,  1.,  1.], dtype=float32)
     """
     b = np.arange(256)[:, np.newaxis]
     # 1-bit mode
@@ -43,6 +69,7 @@ lut1bit, lut2bit, lut4bit = init_luts()
 
 
 def decode_2bit(words):
+    """Decodes int32 words into 2-bit samples."""
     b = words.view(np.uint8)
     return lut2bit.take(b, axis=0)
 
@@ -51,12 +78,14 @@ shift2bit = np.arange(0, 8, 2).astype(np.uint8)
 
 
 def encode_2bit(values):
+    """Encodes 2-bit samples into int32 words."""
     bitvalues = encode_2bit_base(values.reshape(-1, 4))
     bitvalues <<= shift2bit
     return np.bitwise_or.reduce(bitvalues, axis=-1)
 
 
 def decode_4bit(words):
+    """Decodes int32 words into 4-bit samples."""
     b = words.view(np.uint8)
     return lut4bit.take(b, axis=0)
 
@@ -65,6 +94,7 @@ shift04 = np.array([0, 4], np.uint8)
 
 
 def encode_4bit(values):
+    """Encodes 4-bit samples into int32 words."""
     b = encode_4bit_base(values).reshape(-1, 2)
     b <<= shift04
     return b[:, 0] | b[:, 1]
@@ -75,7 +105,7 @@ class VDIFPayload(VLBIPayloadBase):
 
     Parameters
     ----------
-    words : ndarray
+    words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
     header : `~baseband.vdif.VDIFHeader`, optional
@@ -140,7 +170,7 @@ class VDIFPayload(VLBIPayloadBase):
 
         Parameters
         ----------
-        data : ndarray
+        data : `~numpy.ndarray`
             Values to be encoded.
         header : `~baseband.vdif.VDIFHeader`, optional
             If given, used to infer the encoding, and to verify the number of

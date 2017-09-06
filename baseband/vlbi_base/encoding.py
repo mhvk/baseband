@@ -11,19 +11,25 @@ __all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
 
 # The high mag value for 2-bit reconstruction.
 OPTIMAL_2BIT_HIGH = 3.3359
-r"""Optimal high value for a 2-bit digitizer for which the low value is 1.
+r"""Optimal high value for a 2-bit digitizer for which the low value is
++/- 1.
 
-It is chosen such that for a normal distribution in which 68.269% of all values
-are at the low level, this is the mean of the others, i.e.,
+It is chosen such that for a normal distribution in which 68.269% of all
+values are at the low level, this is the mean of the others, i.e.,
 
 .. math::
 
-     l = \frac{\int_1^\infty x \exp(-\frac12x^2) dx}
-              {\int_0^1 x \exp(-\frac12x^2) dx} \times
-         \frac{\int_0^1 \exp(-\frac12x^2)dx}
-              {\int_1^\infty \exp(-\frac12x^2) dx}
+     l = \frac{\int_\sigma^\infty x \exp(-\frac{x^2}{2\sigma^2}) dx}
+              {\int_\sigma^\infty \exp(-\frac{x^2}{2\sigma^2}) dx},
 
-Note that for this value, the standard deviation is 2.1745.
+where the standard deviation :math:`\sigma = 2.1745`, which can
+implicitly be determined from:
+
+.. math::
+
+     1 = \frac{\int_0^\sigma x \exp(-\frac{x^2}{2\sigma^2}) dx}
+          {\int_0^\sigma \exp(-\frac{x^2}{2\sigma^2}) dx}.
+
 """
 TWO_BIT_1_SIGMA = 2.1745
 """Optimal level between low and high for the above OPTIMAL_2BIT_HIGH."""
@@ -46,10 +52,11 @@ clip_low, clip_high = -1.5 * TWO_BIT_1_SIGMA, 1.5 * TWO_BIT_1_SIGMA
 def encode_2bit_base(values):
     """Generic encoder for data stored using two bits.
 
-    This returns an unsigned integer array with values ranging from 0 to 3.
-    It does not do the merging of samples together.
+    This returns an unsigned integer array containing encoded sample
+    values that range from 0 to 3.  The conversion from floating point
+    sample value to unsigned int is given below, with
+    ``lv = TWO_BIT_1_SIGMA = 2.1745``:
 
-    Effectively, get indices such that for ``lv=TWO_BIT_1_SIGMA=2.1745``:
       ================= ======
       Input range       Output
       ================= ======
@@ -58,6 +65,9 @@ def encode_2bit_base(values):
        0. < value <  lv   1
        lv < value         3
       ================= ======
+
+    Samples remain distinct, and have not been merged together into
+    bytes or int32 words.
     """
     # Optimized for speed by doing calculations in-place, and ensuring that
     # the dtypes match.
@@ -71,11 +81,11 @@ def encode_2bit_base(values):
 def encode_4bit_base(values):
     """Generic encoder for data stored using four bits.
 
-    This returns an unsigned integer array with values ranging from 0 to 15.
-    It does not do the merging of samples together.
-
-    Here, levels are linear between 0 and 15, with values first scaled by
-    ``FOUR_BIT_1_SIGMA=2.95`` and then 8 added. Some sample output levels are:
+    This returns an unsigned integer array containing encoded sample
+    values that range from 0 to 15.  Floating point sample values are
+    converted to unsigned int by first scaling them by
+    ``FOUR_BIT_1_SIGMA = 2.95``, then adding 8.  Some sample output
+    levels are:
 
       ========================= ======
       Input range               Output
@@ -85,6 +95,9 @@ def encode_4bit_base(values):
       -0.5 < value*scale < +0.5    8
        6.5 < value*scale          15
       ========================= ======
+
+    Samples remain distinct, and have not been merged together into
+    bytes or int32 words.
     """
     # Optimized for speed by doing calculations in-place.
     values = values * FOUR_BIT_1_SIGMA
