@@ -16,7 +16,7 @@ VDIF File Structure
 
 A VDIF file or data transmission is composed of a sequence of **data frames**,
 each of which is comprised of a self-identifying data frame
-header followed by an array, or **payload**, of data covering a single time
+header followed by a sequence, or **payload**, of data covering a single time
 segment of observations from one or more frequency sub-bands.  The header
 is a pre-defined 32-bytes long, while the payload is task-specific and can
 range from 32 bytes to ~134 megabytes.  Both are little-endian and grouped
@@ -26,15 +26,14 @@ user-defined data.  The layout of these four words is specified by the file's
 **extended-data version**, or EDV.  More detailed information on the header
 can be found in the :ref:`tutorial for supporting a new VDIF EDV <new_edv>`.
 
-A data frame may carry one or multiple frequency sub-bands (called "channels"
-in the VDIF specification, but deliberately called "sub-bands" here to avoid
-confusion with Fourier channels).  A sequence of data frames all carrying the
-same (set of) sub-band(s) is called a **data thread**, denoted by its thread ID.
-A data set consisting of multiple concurrent threads is transmitted or stored
-as a serial sequence of frames called a **data stream**.  The collection of
-frames that cover all threads for a single time segment - equivalently, all
-thread IDs for the same header time and frame number - is a **dataframe set**
-(or just "frame set").
+A data frame may carry one or multiple frequency sub-bands or Fourier
+channels, and we refer to either of these as **channels** for short.  A sequence
+of data frames all carrying the same (set of) channels is called a **data
+thread**, denoted by its thread ID.  A data set consisting of multiple
+concurrent threads is transmitted or stored as a serial sequence of frames
+called a **data stream**.  The collection of frames that cover all threads for a
+single time segment - equivalently, all thread IDs for the same header time and
+frame number - is a **dataframe set** (or just "frame set").
 
 Strict time ordering of frames in the stream, while considered part of VDIF
 best practices, is not mandated, and cannot be guaranteed during data
@@ -42,57 +41,44 @@ transmission over the internet.
 
 .. _vdif_usage:
 
-Usage
-=====
+Usage Notes
+===========
 
-The examples below use the small sample VDIF file :file:`baseband/data/sample.vdif`,
-and assumes the following modules have been imported::
+This section covers VDIF-specific features of Baseband.  Tutorials for general
+usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
+The examples below use the small sample file ``baseband/data/sample.vdif``,
+and assume the `numpy` and `baseband.vdif` modules have been imported::
 
     >>> import numpy as np
     >>> from baseband import vdif
-
-Simple reading and writing of VDIF files can be done entirely using
-:func:`~baseband.vdif.open`, the master input/output function.
-
-Opening in binary mode provides a normal file reader but extended with
-methods to read a :class:`~baseband.vdif.VDIFFrame` (or
-:class:`~baseband.vdif.FrameSet`)::
-
     >>> from baseband.data import SAMPLE_VDIF
+
+Baseband defines the :class:`~baseband.vdif.VDIFFrameSet` data container for
+storing a frame set as well as :class:`~baseband.vdif.VDIFFrame` one for storing
+a single frame. Opening in a VDIF file binary mode provides a file reader
+extended with methods to read both::
+
     >>> fh = vdif.open(SAMPLE_VDIF, 'rb')
     >>> fs = fh.read_frameset()
     >>> fs.data.shape
     (8, 20000, 1)
+    >>> fr = fh.read_frame()
+    >>> fr.data.shape
+    (20000, 1)
     >>> fh.close()
 
-Opening in stream mode wraps the low-level routines such that reading
-and writing is in units of samples.  It also provides access to header
-information::
-
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
-    >>> fh
-    <VDIFStreamReader name=... offset=0
-        frames_per_second=1600, samples_per_frame=20000,
-        sample_shape=SampleShape(nthread=8),
-        complex_data=False, bps=2, edv=3, station=65532,
-        (start) time=2014-06-16T05:56:07.000000000>
-    >>> d = fh.read(12)
-    >>> d.shape
-    (12, 8)
-    >>> d[:, 0].astype(int)  # first thread
-    array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
-    >>> fh.close()
-
-One can pick specific threads::
-
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', thread_ids=[2, 3])
-    >>> d = fh.read(20000)
-    >>> d.shape
-    (20000, 2)
-    >>> fh.close()
+As with other formats, ``fr.data`` is a read-only property of the frame. 
+``fs.data``, though, is a lazy property which, when it is first called, decodes
+the entire frame set payload into a `numpy.ndarray`.  The values in ``fs.data``
+can freely be modified, but are *not* transmitted back to the raw payload data.
 
 To set up a file for writing needs quite a bit of header information. Not
 coincidentally, what is given by the reader above suffices::
+
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', thread_ids=[2, 3])
+    >>> d = fh.read(20000)
+
+::
 
     >>> from astropy.time import Time
     >>> import astropy.units as u
@@ -122,8 +108,7 @@ identical.::
 For small files, one could just do::
 
     >>> with vdif.open(SAMPLE_VDIF, 'rs') as fr, vdif.open(
-    ...         'try.vdif', 'ws', header=fr.header0,
-    ...         nthread=fr.sample_shape.nthread) as fw:
+    ...         'try.vdif', 'ws', header=fr.header0, nthread=fr.nthread) as fw:
     ...     fw.write(fr.read())
 
 This copies everything to memory, though, and some header information is lost.
@@ -168,7 +153,7 @@ When the number of frames per second is not input by the user and cannot be
 deduced from header information (if EDV = 1, 3 or 4, the frame rate can be
 derived from the sampling rate found in the header), Baseband tries to
 determine the frame rate using the private method ``_get_frame_rate`` in
-:class:`~baseband.vlbi_base.base.VLBIStreamReaderBase`.  This function raises
+`~baseband.vdif.base.VDIFStreamReader`.  This function raises
 `EOFError` if the file contains less than one second of data, or is corrupt.
 In either case the file can be opened still by explicitly passing in the frame
 rate to :func:`~baseband.vdif.open` via the `frames_per_second` argument.

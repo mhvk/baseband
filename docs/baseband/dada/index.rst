@@ -12,15 +12,20 @@ ASCII header of typically 4096 bytes followed by a payload.
 Usage
 =====
 
-All files should be opened using :func:`~baseband.dada.open`.  Single files can
-be opened in binary mode, which provides a normal file reader but extended with
-methods to read a :class:`~baseband.dada.DADAFrame`.  For dada files, which
-consist of just a single header and payload, such frames contain all the data.
+This section covers DADA-specific features of Baseband.  Tutorials for general
+usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
+The examples below use the small sample file ``baseband/data/sample.dada``,
+and assume the `baseband.dada` module has been imported::
+
+    >>> from baseband.data import SAMPLE_DADA
+    >>> from baseband import dada
+
+Single files can be opened with :func:`~baseband.dada.open` in binary mode. 
+Dada files consist of just a single header and payload, and can be read into a
+single :class:`~baseband.dada.DADAFrame`.
 
 ::
 
-    >>> from baseband import dada
-    >>> from baseband.data import SAMPLE_DADA
     >>> fh = dada.open(SAMPLE_DADA, 'rb')
     >>> frame = fh.read_frame()
     >>> frame.shape
@@ -37,29 +42,16 @@ are loaded into memory (since the sample file is encoded using 8 bits, the
 above example thus loads 12 bytes into memory).
 
 Opening in stream mode wraps the low-level routines such that reading and
-writing is in units of samples, and one has access to header information.
-
-::
-
-    >>> fh = dada.open(SAMPLE_DADA, 'rs')
-    >>> fh
-    <DADAStreamReader name=... offset=0
-        frames_per_second=1000.0, samples_per_frame=16000,
-        sample_shape=SampleShape(npol=2), bps=8,
-        thread_ids=[0, 1], (start) time=2013-07-02T01:39:20.000>
-    >>> d = fh.read(10000)
-    >>> d.shape
-    (10000, 2)
-    >>> d[:3]
-    array([[ -38.-38.j,  -38.-38.j],
-           [ -38.-38.j,  -40. +0.j],
-           [-105.+60.j,   85.-15.j]], dtype=complex64)
-    >>> fh.close()
+writing is in units of samples, and provides access to header information.
 
 To set up a file for writing as a stream is possible as well.  Here, we use an
 even smaller size of the payload, to show how one can define multiple files.
 
 ::
+
+    >>> fh = dada.open(SAMPLE_DADA, 'rs')
+    >>> d = fh.read(10000)
+    >>> fh.close()
 
     >>> from astropy.time import Time
     >>> import astropy.units as u

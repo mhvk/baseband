@@ -41,6 +41,9 @@ class Mark4Frame(VLBIFrameBase):
         (e.g., that channel information and number of tracks are consistent
         between header and data).  Default: `True`.
 
+    Notes
+    -----
+
     The Frame can also be read instantiated using class methods:
 
       fromfile : read header and payload from a filehandle
