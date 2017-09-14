@@ -110,8 +110,8 @@ class Mark4TrackHeader(VLBIHeaderBase):
     """
 
     _header_parser = HeaderParser(
-        (('bcd_headstack1', (0, 0, 16)),
-         ('bcd_headstack2', (0, 16, 16)),
+        (('bcd_headstack1', (0, 0, 16, 0x3344)),
+         ('bcd_headstack2', (0, 16, 16, 0x1122)),
          ('headstack_id', (1, 30, 2)),
          ('bcd_track_id', (1, 24, 6)),
          ('fan_out', (1, 22, 2)),
@@ -248,8 +248,8 @@ class Mark4Header(Mark4TrackHeader):
 
     _track_header = Mark4TrackHeader
     _properties = (Mark4TrackHeader._properties +
-                   ('fanout', 'samples_per_frame', 'bps', 'converters',
-                    'nchan'))
+                   ('fanout', 'samples_per_frame', 'bps', 'nchan', 'nsb',
+                    'converters'))
     _dtypes = MARK4_DTYPES
 
     # keyed with bps, fanout; Tables 10-14 in reference documentation:
@@ -414,6 +414,10 @@ class Mark4Header(Mark4TrackHeader):
         elif ntrack == 32:
             kwargs.setdefault('headstack_id', np.zeros(32, dtype=int))
             kwargs.setdefault('track_id', np.arange(2, 34))
+        # set number of sidebands to default if no information is given.
+        if not any(key in kwargs for key in ('lsb_output', 'converter_id',
+                                             'converter')):
+            kwargs.setdefault('nsb', 1)
         return super(Mark4Header, cls).fromvalues(ntrack, decade, **kwargs)
 
     def update(self, crc=None, verify=True, **kwargs):
@@ -506,8 +510,7 @@ class Mark4Header(Mark4TrackHeader):
         """Number of bits per sample (either 1 or 2).
 
         If set, combined with ``fanout`` and ``ntrack`` to updates
-        ``magnitude_bit`` for all tracks, and with ``lsb_output`` to set
-        ``converters`` (which should be set explicitly to override this).
+        ``magnitude_bit`` for all tracks.
         """
         return 2 if self['magnitude_bit'].any() else 1
 
@@ -525,51 +528,6 @@ class Mark4Header(Mark4TrackHeader):
             raise ValueError("Mark 4 data can only have bps=1 or 2, "
                              "not {0}".format(bps))
 
-        # set default converters; can be overridden if needed.
-        sb = self['lsb_output']
-        nsb = 1 if (sb == sb[0]).all() else 2
-        nconverter = self.ntrack // (self.fanout * bps * nsb)
-        converters = np.arange(nconverter)
-        if nconverter > 2:
-            converters = (converters.reshape(-1, 2, 2)
-                          .transpose(0, 2, 1).ravel())
-        self.converters = converters
-
-    @property
-    def converters(self):
-        """Converted IDs used for each channel.
-
-        Two channels can share a converter if both side bands are used.
-        """
-        # TODO: also add lsb property which returns array with same shape.
-        # Maybe easier to also define nconverter and nsb?
-        return self['converter_id'][self.track_assignment[0, :, 0]]
-
-    @converters.setter
-    def converters(self, converters):
-        # set converters, duplicating over fanout, lsb, magnitude bit.
-        ta = self.track_assignment
-        sb = self['lsb_output']
-        nsb = 1 if (sb == sb[0]).all() else 2
-        if len(converters) != ta.shape[1] // nsb:
-            raise ValueError('Mark 4 file with bps={0}, fanout={1} and {2} '
-                             'needs to define {3} converters'
-                             .format(self.bps, self.fanout,
-                                     ('a single sideband' if nsb == 1
-                                      else 'two sidebands'),
-                                     ta.shape[1] // nsb))
-
-        if nsb == 2:
-            c = np.empty(ta.shape[1], dtype=int)
-            sb0 = sb[ta[0, :, 0]]
-            c[sb0] = c[~sb0] = converters
-            converters = c
-
-        # Note: cannot assign to slice of header property, so go via array.
-        converter_id = np.empty(self.ntrack, dtype=int)
-        converter_id[ta] = converters[:, np.newaxis]
-        self['converter_id'] = converter_id
-
     @property
     def nchan(self):
         """Number of independent baseband channels.
@@ -581,6 +539,82 @@ class Mark4Header(Mark4TrackHeader):
     @nchan.setter
     def nchan(self, nchan):
         self.bps = self.ntrack // (self.fanout * nchan)
+
+    @property
+    def nsb(self):
+        """Number of side bands used.
+
+        If set, assumes all converters are upper sideband for 1, and that
+        converter IDs alternate between upper and lower sideband for 2.
+        """
+        sb = self['lsb_output']
+        return 1 if (sb == sb[0]).all() else 2
+
+    @nsb.setter
+    def nsb(self, nsb):
+        if nsb == 1:
+            self['lsb_output'] = True
+
+        elif nsb == 2:
+            ta = self.track_assignment
+            ta_ch = ta[0, :, 0]
+            sb = np.tile([False, True], len(ta_ch) // 2)
+            lsb_output = np.empty(self.ntrack, bool)
+            lsb_output[ta] = sb[:, np.newaxis]
+            self['lsb_output'] = np.tile([False, True], 16)
+
+        else:
+            raise ValueError("number of sidebands can only be 1 or 2.")
+
+        # set default converters; can be overridden if needed.
+        nconverter = self.ntrack // (self.fanout * self.bps * self.nsb)
+        converters = np.arange(nconverter)
+        if nconverter > 2:
+            converters = (converters.reshape(-1, 2, 2)
+                          .transpose(0, 2, 1).ravel())
+        self.converters = converters
+
+    @property
+    def converters(self):
+        """Converted ID and sideband used for each channel."""
+        ta_ch = self.track_assignment[0, :, 0]
+        converters = np.empty(len(ta_ch), [("converter", "i4"), ("lsb", "b")])
+        converters['converter'] = self['converter_id'][ta_ch]
+        converters['lsb'] = self['lsb_output'][ta_ch]
+        return converters
+
+    @converters.setter
+    def converters(self, converters):
+        # set converters, duplicating over fanout, lsb, magnitude bit.
+        ta = self.track_assignment
+        ta_ch = ta[0, :, 0]
+        nchan = len(ta_ch)
+        msg = ('Mark 4 file with bps={0}, fanout={1} '
+               'needs to define {2} converters')
+        try:
+            converter = converters['converter']
+        except(KeyError, ValueError, IndexError):
+            converter = np.array(converters)
+            sb = self['lsb_output'][ta_ch]
+            if self.nsb == 2 and len(converter) == len(ta_ch) // 2:
+                c = np.empty(len(ta_ch), dtype=int)
+                c[sb] = c[~sb] = converter
+                converter = c
+            if len(converter) != nchan:
+                raise ValueError(msg.format(self.bps, self.fanout, nchan))
+
+        else:
+            sb = np.array(converters['lsb'])
+            if len(converter) != nchan:
+                raise ValueError(msg.format(self.bps, self.fanout, nchan))
+            lsb_output = np.empty(self.ntrack, bool)
+            lsb_output[ta] = sb[:, np.newaxis]
+            self['lsb_output'] = lsb_output
+
+        # Note: cannot assign to slice of header property, so go via array.
+        converter_id = np.empty(self.ntrack, dtype=int)
+        converter_id[ta] = converter[:, np.newaxis]
+        self['converter_id'] = converter_id
 
     def get_time(self):
         """

@@ -292,8 +292,7 @@ class TestMark4ToVDIF1(object):
                 with io.BytesIO() as s2, mark4.open(
                         s2, 'ws', sample_rate=hv.bandwidth*2,
                         time=hv.time, ntrack=64, bps=2, fanout=4,
-                        bcd_headstack1=0x3344, bcd_headstack2=0x1122,
-                        lsb_output=True, system_id=108) as fw:
+                        system_id=108) as fw:
                     fw.write(dv)
                     number_of_bytes = s2.tell()
                     fm_raw = fm.fh_raw

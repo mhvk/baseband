@@ -76,6 +76,10 @@ class TestMark4(object):
         assert header.framesize == 20000 * 64 // 8
         assert header.payloadsize == header.framesize - header.size
         assert header.mutable is False
+        assert header.nsb == 1
+        assert np.all(header.converters['converter'] ==
+                      [0, 2, 1, 3, 4, 6, 5, 7])
+        assert np.all(header.converters['lsb'])
         assert repr(header).startswith('<Mark4Header bcd_headstack1: [0')
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             header.tofile(s)
@@ -94,9 +98,8 @@ class TestMark4(object):
         # and ntrack, samples_per_frame, bps define headstack_id, bcd_track_id,
         # fan_out, magnitude_bit, and converter_id.
         header4 = mark4.Mark4Header.fromvalues(
-            ntrack=64, samples_per_frame=80000, bps=2, time=header.time,
-            bcd_headstack1=0x3344, bcd_headstack2=0x1122,
-            lsb_output=True, system_id=108)
+            ntrack=64, samples_per_frame=80000, bps=2, nsb=1, time=header.time,
+            system_id=108)
         assert header4 == header
         assert header4.mutable is True
         # Check decade.
@@ -166,13 +169,6 @@ class TestMark4(object):
         header12.time = header.time
         assert header12.ntrack == 53
         assert abs(header12.time - header.time) < 1. * u.ns
-        # with fromvalues, need to use ntrack covered by MARK4_DTYPES,
-        # otherwise crc generation fails. Still, use verify=False since many
-        # other things are not set.
-        header13 = mark4.Mark4Header.fromvalues(ntrack=16, time=header.time,
-                                                verify=False)
-        assert header13.ntrack == 16
-        assert abs(header13.time - header.time) < 1. * u.ns
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
@@ -582,14 +578,15 @@ class Test32TrackFanout4():
             header = mark4.Mark4Header.fromfile(fh, ntrack=32, decade=2010)
 
         # Try initialising with properties instead of keywords.
-        # Here, we let time imply the decade, bcd_unit_year, bcd_day, bcd_hour,
-        # bcd_minute, bcd_second, bcd_fraction;
-        # and ntrack, samples_per_frame, bps define headstack_id, bcd_track_id,
-        # fan_out, magnitude_bit, and converter_id.
+        # Here, we let
+        # * time imply the decade, bcd_unit_year, bcd_day, bcd_hour,
+        #   bcd_minute, bcd_second, bcd_fraction;
+        # * ntrack, samples_per_frame, bps define headstack_id, bcd_track_id,
+        #   fan_out, and magnitude_bit;
+        # * nsb defines lsb_output and converter_id.
         header1 = mark4.Mark4Header.fromvalues(
-            ntrack=32, samples_per_frame=80000, bps=2, time=header.time,
-            bcd_headstack1=0x3344, bcd_headstack2=0x1122,
-            lsb_output=np.tile([False, True], 16), system_id=108)
+            ntrack=32, samples_per_frame=80000, bps=2, nsb=2, time=header.time,
+            system_id=108)
         assert header1 == header
 
     def test_file_streamer(self, tmpdir):
@@ -646,15 +643,15 @@ class Test32TrackFanout2():
             header = mark4.Mark4Header.fromfile(fh, ntrack=32, decade=2010)
 
         # Try initialising with properties instead of keywords.
-        # Here, we let time imply the decade, bcd_unit_year, bcd_day, bcd_hour,
-        # bcd_minute, bcd_second, bcd_fraction;
-        # and ntrack, samples_per_frame, bps define headstack_id, bcd_track_id,
-        # fan_out, magnitude_bit, and converter_id.
+        # * time imply the decade, bcd_unit_year, bcd_day, bcd_hour,
+        #   bcd_minute, bcd_second, bcd_fraction;
+        # * ntrack, samples_per_frame, bps define headstack_id, bcd_track_id,
+        #   fan_out, and magnitude_bit;
+        # * header.converter since lsb_output and converter_id are somewhat
+        #   non-standard
         header1 = mark4.Mark4Header.fromvalues(
             ntrack=32, samples_per_frame=40000, bps=2, time=header.time,
-            bcd_headstack1=0x3344, bcd_headstack2=0x1122,
-            lsb_output=np.hstack((np.zeros(16, dtype=bool),
-                                  np.ones(16, dtype=bool))), system_id=108)
+            system_id=108, converters=header.converters)
         assert header1 == header
 
     def test_file_streamer(self, tmpdir):
