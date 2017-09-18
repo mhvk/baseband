@@ -233,10 +233,25 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     def _get_frame_rate(fh, header_template):
         """Returns the number of frames in one second of data.
 
+        Parameters
+        ----------
+        fh : io.BufferedReader
+            Binary file handle.
+        header_template : header class or instance
+            Definition or instance of file format's header class.
+
+        Returns
+        -------
+        fps : int
+            Frames per second.
+
+        Notes
+        -----
+
         Unlike VLBIStreamReaderBase._get_frame_rate, this function reads
-        only two frames, extracting the timestamps from each to determine
-        how much time has passed between frames.  If the function fails,
-        it is either because only one frame exists or file is corrupt.
+        only two consecutive frames, extracting their timestamps to determine
+        how much time has elapsed.  It will return an EOFError if there is
+        only one frame.
         """
         oldpos = fh.tell()
         header0 = header_template.fromfile(fh, header_template.ntrack,

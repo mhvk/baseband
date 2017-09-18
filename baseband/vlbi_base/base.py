@@ -134,10 +134,10 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                                                          header0)
             except Exception as exc:
                 exc.args += ("The frame rate could not be auto-detected. "
-                             "This can happen if the file has less than "
-                             "one second of data, is in Mark 4 format and "
-                             "has only one frame, or because it is corrupted. "
-                             "Try passing in an explicit 'frames_per_second'.",)
+                             "This can happen if the file is too short to "
+                             "determine the frame rate, or because it is "
+                             "corrupted.  Try passing in an explicit "
+                             "'frames_per_second'.",)
                 raise
 
         super(VLBIStreamReaderBase, self).__init__(
@@ -147,6 +147,21 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     @staticmethod
     def _get_frame_rate(fh, header_template):
         """Returns the number of frames in one second of data.
+
+        Parameters
+        ----------
+        fh : io.BufferedReader
+            Binary file handle.
+        header_template : header class or instance
+            Definition or instance of file format's header class.
+
+        Returns
+        -------
+        fps : int
+            Frames per second.
+
+        Notes
+        -----
 
         The function cycles through headers, starting from the file
         pointer's current position, to find the next frame whose
