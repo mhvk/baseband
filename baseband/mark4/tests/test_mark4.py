@@ -448,6 +448,15 @@ class TestMark4(object):
         assert not np.any(record2[1] == 0.)
         assert np.all(record3 == record2)
 
+        # Test if _get_frame_rate automatic frame rate calculator works,
+        # returns same header and payload info.
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fh:
+            assert header == fh.header0
+            assert fh.frames_per_second * fh.samples_per_frame == 32000000
+            record4 = fh.read(642)
+
+        assert np.all(record4 == record)
+
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz) as fh:
             time0 = fh.tell(unit='time')

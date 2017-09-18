@@ -389,10 +389,12 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def size(self):
+        """Header size, in bytes."""
         return self.ntrack * 160 // 8
 
     @property
     def framesize(self):
+        """Frame size, in bytes."""
         return self.ntrack * PAYLOADSIZE // 8
 
     @framesize.setter
@@ -402,7 +404,7 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def payloadsize(self):
-        """Payloadsize; missing pieces are the header bytes."""
+        """Payload size, in bytes; missing pieces are the header bytes."""
         return self.framesize - self.size
 
     @payloadsize.setter
