@@ -131,13 +131,13 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         if frames_per_second is None and sample_rate is None:
             try:
                 frames_per_second = self._get_frame_rate(fh_raw,
-                                                         type(header0))
+                                                         header0)
             except Exception as exc:
-                exc.args += ("the frame rate could not be auto-detected. "
+                exc.args += ("The frame rate could not be auto-detected. "
                              "This can happen if the file has less than "
-                             "one second of data, or because it is "
-                             "corrupted.  Try passing in an explicit "
-                             "'frames_per_second'.",)
+                             "one second of data, is in Mark 4 format and "
+                             "has only one frame, or because it is corrupted. "
+                             "Try passing in an explicit 'frames_per_second'.",)
                 raise
 
         super(VLBIStreamReaderBase, self).__init__(
@@ -145,7 +145,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             samples_per_frame, frames_per_second, sample_rate)
 
     @staticmethod
-    def _get_frame_rate(fh, header_class):
+    def _get_frame_rate(fh, header_template):
         """Returns the number of frames in one second of data.
 
         The function cycles through headers, starting from the file
@@ -161,17 +161,17 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         correct.
         """
         oldpos = fh.tell()
-        header = header_class.fromfile(fh)
+        header = header_template.fromfile(fh)
         frame_nr0 = header['frame_nr']
         sec0 = header.seconds
         while header['frame_nr'] == frame_nr0:
             fh.seek(header.payloadsize, 1)
-            header = header_class.fromfile(fh)
+            header = header_template.fromfile(fh)
         max_frame = frame_nr0
         while header['frame_nr'] > 0:
             max_frame = max(header['frame_nr'], max_frame)
             fh.seek(header.payloadsize, 1)
-            header = header_class.fromfile(fh)
+            header = header_template.fromfile(fh)
 
         if header.seconds != sec0 + 1:  # pragma: no cover
             warnings.warn("Header time changed by more than 1 second?")
