@@ -379,7 +379,7 @@ class TestMark5B(object):
 
         # Check files can be made byte-for-byte identical.
         m5_test2 = str(tmpdir.join('test2.m5b'))
-        with mark5b.open(m5_test2, 'ws', time=time0, nchan=8, bps=2, 
+        with mark5b.open(m5_test2, 'ws', time=time0, nchan=8, bps=2,
                          sample_rate=32*u.MHz, user=header['user'],
                          internal_tvg=header['internal_tvg'],
                          frame_nr=header['frame_nr']) as fw:
@@ -401,6 +401,7 @@ class TestMark5B(object):
         with mark5b.open(m5_test3, 'rs', nchan=8, bps=2,
                          sample_rate=10*u.kHz, ref_mjd=57000) as fh:
             record6 = fh.read()     # Read across days.
+            assert np.all(record6 == record)
             assert fh.tell(unit='time').iso == '2014-06-14 00:00:01.000000000'
 
     def test_stream_invalid(self):
