@@ -225,11 +225,15 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         offset0 = self.offset
         while count > 0:
             dt, frame_nr, sample_offset = self._frame_info()
-            if(dt != self._frame.seconds - self.header0.seconds or
+            dt_expected = (self._frame.seconds - self.header0.seconds +
+                           86400 * (self._frame.jday - self.header0.jday))
+            if(dt != dt_expected or
                frame_nr != self._frame['frame_nr']):
                 # Read relevant frame, reusing data array from previous frame.
                 self._read_frame()
-                assert dt == (self._frame.seconds - self.header0.seconds)
+                dt_expected = (self._frame.seconds - self.header0.seconds +
+                               86400 * (self._frame.jday - self.header0.jday))
+                assert dt == dt_expected
                 assert frame_nr == self._frame['frame_nr']
 
             data = self._frame.data

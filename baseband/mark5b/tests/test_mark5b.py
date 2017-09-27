@@ -54,7 +54,7 @@ from ...data import SAMPLE_MARK5B as SAMPLE_FILE
 
 
 class TestMark5B(object):
-    def test_header(self):
+    def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(
                 fh, ref_mjd=Time('2014-06-01').mjd)
@@ -67,7 +67,7 @@ class TestMark5B(object):
         assert header.payloadsize == 10000
         assert header.framesize == 10016
         assert header['frame_nr'] == 0
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             header.tofile(s)
             s.seek(0)
             header2 = mark5b.Mark5BHeader.fromfile(s, header.kday)
@@ -118,7 +118,7 @@ class TestMark5B(object):
         assert np.all(mark5b.payload.lut2bit[0xaa] == -1.)
         assert np.all(mark5b.payload.lut2bit[0xff] == o2h)
 
-    def test_payload(self):
+    def test_payload(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(16)  # skip header
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
@@ -130,7 +130,7 @@ class TestMark5B(object):
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
                                 [-3, +3, -1, +3, -1, -1, -1, +1],
                                 [+3, -1, +3, +3, +1, -1, +3, -1]]))
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             payload.tofile(s)
             s.seek(0)
             payload2 = mark5b.Mark5BPayload.fromfile(s, payload.nchan,
@@ -172,7 +172,7 @@ class TestMark5B(object):
         assert np.all(payload2[item] == sel_data)
         assert payload2 == payload
 
-    def test_frame(self):
+    def test_frame(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
@@ -186,7 +186,7 @@ class TestMark5B(object):
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
                                 [-3, +3, -1, +3, -1, -1, -1, +1],
                                 [+3, -1, +3, +3, +1, -1, +3, -1]]))
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
             frame2 = mark5b.Mark5BFrame.fromfile(s, ref_mjd=57000.,
@@ -244,7 +244,7 @@ class TestMark5B(object):
         with pytest.raises(ValueError):
             header.get_time(frame_nr=1)
 
-    def test_find_header(self):
+    def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,
         # since otherwise they run *very* slow.  This is somehow related to
         # pytest, since speed is not a big issue running stuff on its own.
@@ -270,29 +270,31 @@ class TestMark5B(object):
         assert header_16b == header_0
         assert header_10000f['frame_nr'] == 1
         assert header_m10000b['frame_nr'] == 3
-        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+        m5_test = str(tmpdir.join('test.m5b'))
+        with open(m5_test, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
             s.write(f.read(10040))
             f.seek(20000)
             s.write(f.read())
-            with mark5b.open(s, 'rb') as fh:
-                fh.seek(0)
-                header_0 = fh.find_header(template_header=header0)
-                assert fh.tell() == 0
-                fh.seek(10000)
-                header_10000f = fh.find_header(template_header=header0,
-                                               forward=True)
-                assert fh.tell() == header0.framesize * 2 - 9960
+        with mark5b.open(m5_test, 'rb') as fh:
+            fh.seek(0)
+            header_0 = fh.find_header(template_header=header0)
+            assert fh.tell() == 0
+            fh.seek(10000)
+            header_10000f = fh.find_header(template_header=header0,
+                                           forward=True)
+            assert fh.tell() == header0.framesize * 2 - 9960
         # for completeness, also check a really short file...
-        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+        m5_test2 = str(tmpdir.join('test2.m5b'))
+        with open(m5_test2, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
             s.write(f.read(10018))
-            with mark5b.open(s, 'rb') as fh:
-                fh.seek(10)
-                header_10 = fh.find_header(template_header=header0,
-                                           forward=False)
-                assert fh.tell() == 0
-            assert header_10 == header0
+        with mark5b.open(m5_test2, 'rb') as fh:
+            fh.seek(10)
+            header_10 = fh.find_header(template_header=header0,
+                                       forward=False)
+            assert fh.tell() == 0
+        assert header_10 == header0
 
-    def test_filestreamer(self):
+    def test_filestreamer(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
 
@@ -352,8 +354,9 @@ class TestMark5B(object):
             record = fh.read(20000)
             time1 = fh.tell(unit='time')
 
-        with io.BytesIO() as s, mark5b.open(s, 'ws', time=time0, nchan=8,
-                                            bps=2, sample_rate=32*u.MHz) as fw:
+        m5_test = str(tmpdir.join('test.m5b'))
+        with mark5b.open(m5_test, 'ws', time=time0, nchan=8,
+                         bps=2, sample_rate=32*u.MHz) as fw:
             # Write in pieces to ensure squeezed data can be handled,
             # And add in an invalid frame for good measure.
             fw.write(record[:10])
@@ -364,11 +367,9 @@ class TestMark5B(object):
             fw.write(record[5000:10000], invalid_data=True)
             fw.write(record[10000:])
             assert fw.tell(unit='time') == time1
-            fw.fh_raw.flush()
 
-            s.seek(0)
-            fh = mark5b.open(s, 'rs', nchan=8, bps=2, sample_rate=32*u.MHz,
-                             ref_mjd=57000)
+        with mark5b.open(m5_test, 'rs', nchan=8, bps=2, sample_rate=32*u.MHz,
+                         ref_mjd=57000) as fh:
             assert fh.tell(unit='time') == time0
             record2 = fh.read(20000)
             assert fh.tell(unit='time') == time1
@@ -377,17 +378,31 @@ class TestMark5B(object):
             assert np.all(record2[10000:] == record[10000:])
 
         # Check files can be made byte-for-byte identical.
-        with io.BytesIO() as s, mark5b.open(
-                s, 'ws', time=time0, nchan=8, bps=2, sample_rate=32*u.MHz,
-                user=header['user'], internal_tvg=header['internal_tvg'],
-                frame_nr=header['frame_nr']) as fw:
-
+        m5_test2 = str(tmpdir.join('test2.m5b'))
+        with mark5b.open(m5_test2, 'ws', time=time0, nchan=8, bps=2,
+                         sample_rate=32*u.MHz, user=header['user'],
+                         internal_tvg=header['internal_tvg'],
+                         frame_nr=header['frame_nr']) as fw:
             fw.write(record)
-            s.seek(0)
-            with open(SAMPLE_FILE, 'rb') as fr:
-                orig_bytes = fr.read()
-                conv_bytes = s.read()
-                assert conv_bytes == orig_bytes
+
+        with open(SAMPLE_FILE, 'rb') as fr, open(m5_test2, 'rb') as fs:
+            orig_bytes = fr.read()
+            conv_bytes = fs.read()
+            assert conv_bytes == orig_bytes
+
+        # Check if data can be read across days.  Write out sample Mark 5B
+        # with fake timecode and step, and see if it can be re-read.
+        m5_test3 = str(tmpdir.join('test3.m5b'))
+        time_premidnight = Time('2014:164:23:59:59')
+        with mark5b.open(m5_test3, 'ws', time=time_premidnight,
+                         nchan=8, bps=2, sample_rate=10*u.kHz) as fw:
+            fw.write(record)
+
+        with mark5b.open(m5_test3, 'rs', nchan=8, bps=2,
+                         sample_rate=10*u.kHz, ref_mjd=57000) as fh:
+            record6 = fh.read()     # Read across days.
+            assert np.all(record6 == record)
+            assert fh.tell(unit='time').iso == '2014-06-14 00:00:01.000000000'
 
     def test_stream_invalid(self):
         with pytest.raises(ValueError):
