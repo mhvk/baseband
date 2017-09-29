@@ -62,6 +62,11 @@ When writing to file, we need to pass in the frame rate in addition to
 ``ntrack`` and ``decade`` so that times for individual samples can be
 calculated.
 
+    >>> fw = mark4.open('sample_mark4_segment.m4', 'ws', header=frame.header,
+    ...                 ntrack=64, decade=2010, frames_per_second=400)
+    >>> fw.write(frame.data)
+    >>> fw.close()
+
 .. _mark4_api:
 
 Reference/API
