@@ -11,7 +11,7 @@ __all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
 
 # The high mag value for 2-bit reconstruction.  Note that mark5access uses
 # OPTIMAL_2BIT_HIGH = 3.3359, which is possibly a typo.
-OPTIMAL_2BIT_HIGH = 3.3359
+OPTIMAL_2BIT_HIGH = 3.316505
 r"""Optimal high value for a 2-bit digitizer for which the low value is 1.
 
 It is chosen such that for a normal distribution in which 68.269% of all
