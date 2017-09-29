@@ -9,29 +9,40 @@ __all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
            'encode_4bit_base', 'decode_8bit', 'encode_8bit']
 
 
-# The high mag value for 2-bit reconstruction.
+# The high mag value for 2-bit reconstruction.  Note that mark5access uses
+# OPTIMAL_2BIT_HIGH = 3.3359, which is possibly a typo.
 OPTIMAL_2BIT_HIGH = 3.3359
-r"""Optimal high value for a 2-bit digitizer for which the low value is
-+/- 1.
+r"""Optimal high value for a 2-bit digitizer for which the low value is 1.
 
 It is chosen such that for a normal distribution in which 68.269% of all
 values are at the low level, this is the mean of the others, i.e.,
 
 .. math::
 
-     l = \frac{\int_\sigma^\infty x \exp(-\frac{x^2}{2\sigma^2}) dx}
-              {\int_\sigma^\infty \exp(-\frac{x^2}{2\sigma^2}) dx},
+    l = \frac{\int_\sigma^\infty x \exp(-\frac{x^2}{2\sigma^2}) dx}
+             {\int_\sigma^\infty \exp(-\frac{x^2}{2\sigma^2}) dx},
 
-where the standard deviation :math:`\sigma = 2.1745`, which can
-implicitly be determined from:
+where the standard deviation is determined from:
 
 .. math::
 
-     1 = \frac{\int_0^\sigma x \exp(-\frac{x^2}{2\sigma^2}) dx}
-          {\int_0^\sigma \exp(-\frac{x^2}{2\sigma^2}) dx}.
+    1 = \frac{\int_0^\sigma x \exp(-\frac{x^2}{2\sigma^2}) dx}
+         {\int_0^\sigma \exp(-\frac{x^2}{2\sigma^2}) dx}.
 
+These give:
+
+.. math::
+
+    \sigma = \frac{\sqrt{\frac{\pi}{2}}\mathrm{erf}
+             (\sqrt{1/2})}{1 - \sqrt{1/e}} = 2.174564,
+
+and
+
+.. math::
+
+    l = \frac{1}{(\sqrt{e} - 1)(1/\mathrm{erf}(\sqrt{1/2}) - 1)} = 3.316505
 """
-TWO_BIT_1_SIGMA = 2.1745
+TWO_BIT_1_SIGMA = 2.174564
 """Optimal level between low and high for the above OPTIMAL_2BIT_HIGH."""
 FOUR_BIT_1_SIGMA = 2.95
 """Scaling for four-bit encoding that makes it look like 2 bit."""
@@ -66,8 +77,7 @@ def encode_2bit_base(values):
        lv < value         3
       ================= ======
 
-    Samples remain distinct, and have not been merged together into
-    bytes or int32 words.
+    This does not pack the samples into bytes.
     """
     # Optimized for speed by doing calculations in-place, and ensuring that
     # the dtypes match.
@@ -96,8 +106,7 @@ def encode_4bit_base(values):
        6.5 < value*scale          15
       ========================= ======
 
-    Samples remain distinct, and have not been merged together into
-    bytes or int32 words.
+    This does not pack the samples into bytes.
     """
     # Optimized for speed by doing calculations in-place.
     values = values * FOUR_BIT_1_SIGMA

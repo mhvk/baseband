@@ -20,8 +20,7 @@ __all__ = ['init_luts', 'decode_2bit', 'decode_4bit', 'encode_2bit',
 
 
 def init_luts():
-    """Sets up the look-up tables for levels as a function of input
-    byte.
+    """Sets up the look-up tables for levels as a function of input byte.
 
     Returns
     -------
@@ -69,7 +68,7 @@ lut1bit, lut2bit, lut4bit = init_luts()
 
 
 def decode_2bit(words):
-    """Decodes int32 words into 2-bit samples."""
+    """Decodes data stored using 2 bits per sample."""
     b = words.view(np.uint8)
     return lut2bit.take(b, axis=0)
 
@@ -78,14 +77,15 @@ shift2bit = np.arange(0, 8, 2).astype(np.uint8)
 
 
 def encode_2bit(values):
-    """Encodes 2-bit samples into int32 words."""
+    """Encodes values using 2 bits per sample, packing the result into bytes.
+    """
     bitvalues = encode_2bit_base(values.reshape(-1, 4))
     bitvalues <<= shift2bit
     return np.bitwise_or.reduce(bitvalues, axis=-1)
 
 
 def decode_4bit(words):
-    """Decodes int32 words into 4-bit samples."""
+    """Decodes data stored using 4 bits per sample."""
     b = words.view(np.uint8)
     return lut4bit.take(b, axis=0)
 
@@ -94,7 +94,8 @@ shift04 = np.array([0, 4], np.uint8)
 
 
 def encode_4bit(values):
-    """Encodes 4-bit samples into int32 words."""
+    """Encodes values using 4 bits per sample, packing the result into bytes.
+    """
     b = encode_4bit_base(values).reshape(-1, 2)
     b <<= shift04
     return b[:, 0] | b[:, 1]

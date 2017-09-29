@@ -139,8 +139,7 @@ class VLBIPayloadBase(object):
         return np.dtype(np.complex64 if self.complex_data else np.float32)
 
     def _item_to_slices(self, item):
-        """Get word and data slices required to retrieve sample(s)
-        specified by ``item``.
+        """Get word and data slices required to obtain given item.
 
         Parameters
         ----------
@@ -156,16 +155,16 @@ class VLBIPayloadBase(object):
             ``ds`` is the smallest possible array that includes all
             of the requested ``item``.
         data_slice : int or slice
-            Int or slice such that ``ds[data_slice]`` is the requested
+            Int or slice such that ``decode(ds)[data_slice]`` is the requested
             ``item``.
 
         Notes
         -----
-        Since ``item`` is restricted to (tuples of) ints or slices, cannot
+        ``item`` is restricted to (tuples of) ints or slices, so one cannot
         access non-contiguous samples using fancy indexing.  If ``item``
-        is a slice, cannot use a negative increment.  Unable to parse
-        payloads whose words have unused space (eg. VDIF files with 20
-        bits/sample).
+        is a slice, a negative increment cannot be used.  The function is
+        unable to parse payloads whose words have unused space (eg. VDIF files
+        with 20 bits/sample).
         """
         if isinstance(item, tuple):
             word_slice, data_slice = self._item_to_slices(item[0])
@@ -244,9 +243,9 @@ class VLBIPayloadBase(object):
             words_slice, data_slice = self._item_to_slices(item)
 
         data = np.asanyarray(data)
-        # Check if new data spans entire word and is correctly shaped.  If
-        # so, can skip decoding.  If not, decode appropriate words and
-        # insert new data.
+        # Check if the new data spans an entire word and is correctly shaped.
+        # If so, skip decoding.  If not, decode appropriate words and insert
+        # new data.
         if not (data_slice == slice(None) and
                 data.shape[-len(self.sample_shape):] == self.sample_shape and
                 data.dtype.kind == self.dtype.kind):
