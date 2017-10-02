@@ -63,7 +63,7 @@ would use the `~baseband.vdif.base.VDIFStreamReader.read` method::
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> d = fh.read(12)
     >>> type(d)
-    <class 'numpy.ndarray'>
+    <... 'numpy.ndarray'>
     >>> d.shape
     (12, 8)
     >>> d[:, 0].astype(int)  # First thread.
@@ -165,10 +165,7 @@ lookup::
     >>> header0['frame_length']
     629
 
-The full list of keywords is available through the ``keys`` method::
-
-    >>> header0.keys()
-    odict_keys(['invalid_data', 'legacy_mode', ...])
+The full list of keywords is available by printing out ``header0.keys()``.
 
 A number of derived properties, such as the time (as a `~astropy.time.Time`
 object), are also available through the header object.  
