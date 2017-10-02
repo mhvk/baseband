@@ -24,7 +24,6 @@ Using Baseband
    :maxdepth: 1
 
    tutorials/getting_started
-   tutorials/frame_io
 
 .. _specific_file_formats_toc:
 
