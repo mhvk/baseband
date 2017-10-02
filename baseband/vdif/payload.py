@@ -10,6 +10,7 @@ specifications.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
+from collections import namedtuple
 
 from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.encoding import (encode_2bit_base, encode_4bit_base,
@@ -130,6 +131,8 @@ class VDIFPayload(VLBIPayloadBase):
                  4: encode_4bit,
                  8: encode_8bit}
 
+    _sample_shape_template = namedtuple('_sample_shape_template', ['nchan',])
+
     def __init__(self, words, header=None,
                  nchan=1, bps=2, complex_data=False):
         if header is not None:
@@ -143,8 +146,9 @@ class VDIFPayload(VLBIPayloadBase):
                 self._encoders = Mark5BPayload._encoders
                 if complex_data:
                     raise ValueError("VDIF/Mark5B payload cannot be complex.")
+        sample_shape = 
         super(VDIFPayload, self).__init__(words, bps=bps,
-                                          sample_shape=(nchan,),
+                                          sample_shape=sample_shape,
                                           complex_data=complex_data)
         self.nchan = nchan
 
