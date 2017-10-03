@@ -11,6 +11,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import sys
 import numpy as np
+from collections import namedtuple
 from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
 from .header import MARK4_DTYPES
@@ -210,6 +211,9 @@ class Mark4Payload(VLBIPayloadBase):
                  (8, 2, 2): decode_8chan_2bit_fanout2,
                  (8, 2, 4): decode_8chan_2bit_fanout4}
 
+    _sample_shape_cls = namedtuple('sample_shape', 'nchan')
+    _sample_shape_cls.__doc__ = "Mark 4 sample shape."
+
     def __init__(self, words, header=None, nchan=1, bps=2, fanout=1):
         if header is not None:
             nchan = header.nchan
@@ -218,11 +222,11 @@ class Mark4Payload(VLBIPayloadBase):
             self._size = header.payloadsize
         self._dtype_word = MARK4_DTYPES[nchan * bps * fanout]
         self.fanout = fanout
+        sample_shape = self._sample_shape_cls(nchan)
         super(Mark4Payload, self).__init__(words, bps=bps,
-                                           sample_shape=(nchan,),
+                                           sample_shape=sample_shape,
                                            complex_data=False)
-        self.nchan = nchan
-        self._coder = (nchan, bps, fanout)
+        self._coder = (self.sample_shape.nchan, bps, fanout)
 
     @classmethod
     def fromfile(cls, fh, header):

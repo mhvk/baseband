@@ -1,9 +1,10 @@
 # Licensed under the GPLv3 - see LICENSE.rst
 import numpy as np
 
-from ..vlbi_base.base import (make_opener, VLBIFileBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase)
+from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamReaderBase,
+                              VLBIStreamWriterBase)
 from .header import Mark4Header
+from .payload import Mark4Payload
 from .frame import Mark4Frame
 
 
@@ -209,12 +210,14 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         ``sample_rate``, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
+    squeeze : bool
+        If `True` (default), remove channel and thread dimensions if unity.
     """
 
     _frame_class = Mark4Frame
 
     def __init__(self, fh_raw, ntrack, decade=None, thread_ids=None,
-                 frames_per_second=None, sample_rate=None):
+                 frames_per_second=None, sample_rate=None, squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
@@ -223,11 +226,13 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
+        sample_shape = self._frame.payload.sample_shape
         super(Mark4StreamReader, self).__init__(
-            fh_raw, header0=header, nchan=header.nchan, bps=header.bps,
-            complex_data=False, thread_ids=thread_ids,
+            fh_raw, header0=header, sample_shape=sample_shape,
+            bps=header.bps, complex_data=False, thread_ids=thread_ids,
             samples_per_frame=header.samples_per_frame,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
+        self.squeeze = squeeze
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
@@ -265,7 +270,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         tdelta = header1.ms[0] - header0.ms[0]
         return int(np.round(1000. / tdelta))
 
-    def read(self, count=None, fill_value=0., squeeze=True, out=None):
+    def read(self, count=None, fill_value=0., out=None):
         """Read count samples.
 
         The range retrieved can span multiple frames.
@@ -277,8 +282,6 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             file is read.
         fill_value : float
             Value to use for invalid or missing data.
-        squeeze : bool
-            If `True` (default), remove channel and thread dimensions if unity.
         out : `None` or array
             Array to store the data in. If given, count will be inferred,
             and squeeze is set to `False`.
@@ -292,8 +295,9 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            out = np.empty((self.nthread, count),
+            out = np.empty((self._sample_shape.nchan, count),
                            dtype=self._frame.dtype).T
+            squeeze = self.squeeze
         else:
             count = out.shape[0]
             squeeze = False
@@ -326,6 +330,12 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         # Convert payloads to data array.
         self._frame_data = self._frame.data
         self._frame_nr = frame_nr
+
+    @property
+    def sample_shape(self):
+        """Shape of a data sample (possibly squeezed).
+        """
+        return self._get_squeezed_shape('Mark 4')
 
 
 class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
@@ -365,21 +375,24 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
                  header=None, **kwargs):
         if header is None:
             header = Mark4Header.fromvalues(**kwargs)
+        sample_shape = Mark4Payload._sample_shape_cls(header.nchan)
         super(Mark4StreamWriter, self).__init__(
-            fh_raw=raw, header0=header, thread_ids=range(header.nchan),
-            bps=header.bps, nchan=header.nchan, complex_data=False,
+            fh_raw=raw, header0=header, sample_shape=sample_shape,
+            thread_ids=range(header.nchan), bps=header.bps, complex_data=False,
             samples_per_frame=(header.framesize * 8 // header.bps //
                                header.nchan),
             frames_per_second=frames_per_second, sample_rate=sample_rate)
 
-        self._data = np.zeros((self.samples_per_frame, self.nchan), np.float32)
+        self._data = np.zeros((self.samples_per_frame,
+                               self._sample_shape.nchan), np.float32)
 
     def write(self, data, squeezed=True, invalid_data=False):
         """Write data, buffering by frames as needed."""
         if squeezed and data.ndim < 2:
-            data = np.expand_dims(data, axis=1 if self.nthread == 1 else 0)
+            data = np.expand_dims(data, axis=1 if
+                                  self._sample_shape.nchan == 1 else 0)
 
-        assert data.shape[1] == self.nthread
+        assert data.shape[1] == self._sample_shape.nchan
 
         count = data.shape[0]
         sample = 0

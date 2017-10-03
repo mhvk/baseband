@@ -238,8 +238,8 @@ class VDIFStreamBase(VLBIStreamBase):
 
     _frame_class = VDIFFrame
 
-    def __init__(self, fh_raw, header0, thread_ids, frames_per_second=None,
-                 sample_rate=None):
+    def __init__(self, fh_raw, header0, sample_shape, thread_ids,
+                 frames_per_second=None, sample_rate=None):
         if frames_per_second is None and sample_rate is None:
             try:
                 frames_per_second = int(header0.framerate.to(u.Hz).value)
@@ -247,7 +247,7 @@ class VDIFStreamBase(VLBIStreamBase):
                 pass  # super below will scan file to get framerate.
 
         super(VDIFStreamBase, self).__init__(
-            fh_raw=fh_raw, header0=header0, nchan=header0.nchan,
+            fh_raw=fh_raw, header0=header0, sample_shape=sample_shape,
             bps=header0.bps, complex_data=header0['complex_data'],
             thread_ids=thread_ids,
             samples_per_frame=header0.samples_per_frame,
@@ -263,8 +263,9 @@ class VDIFStreamBase(VLBIStreamBase):
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
-                "    nthread={s.nthread}, "
-                "samples_per_frame={s.samples_per_frame}, nchan={s.nchan},\n"
+                "    nthread={s._sample_shape.nthread}, "
+                "samples_per_frame={s.samples_per_frame}, "
+                "nchan={s._sample_shape.nchan},\n"
                 "    frames_per_second={s.frames_per_second}, "
                 "complex_data={s.complex_data}, bps={h.bps}, edv={h.edv},\n"
                 "    station={h.station}, (start) time={s.time0}>"
@@ -289,9 +290,12 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         ``sample_rate``, EDV bandwidth, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each channel in each thread is sampled.
+    squeeze : bool
+        If `True` (default), remove channel and thread dimensions if unity.
     """
+
     def __init__(self, fh_raw, thread_ids=None, frames_per_second=None,
-                 sample_rate=None):
+                 sample_rate=None, squeeze=True):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
@@ -306,8 +310,11 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         if thread_ids is None:
             thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
         self._framesetsize = fh_raw.tell()
-        super(VDIFStreamReader, self).__init__(fh_raw, header, thread_ids,
-                                               frames_per_second, sample_rate)
+        sample_shape = self._frameset.sample_shape
+        super(VDIFStreamReader, self).__init__(fh_raw, header, sample_shape,
+                                               thread_ids, frames_per_second,
+                                               sample_rate)
+        self.squeeze = squeeze
 
     @lazyproperty
     def header1(self):
@@ -319,7 +326,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         # Find first header with same thread_id going backward.
         found = False
         # Set maximum as twice number of frames in frameset.
-        maximum = 2*self.nthread*self.header0.framesize
+        maximum = 2 * self._sample_shape.nthread * self.header0.framesize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
             header1 = self.find_header(
@@ -335,7 +342,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         self.fh_raw.seek(raw_offset)
         return header1
 
-    def read(self, count=None, fill_value=0., squeeze=True, out=None):
+    def read(self, count=None, fill_value=0., out=None):
         """Read count samples.
 
         The range retrieved can span multiple frames.
@@ -347,11 +354,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             file is read.
         fill_value : float or complex
             Value to use for invalid or missing data.
-        squeeze : bool
-            If `True` (default), remove channel and thread dimensions if unity.
         out : `None` or array
             Array to store the data in. If given, count will be inferred,
-            and squeeze is set to `False`.
+            and squeezing is disabled (overriding the ``squeeze`` attribute).
 
         Returns
         -------
@@ -362,8 +367,10 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            out = np.empty((self.nthread, count, self.nchan),
+            out = np.empty((self._sample_shape.nthread, count,
+                            self._sample_shape.nchan),
                            dtype=self._frameset.dtype).transpose(1, 0, 2)
+            squeeze = self.squeeze
         else:
             count = out.shape[0]
             squeeze = False
@@ -389,8 +396,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             self.offset += nsample
             count -= nsample
 
-        # Ensure pointer is at right place.
-
         return out.squeeze() if squeeze else out
 
     def _read_frame_set(self, fill_value=0.):
@@ -399,6 +404,12 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         self._frameset = self.read_frameset(self.thread_ids,
                                             edv=self.header0.edv)
         self._frameset.invalid_data_value = fill_value
+
+    @property
+    def sample_shape(self):
+        """Shape of a data sample (possibly squeezed).
+        """
+        return self._get_squeezed_shape('VDIF')
 
 
 class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
@@ -450,9 +461,11 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
                  sample_rate=None, header=None, **kwargs):
         if header is None:
             header = VDIFHeader.fromvalues(**kwargs)
+        # No frame sets yet exist, so generate a sample shape from values.
+        sample_shape = VDIFFrameSet._sample_shape_cls(nthread, header.nchan)
         super(VDIFStreamWriter, self).__init__(
-            raw, header, range(nthread), frames_per_second=frames_per_second,
-            sample_rate=sample_rate)
+            raw, header, sample_shape, range(nthread),
+            frames_per_second=frames_per_second, sample_rate=sample_rate)
         # Set framerate and thus bandwidth in the header, if not set already.
         try:
             header_framerate = self.header0.framerate
@@ -462,19 +475,20 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
             if header_framerate == 0:
                 header.framerate = self.frames_per_second * u.Hz
         self._data = np.zeros(
-            (self.nthread, self.samples_per_frame, self.nchan),
+            (self._sample_shape.nthread, self.samples_per_frame,
+                self._sample_shape.nchan),
             np.complex64 if self.complex_data else np.float32)
 
     def write(self, data, squeezed=True, invalid_data=False):
         """Write data, buffering by frames as needed."""
         if squeezed and data.ndim < 3:
-            if self.nthread == 1:
+            if self._sample_shape.nthread == 1:
                 data = np.expand_dims(data, axis=1)
-            if self.nchan == 1:
+            if self._sample_shape.nchan == 1:
                 data = np.expand_dims(data, axis=-1)
 
-        assert data.shape[1] == self.nthread
-        assert data.shape[2] == self.nchan
+        assert data.shape[1] == self._sample_shape.nthread
+        assert data.shape[2] == self._sample_shape.nchan
 
         count = data.shape[0]
         sample = 0
@@ -513,6 +527,8 @@ frames_per_second : int
     ``sample_rate``, EDV bandwidth, or by scanning the file.
 sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each channel in each thread is sampled.
+squeeze : bool
+    If `True` (default), remove channel and thread dimensions if unity.
 
 --- For writing : (see :class:`VDIFStreamWriter`)
 

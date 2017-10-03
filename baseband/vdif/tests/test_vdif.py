@@ -506,9 +506,6 @@ class TestVDIF(object):
             assert fh.tell() == 0
             with pytest.raises(ValueError):
                 fh.seek(0, 3)
-            out = np.zeros((12, 8, 1))
-            fh.read(out=out)
-            assert fh.tell() == 12
             assert fh.size == 40000
             assert abs(fh.time1 - fh.header1.time - u.s /
                        fh.frames_per_second) < 1. * u.ns
@@ -518,7 +515,21 @@ class TestVDIF(object):
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==
                       np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
-        assert np.all(out.squeeze() == record)
+
+        # Test that squeeze attribute works on read - except when out is
+        # passed - and sample_shape.
+        with vdif.open(SAMPLE_FILE, 'rs') as fh:
+            assert tuple(fh.sample_shape) == (8,)
+            assert fh.read(1).shape == (8,)
+            fh.seek(0)
+            out = np.zeros((12, 8, 1))
+            fh.read(out=out)
+            assert fh.tell() == 12
+            assert np.all(out.squeeze() == record)
+
+        with vdif.open(SAMPLE_FILE, 'rs', squeeze=False) as fh:
+            assert tuple(fh.sample_shape) == (8, 1)
+            assert fh.read(1).shape == (1, 8, 1)
 
     def test_stream_writer(self, tmpdir):
         vdif_file = str(tmpdir.join('simple.vdif'))
@@ -540,8 +551,8 @@ class TestVDIF(object):
             assert fh.samples_per_frame == 16
             assert not fh.complex_data
             assert fh.header0.bps == 2
-            assert fh.nchan == 2
-            assert fh.nthread == 2
+            assert fh._sample_shape.nchan == 2
+            assert fh._sample_shape.nthread == 2
             assert fh.time0 == Time('2010-01-01')
             assert fh.time1 == fh.time0 + 1.5 * u.s
             fh.seek(16)

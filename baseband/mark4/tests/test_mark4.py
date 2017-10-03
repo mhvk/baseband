@@ -502,6 +502,21 @@ class TestMark4(object):
                 conv_bytes = s.read()
                 assert conv_bytes == orig_bytes
 
+        # Test that squeeze attribute works on read - except when out is
+        # passed - and sample_shape.
+        with mark4.open(SAMPLE_FILE, 'rs') as fh:
+            assert tuple(fh.sample_shape) == (8,)
+            assert fh.read(1).shape == (8,)
+            fh.seek(0)
+            out = np.zeros((12, 8))
+            fh.read(out=out)
+            assert fh.tell() == 12
+            assert np.all(out.squeeze() == record[:12])
+
+        with mark4.open(SAMPLE_FILE, 'rs', squeeze=False) as fh:
+            assert tuple(fh.sample_shape) == (8,)
+            assert fh.read(1).shape == (1, 8)
+
     def test_corrupt_stream(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh, io.BytesIO() as s:
             fh.seek(0xa88)

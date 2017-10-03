@@ -1,6 +1,7 @@
 import io
 import warnings
 import numpy as np
+from collections import namedtuple
 from astropy import units as u
 from astropy.utils import lazyproperty
 
@@ -48,16 +49,17 @@ class VLBIStreamBase(VLBIFileBase):
 
     _frame_class = None
 
-    def __init__(self, fh_raw, header0, nchan, bps, complex_data, thread_ids,
-                 samples_per_frame, frames_per_second=None,
+    def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
+                 thread_ids, samples_per_frame, frames_per_second=None,
                  sample_rate=None):
         super(VLBIStreamBase, self).__init__(fh_raw)
         self.header0 = header0
-        self.nchan = nchan
+        self._sample_shape = sample_shape
+        # self.nchan = nchan
         self.bps = bps
         self.complex_data = complex_data
         self.thread_ids = thread_ids
-        self.nthread = nchan if thread_ids is None else len(thread_ids)
+        # self.nthread = nchan if thread_ids is None else len(thread_ids)
         self.samples_per_frame = samples_per_frame
         if frames_per_second is None:
             frames_per_second = sample_rate.to(u.Hz).value / samples_per_frame
@@ -115,7 +117,8 @@ class VLBIStreamBase(VLBIFileBase):
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
-                "    samples_per_frame={s.samples_per_frame}, nchan={s.nchan},"
+                "    samples_per_frame={s.samples_per_frame},"
+                " nchan={s._sample_shape.nchan},"
                 " frames_per_second={s.frames_per_second}, bps={s.bps},\n"
                 "    {t}(start) time={s.time0.isot}>"
                 .format(s=self, t=('thread_ids={0}, '.format(self.thread_ids)
@@ -124,8 +127,10 @@ class VLBIStreamBase(VLBIFileBase):
 
 class VLBIStreamReaderBase(VLBIStreamBase):
 
-    def __init__(self, fh_raw, header0, nchan, bps, complex_data, thread_ids,
-                 samples_per_frame, frames_per_second=None,
+    _squeezed_shape = None
+
+    def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
+                 thread_ids, samples_per_frame, frames_per_second=None,
                  sample_rate=None):
 
         if frames_per_second is None and sample_rate is None:
@@ -141,7 +146,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 raise
 
         super(VLBIStreamReaderBase, self).__init__(
-            fh_raw, header0, nchan, bps, complex_data, thread_ids,
+            fh_raw, header0, sample_shape, bps, complex_data, thread_ids,
             samples_per_frame, frames_per_second, sample_rate)
 
     @staticmethod
@@ -194,6 +199,31 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         fh.seek(oldpos)
         return max_frame + 1
 
+    def _get_squeezed_shape(self, format_name):
+        """Generates sample shape with dimensions of length unity removed.
+
+        Parameters
+        ----------
+        format_name : str
+            Name of file format, to include in sample shape docstring.
+
+        Returns
+        -------
+        squeezed_shape : collections.namedtuple
+            Squeezed shape with unity dimensions removed.
+        """
+        if self.squeeze:
+            if not self._squeezed_shape:
+                field_names = np.array(self._sample_shape._fields)
+                dims = np.array(self._sample_shape)
+                keep_dims = (dims > 1)
+                sqz_shp = namedtuple('sample_shape', field_names[keep_dims])
+                sqz_shp.__doc__ = format_name + " sample shape (squeezed)."
+                self._squeezed_shape = sqz_shp(*dims[keep_dims])
+            return self._squeezed_shape
+        return self._sample_shape
+
+
     @lazyproperty
     def header1(self):
         """Last header of the file."""
@@ -205,7 +235,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         self.fh_raw.seek(raw_offset)
         if header1 is None:
             raise ValueError("Corrupt VLBI frame? No frame in last {0} bytes."
-                             .format(10*self.header0.framesize))
+                             .format(10 * self.header0.framesize))
         return header1
 
     @lazyproperty
@@ -268,7 +298,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             warnings.warn("Closing with partial buffer remaining."
                           "Writing padded frame, marked as invalid.")
             self.write(np.zeros((self.samples_per_frame - extra,
-                                 self.nthread, self.nchan)),
+                                 self._sample_shape)),
                        invalid_data=True)
             assert self.offset % self.samples_per_frame == 0
         return super(VLBIStreamWriterBase, self).close()
