@@ -226,7 +226,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
-        sample_shape = self._frame.payload.sample_shape
+        sample_shape = Mark4Payload._sample_shape_cls(len(thread_ids)) if \
+            thread_ids else self._frame.payload.sample_shape
         super(Mark4StreamReader, self).__init__(
             fh_raw, header0=header, sample_shape=sample_shape,
             bps=header.bps, complex_data=False, thread_ids=thread_ids,
@@ -284,7 +285,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             Value to use for invalid or missing data.
         out : `None` or array
             Array to store the data in. If given, count will be inferred,
-            and squeeze is set to `False`.
+            and squeeze behavior will be overridden to False.
 
         Returns
         -------
@@ -433,6 +434,8 @@ frames_per_second : int, optional
     ``sample_rate``, or by scanning the file.
 sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each thread is sampled (bandwidth * 2; frequency units).
+squeeze : bool
+    If `True` (default), remove channel and thread dimensions if unity.
 
 --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
 

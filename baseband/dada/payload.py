@@ -3,6 +3,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
+from collections import namedtuple
 
 from ..vlbi_base.payload import VLBIPayloadBase
 
@@ -42,12 +43,16 @@ class DADAPayload(VLBIPayloadBase):
     _encoders = {
         8: encode_8bit}
 
+    _sample_shape_cls = namedtuple('sample_shape', 'npol, nchan')
+    _sample_shape_cls.__doc__ = "DADA sample shape."
+
     def __init__(self, words, header=None, bps=8, sample_shape=(),
                  complex_data=False):
         if header is not None:
             bps = header.bps
             sample_shape = header.sample_shape
             complex_data = header.complex_data
+        sample_shape = self._sample_shape_cls(*sample_shape)
         super(DADAPayload, self).__init__(words, sample_shape=sample_shape,
                                           bps=bps, complex_data=complex_data)
 

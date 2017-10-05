@@ -10,6 +10,7 @@ http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
+from collections import namedtuple
 from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
 
@@ -109,14 +110,17 @@ class Mark5BPayload(VLBIPayloadBase):
     _encoders = {2: encode_2bit}
     _decoders = {2: decode_2bit}
 
+    _sample_shape_cls = namedtuple('sample_shape', 'nchan')
+    _sample_shape_cls.__doc__ = "Mark 5B sample shape."
+
     def __init__(self, words, nchan=1, bps=2, complex_data=False):
         if complex_data:
             raise ValueError("Mark5B format does not support complex data.")
 
+        sample_shape = self._sample_shape_cls(nchan)
         super(Mark5BPayload, self).__init__(words, bps=bps,
-                                            sample_shape=(nchan,),
+                                            sample_shape=sample_shape,
                                             complex_data=False)
-        self.nchan = nchan
 
     @classmethod
     def fromdata(cls, data, bps=2):

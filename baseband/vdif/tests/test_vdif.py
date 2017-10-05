@@ -516,8 +516,8 @@ class TestVDIF(object):
         assert np.all(record.astype(int)[:, 0] ==
                       np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
 
-        # Test that squeeze attribute works on read - except when out is
-        # passed - and sample_shape.
+        # Test that squeeze attribute works on read and sample shape, but is
+        # overridden when reading in-place.
         with vdif.open(SAMPLE_FILE, 'rs') as fh:
             assert tuple(fh.sample_shape) == (8,)
             assert fh.read(1).shape == (8,)
@@ -558,6 +558,14 @@ class TestVDIF(object):
             fh.seek(16)
             record = fh.read(16)
         assert np.all(record == data)
+
+        # Try writing an incomplete file.
+        vdif_incomplete = str(tmpdir.join('incomplete.vdif'))
+        with vdif.open(SAMPLE_FILE, 'rs') as fr:
+            fw = vdif.open(vdif_incomplete, 'ws', header=fr.header0,
+                           nthread=8, frames_per_second=1600)
+            fw.write(fr.read(10))
+            fw.close()
 
     def test_corrupt_stream(self):
         with vdif.open(SAMPLE_FILE, 'rb') as fh, io.BytesIO() as s:

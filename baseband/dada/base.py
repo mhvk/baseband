@@ -6,6 +6,7 @@ import re
 import numpy as np
 from astropy.extern import six
 from astropy.utils import lazyproperty
+from collections import namedtuple
 
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
@@ -198,8 +199,10 @@ class DADAStreamBase(VLBIStreamBase):
                              header0.samples_per_frame)
         if thread_ids is None:
             thread_ids = list(range(header0['NPOL']))
+        sample_shape = DADAPayload._sample_shape_cls(len(thread_ids),
+                                                     header0.nchan)
         super(DADAStreamBase, self).__init__(
-            fh_raw=fh_raw, header0=header0, nchan=header0['NCHAN'],
+            fh_raw=fh_raw, header0=header0, sample_shape=sample_shape,
             bps=header0.bps, complex_data=header0.complex_data,
             thread_ids=thread_ids,
             samples_per_frame=header0.samples_per_frame,
@@ -210,9 +213,9 @@ class DADAStreamBase(VLBIStreamBase):
         return divmod(self.offset, self.samples_per_frame)
 
     def _unsqueeze(self, data):
-        if data.ndim < 3 and self.nthread == 1:
+        if data.ndim < 3 and self._sample_shape[0] == 1:
             data = data[:, np.newaxis]
-        if data.ndim < 3 and self.nchan == 1:
+        if data.ndim < 3 and self._sample_shape[1] == 1:
             data = data[..., np.newaxis]
         return data
 
@@ -229,11 +232,14 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         file handle of the (first) raw DADA stream.
     thread_ids : list of int, optional
         Specific threads to read.  By default, all threads are read.
+    squeeze : bool
+        If `True` (default), remove channel and thread dimensions if unity.
     """
-    def __init__(self, fh_raw, thread_ids=None):
+    def __init__(self, fh_raw, thread_ids=None, squeeze=True):
         header = DADAHeader.fromfile(fh_raw)
         super(DADAStreamReader, self).__init__(fh_raw, header, thread_ids)
         self._get_frame(0)
+        self.squeeze = squeeze
 
     @lazyproperty
     def header1(self):
@@ -242,7 +248,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         frame1 = self.read_frame(memmap=True)
         return frame1.header
 
-    def read(self, count=None, squeeze=True, out=None):
+    def read(self, count=None, out=None):
         """Read count samples.
 
         Parameters
@@ -250,9 +256,6 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         count : int, optional
             Number of samples to read.  If omitted or negative, the whole
             file is read. Ignored if ``out`` is given.
-        squeeze : bool
-            If `True` (default), remove channel and thread dimensions if unity
-            (or allow those to have been removed in ``out``).
         out : `None` or array
             Array to store the data in. If given, ``count`` will be inferred.
             If ``squeeze`` is `True`, unity dimensions can be absent.
@@ -268,14 +271,14 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            result = np.empty((count,) + self._frame.sample_shape,
+            result = np.empty((count,) + self._sample_shape,
                               dtype=self._frame.dtype)
             # Generate view of the result data set that will be returned.
-            out = result.squeeze() if squeeze else result
+            out = result.squeeze() if self.squeeze else result
         else:
             count = out.shape[0]
             # Create a properly-shaped view of the output if needed.
-            result = self._unsqueeze(out) if squeeze else out
+            result = self._unsqueeze(out) if self.squeeze else out
 
         offset0 = self.offset
         while count > 0:
@@ -304,6 +307,12 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         assert (self._frame.header['OBS_OFFSET'] ==
                 self.header0['OBS_OFFSET'] + frame_nr *
                 self.header0.payloadsize)
+
+    @property
+    def sample_shape(self):
+        """Shape of a data sample (possibly squeezed).
+        """
+        return self._get_squeezed_shape('DADA')
 
 
 class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
@@ -342,8 +351,8 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
         if squeezed:
             data = self._unsqueeze(data)
 
-        assert data.shape[1] == self.nthread
-        assert data.shape[2] == self.nchan
+        assert data.shape[1] == self._sample_shape.npol
+        assert data.shape[2] == self._sample_shape.nchan
 
         count = data.shape[0]
         sample = 0
@@ -382,6 +391,8 @@ thread_ids : list of int, optional
     Specific threads to read.  By default, all threads are read.
     (For DADA, the number threads equals ``header['NPOL']``, i.e.,
     the number of polarisations.)
+squeeze : bool
+    If `True` (default), remove channel and thread dimensions if unity.
 
 --- For writing : (see :class:`~baseband.dada.base.DADAStreamWriter`)
 

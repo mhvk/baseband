@@ -432,10 +432,6 @@ class TestMark4(object):
             assert fh.tell() == 80641
             # Raw file should be just after frame 1.
             assert fh.fh_raw.tell() == 0xa88 + 2 * fh.header0.framesize
-            # While we're at it, check in-place reading as well.
-            fh.seek(80000 + 639)
-            out = np.zeros_like(record2)
-            record3 = fh.read(out=out)
 
         assert record.shape == (642, 8)
         assert np.all(record[:640] == 0.)
@@ -446,16 +442,15 @@ class TestMark4(object):
         assert record2.shape == (2, 8)
         assert np.all(record2[0] == 0.)
         assert not np.any(record2[1] == 0.)
-        assert np.all(record3 == record2)
 
         # Test if _get_frame_rate automatic frame rate calculator works,
         # returns same header and payload info.
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fh:
             assert header == fh.header0
             assert fh.frames_per_second * fh.samples_per_frame == 32000000
-            record4 = fh.read(642)
+            record3 = fh.read(642)
 
-        assert np.all(record4 == record)
+        assert np.all(record3 == record)
 
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz) as fh:
@@ -502,9 +497,9 @@ class TestMark4(object):
                 conv_bytes = s.read()
                 assert conv_bytes == orig_bytes
 
-        # Test that squeeze attribute works on read - except when out is
-        # passed - and sample_shape.
-        with mark4.open(SAMPLE_FILE, 'rs') as fh:
+        # Test that squeeze attribute works on read and sample shape, but is
+        # overridden when reading in-place.
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fh:
             assert tuple(fh.sample_shape) == (8,)
             assert fh.read(1).shape == (8,)
             fh.seek(0)
@@ -513,7 +508,8 @@ class TestMark4(object):
             assert fh.tell() == 12
             assert np.all(out.squeeze() == record[:12])
 
-        with mark4.open(SAMPLE_FILE, 'rs', squeeze=False) as fh:
+        with mark4.open(SAMPLE_FILE, 'rs',
+                        ntrack=64, decade=2010, squeeze=False) as fh:
             assert tuple(fh.sample_shape) == (8,)
             assert fh.read(1).shape == (1, 8)
 

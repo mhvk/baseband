@@ -313,6 +313,26 @@ class TestDADA(object):
             assert np.abs(fh.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data == self.payload.data[:, 0, 0])
 
+        # Try reading a single polarization.
+        with dada.open(SAMPLE_FILE, 'rs', thread_ids=[0]) as fh:
+            record3 = fh.read(12)
+            assert np.all(record3 == record1[:12, 0])
+
+        # Test that squeeze attribute works on read and sample shape, but is
+        # overridden when reading in-place.
+        with dada.open(SAMPLE_FILE, 'rs') as fh:
+            assert tuple(fh.sample_shape) == (2,)
+            assert fh.read(1).shape == (2,)
+            fh.seek(0)
+            out = np.zeros((12, 2), dtype=np.complex64)
+            fh.read(out=out)
+            assert fh.tell() == 12
+            assert np.all(out.squeeze() == record1)
+
+        with dada.open(SAMPLE_FILE, 'rs', squeeze=False) as fh:
+            assert tuple(fh.sample_shape) == (2, 1)
+            assert fh.read(1).shape == (1, 2, 1)
+
     def test_incomplete_stream(self, tmpdir):
         filename = str(tmpdir.join('a.dada'))
         with catch_warnings(UserWarning) as w:

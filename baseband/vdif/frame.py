@@ -191,13 +191,8 @@ class VDIFFrameSet(object):
     """
     invalid_data_value = 0.
 
-    _sample_shape_cls = namedtuple('sample_shape', 'nthread, nchan')
-    _sample_shape_cls.__doc__ = "VDIF sample shape."
-
     def __init__(self, frames, header0=None):
         self.frames = frames
-        self.sample_shape = self._sample_shape_cls(
-            len(frames), frames[0].payload.sample_shape.nchan)
         # Used in .data below to decode data only once.
         self._data = None
         if header0 is None:

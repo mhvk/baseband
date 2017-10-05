@@ -297,9 +297,8 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         if extra != 0:
             warnings.warn("Closing with partial buffer remaining."
                           "Writing padded frame, marked as invalid.")
-            self.write(np.zeros((self.samples_per_frame - extra,
-                                 self._sample_shape)),
-                       invalid_data=True)
+            self.write(np.zeros((self.samples_per_frame - extra,) +
+                                self._sample_shape), invalid_data=True)
             assert self.offset % self.samples_per_frame == 0
         return super(VLBIStreamWriterBase, self).close()
 

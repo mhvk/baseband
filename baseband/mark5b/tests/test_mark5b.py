@@ -133,13 +133,14 @@ class TestMark5B(object):
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             payload.tofile(s)
             s.seek(0)
-            payload2 = mark5b.Mark5BPayload.fromfile(s, payload.nchan,
-                                                     payload.bps)
+            payload2 = mark5b.Mark5BPayload.fromfile(
+                s, payload.sample_shape.nchan, payload.bps)
             assert payload2 == payload
             with pytest.raises(EOFError):
                 # Too few bytes.
                 s.seek(100)
-                mark5b.Mark5BPayload.fromfile(s, payload.nchan, payload.bps)
+                mark5b.Mark5BPayload.fromfile(s, payload.sample_shape.nchan,
+                                              payload.bps)
 
         payload3 = mark5b.Mark5BPayload.fromdata(payload.data, bps=payload.bps)
         assert payload3 == payload
@@ -319,10 +320,6 @@ class TestMark5B(object):
             fh.seek(-10, 2)
             assert fh.tell() == fh.size - 10
             record3 = fh.read()
-            # While we're at it, check in-place reading as well.
-            fh.seek(-10, 2)
-            out = np.zeros_like(record3)
-            record4 = fh.read(out=out)
 
         assert header1['frame_nr'] == 3
         assert header1['user'] == header['user']
@@ -341,12 +338,11 @@ class TestMark5B(object):
                       np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
                                 [-1, +1, -3, +3, -3, +1, +3, +1]]))
         assert record3.shape == (10, 8)
-        assert np.all(record4 == record3)
         # Read only some selected threads.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2, thread_ids=[4, 5],
                          sample_rate=32*u.MHz, ref_mjd=57000) as fh:
-            record5 = fh.read(12)
-        assert np.all(record5 == record[:, 4:6])
+            record4 = fh.read(12)
+        assert np.all(record4 == record[:, 4:6])
         # Read all data and check that it can be written out.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, ref_mjd=57000) as fh:
@@ -400,9 +396,27 @@ class TestMark5B(object):
 
         with mark5b.open(m5_test3, 'rs', nchan=8, bps=2,
                          sample_rate=10*u.kHz, ref_mjd=57000) as fh:
-            record6 = fh.read()     # Read across days.
-            assert np.all(record6 == record)
+            record5 = fh.read()     # Read across days.
+            assert np.all(record5 == record)
             assert fh.tell(unit='time').iso == '2014-06-14 00:00:01.000000000'
+
+        # Test that squeeze attribute works on read and sample shape, but is
+        # overridden when reading in-place.
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
+            assert tuple(fh.sample_shape) == (8,)
+            assert fh.read(1).shape == (8,)
+            fh.seek(0)
+            out = np.zeros((12, 8))
+            fh.read(out=out)
+            assert fh.tell() == 12
+            assert np.all(out.squeeze() == record[:12])
+
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                         sample_rate=32*u.MHz, ref_mjd=57000,
+                         squeeze=False) as fh:
+            assert tuple(fh.sample_shape) == (8,)
+            assert fh.read(1).shape == (1, 8)
 
     def test_stream_invalid(self):
         with pytest.raises(ValueError):

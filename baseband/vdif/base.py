@@ -2,6 +2,7 @@
 import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
+from collections import namedtuple
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
@@ -238,13 +239,18 @@ class VDIFStreamBase(VLBIStreamBase):
 
     _frame_class = VDIFFrame
 
-    def __init__(self, fh_raw, header0, sample_shape, thread_ids,
-                 frames_per_second=None, sample_rate=None):
+    _sample_shape_cls = namedtuple('sample_shape', 'nthread, nchan')
+    _sample_shape_cls.__doc__ = "VDIF sample shape."
+
+    def __init__(self, fh_raw, header0, thread_ids, frames_per_second=None,
+                 sample_rate=None):
         if frames_per_second is None and sample_rate is None:
             try:
                 frames_per_second = int(header0.framerate.to(u.Hz).value)
             except AttributeError:
                 pass  # super below will scan file to get framerate.
+
+        sample_shape = self._sample_shape_cls(len(thread_ids), header0.nchan)
 
         super(VDIFStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, sample_shape=sample_shape,
@@ -310,10 +316,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         if thread_ids is None:
             thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
         self._framesetsize = fh_raw.tell()
-        sample_shape = self._frameset.sample_shape
-        super(VDIFStreamReader, self).__init__(fh_raw, header, sample_shape,
-                                               thread_ids, frames_per_second,
-                                               sample_rate)
+        super(VDIFStreamReader, self).__init__(fh_raw, header, thread_ids,
+                                               frames_per_second, sample_rate)
         self.squeeze = squeeze
 
     @lazyproperty
@@ -462,10 +466,9 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
         if header is None:
             header = VDIFHeader.fromvalues(**kwargs)
         # No frame sets yet exist, so generate a sample shape from values.
-        sample_shape = VDIFFrameSet._sample_shape_cls(nthread, header.nchan)
         super(VDIFStreamWriter, self).__init__(
-            raw, header, sample_shape, range(nthread),
-            frames_per_second=frames_per_second, sample_rate=sample_rate)
+            raw, header, range(nthread), frames_per_second=frames_per_second,
+            sample_rate=sample_rate)
         # Set framerate and thus bandwidth in the header, if not set already.
         try:
             header_framerate = self.header0.framerate
