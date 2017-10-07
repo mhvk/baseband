@@ -5,6 +5,7 @@ import io
 import pytest
 import numpy as np
 from astropy import units as u
+from astropy.tests.helper import catch_warnings
 from ... import mark4
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
 from ..header import Mark4TrackHeader
@@ -55,7 +56,7 @@ class TestMark4(object):
         words = mark4.header.stream2words(stream)
         assert np.all(mark4.header.words2stream(words) == stream)
 
-    def test_header(self):
+    def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
@@ -77,7 +78,7 @@ class TestMark4(object):
         assert header.payloadsize == header.framesize - header.size
         assert header.mutable is False
         assert repr(header).startswith('<Mark4Header bcd_headstack1: [0')
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             header.tofile(s)
             s.seek(0)
             header2 = mark4.Mark4Header.fromfile(s, header.ntrack,
@@ -196,7 +197,7 @@ class TestMark4(object):
         assert np.all(reorder32(check.view('u4')).view(np.uint8) ==
                       expected)
 
-    def test_payload(self):
+    def test_payload(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
@@ -209,7 +210,7 @@ class TestMark4(object):
         assert np.all(payload[1].astype(int) ==
                       np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
 
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             payload.tofile(s)
             s.seek(0)
             payload2 = mark4.Mark4Payload.fromfile(s, header)
@@ -267,7 +268,7 @@ class TestMark4(object):
         assert np.all(payload2[item] == sel_data)
         assert payload2 == payload
 
-    def test_frame(self):
+    def test_frame(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
@@ -284,7 +285,7 @@ class TestMark4(object):
                       np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
         assert np.all(frame.data[641].astype(int) ==
                       np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
             frame2 = mark4.Mark4Frame.fromfile(s, ntrack=64, decade=2010)
@@ -328,7 +329,7 @@ class TestMark4(object):
                 expected = time0 + frame_nr * frame_duration
                 assert abs(header_time - expected) < 1. * u.ns
 
-    def test_find_header(self):
+    def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,
         # since otherwise they run *very* slow.  This is somehow related to
         # pytest, since speed is not a big issue running stuff on its own.
@@ -377,7 +378,8 @@ class TestMark4(object):
         # test small file
         with open(SAMPLE_FILE, 'rb') as fh:
             # One that simply is too small altogether
-            with io.BytesIO() as s, mark4.open(s, 'rb') as fh_short:
+            m4_test = str(tmpdir.join('test.m4'))
+            with open(m4_test, 'w+b') as s, mark4.open(s, 'rb') as fh_short:
                 s.write(fh.read(80000))
                 fh_short.seek(100)
                 assert fh_short.find_header(template_header=header0) is None
@@ -387,7 +389,7 @@ class TestMark4(object):
                 assert fh_short.tell() == 100
 
             # And one that could fit one frame, but doesn't.
-            with io.BytesIO() as s, mark4.open(s, 'rb') as fh_short:
+            with open(m4_test, 'w+b') as s, mark4.open(s, 'rb') as fh_short:
                 fh.seek(0)
                 s.write(fh.read(162690))
                 fh_short.seek(200)
@@ -398,7 +400,7 @@ class TestMark4(object):
                 assert fh_short.tell() == 200
 
             # now add enough that the file does include a complete header.
-            with io.BytesIO() as s, mark4.open(s, 'rb') as fh_short2:
+            with open(m4_test, 'w+b') as s, mark4.open(s, 'rb') as fh_short2:
                 fh.seek(0)
                 s.write(fh.read(163000))
                 s.seek(0)
@@ -470,7 +472,6 @@ class TestMark4(object):
             fw.write(record[11:80000])
             fw.write(record[80000:], invalid_data=True)
             assert fw.tell(unit='time') == time1
-            fw.fh_raw.flush()
 
         with mark4.open(rewritten_file, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz, thread_ids=[3, 4]) as fh:
@@ -482,11 +483,9 @@ class TestMark4(object):
 
         # Check files can be made byte-for-byte identical.  Here, we use the
         # original header so we set stuff like head_stack, etc.
-        with io.BytesIO() as s, mark4.open(s, 'ws', header=header,
-                                           sample_rate=32*u.MHz) as fw:
-
+        with open(str(tmpdir.join('test.m4')), 'w+b') as s, \
+                mark4.open(s, 'ws', header=header, sample_rate=32*u.MHz) as fw:
             fw.write(record)
-            fw.fh_raw.flush()
             number_of_bytes = s.tell()
             assert number_of_bytes == fh_raw_tell1 - 0xa88
 
@@ -513,8 +512,28 @@ class TestMark4(object):
             assert tuple(fh.sample_shape) == (8,)
             assert fh.read(1).shape == (1, 8)
 
-    def test_corrupt_stream(self):
-        with mark4.open(SAMPLE_FILE, 'rb') as fh, io.BytesIO() as s:
+    # Test that writing an incomplete stream is possible, and that frame set is
+    # appropriately marked as invalid.
+    def test_incomplete_stream(self, tmpdir):
+        m4_incomplete = str(tmpdir.join('incomplete.m4'))
+        with catch_warnings(UserWarning) as w:
+            with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fr:
+                record = fr.read(10)
+                with mark4.open(m4_incomplete, 'ws', header=fr.header0,
+                                ntrack=64, decade=2010,
+                                sample_rate=32*u.MHz) as fw:
+                    fw.write(record)
+        assert len(w) == 1
+        assert 'partial buffer' in str(w[0].message)
+        with mark4.open(m4_incomplete, 'rs', ntrack=64, decade=2010,
+                        frames_per_second=400) as fwr:
+            assert not fwr._frame.valid
+            assert np.all(fwr.read() ==
+                          fwr._frame.invalid_data_value)
+
+    def test_corrupt_stream(self, tmpdir):
+        with mark4.open(SAMPLE_FILE, 'rb') as fh, \
+                open(str(tmpdir.join('test.m4')), 'w+b') as s:
             fh.seek(0xa88)
             frame = fh.read_frame(ntrack=64, decade=2010)
             frame.tofile(s)
@@ -533,7 +552,7 @@ class TestMark4(object):
             mark4.open('ts.dat', 's')
 
 
-def test_32track_fanout4_file():
+def test_32track_fanout4_file(tmpdir):
     with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
         assert fh.find_frame(ntrack=32) == 9656
 
@@ -555,10 +574,9 @@ def test_32track_fanout4_file():
          [-3, -1, 1, -1],
          [1, 3, 1, 3]]))
 
-    with io.BytesIO() as s, mark4.open(s, 'ws', header=header0,
-                                       frames_per_second=400) as fw:
+    with open(str(tmpdir.join('test.m4')), 'w+b') as s, \
+            mark4.open(s, 'ws', header=header0, frames_per_second=400) as fw:
         fw.write(record)
-        fw.fh_raw.flush()
         number_of_bytes = s.tell()
         assert number_of_bytes == fh_raw_tell1 - 9656
 
@@ -580,7 +598,7 @@ def test_32track_fanout4_file():
         fh.close()
 
 
-def test_32track_fanout2_file():
+def test_32track_fanout2_file(tmpdir):
     with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
         assert fh.find_frame(ntrack=32) == 17436
 
@@ -602,10 +620,9 @@ def test_32track_fanout2_file():
          [-1, -1, -3, -1, 1, 1, -1, 1],
          [-1, -3, -1, 1, -1, 1, -1, 1]]))
 
-    with io.BytesIO() as s, mark4.open(s, 'ws', header=header0,
-                                       frames_per_second=400) as fw:
+    with open(str(tmpdir.join('test.m4')), 'w+b') as s, \
+            mark4.open(s, 'ws', header=header0, frames_per_second=400) as fw:
         fw.write(record)
-        fw.fh_raw.flush()
         number_of_bytes = s.tell()
         assert number_of_bytes == fh_raw_tell1 - 17436
 

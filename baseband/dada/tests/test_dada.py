@@ -333,6 +333,8 @@ class TestDADA(object):
             assert tuple(fh.sample_shape) == (2, 1)
             assert fh.read(1).shape == (1, 2, 1)
 
+    # Test that writing an incomplete stream is possible, and that frame set is
+    # valid but invalid samples are appropriately marked.
     def test_incomplete_stream(self, tmpdir):
         filename = str(tmpdir.join('a.dada'))
         with catch_warnings(UserWarning) as w:
@@ -340,6 +342,11 @@ class TestDADA(object):
                 fw.write(self.payload[:10])
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
+        with dada.open(filename, 'rs', squeeze=False) as fwr:
+            assert fwr._frame.valid
+            data = fwr.read()
+            assert np.all(data[:10] == self.payload[:10])
+            assert np.all(data[10:] == fwr._frame.invalid_data_value)
 
     def test_multiple_files_stream(self, tmpdir):
         time0 = self.header.time

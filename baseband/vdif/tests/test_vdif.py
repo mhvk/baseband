@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 from astropy.time import Time
 import astropy.units as u
+from astropy.tests.helper import catch_warnings
 
 from ... import vdif, vlbi_base
 from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_MWA_VDIF as SAMPLE_MWA,
@@ -43,7 +44,7 @@ from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_MWA_VDIF as SAMPLE_MWA,
 
 class TestVDIF(object):
 
-    def test_header(self):
+    def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
         assert header.size == 32
@@ -60,7 +61,7 @@ class TestVDIF(object):
         assert header.bps == 2
         assert not header['complex_data']
         assert header.mutable is False
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.vdif')), 'w+b') as s:
             header.tofile(s)
             s.seek(0)
             header2 = vdif.VDIFHeader.fromfile(s)
@@ -116,7 +117,7 @@ class TestVDIF(object):
         assert isinstance(header6, vdif.header.VDIFBaseHeader)
         assert header6['edv'] == 100
 
-    def test_custom_header(self):
+    def test_custom_header(self, tmpdir):
         # Custom header with an EDV that already exists
         with pytest.raises(ValueError):
             class VDIFHeaderY(vdif.header.VDIFBaseHeader):
@@ -158,7 +159,7 @@ class TestVDIF(object):
         assert headerX_dummy.edv == 0x58
 
         # Write to dummy file, then re-read.
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.vdif')), 'w+b') as s:
             headerX_dummy.tofile(s)
             s.seek(0)
             headerX = vdif.VDIFHeader.fromfile(s)
@@ -185,7 +186,7 @@ class TestVDIF(object):
         assert headerX.nonsense_1 == 100
         assert headerX.nonsense_2 == 10000000
 
-    def test_decoding(self):
+    def test_decoding(self, tmpdir):
         """Check that look-up levels are consistent with mark5access."""
         o2h = vlbi_base.encoding.OPTIMAL_2BIT_HIGH
         assert np.all(vdif.payload.lut1bit[0] == -1.)
@@ -229,7 +230,7 @@ class TestVDIF(object):
         header['complex_data'] = True
         assert vdif.VDIFPayload.fromdata(acmplx, header) == payload4
 
-    def test_payload(self):
+    def test_payload(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
             payload = vdif.VDIFPayload.fromfile(fh, header)
@@ -238,7 +239,7 @@ class TestVDIF(object):
         assert payload.dtype == np.float32
         assert np.all(payload[:12, 0].astype(int) ==
                       np.array([1, 1, 1, -3, 1, 1, -3, -3, -3, 3, 3, -1]))
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.vdif')), 'w+b') as s:
             payload.tofile(s)
             s.seek(0)
             payload2 = vdif.VDIFPayload.fromfile(s, header)
@@ -291,7 +292,7 @@ class TestVDIF(object):
         assert np.all(payload2[item] == sel_data)
         assert payload2 == payload
 
-    def test_frame(self):
+    def test_frame(self, tmpdir):
         with vdif.open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)
             payload = vdif.VDIFPayload.fromfile(fh, header)
@@ -303,7 +304,8 @@ class TestVDIF(object):
         assert frame == vdif.VDIFFrame(header, payload)
         assert np.all(frame.data[:12, 0].astype(int) ==
                       np.array([1, 1, 1, -3, 1, 1, -3, -3, -3, 3, 3, -1]))
-        with io.BytesIO() as s:
+        vdif_test = str(tmpdir.join('test.vdif'))
+        with open(vdif_test, 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
             frame2 = vdif.VDIFFrame.fromfile(s)
@@ -320,11 +322,10 @@ class TestVDIF(object):
         frame5.valid = True
         assert frame5 == frame
         # Also test binary file writer.
-        with io.BytesIO() as s, vdif.open(s, 'wb') as fw:
+        with vdif.open(vdif_test, 'wb') as fw:
             fw.write_frame(frame)
             fw.write_frame(frame.data, header)
-            fw.flush()
-            s.seek(0)
+        with open(vdif_test, 'rb') as s:
             frame6 = vdif.VDIFFrame.fromfile(s)
             frame7 = vdif.VDIFFrame.fromfile(s)
         assert frame6 == frame
@@ -394,7 +395,7 @@ class TestVDIF(object):
             with pytest.raises(IOError):
                 fh.read_frameset(thread_ids=[1, 9])
 
-    def test_find_header(self):
+    def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,
         # since otherwise they run *very* slow.  This is somehow related to
         # pytest, since speed is not a big issue running stuff on its own.
@@ -451,7 +452,8 @@ class TestVDIF(object):
         assert header_m5000b['frame_nr'] == 1
         assert header_m5000b['thread_id'] == 6
         # Make file with missing data.
-        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+        with open(str(tmpdir.join('test.vdif')), 'w+b') as s, \
+                open(SAMPLE_FILE, 'rb') as f:
             s.write(f.read(5100))
             f.seek(10000)
             s.write(f.read())
@@ -470,7 +472,8 @@ class TestVDIF(object):
         assert header_5000f['thread_id'] == 5
         assert header_5000ft == header_5000f
         # for completeness, also check a really short file...
-        with io.BytesIO() as s, open(SAMPLE_FILE, 'rb') as f:
+        with open(str(tmpdir.join('test.vdif')), 'w+b') as s, \
+                open(SAMPLE_FILE, 'rb') as f:
             s.write(f.read(5040))
             with vdif.open(s, 'rb') as fh:
                 fh.seek(10)
@@ -559,16 +562,26 @@ class TestVDIF(object):
             record = fh.read(16)
         assert np.all(record == data)
 
-        # Try writing an incomplete file.
+    # Test that writing an incomplete stream is possible, and that frame set is
+    # appropriately marked as invalid.
+    def test_incomplete_stream(self, tmpdir):
         vdif_incomplete = str(tmpdir.join('incomplete.vdif'))
-        with vdif.open(SAMPLE_FILE, 'rs') as fr:
-            fw = vdif.open(vdif_incomplete, 'ws', header=fr.header0,
-                           nthread=8, frames_per_second=1600)
-            fw.write(fr.read(10))
-            fw.close()
+        with catch_warnings(UserWarning) as w:
+            with vdif.open(SAMPLE_FILE, 'rs') as fr:
+                record = fr.read(10)
+                with vdif.open(vdif_incomplete, 'ws', header=fr.header0,
+                               nthread=8, frames_per_second=1600) as fw:
+                    fw.write(record)
+        assert len(w) == 1
+        assert 'partial buffer' in str(w[0].message)
+        with vdif.open(vdif_incomplete, 'rs') as fwr:
+            assert all([not frame.valid for frame in fwr._frameset.frames])
+            assert np.all(fwr.read() ==
+                          fwr._frameset.invalid_data_value)
 
-    def test_corrupt_stream(self):
-        with vdif.open(SAMPLE_FILE, 'rb') as fh, io.BytesIO() as s:
+    def test_corrupt_stream(self, tmpdir):
+        with vdif.open(SAMPLE_FILE, 'rb') as fh, \
+                open(str(tmpdir.join('test.vdif')), 'w+b') as s:
             frame = fh.read_frame()
             frame.tofile(s)
             # now add lots of the next frame, i.e., with a different thread_id
@@ -644,7 +657,7 @@ def test_arochime_vdif():
             pass
 
 
-def test_legacy_vdif():
+def test_legacy_vdif(tmpdir):
     """Create legacy header, ensuring it is not treated as EDV=0 (see #12)."""
     # legacy_mode, 1 sec, epoch 4, vdif v1, nchan=2, 507*8 bytes, bps=2, 'AA'
     words = (1 << 30 | 1, 4 << 24, 1 << 29 | 1 << 24 | 507, 1 << 26 | 0x4141)
@@ -661,7 +674,7 @@ def test_legacy_vdif():
     assert header.bps == 2
     assert header['thread_id'] == 0
     assert header.station == 'AA'
-    with io.BytesIO() as s:
+    with open(str(tmpdir.join('test.vdif')), 'w+b') as s:
         header.tofile(s)
         # Add fake payload
         s.write(np.zeros(503, dtype=np.int64).tostring())

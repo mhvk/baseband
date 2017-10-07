@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 from astropy import units as u
 from astropy.time import Time
+from astropy.tests.helper import catch_warnings
 from ... import mark5b
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
 from ...data import SAMPLE_MARK5B as SAMPLE_FILE
@@ -421,3 +422,22 @@ class TestMark5B(object):
     def test_stream_invalid(self):
         with pytest.raises(ValueError):
             mark5b.open('ts.dat', 's')
+
+    # Test that writing an incomplete stream is possible, and that frame set is
+    # appropriately marked as invalid.
+    def test_incomplete_stream(self, tmpdir):
+        m5_incomplete = str(tmpdir.join('incomplete.m5'))
+        with catch_warnings(UserWarning) as w:
+            with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                             sample_rate=32*u.MHz, ref_mjd=57000) as fr:
+                record = fr.read(10)
+                with mark5b.open(m5_incomplete, 'ws', header=fr.header0,
+                                nchan=8, sample_rate=32*u.MHz) as fw:
+                    fw.write(record)
+        assert len(w) == 1
+        assert 'partial buffer' in str(w[0].message)
+        with mark5b.open(m5_incomplete, 'rs', nchan=8, bps=2,
+                         sample_rate=32*u.MHz, ref_mjd=57000) as fwr:
+            assert not fwr._frame.valid
+            assert np.all(fwr.read() ==
+                          fwr._frame.invalid_data_value)
