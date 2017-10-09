@@ -10,6 +10,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
+from collections import namedtuple
 
 from ..vlbi_base.payload import VLBIPayloadBase
 
@@ -76,6 +77,11 @@ class GSBPayload(VLBIPayloadBase):
                  8: decode_8bit}
     _dtype_word = np.int8
 
+    _sample_shape_cls_onethread = namedtuple('sample_shape', 'nchan')
+    _sample_shape_cls_onethread.__doc__ = "GSB sample shape (multi-threaded)."
+    _sample_shape_cls_nthread = namedtuple('sample_shape', 'nthread, nchan')
+    _sample_shape_cls_nthread.__doc__ = "GSB sample shape (multi-threaded)."
+
     @classmethod
     def fromfile(cls, fh, payloadsize=None, bps=4, nchan=1,
                  complex_data=False):
@@ -94,20 +100,22 @@ class GSBPayload(VLBIPayloadBase):
             Number of bits per sample part (i.e., per channel and per real or
             imaginary component).  Default: 4.
         nchan : int
-            Number of fourier channels.  Default: 1.
+            Number of Fourier channels.  Default: 1.
         complex_data : bool
             Whether data is complex or float.  Default: False.
         """
         if hasattr(fh, 'read'):
+            sample_shape = cls._sample_shape_cls_onethread(nchan)
             return super(GSBPayload,
                          cls).fromfile(fh, payloadsize=payloadsize,
-                                       bps=bps, sample_shape=(nchan,),
+                                       bps=bps, sample_shape=sample_shape,
                                        complex_data=complex_data)
 
         nthread = len(fh)
+        sample_shape_onethread = cls._sample_shape_cls_onethread(nchan)
         payloads = [[super(GSBPayload,
                            cls).fromfile(fh1, payloadsize=payloadsize, bps=bps,
-                                         sample_shape=(nchan,),
+                                         sample_shape=sample_shape_onethread,
                                          complex_data=complex_data)
                      for fh1 in fh_set] for fh_set in fh]
         if nthread == 1:
