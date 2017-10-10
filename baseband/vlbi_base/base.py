@@ -222,7 +222,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             return self._squeezed_shape
         return self._sample_shape
 
-
     @lazyproperty
     def header1(self):
         """Last header of the file."""
