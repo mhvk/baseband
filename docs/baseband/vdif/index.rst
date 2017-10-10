@@ -121,7 +121,8 @@ identical.::
 For small files, one could just do::
 
     >>> with vdif.open(SAMPLE_VDIF, 'rs') as fr, vdif.open(
-    ...         'try.vdif', 'ws', header=fr.header0, nthread=fr.nthread) as fw:
+    ...         'try.vdif', 'ws', header=fr.header0,
+    ...         nthread=fr.sample_shape.nthread) as fw:
     ...     fw.write(fr.read())
 
 This copies everything to memory, though, and some header information is lost.

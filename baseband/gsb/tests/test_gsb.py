@@ -35,7 +35,7 @@ class TestGSB(object):
         self.data = np.clip(np.round(np.random.uniform(-8.5, 7.5, size=2048)),
                             -8, 7).reshape(-1, 1)
 
-    def test_header(self):
+    def test_header(self, tmpdir):
         with gsb.open(SAMPLE_HEADER, 'rt') as fh:
             header = gsb.GSBHeader.fromfile(fh, verify=True)
             fh.seek(0)
@@ -54,7 +54,7 @@ class TestGSB(object):
         with pytest.raises(TypeError):
             header['sub_int'] = 0
 
-        with io.StringIO() as s:
+        with open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
             header.tofile(s)
             s.seek(0)
             assert s.readline().strip() == h_raw
@@ -206,7 +206,7 @@ class TestGSB(object):
         d2 = decode_4bit(b2)
         assert np.all(d2 == areal2)
 
-    def test_payload(self):
+    def test_payload(self, tmpdir):
         payload1 = gsb.GSBPayload.fromdata(self.data, bps=4)
         assert np.all(payload1.data == self.data)
         payload2 = gsb.GSBPayload.fromdata(self.data[:1024], bps=8)
@@ -222,7 +222,7 @@ class TestGSB(object):
         payload5 = gsb.GSBPayload.fromdata(channelized, bps=4)
         assert payload5.shape == channelized.shape
         assert np.all(payload5.words == payload1.words)
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.dat')), 'w+b') as s:
             payload1.tofile(s)
             s.seek(0)
             payload6 = gsb.GSBPayload.fromfile(s, bps=4,
@@ -231,10 +231,11 @@ class TestGSB(object):
         assert payload6 == payload1
 
     @pytest.mark.parametrize('bps', (4, 8))
-    def test_phased_payload_minimal(self, bps):
+    def test_phased_payload_minimal(self, bps, tmpdir):
         payload = gsb.GSBPayload.fromdata(self.data[:1024*8//bps], bps=bps)
         # create a "fake" phased payload by writing the same data to files
-        with io.BytesIO() as s1, io.BytesIO() as s2:
+        with open(str(tmpdir.join('test1.dat')), 'w+b') as s1, \
+                open(str(tmpdir.join('test2.dat')), 'w+b') as s2:
             payload.tofile(s1)
             payload.tofile(s2)
             s1.seek(0)
@@ -248,14 +249,15 @@ class TestGSB(object):
                                                  payloadsize=payload.size)
                 assert np.all(phased.data == payload.data[:, np.newaxis])
 
-    def test_rawdump_frame(self):
+    def test_rawdump_frame(self, tmpdir):
         header1 = gsb.GSBHeader(self.rawdump_ts.split())
         frame1 = gsb.GSBFrame.fromdata(self.data, header1, bps=4)
         assert np.all(frame1.data == self.data)
         assert frame1.size == len(self.data) // 2
         frame2 = gsb.GSBFrame(frame1.header, frame1.payload)
         assert frame2 == frame1
-        with io.StringIO() as sh, io.BytesIO() as sp:
+        with open(str(tmpdir.join('test.timestamp')), 'w+t') as sh, \
+                open(str(tmpdir.join('test.dat')), 'w+b') as sp:
             frame1.tofile(sh, sp)
             sh.seek(0)
             sp.seek(0)
@@ -263,7 +265,7 @@ class TestGSB(object):
                                            payloadsize=frame1.size)
         assert frame3 == frame1
 
-    def test_phased_frame(self):
+    def test_phased_frame(self, tmpdir):
         data = self.data.reshape(-1, 1, 2)
         with gsb.open(SAMPLE_HEADER, 'rt') as fh:
             header1 = gsb.GSBHeader.fromfile(fh, verify=True)
@@ -282,7 +284,9 @@ class TestGSB(object):
         frame2.valid = True
         assert frame2.valid is True
         assert np.all(frame2.data == cmplx)
-        with io.StringIO() as sh, io.BytesIO() as sp0, io.BytesIO() as sp1:
+        with open(str(tmpdir.join('test.timestamp')), 'w+t') as sh, \
+                open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
+                open(str(tmpdir.join('test1.dat')), 'w+b') as sp1:
             frame1.tofile(sh, ((sp0, sp1),))
             assert sp0.tell() == frame1.size // 2
             assert sp1.tell() == frame1.size // 2
@@ -300,9 +304,11 @@ class TestGSB(object):
         assert frame4.size == frame1.size  # number of bytes doesn't change.
         assert frame4.shape == twopol.shape
         assert np.all(frame4.data == twopol)
-        with io.StringIO() as sh, \
-                io.BytesIO() as sp0, io.BytesIO() as sp1, \
-                io.BytesIO() as sp2, io.BytesIO() as sp3:
+        with open(str(tmpdir.join('test.timestamp')), 'w+t') as sh, \
+                open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
+                open(str(tmpdir.join('test1.dat')), 'w+b') as sp1, \
+                open(str(tmpdir.join('test2.dat')), 'w+b') as sp2, \
+                open(str(tmpdir.join('test3.dat')), 'w+b') as sp3:
             frame4.tofile(sh, ((sp0, sp1), (sp2, sp3)))
             for s in sp0, sp1, sp2, sp3:
                 assert s.tell() == frame4.payload.size // 4
@@ -359,7 +365,7 @@ class TestGSB(object):
         raw_file = str(tmpdir.join('raw0.dat'))
         with gsb.open(ts_file, 'wt') as sh:
             sh.write_timestamp(header)
-        with io.open(raw_file, 'wb') as sp:
+        with open(raw_file, 'wb') as sp:
             payload.tofile(sp)
 
         # Open here with payloadsize given, below with samples_per_frame
@@ -377,9 +383,10 @@ class TestGSB(object):
         assert np.all(data == self.data.ravel())
         assert np.all(out == self.data)
 
-        with io.BytesIO() as sh, io.BytesIO() as sp, gsb.open(
-                sh, 'ws', raw=sp, sample_rate=4096*u.Hz,
-                samples_per_frame=payload.nsample, **header) as fh_w:
+        with open(str(tmpdir.join('test_time.dat')), 'w+b') as sh, \
+                open(str(tmpdir.join('test.dat')), 'w+b') as sp, \
+                gsb.open(sh, 'ws', raw=sp, sample_rate=4096*u.Hz,
+                         samples_per_frame=payload.nsample, **header) as fh_w:
             fh_w.write(self.data.ravel())
             fh_w.write(self.data.ravel())
             assert fh_w.tell() == 2 * len(self.data)
@@ -399,7 +406,8 @@ class TestGSB(object):
 
         # Test that opening that raises an exception correctly handles
         # file closing. (Note that the timestamp file always gets closed).
-        with io.BytesIO() as sh, io.BytesIO() as sp:
+        with open(str(tmpdir.join('test_time.dat')), 'w+b') as sh, \
+                open(str(tmpdir.join('test.dat')), 'w+b') as sp:
             with pytest.raises(u.UnitsError):
                 gsb.open(sh, 'ws', raw=sp, sample_rate=4096*u.m,
                          samples_per_frame=payload.nsample, **header)
@@ -447,9 +455,11 @@ class TestGSB(object):
         assert np.all(data[onepol.shape[0]:] == onepol[::-1].squeeze())
         # Two polarisations, 16 channels
         twopol = cmplx.reshape(-1, 2, 16)
-        with io.BytesIO() as sh, \
-                io.BytesIO() as sp0, io.BytesIO() as sp1, \
-                io.BytesIO() as sp2, io.BytesIO() as sp3, \
+        with open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
+                open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
+                open(str(tmpdir.join('test1.dat')), 'w+b') as sp1, \
+                open(str(tmpdir.join('test2.dat')), 'w+b') as sp2, \
+                open(str(tmpdir.join('test3.dat')), 'w+b') as sp3, \
                 gsb.open(sh, 'ws', raw=((sp0, sp1), (sp2, sp3)),
                          bps=bps, sample_rate=128*u.Hz,
                          samples_per_frame=twopol.shape[0] // 2,
@@ -484,7 +494,8 @@ class TestGSB(object):
         with pytest.raises(ValueError):
             # no r or w in mode
             gsb.open('ts.dat', 's')
-        with pytest.raises(TypeError), io.TextIOBase() as s:
+        with pytest.raises(TypeError), \
+                open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
             # TextIOBase for fh
             gsb.open(s, 'rt')
         with pytest.raises(IOError):

@@ -3,6 +3,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import io
 import numpy as np
+import warnings
 from astropy.utils import lazyproperty
 import astropy.units as u
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
@@ -124,8 +125,17 @@ class GSBStreamBase(VLBIStreamBase):
                                  (1 if rawdump else len(fh_raw[0])) //
                                  (nchan * (2 if complex_data else 1)))
 
+        # Temporary warning that specific thread reading isn't supported.
+        if not rawdump and len(thread_ids) != len(fh_raw):
+            warnings.warn("Baseband.gsb currently does not support reading"
+                          " specific threads.  All {0} threads will be "
+                          "read.".format(len(fh_raw)))
+        # sample_shape uses len(fh_raw) instead of len(thread_ids)!
+        sample_shape = GSBPayload._sample_shape_cls_1thread(nchan) if rawdump \
+            else GSBPayload._sample_shape_cls_nthread(len(fh_raw), nchan)
+
         super(GSBStreamBase, self).__init__(
-            fh_raw, header0=header0, nchan=nchan, bps=bps,
+            fh_raw, header0=header0, sample_shape=sample_shape, bps=bps,
             complex_data=complex_data, thread_ids=thread_ids,
             samples_per_frame=samples_per_frame,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
@@ -149,7 +159,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     def __init__(self, fh_ts, fh_raw, thread_ids=None,
                  nchan=None, bps=None, complex_data=None,
                  samples_per_frame=None, payloadsize=None,
-                 frames_per_second=None, sample_rate=None):
+                 frames_per_second=None, sample_rate=None,
+                 squeeze=True):
         header0 = fh_ts.read_timestamp()
         self._header0_size = fh_ts.tell()
         if frames_per_second is None and sample_rate is None:
@@ -166,6 +177,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             payloadsize=payloadsize,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
         self._frame_nr = None
+        self.squeeze = squeeze
 
     @lazyproperty
     def header1(self):
@@ -185,7 +197,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         self.fh_ts.seek(fh_ts_offset)
         return self.header0.__class__(tuple(last_line.split()))
 
-    def read(self, count=None, fill_value=0., squeeze=True, out=None):
+    def read(self, count=None, fill_value=0., out=None):
         """Read count samples.
 
         The range retrieved can span multiple frames.
@@ -197,8 +209,6 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             file is read.
         fill_value : float or complex
             Value to use for invalid or missing data.
-        squeeze : bool
-            If `True` (default), remove channel and thread dimensions if unity.
         out : `None` or array
             Array to store the data in. If given, count will be inferred,
             and squeeze is set to `False`.
@@ -213,10 +223,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 count = self.size - self.offset
 
             dtype = np.complex64 if self.complex_data else np.float32
-            if self.header0.mode == 'rawdump':
-                out = np.empty((count, self.nchan), dtype)
-            else:
-                out = np.empty((count, self.nthread, self.nchan), dtype)
+            out = np.empty((count,) + self._sample_shape, dtype)
+            squeeze = self.squeeze
 
         else:
             count = out.shape[0]
@@ -256,10 +264,17 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                     fh.seek(frame_nr * self._payloadsize)
         self._frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
                                         payloadsize=self._payloadsize,
-                                        nchan=self.nchan, bps=self.bps,
+                                        nchan=self._sample_shape.nchan,
+                                        bps=self.bps,
                                         complex_data=self.complex_data)
         self._frame_nr = frame_nr
         return self._frame
+
+    @property
+    def sample_shape(self):
+        """Shape of a data sample (possibly squeezed).
+        """
+        return self._get_squeezed_shape('GSB')
 
 
 class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
@@ -276,21 +291,23 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
             complex_data=complex_data,
             samples_per_frame=samples_per_frame, payloadsize=payloadsize,
             frames_per_second=frames_per_second, sample_rate=sample_rate)
-        self._data = np.zeros((self.samples_per_frame, self.nthread,
-                               self.nchan), (np.complex64 if self.complex_data
-                                             else np.float32))
+        self._data = np.zeros((self.samples_per_frame,) + self._sample_shape,
+                              (np.complex64 if self.complex_data
+                               else np.float32))
         self._valid = True
 
     def write(self, data, squeezed=True):
         """Write data, buffering by frames as needed."""
         if squeezed and data.ndim < 3:
-            if self.nthread == 1:
+            if self.header0.mode == 'phased' and \
+                    self._sample_shape.nthread == 1:
                 data = np.expand_dims(data, axis=1)
-            if self.nchan == 1:
+            if self._sample_shape.nchan == 1:
                 data = np.expand_dims(data, axis=-1)
 
-        assert data.shape[1] == self.nthread
-        assert data.shape[2] == self.nchan
+        if self.header0.mode == 'phased':
+            assert data.shape[1] == self._sample_shape.nthread
+        assert data.shape[-1] == self._sample_shape.nchan
         assert data.dtype.kind == self._data.dtype.kind
 
         count = data.shape[0]

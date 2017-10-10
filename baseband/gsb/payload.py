@@ -77,8 +77,8 @@ class GSBPayload(VLBIPayloadBase):
                  8: decode_8bit}
     _dtype_word = np.int8
 
-    _sample_shape_cls_onethread = namedtuple('sample_shape', 'nchan')
-    _sample_shape_cls_onethread.__doc__ = "GSB sample shape (multi-threaded)."
+    _sample_shape_cls_1thread = namedtuple('sample_shape', 'nchan')
+    _sample_shape_cls_1thread.__doc__ = "GSB sample shape (single-threaded)."
     _sample_shape_cls_nthread = namedtuple('sample_shape', 'nthread, nchan')
     _sample_shape_cls_nthread.__doc__ = "GSB sample shape (multi-threaded)."
 
@@ -105,17 +105,17 @@ class GSBPayload(VLBIPayloadBase):
             Whether data is complex or float.  Default: False.
         """
         if hasattr(fh, 'read'):
-            sample_shape = cls._sample_shape_cls_onethread(nchan)
+            sample_shape = cls._sample_shape_cls_1thread(nchan)
             return super(GSBPayload,
                          cls).fromfile(fh, payloadsize=payloadsize,
                                        bps=bps, sample_shape=sample_shape,
                                        complex_data=complex_data)
 
         nthread = len(fh)
-        sample_shape_onethread = cls._sample_shape_cls_onethread(nchan)
+        sample_shape_1thread = cls._sample_shape_cls_1thread(nchan)
         payloads = [[super(GSBPayload,
                            cls).fromfile(fh1, payloadsize=payloadsize, bps=bps,
-                                         sample_shape=sample_shape_onethread,
+                                         sample_shape=sample_shape_1thread,
                                          complex_data=complex_data)
                      for fh1 in fh_set] for fh_set in fh]
         if nthread == 1:
@@ -134,7 +134,8 @@ class GSBPayload(VLBIPayloadBase):
                 for payload, part in zip(payload_set, thread):
                     part[:] = payload.words.reshape(-1, bpfs // 8)
 
-        return cls(words.ravel(), bps=bps, sample_shape=(nthread, nchan),
+        sample_shape_nthread = cls._sample_shape_cls_nthread(nthread, nchan)
+        return cls(words.ravel(), bps=bps, sample_shape=sample_shape_nthread,
                    complex_data=complex_data)
 
     def tofile(self, fh):
