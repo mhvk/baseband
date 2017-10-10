@@ -6,7 +6,6 @@ import re
 import numpy as np
 from astropy.extern import six
 from astropy.utils import lazyproperty
-from collections import namedtuple
 
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,

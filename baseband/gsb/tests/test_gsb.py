@@ -1,6 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE.rst
-import io
 import pytest
+import io
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
@@ -383,7 +383,7 @@ class TestGSB(object):
         assert np.all(data == self.data.ravel())
         assert np.all(out == self.data)
 
-        with open(str(tmpdir.join('test_time.dat')), 'w+b') as sh, \
+        with io.open(str(tmpdir.join('test_time.dat')), 'w+b') as sh, \
                 open(str(tmpdir.join('test.dat')), 'w+b') as sp, \
                 gsb.open(sh, 'ws', raw=sp, sample_rate=4096*u.Hz,
                          samples_per_frame=payload.nsample, **header) as fh_w:
@@ -406,7 +406,7 @@ class TestGSB(object):
 
         # Test that opening that raises an exception correctly handles
         # file closing. (Note that the timestamp file always gets closed).
-        with open(str(tmpdir.join('test_time.dat')), 'w+b') as sh, \
+        with io.open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
                 open(str(tmpdir.join('test.dat')), 'w+b') as sp:
             with pytest.raises(u.UnitsError):
                 gsb.open(sh, 'ws', raw=sp, sample_rate=4096*u.m,
@@ -455,7 +455,7 @@ class TestGSB(object):
         assert np.all(data[onepol.shape[0]:] == onepol[::-1].squeeze())
         # Two polarisations, 16 channels
         twopol = cmplx.reshape(-1, 2, 16)
-        with open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
+        with io.open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
                 open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
                 open(str(tmpdir.join('test1.dat')), 'w+b') as sp1, \
                 open(str(tmpdir.join('test2.dat')), 'w+b') as sp2, \
@@ -495,7 +495,7 @@ class TestGSB(object):
             # no r or w in mode
             gsb.open('ts.dat', 's')
         with pytest.raises(TypeError), \
-                open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
+                io.open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
             # TextIOBase for fh
             gsb.open(s, 'rt')
         with pytest.raises(IOError):

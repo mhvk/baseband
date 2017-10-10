@@ -2,7 +2,6 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import io
 import pytest
 import copy
 import numpy as np
@@ -20,7 +19,7 @@ class TestDADA(object):
             self.header = dada.DADAHeader.fromfile(fh)
             self.payload = dada.DADAPayload.fromfile(fh, self.header)
 
-    def test_header(self):
+    def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = dada.DADAHeader.fromfile(fh)
             assert header.size == 4096
@@ -41,7 +40,7 @@ class TestDADA(object):
         with pytest.raises(AttributeError):
             header.python
 
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.dada')), 'w+b') as s:
             header.tofile(s)
             assert s.tell() == header.size
             s.seek(0)
@@ -50,7 +49,7 @@ class TestDADA(object):
             assert header2.mutable is False
             assert s.tell() == header.size
 
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.dada')), 'w+b') as s:
             # now create header with wrong HDR_SIZE in file
             bad_header = header.copy()
             bad_header['HDR_SIZE'] = 1000
@@ -130,7 +129,7 @@ class TestDADA(object):
         assert header9.mutable is True
         assert header9.comments == header.comments
 
-    def test_payload(self):
+    def test_payload(self, tmpdir):
         payload = self.payload
         assert payload.size == 64000
         assert payload.shape == (16000, 2, 1)
@@ -140,7 +139,7 @@ class TestDADA(object):
              [[-38.-38.j], [-40.+0.j]],
              [[-105.+60.j], [85.-15.j]]], dtype=np.complex64))
 
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.dada')), 'w+b') as s:
             payload.tofile(s)
             s.seek(0)
             payload2 = dada.DADAPayload.fromfile(s, payloadsize=64000, bps=8,
@@ -160,7 +159,7 @@ class TestDADA(object):
         assert not isinstance(payload.words, np.memmap)
         assert payload == payload4
 
-    def test_frame(self):
+    def test_frame(self, tmpdir):
         with dada.open(SAMPLE_FILE, 'rb') as fh:
             frame = fh.read_frame(memmap=False)
         header, payload = frame.header, frame.payload
@@ -171,7 +170,7 @@ class TestDADA(object):
             [[[-38.-38.j], [-38.-38.j]],
              [[-38.-38.j], [-40.+0.j]],
              [[-105.+60.j], [85.-15.j]]], dtype=np.complex64))
-        with io.BytesIO() as s:
+        with open(str(tmpdir.join('test.dada')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
             frame2 = dada.DADAFrame.fromfile(s, memmap=False)

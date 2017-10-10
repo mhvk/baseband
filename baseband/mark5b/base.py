@@ -1,6 +1,5 @@
 import numpy as np
 from astropy import units as u
-from collections import namedtuple
 
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase, make_opener)

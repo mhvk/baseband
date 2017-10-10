@@ -1,7 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE.rst
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-import io
 import pytest
 import numpy as np
 from astropy import units as u
@@ -432,7 +431,7 @@ class TestMark5B(object):
                              sample_rate=32*u.MHz, ref_mjd=57000) as fr:
                 record = fr.read(10)
                 with mark5b.open(m5_incomplete, 'ws', header=fr.header0,
-                                nchan=8, sample_rate=32*u.MHz) as fw:
+                                 nchan=8, sample_rate=32*u.MHz) as fw:
                     fw.write(record)
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)

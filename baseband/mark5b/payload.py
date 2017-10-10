@@ -111,7 +111,6 @@ class Mark5BPayload(VLBIPayloadBase):
     _decoders = {2: decode_2bit}
 
     _sample_shape_cls = namedtuple('sample_shape', 'nchan')
-    _sample_shape_cls.__doc__ = "Mark 5B sample shape."
 
     def __init__(self, words, nchan=1, bps=2, complex_data=False):
         if complex_data:

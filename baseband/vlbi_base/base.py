@@ -218,7 +218,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 dims = np.array(self._sample_shape)
                 keep_dims = (dims > 1)
                 sqz_shp = namedtuple('sample_shape', field_names[keep_dims])
-                sqz_shp.__doc__ = format_name + " sample shape (squeezed)."
                 self._squeezed_shape = sqz_shp(*dims[keep_dims])
             return self._squeezed_shape
         return self._sample_shape

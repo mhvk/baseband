@@ -240,7 +240,6 @@ class VDIFStreamBase(VLBIStreamBase):
     _frame_class = VDIFFrame
 
     _sample_shape_cls = namedtuple('sample_shape', 'nthread, nchan')
-    _sample_shape_cls.__doc__ = "VDIF sample shape."
 
     def __init__(self, fh_raw, header0, thread_ids, frames_per_second=None,
                  sample_rate=None):

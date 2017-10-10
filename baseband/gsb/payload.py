@@ -78,9 +78,7 @@ class GSBPayload(VLBIPayloadBase):
     _dtype_word = np.int8
 
     _sample_shape_cls_1thread = namedtuple('sample_shape', 'nchan')
-    _sample_shape_cls_1thread.__doc__ = "GSB sample shape (single-threaded)."
     _sample_shape_cls_nthread = namedtuple('sample_shape', 'nthread, nchan')
-    _sample_shape_cls_nthread.__doc__ = "GSB sample shape (multi-threaded)."
 
     @classmethod
     def fromfile(cls, fh, payloadsize=None, bps=4, nchan=1,
@@ -137,6 +135,28 @@ class GSBPayload(VLBIPayloadBase):
         sample_shape_nthread = cls._sample_shape_cls_nthread(nthread, nchan)
         return cls(words.ravel(), bps=bps, sample_shape=sample_shape_nthread,
                    complex_data=complex_data)
+
+    @classmethod
+    def fromdata(cls, data, bps=2):
+        """Encode data as payload.
+
+        Parameters
+        ----------
+        data : `numpy.ndarray`
+            Data to be encoded. The last dimension is taken as the number of
+            channels.
+        bps : int
+            Number of bits per sample to use (for complex data, for real and
+            imaginary part separately; default: 2).
+        """
+        payload = super(GSBPayload, cls).fromdata(data, bps=bps)
+        if len(data.shape[1:]) == 1:
+            payload.sample_shape = \
+                cls._sample_shape_cls_1thread(*data.shape[1:])
+        else:
+            payload.sample_shape = \
+                cls._sample_shape_cls_nthread(*data.shape[1:])
+        return payload
 
     def tofile(self, fh):
         try:

@@ -132,7 +132,6 @@ class VDIFPayload(VLBIPayloadBase):
                  8: encode_8bit}
 
     _sample_shape_cls = namedtuple('sample_shape', 'nchan')
-    _sample_shape_cls.__doc__ = "VDIF sample shape (single frame)."
 
     def __init__(self, words, header=None,
                  nchan=1, bps=2, complex_data=False):
