@@ -211,7 +211,7 @@ class Mark4Payload(VLBIPayloadBase):
                  (8, 2, 2): decode_8chan_2bit_fanout2,
                  (8, 2, 4): decode_8chan_2bit_fanout4}
 
-    _sample_shape_cls = namedtuple('sample_shape', 'nchan')
+    _sample_shape_cls = namedtuple('SampleShape', 'nchan')
 
     def __init__(self, words, header=None, nchan=1, bps=2, fanout=1):
         if header is not None:

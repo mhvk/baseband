@@ -184,16 +184,11 @@ class DADAStreamBase(VLBIStreamBase):
     thread_ids : list of int, optional
         Specific threads to use.  By default, as many as there are
         polarisations ('header0["NPOL"]').
-    files : list or tuple of str, optional
-        Should contain the names of all files of a given observation,
-        in time-order.
-    template : str, optional
-        A template string that can be formatted using 'frame_nr', 'obs_offset',
-        and other header keywords.  For details, see
-        :class:`~baseband.dada.base.DADAFileNameSequencer`.
+    squeeze : bool, optional
+        If `True` (default), remove channel and thread dimensions if unity.
     """
 
-    def __init__(self, fh_raw, header0, thread_ids=None):
+    def __init__(self, fh_raw, header0, thread_ids=None, squeeze=True):
         frames_per_second = (1. / (header0['TSAMP'] * 1e-6) /
                              header0.samples_per_frame)
         if thread_ids is None:
@@ -205,18 +200,11 @@ class DADAStreamBase(VLBIStreamBase):
             bps=header0.bps, complex_data=header0.complex_data,
             thread_ids=thread_ids,
             samples_per_frame=header0.samples_per_frame,
-            frames_per_second=frames_per_second)
+            frames_per_second=frames_per_second, squeeze=squeeze)
 
     def _frame_info(self):
         """Convert offset to file number and offset into that file."""
         return divmod(self.offset, self.samples_per_frame)
-
-    def _unsqueeze(self, data):
-        if data.ndim < 3 and self._sample_shape[0] == 1:
-            data = data[:, np.newaxis]
-        if data.ndim < 3 and self._sample_shape[1] == 1:
-            data = data[..., np.newaxis]
-        return data
 
 
 class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
@@ -231,14 +219,14 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         file handle of the (first) raw DADA stream.
     thread_ids : list of int, optional
         Specific threads to read.  By default, all threads are read.
-    squeeze : bool
+    squeeze : bool, optional
         If `True` (default), remove channel and thread dimensions if unity.
     """
     def __init__(self, fh_raw, thread_ids=None, squeeze=True):
         header = DADAHeader.fromfile(fh_raw)
-        super(DADAStreamReader, self).__init__(fh_raw, header, thread_ids)
+        super(DADAStreamReader, self).__init__(fh_raw, header, thread_ids,
+                                               squeeze)
         self._get_frame(0)
-        self.squeeze = squeeze
 
     @lazyproperty
     def header1(self):
@@ -254,17 +242,18 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         ----------
         count : int, optional
             Number of samples to read.  If omitted or negative, the whole
-            file is read. Ignored if ``out`` is given.
+            file is read.  Ignored if ``out`` is given.
         out : `None` or array
             Array to store the data in. If given, ``count`` will be inferred.
-            If ``squeeze`` is `True`, unity dimensions can be absent.
+            If ``squeeze`` is `True`, ``out`` must have squeezed sample
+            dimensions.
 
         Returns
         -------
         out : array of float or complex
-            Dimensions are (sample-time, thread, channel), with dimensions of
-            length unity possibly removed (if ``squeeze`` is `True`, or if they
-            were not present in the ``out`` array passed in).
+            Dimensions are (sample-time, thread (polarization), channel), with
+            dimensions of length unity possibly removed (if ``squeeze`` is
+            `True`).
         """
         if out is None:
             if count is None or count < 0:
@@ -307,12 +296,6 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
                 self.header0['OBS_OFFSET'] + frame_nr *
                 self.header0.payloadsize)
 
-    @property
-    def sample_shape(self):
-        """Shape of a data sample (possibly squeezed).
-        """
-        return self._get_squeezed_shape('DADA')
-
 
 class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
     """DADA format writer.
@@ -324,30 +307,31 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
         or ``template`` is passed in.
     header : :class:`~baseband.dada.DADAHeader`
         Header for the file, holding time information, etc.
+    squeeze : bool, optional
+        If `True` (default), `write` accepts squeezed arrays as input,
+        and adds channel and thread dimensions if unity.
     """
-    def __init__(self, fh_raw, header):
+    def __init__(self, fh_raw, header, squeeze=True):
         assert header.get('OBS_OVERLAP', 0) == 0
-        super(DADAStreamWriter, self).__init__(fh_raw, header)
+        super(DADAStreamWriter, self).__init__(fh_raw, header, squeeze=squeeze)
         self._frame = self.memmap_frame(header)
         self._frame_nr = 0
 
-    def write(self, data, squeezed=True, invalid_data=False):
+    def write(self, data, invalid_data=False):
         """Write data, using multiple files as needed.
 
         Parameters
         ----------
         data : array
-            Piece of data to be written.  This should be properly scaled to
-            make best use of the dynamic range delivered by the encoding.
-        squeezed : bool, optional
-            If `True` (default), allow dimensions with size one to be absent
-            (i.e., if ``nthread`` and/or ``nchan`` is unity).
-        invalid_data : bool
-            Whether the current data is valid.  Present for consistency with
-            other stream writers.  It does not seem possible to store this
-            information in dada files.
+            Piece of data to be written, with sample dimensions as given by
+            ``sample_shape``. This should be properly scaled to make best use
+            of the dynamic range delivered by the encoding.
+        invalid_data : bool, optional
+            Whether the current data is valid.  Defaults to `False`.  Present
+            for consistency with other stream writers.  It does not seem
+            possible to store this information in DADA files.
         """
-        if squeezed:
+        if self.squeeze:
             data = self._unsqueeze(data)
 
         assert data.shape[1] == self._sample_shape.npol
@@ -390,13 +374,16 @@ thread_ids : list of int, optional
     Specific threads to read.  By default, all threads are read.
     (For DADA, the number threads equals ``header['NPOL']``, i.e.,
     the number of polarisations.)
-squeeze : bool
+squeeze : bool, optional
     If `True` (default), remove channel and thread dimensions if unity.
 
 --- For writing : (see :class:`~baseband.dada.base.DADAStreamWriter`)
 
 header : `~baseband.dada.DADAHeader`, optional
     Header for the first frame, holding time information, etc.
+squeeze : bool, optional
+    If `True` (default), `write` accepts squeezed arrays as input,
+    and adds channel and thread dimensions if unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.  See

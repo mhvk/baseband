@@ -128,8 +128,8 @@ class TestVLBIBase(object):
         with pytest.raises(TypeError):
             header.mutable = True
 
-    def test_header_fromfile(self):
-        with io.BytesIO() as s:
+    def test_header_fromfile(self, tmpdir):
+        with open(str(tmpdir.join('test.dat')), 'w+b') as s:
             s.write(four_word_struct.pack(*self.header.words))
             s.seek(2)
             with pytest.raises(EOFError):
@@ -306,8 +306,8 @@ class TestVLBIBase(object):
         with pytest.raises(ValueError):
             payload[1:3, :1] = np.ones((1, 2))
 
-    def test_payload_fromfile(self):
-        with io.BytesIO() as s:
+    def test_payload_fromfile(self, tmpdir):
+        with open(str(tmpdir.join('test.dat')), 'w+b') as s:
             self.payload.tofile(s)
             s.seek(0)
             with pytest.raises(ValueError):
@@ -378,8 +378,8 @@ class TestVLBIBase(object):
         assert frame2[3, 1] == 5
         assert frame2.payload != self.payload
 
-    def test_frame_fromfile(self):
-        with io.BytesIO() as s:
+    def test_frame_fromfile(self, tmpdir):
+        with open(str(tmpdir.join('test.dat')), 'w+b') as s:
             self.frame.tofile(s)
             s.seek(0)
             frame = self.Frame.fromfile(s, payloadsize=self.payload.size,

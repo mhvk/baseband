@@ -11,7 +11,6 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
-from collections import namedtuple
 
 from ..vlbi_base.frame import VLBIFrameBase
 from .header import VDIFHeader

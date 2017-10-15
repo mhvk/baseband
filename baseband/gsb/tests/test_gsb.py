@@ -209,6 +209,8 @@ class TestGSB(object):
     def test_payload(self, tmpdir):
         payload1 = gsb.GSBPayload.fromdata(self.data, bps=4)
         assert np.all(payload1.data == self.data)
+        assert payload1.sample_shape == (1,)
+        assert payload1.sample_shape.nchan == 1
         payload2 = gsb.GSBPayload.fromdata(self.data[:1024], bps=8)
         assert np.all(payload2.data == self.data[:1024])
         cmplx = self.data[::2] + 1j * self.data[1::2]
@@ -221,6 +223,8 @@ class TestGSB(object):
         channelized = self.data.reshape(-1, 512)
         payload5 = gsb.GSBPayload.fromdata(channelized, bps=4)
         assert payload5.shape == channelized.shape
+        assert payload5.sample_shape == (512,)
+        assert payload5.sample_shape.nchan == 512
         assert np.all(payload5.words == payload1.words)
         with open(str(tmpdir.join('test.dat')), 'w+b') as s:
             payload1.tofile(s)
@@ -377,11 +381,17 @@ class TestGSB(object):
             assert_quantity_allclose(fh_r.tell(unit=u.s), 1. * u.s)
             assert fh_r.header1 == header
             # recheck with output array given
-            out = np.zeros_like(self.data)
+            out = np.zeros_like(self.data).squeeze()
             fh_r.seek(0)
             fh_r.read(out=out)
+            # check that non-squeezed output is identical in content
+            fh_r.squeeze = False
+            out2 = np.zeros_like(self.data)
+            fh_r.seek(0)
+            fh_r.read(out=out2)
         assert np.all(data == self.data.ravel())
-        assert np.all(out == self.data)
+        assert np.all(out == self.data.squeeze())
+        assert np.all(out2 == self.data)
 
         with io.open(str(tmpdir.join('test_time.dat')), 'w+b') as sh, \
                 open(str(tmpdir.join('test.dat')), 'w+b') as sp, \
@@ -428,10 +438,13 @@ class TestGSB(object):
                       bps=bps, sample_rate=256*u.Hz,
                       samples_per_frame=onepol.shape[0] // 2,
                       nchan=onepol.shape[2], nthread=1,
-                      complex_data=True, header=header) as fh_w:
-            # Write data twice.
+                      complex_data=True, squeeze=False,
+                      header=header) as fh_w:
+            # Write data.
             fh_w.write(onepol)
-            fh_w.write(onepol[::-1])
+            # Write data again, but reversed and squeezed
+            fh_w.squeeze = True
+            fh_w.write(onepol[::-1].squeeze())
             assert fh_w.tell() == onepol.shape[0] * 2
             assert_quantity_allclose(fh_w.tell(unit=u.s), 0.5 * u.s)
             assert fh_w._header['seq_nr'] == fh_w.header0['seq_nr'] + 3

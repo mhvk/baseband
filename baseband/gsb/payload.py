@@ -77,8 +77,8 @@ class GSBPayload(VLBIPayloadBase):
                  8: decode_8bit}
     _dtype_word = np.int8
 
-    _sample_shape_cls_1thread = namedtuple('sample_shape', 'nchan')
-    _sample_shape_cls_nthread = namedtuple('sample_shape', 'nthread, nchan')
+    _sample_shape_cls_1thread = namedtuple('SampleShape', 'nchan')
+    _sample_shape_cls_nthread = namedtuple('SampleShape', 'nthread, nchan')
 
     @classmethod
     def fromfile(cls, fh, payloadsize=None, bps=4, nchan=1,
@@ -151,11 +151,11 @@ class GSBPayload(VLBIPayloadBase):
         """
         payload = super(GSBPayload, cls).fromdata(data, bps=bps)
         if len(data.shape[1:]) == 1:
-            payload.sample_shape = \
-                cls._sample_shape_cls_1thread(*data.shape[1:])
+            payload.sample_shape = cls._sample_shape_cls_1thread(
+                *data.shape[1:])
         else:
-            payload.sample_shape = \
-                cls._sample_shape_cls_nthread(*data.shape[1:])
+            payload.sample_shape = cls._sample_shape_cls_nthread(
+                *data.shape[1:])
         return payload
 
     def tofile(self, fh):

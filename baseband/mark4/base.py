@@ -210,7 +210,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         ``sample_rate``, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
-    squeeze : bool
+    squeeze : bool, optional
         If `True` (default), remove channel and thread dimensions if unity.
     """
 
@@ -226,14 +226,14 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
-        sample_shape = Mark4Payload._sample_shape_cls(len(thread_ids)) if \
-            thread_ids else self._frame.payload.sample_shape
+        sample_shape = (Mark4Payload._sample_shape_cls(len(thread_ids)) if
+                        thread_ids else self._frame.payload.sample_shape)
         super(Mark4StreamReader, self).__init__(
             fh_raw, header0=header, sample_shape=sample_shape,
             bps=header.bps, complex_data=False, thread_ids=thread_ids,
             samples_per_frame=header.samples_per_frame,
-            frames_per_second=frames_per_second, sample_rate=sample_rate)
-        self.squeeze = squeeze
+            frames_per_second=frames_per_second, sample_rate=sample_rate,
+            squeeze=squeeze)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
@@ -280,28 +280,30 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         ----------
         count : int
             Number of samples to read.  If omitted or negative, the whole
-            file is read.
+            file is read.  Ignored if ``out`` is given.
         fill_value : float
             Value to use for invalid or missing data.
         out : `None` or array
-            Array to store the data in. If given, count will be inferred,
-            and squeeze behavior will be overridden to False.
+            Array to store the data in. If given, ``count`` will be inferred.
+            If ``squeeze`` is `True`, ``out`` must have squeezed sample
+            dimensions.
 
         Returns
         -------
         out : array of float
-            Dimensions are (sample-time, vlbi-thread, channel).
+            Dimensions are (sample-time, channel) with dimensions
+            of length unity possibly removed (if ``squeeze`` is `True`).
         """
         if out is None:
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            out = np.empty((self._sample_shape.nchan, count),
-                           dtype=self._frame.dtype).T
-            squeeze = self.squeeze
+            result = np.empty((self._sample_shape.nchan, count),
+                              dtype=self._frame.dtype).T
+            out = result.squeeze() if self.squeeze else result
         else:
             count = out.shape[0]
-            squeeze = False
+            result = self._unsqueeze(out) if self.squeeze else out
 
         offset0 = self.offset
         while count > 0:
@@ -316,12 +318,12 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            out[sample:sample + nsample] = data[sample_offset:
-                                                sample_offset + nsample]
+            result[sample:sample + nsample] = data[sample_offset:
+                                                   sample_offset + nsample]
             self.offset += nsample
             count -= nsample
 
-        return out.squeeze() if squeeze else out
+        return out
 
     def _read_frame(self):
         frame_nr = self.offset // self.samples_per_frame
@@ -331,12 +333,6 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         # Convert payloads to data array.
         self._frame_data = self._frame.data
         self._frame_nr = frame_nr
-
-    @property
-    def sample_shape(self):
-        """Shape of a data sample (possibly squeezed).
-        """
-        return self._get_squeezed_shape('Mark 4')
 
 
 class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
@@ -353,6 +349,9 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
     header : `~baseband.mark4.Mark4Header`
         Header for the first frame, holding start time information, etc.
+    squeeze : bool, optional
+        If `True` (default), `write` accepts squeezed arrays as input,
+        and adds channel and thread dimensions if unity.
     **kwargs
         If no header is give, an attempt is made to construct the header from
         these.  For a standard header, this would include the following.
@@ -373,7 +372,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
     _frame_class = Mark4Frame
 
     def __init__(self, raw, frames_per_second=None, sample_rate=None,
-                 header=None, **kwargs):
+                 header=None, squeeze=True, **kwargs):
         if header is None:
             header = Mark4Header.fromvalues(**kwargs)
         sample_shape = Mark4Payload._sample_shape_cls(header.nchan)
@@ -382,16 +381,26 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
             thread_ids=range(header.nchan), bps=header.bps, complex_data=False,
             samples_per_frame=(header.framesize * 8 // header.bps //
                                header.nchan),
-            frames_per_second=frames_per_second, sample_rate=sample_rate)
+            frames_per_second=frames_per_second, sample_rate=sample_rate,
+            squeeze=squeeze)
 
         self._data = np.zeros((self.samples_per_frame,
                                self._sample_shape.nchan), np.float32)
 
-    def write(self, data, squeezed=True, invalid_data=False):
-        """Write data, buffering by frames as needed."""
-        if squeezed and data.ndim < 2:
-            data = np.expand_dims(data, axis=1 if
-                                  self._sample_shape.nchan == 1 else 0)
+    def write(self, data, invalid_data=False):
+        """Write data, buffering by frames as needed.
+
+        Parameters
+        ----------
+        data : array
+            Piece of data to be written, with sample dimensions as given by
+            ``sample_shape``. This should be properly scaled to make best use
+            of the dynamic range delivered by the encoding.
+        invalid_data : bool, optional
+            Whether the current data is valid.  Defaults to `False`.
+        """
+        if self.squeeze:
+            data = self._unsqueeze(data)
 
         assert data.shape[1] == self._sample_shape.nchan
 
@@ -434,7 +443,7 @@ frames_per_second : int, optional
     ``sample_rate``, or by scanning the file.
 sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each thread is sampled (bandwidth * 2; frequency units).
-squeeze : bool
+squeeze : bool, optional
     If `True` (default), remove channel and thread dimensions if unity.
 
 --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
@@ -446,6 +455,9 @@ sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each thread is sampled (bandwidth * 2; frequency units).
 header : `~baseband.mark4.Mark4Header`
     Header for the first frame, holding time information, etc.
+squeeze : bool, optional
+    If `True` (default), `write` accepts squeezed arrays as input,
+    and adds channel and thread dimensions if unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.  See

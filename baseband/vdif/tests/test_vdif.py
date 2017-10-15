@@ -235,6 +235,9 @@ class TestVDIF(object):
             payload = vdif.VDIFPayload.fromfile(fh, header)
         assert payload.size == 5000
         assert payload.shape == (20000, 1)
+        # Check sample shape validity
+        assert payload.sample_shape == (1,)
+        assert payload.sample_shape.nchan == 1
         assert payload.dtype == np.float32
         assert np.all(payload[:12, 0].astype(int) ==
                       np.array([1, 1, 1, -3, 1, 1, -3, -3, -3, 3, 3, -1]))
@@ -424,11 +427,11 @@ class TestVDIF(object):
             fh.seek(-10000, 2)
             header_m10000b = fh.find_header(framesize=header0.framesize,
                                             forward=False)
-            assert fh.tell() == 14*header0.framesize
+            assert fh.tell() == 14 * header0.framesize
             fh.seek(-5000, 2)
             header_m5000b = fh.find_header(framesize=header0.framesize,
                                            forward=False)
-            assert fh.tell() == 15*header0.framesize
+            assert fh.tell() == 15 * header0.framesize
             fh.seek(-20, 2)
             header_end = fh.find_header(template_header=header0,
                                         forward=True)
@@ -518,20 +521,25 @@ class TestVDIF(object):
         assert np.all(record.astype(int)[:, 0] ==
                       np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
 
-        # Test that squeeze attribute works on read and sample shape, but is
-        # overridden when reading in-place.
+        # Test that squeeze attribute works on read (including in-place read)
+        # but can be turned off if needed.
         with vdif.open(SAMPLE_FILE, 'rs') as fh:
-            assert tuple(fh.sample_shape) == (8,)
+            assert fh.sample_shape == (8,)
+            assert fh.sample_shape.nthread == 8
             assert fh.read(1).shape == (8,)
+            fh.seek(0)
+            out = np.zeros((12, 8))
+            fh.read(out=out)
+            assert fh.tell() == 12
+            assert np.all(out.squeeze() == record)
+            fh.squeeze = False
+            assert fh.sample_shape == (8, 1)
+            assert fh.read(1).shape == (1, 8, 1)
             fh.seek(0)
             out = np.zeros((12, 8, 1))
             fh.read(out=out)
             assert fh.tell() == 12
             assert np.all(out.squeeze() == record)
-
-        with vdif.open(SAMPLE_FILE, 'rs', squeeze=False) as fh:
-            assert tuple(fh.sample_shape) == (8, 1)
-            assert fh.read(1).shape == (1, 8, 1)
 
     def test_stream_writer(self, tmpdir):
         vdif_file = str(tmpdir.join('simple.vdif'))
@@ -560,6 +568,26 @@ class TestVDIF(object):
             fh.seek(16)
             record = fh.read(16)
         assert np.all(record == data)
+
+        # Test that squeeze attribute works on write but can be turned off if
+        # needed.
+        with vdif.open(SAMPLE_FILE, 'rs') as fh:
+            record = fh.read()
+            header = fh.header0
+
+        test_file = str(tmpdir.join('test.vdif'))
+        with vdif.open(test_file, 'ws', nthread=8, header=header) as fw:
+            assert fw.sample_shape == (8,)
+            assert fw.sample_shape.nthread == 8
+            fw.write(record[:20000])
+            fw.squeeze = False
+            assert fw.sample_shape == (8, 1)
+            assert fw.sample_shape.nthread == 8
+            assert fw.sample_shape.nchan == 1
+            fw.write(record[20000:, :, np.newaxis])
+
+        with vdif.open(test_file, 'rs') as fh:
+            assert np.all(fh.read() == record)
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.

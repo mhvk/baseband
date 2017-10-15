@@ -133,6 +133,10 @@ class TestDADA(object):
         payload = self.payload
         assert payload.size == 64000
         assert payload.shape == (16000, 2, 1)
+        # Check sample shape validity
+        assert payload.sample_shape == (2, 1)
+        assert payload.sample_shape.npol == 2
+        assert payload.sample_shape.nchan == 1
         assert payload.dtype == np.complex64
         assert np.all(payload[:3] == np.array(
             [[[-38.-38.j], [-38.-38.j]],
@@ -262,8 +266,8 @@ class TestDADA(object):
             record1 = fh.read(12)
             assert fh.tell() == 12
             fh.seek(10000)
-            record2 = np.zeros((2, 2, 1), dtype=np.complex64)
-            record2 = fh.read(2, out=record2)
+            record2 = np.zeros((2, 2), dtype=np.complex64)
+            record2 = fh.read(out=record2)
             assert fh.tell() == 10002
             assert np.abs(fh.tell(unit='time') -
                           (time0 + 10002 / (16*u.MHz))) < 1. * u.ns
@@ -279,11 +283,12 @@ class TestDADA(object):
              [-105.+60.j, 85.-15.j]], dtype=np.complex64))
         assert record1.shape == (12, 2) and record1.dtype == np.complex64
         assert np.all(record1 == self.payload[:12].squeeze())
-        assert record2.shape == (2, 2, 1)
-        assert np.all(record2 == self.payload[10000:10002])
+        assert record2.shape == (2, 2)
+        assert np.all(record2 == self.payload[10000:10002].squeeze())
 
         filename = str(tmpdir.join('a.dada'))
-        with dada.open(filename, 'ws', header=self.header) as fw:
+        with dada.open(filename, 'ws', header=self.header,
+                       squeeze=False) as fw:
             fw.write(self.payload.data)
             assert fw.time0 == time0
             assert np.abs(fw.tell(unit='time') -
@@ -317,27 +322,48 @@ class TestDADA(object):
             record3 = fh.read(12)
             assert np.all(record3 == record1[:12, 0])
 
-        # Test that squeeze attribute works on read and sample shape, but is
-        # overridden when reading in-place.
+        # Test that squeeze attribute works on read (including in-place read)
+        # and write, but can be turned off if needed.
         with dada.open(SAMPLE_FILE, 'rs') as fh:
-            assert tuple(fh.sample_shape) == (2,)
+            assert fh.sample_shape == (2,)
+            assert fh.sample_shape.npol == 2
             assert fh.read(1).shape == (2,)
             fh.seek(0)
             out = np.zeros((12, 2), dtype=np.complex64)
             fh.read(out=out)
             assert fh.tell() == 12
+            assert np.all(out == record1)
+            fh.squeeze = False
+            assert fh.sample_shape == (2, 1)
+            assert fh.sample_shape.npol == 2
+            assert fh.sample_shape.nchan == 1
+            assert fh.read(1).shape == (1, 2, 1)
+            fh.seek(0)
+            out = np.zeros((12, 2, 1), dtype=np.complex64)
+            fh.read(out=out)
+            assert fh.tell() == 12
             assert np.all(out.squeeze() == record1)
 
-        with dada.open(SAMPLE_FILE, 'rs', squeeze=False) as fh:
-            assert tuple(fh.sample_shape) == (2, 1)
-            assert fh.read(1).shape == (1, 2, 1)
+        with dada.open(filename, 'ws', header=self.header) as fw:
+            assert fw.sample_shape == (2,)
+            assert fw.sample_shape.npol == 2
+            fw.write(self.payload[:8000].squeeze())
+            fw.squeeze = False
+            assert fw.sample_shape == (2, 1)
+            assert fw.sample_shape.npol == 2
+            assert fw.sample_shape.nchan == 1
+            fw.write(self.payload[8000:16000])
+
+        with dada.open(filename, 'rs', squeeze=False) as fh:
+            assert np.all(fh.read() == self.payload)
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # valid but invalid samples are appropriately marked.
     def test_incomplete_stream(self, tmpdir):
         filename = str(tmpdir.join('a.dada'))
         with catch_warnings(UserWarning) as w:
-            with dada.open(filename, 'ws', header=self.header) as fw:
+            with dada.open(filename, 'ws', header=self.header,
+                           squeeze=False) as fw:
                 fw.write(self.payload[:10])
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)

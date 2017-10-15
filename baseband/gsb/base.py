@@ -3,7 +3,6 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import io
 import numpy as np
-import warnings
 from astropy.utils import lazyproperty
 import astropy.units as u
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
@@ -107,7 +106,8 @@ class GSBStreamBase(VLBIStreamBase):
     def __init__(self, fh_ts, fh_raw, header0, thread_ids=None,
                  nchan=None, bps=None, complex_data=None,
                  samples_per_frame=None, payloadsize=None,
-                 frames_per_second=None, sample_rate=None):
+                 frames_per_second=None, sample_rate=None,
+                 squeeze=True):
         self.fh_ts = fh_ts
         rawdump = header0.mode == 'rawdump'
         complex_data = (complex_data if complex_data is not None else
@@ -126,19 +126,23 @@ class GSBStreamBase(VLBIStreamBase):
                                  (nchan * (2 if complex_data else 1)))
 
         # Temporary warning that specific thread reading isn't supported.
-        if not rawdump and len(thread_ids) != len(fh_raw):
-            warnings.warn("Baseband.gsb currently does not support reading"
-                          " specific threads.  All {0} threads will be "
-                          "read.".format(len(fh_raw)))
+        if not rawdump:
+            assert len(thread_ids) == len(fh_raw), (
+                "Baseband.gsb currently does not support "
+                "reading specific threads.")
         # sample_shape uses len(fh_raw) instead of len(thread_ids)!
-        sample_shape = GSBPayload._sample_shape_cls_1thread(nchan) if rawdump \
-            else GSBPayload._sample_shape_cls_nthread(len(fh_raw), nchan)
+        if rawdump:
+            sample_shape = GSBPayload._sample_shape_cls_1thread(nchan)
+        else:
+            sample_shape = GSBPayload._sample_shape_cls_nthread(len(fh_raw),
+                                                                nchan)
 
         super(GSBStreamBase, self).__init__(
             fh_raw, header0=header0, sample_shape=sample_shape, bps=bps,
             complex_data=complex_data, thread_ids=thread_ids,
             samples_per_frame=samples_per_frame,
-            frames_per_second=frames_per_second, sample_rate=sample_rate)
+            frames_per_second=frames_per_second, sample_rate=sample_rate,
+            squeeze=squeeze)
         self._payloadsize = payloadsize
 
     def close(self):
@@ -149,6 +153,22 @@ class GSBStreamBase(VLBIStreamBase):
             for fh_pair in self.fh_raw:
                 for fh in fh_pair:
                     fh.close()
+
+    def __repr__(self):
+        if isinstance(self.fh_raw, (list, tuple)):
+            data_name = tuple(tuple(p.name.split('/')[-1] for p in pol)
+                              for pol in self.fh_raw)
+        else:
+            data_name = self.fh_raw.name
+        return ("<{s.__class__.__name__} header={s.fh_ts.name}"
+                " offset= {s.offset}\n    data={dn}\n"
+                "    frames_per_second={s.frames_per_second:.3f},"
+                " samples_per_frame={s.samples_per_frame},\n"
+                "    sample_shape={s.sample_shape}, bps={s.bps},\n"
+                "    {t}(start) time={s.time0.isot}>"
+                .format(s=self, dn=data_name, t=(
+                    'thread_ids={0}, '.format(self.thread_ids) if
+                    self.thread_ids else '')))
 
 
 class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
@@ -167,17 +187,17 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             header1 = fh_ts.read_timestamp()
             assert (fh_ts.tell() ==
                     header0.seek_offset(2, size=self._header0_size))
-            frames_per_second = (1./(header1.time -
-                                     header0.time).to(u.s)).value
+            frames_per_second = (1. / (header1.time -
+                                       header0.time).to(u.s)).value
         fh_ts.seek(0)
         super(GSBStreamReader, self).__init__(
             fh_ts, fh_raw, header0, nchan=nchan, bps=bps,
             complex_data=complex_data,
             thread_ids=thread_ids, samples_per_frame=samples_per_frame,
             payloadsize=payloadsize,
-            frames_per_second=frames_per_second, sample_rate=sample_rate)
+            frames_per_second=frames_per_second, sample_rate=sample_rate,
+            squeeze=squeeze)
         self._frame_nr = None
-        self.squeeze = squeeze
 
     @lazyproperty
     def header1(self):
@@ -210,8 +230,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         fill_value : float or complex
             Value to use for invalid or missing data.
         out : `None` or array
-            Array to store the data in. If given, count will be inferred,
-            and squeeze is set to `False`.
+            Array to store the data in. If given, count will be inferred.
 
         Returns
         -------
@@ -223,12 +242,12 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 count = self.size - self.offset
 
             dtype = np.complex64 if self.complex_data else np.float32
-            out = np.empty((count,) + self._sample_shape, dtype)
-            squeeze = self.squeeze
+            result = np.empty((count,) + self._sample_shape, dtype)
+            out = result.squeeze() if self.squeeze else result
 
         else:
             count = out.shape[0]
-            squeeze = False
+            result = self._unsqueeze(out) if self.squeeze else out
 
         offset0 = self.offset
         while count > 0:
@@ -245,12 +264,12 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            out[sample:sample + nsample] = self._frame[sample_offset:
-                                                       sample_offset + nsample]
+            result[sample:sample + nsample] = self._frame[
+                sample_offset:sample_offset + nsample]
             self.offset += nsample
             count -= nsample
 
-        return out.squeeze() if squeeze else out
+        return out
 
     def _read_frame(self, fill_value=0., out=None):
         frame_nr = self.offset // self.samples_per_frame
@@ -270,17 +289,12 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         self._frame_nr = frame_nr
         return self._frame
 
-    @property
-    def sample_shape(self):
-        """Shape of a data sample (possibly squeezed).
-        """
-        return self._get_squeezed_shape('GSB')
-
 
 class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
     def __init__(self, fh_ts, fh_raw, header=None, nchan=None, bps=None,
                  complex_data=None, samples_per_frame=None, payloadsize=None,
-                 frames_per_second=None, sample_rate=None, **kwargs):
+                 frames_per_second=None, sample_rate=None, squeeze=True,
+                 **kwargs):
         if header is None:
             mode = kwargs.pop('header_mode',
                               'rawdump' if hasattr(fh_raw, 'read') else
@@ -288,22 +302,24 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
             header = GSBHeader.fromvalues(mode=mode, **kwargs)
         super(GSBStreamWriter, self).__init__(
             fh_ts, fh_raw, header, nchan=nchan, bps=bps,
-            complex_data=complex_data,
-            samples_per_frame=samples_per_frame, payloadsize=payloadsize,
-            frames_per_second=frames_per_second, sample_rate=sample_rate)
+            complex_data=complex_data, samples_per_frame=samples_per_frame,
+            payloadsize=payloadsize, frames_per_second=frames_per_second,
+            sample_rate=sample_rate, squeeze=squeeze)
         self._data = np.zeros((self.samples_per_frame,) + self._sample_shape,
                               (np.complex64 if self.complex_data
                                else np.float32))
         self._valid = True
 
-    def write(self, data, squeezed=True):
+    def write(self, data):
         """Write data, buffering by frames as needed."""
-        if squeezed and data.ndim < 3:
-            if self.header0.mode == 'phased' and \
-                    self._sample_shape.nthread == 1:
-                data = np.expand_dims(data, axis=1)
-            if self._sample_shape.nchan == 1:
-                data = np.expand_dims(data, axis=-1)
+        #if squeezed and data.ndim < 3:
+        #    if (self.header0.mode == 'phased' and
+        #            self._sample_shape.nthread == 1):
+        #        data = np.expand_dims(data, axis=1)
+        #    if self._sample_shape.nchan == 1:
+        #        data = np.expand_dims(data, axis=-1)
+        if self.squeeze:
+            data = self._unsqueeze(data)
 
         if self.header0.mode == 'phased':
             assert data.shape[1] == self._sample_shape.nthread
@@ -392,6 +408,9 @@ def open(name, mode='rs', **kwargs):
     samples_per_frame : int
         Total number of samples per frame.  Can also give ``payloadsize``, the
         number of bytes per payload block.
+    squeeze : bool, optional
+        If `True` (default), remove channel and thread dimensions if unity.
+        If writing, accept squeezed arrays as input.
 
     --- For writing a stream : (see `~baseband.gsb.base.GSBStreamWriter`)
 
@@ -431,7 +450,7 @@ def open(name, mode='rs', **kwargs):
 
         opened_files = []
         if not hasattr(name, fh_attr):
-            name = io.open(name, mode.replace('t', '').replace('b', '')+'b')
+            name = io.open(name, mode.replace('t', '').replace('b', '') + 'b')
             opened_files = [name]
         elif isinstance(name, io.TextIOBase):
             raise TypeError("Only binary file handles can be used (even for "
@@ -450,7 +469,7 @@ def open(name, mode='rs', **kwargs):
             if hasattr(raw, fh_attr):
                 fh_raw = raw
             else:
-                fh_raw = io.open(raw, mode.replace('s', '')+'b')
+                fh_raw = io.open(raw, mode.replace('s', '') + 'b')
                 opened_files.append(raw)
         else:
             if not isinstance(raw[0], (list, tuple)):

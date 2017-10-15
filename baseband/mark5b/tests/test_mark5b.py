@@ -125,6 +125,9 @@ class TestMark5B(object):
         assert payload._size == 10000
         assert payload.size == 10000
         assert payload.shape == (5000, 8)
+        # Check sample shape validity
+        assert payload.sample_shape == (8,)
+        assert payload.sample_shape.nchan == 8
         assert payload.dtype == np.float32
         assert np.all(payload[:3].astype(int) ==
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
@@ -217,7 +220,7 @@ class TestMark5B(object):
             time0 = header0.time
             samples_per_frame = header0.payloadsize * 8 // 2 // 8
             frame_rate = 32. * u.MHz / samples_per_frame
-            frame_duration = 1./frame_rate
+            frame_duration = 1. / frame_rate
             fh.seek(0)
             while True:
                 try:
@@ -264,7 +267,7 @@ class TestMark5B(object):
             fh.seek(-10000, 2)
             header_m10000b = fh.find_header(template_header=header0,
                                             forward=False)
-            assert fh.tell() == 3*header0.framesize
+            assert fh.tell() == 3 * header0.framesize
             fh.seek(-30, 2)
             header_end = fh.find_header(template_header=header0, forward=True)
             assert header_end is None
@@ -285,10 +288,9 @@ class TestMark5B(object):
                                            forward=True)
             assert fh.tell() == header0.framesize * 2 - 9960
         # for completeness, also check a really short file...
-        m5_test2 = str(tmpdir.join('test2.m5b'))
-        with open(m5_test2, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
+        with open(m5_test, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
             s.write(f.read(10018))
-        with mark5b.open(m5_test2, 'rb') as fh:
+        with mark5b.open(m5_test, 'rb') as fh:
             fh.seek(10)
             header_10 = fh.find_header(template_header=header0,
                                        forward=False)
@@ -312,7 +314,7 @@ class TestMark5B(object):
             fh.seek(10000)
             record2 = fh.read(2)
             assert fh.tell() == 10002
-            assert fh.fh_raw.tell() == 3.*header.framesize
+            assert fh.fh_raw.tell() == 3. * header.framesize
             assert np.abs(fh.tell(unit='time') -
                           (fh.time0 + 10002 / (32*u.MHz))) < 1. * u.ns
             fh.seek(fh.time0 + 1000 / (32*u.MHz))
@@ -355,10 +357,7 @@ class TestMark5B(object):
                          bps=2, sample_rate=32*u.MHz) as fw:
             # Write in pieces to ensure squeezed data can be handled,
             # And add in an invalid frame for good measure.
-            fw.write(record[:10])
-            fw.write(record[10])
-            with pytest.raises(ValueError):
-                fw.write(record[10], squeezed=False)
+            fw.write(record[:11])
             fw.write(record[11:5000])
             fw.write(record[5000:10000], invalid_data=True)
             fw.write(record[10000:])
@@ -374,49 +373,69 @@ class TestMark5B(object):
             assert np.all(record2[10000:] == record[10000:])
 
         # Check files can be made byte-for-byte identical.
-        m5_test2 = str(tmpdir.join('test2.m5b'))
-        with mark5b.open(m5_test2, 'ws', time=time0, nchan=8, bps=2,
+        with mark5b.open(m5_test, 'ws', time=time0, nchan=8, bps=2,
                          sample_rate=32*u.MHz, user=header['user'],
                          internal_tvg=header['internal_tvg'],
                          frame_nr=header['frame_nr']) as fw:
             fw.write(record)
 
-        with open(SAMPLE_FILE, 'rb') as fr, open(m5_test2, 'rb') as fs:
+        with open(SAMPLE_FILE, 'rb') as fr, open(m5_test, 'rb') as fs:
             orig_bytes = fr.read()
             conv_bytes = fs.read()
             assert conv_bytes == orig_bytes
 
         # Check if data can be read across days.  Write out sample Mark 5B
         # with fake timecode and step, and see if it can be re-read.
-        m5_test3 = str(tmpdir.join('test3.m5b'))
         time_premidnight = Time('2014:164:23:59:59')
-        with mark5b.open(m5_test3, 'ws', time=time_premidnight,
+        with mark5b.open(m5_test, 'ws', time=time_premidnight,
                          nchan=8, bps=2, sample_rate=10*u.kHz) as fw:
             fw.write(record)
 
-        with mark5b.open(m5_test3, 'rs', nchan=8, bps=2,
+        with mark5b.open(m5_test, 'rs', nchan=8, bps=2,
                          sample_rate=10*u.kHz, ref_mjd=57000) as fh:
             record5 = fh.read()     # Read across days.
             assert np.all(record5 == record)
             assert fh.tell(unit='time').iso == '2014-06-14 00:00:01.000000000'
 
-        # Test that squeeze attribute works on read and sample shape, but is
-        # overridden when reading in-place.
+        # Test that squeeze attribute works on read (including in-place read)
+        # and write, but can be turned off if needed.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, ref_mjd=57000) as fh:
-            assert tuple(fh.sample_shape) == (8,)
+            assert fh.sample_shape == (8,)
+            assert fh.sample_shape.nchan == 8
             assert fh.read(1).shape == (8,)
             fh.seek(0)
             out = np.zeros((12, 8))
             fh.read(out=out)
             assert fh.tell() == 12
-            assert np.all(out.squeeze() == record[:12])
+            assert np.all(out == record[:12])
 
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, ref_mjd=57000,
-                         squeeze=False) as fh:
-            assert tuple(fh.sample_shape) == (8,)
-            assert fh.read(1).shape == (1, 8)
+                         thread_ids=[0], squeeze=False) as fh:
+            assert fh.sample_shape == (1,)
+            assert fh.sample_shape.nchan == 1
+            assert fh.read(1).shape == (1, 1)
+            fh.seek(0)
+            out = np.zeros((12, 1))
+            fh.read(out=out)
+            assert fh.tell() == 12
+            assert np.all(out.squeeze() == record[:12, 0])
+
+        with mark5b.open(m5_test, 'ws', time=time0, nchan=1, bps=2,
+                         sample_rate=32*u.MHz) as fw:
+            assert fw.sample_shape == ()
+            fw.write(record[:10000, 0])
+            fw.squeeze = False
+            assert fw.sample_shape == (1,)
+            assert fw.sample_shape.nchan == 1
+            fw.write(record[10000:, 0:1])   # 0:1 to keep record 2-dimensional.
+            # Write some dummy data to fill up the rest of the frame.
+            fw.write(np.zeros((20000, 1), dtype='float32'))
+
+        with mark5b.open(m5_test, 'rs', nchan=1, bps=2,
+                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
+            assert np.all(fh.read(20000) == record[:, 0])
 
     def test_stream_invalid(self):
         with pytest.raises(ValueError):

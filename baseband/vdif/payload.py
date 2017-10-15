@@ -131,7 +131,7 @@ class VDIFPayload(VLBIPayloadBase):
                  4: encode_4bit,
                  8: encode_8bit}
 
-    _sample_shape_cls = namedtuple('sample_shape', 'nchan')
+    _sample_shape_cls = namedtuple('SampleShape', 'nchan')
 
     def __init__(self, words, header=None,
                  nchan=1, bps=2, complex_data=False):

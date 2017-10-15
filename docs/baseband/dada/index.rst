@@ -44,7 +44,8 @@ writing is in units of samples, and one has access to header information.
     >>> fh = dada.open(SAMPLE_DADA, 'rs')
     >>> fh
     <DADAStreamReader name=... offset=0
-        samples_per_frame=16000, nchan=1, frames_per_second=1000.0, bps=8,
+        frames_per_second=1000.0, samples_per_frame=16000,
+        sample_shape=SampleShape(npol=2), bps=8,
         thread_ids=[0, 1], (start) time=2013-07-02T01:39:20.000>
     >>> d = fh.read(10000)
     >>> d.shape

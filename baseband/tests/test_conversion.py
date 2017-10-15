@@ -48,8 +48,8 @@ class TestVDIFMark5B(object):
             assert header.framesize == 10032
             assert header.size == 32
             assert header.payloadsize == m5h.payloadsize
-            assert header.samples_per_frame == \
-                10000*8//m5pl.bps//m5pl.sample_shape.nchan
+            assert (header.samples_per_frame ==
+                    10000 * 8 // m5pl.bps // m5pl.sample_shape.nchan)
 
         # A copy might remove any `kday` keywords set, but should still work
         # (Regression test for #34)

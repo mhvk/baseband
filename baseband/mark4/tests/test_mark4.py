@@ -203,6 +203,9 @@ class TestMark4(object):
             payload = mark4.Mark4Payload.fromfile(fh, header)
         assert payload.size == (20000 - 160) * 64 // 8
         assert payload.shape == ((20000 - 160) * 4, 8)
+        # Check sample shape validity
+        assert payload.sample_shape == (8,)
+        assert payload.sample_shape.nchan == 8
         assert payload.dtype == np.float32
         assert np.all(payload[0].astype(int) ==
                       np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
@@ -317,7 +320,7 @@ class TestMark4(object):
             # use framesize, since header adds to payload.
             samples_per_frame = header0.framesize * 8 // 2 // 8
             frame_rate = 32. * u.MHz / samples_per_frame
-            frame_duration = 1./frame_rate
+            frame_duration = 1. / frame_rate
             fh.seek(0xa88)
             for frame_nr in range(100):
                 try:
@@ -460,14 +463,11 @@ class TestMark4(object):
             fh_raw_tell1 = fh.fh_raw.tell()
             time1 = fh.tell(unit='time')
 
-        # Get a file name in our temporary testing directory.
         rewritten_file = str(tmpdir.join('rewritten.m4'))
-
         with mark4.open(rewritten_file, 'ws', sample_rate=32*u.MHz,
                         time=time0, ntrack=64, bps=2, fanout=4) as fw:
             # write in bits and pieces and with some invalid data as well.
-            fw.write(record[:10])
-            fw.write(record[10])
+            fw.write(record[:11])
             fw.write(record[11:80000])
             fw.write(record[80000:], invalid_data=True)
             assert fw.tell(unit='time') == time1
@@ -495,21 +495,34 @@ class TestMark4(object):
                 conv_bytes = s.read()
                 assert conv_bytes == orig_bytes
 
-        # Test that squeeze attribute works on read and sample shape, but is
-        # overridden when reading in-place.
+        # Test that squeeze attribute works on read (including in-place read)
+        # and write, but can be turned off if needed.
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fh:
-            assert tuple(fh.sample_shape) == (8,)
+            assert fh.sample_shape == (8,)
+            assert fh.sample_shape.nchan == 8
             assert fh.read(1).shape == (8,)
             fh.seek(0)
             out = np.zeros((12, 8))
             fh.read(out=out)
             assert fh.tell() == 12
-            assert np.all(out.squeeze() == record[:12])
+            assert np.all(out == record[:12])
 
-        with mark4.open(SAMPLE_FILE, 'rs',
-                        ntrack=64, decade=2010, squeeze=False) as fh:
-            assert tuple(fh.sample_shape) == (8,)
-            assert fh.read(1).shape == (1, 8)
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
+                        thread_ids=[0], squeeze=False) as fh:
+            assert fh.sample_shape == (1,)
+            assert fh.sample_shape.nchan == 1
+            assert fh.read(1).shape == (1, 1)
+            fh.seek(0)
+            out = np.zeros((12, 1))
+            fh.read(out=out)
+            assert fh.tell() == 12
+            assert np.all(out.squeeze() == record[:12, 0])
+
+        with mark4.open(str(tmpdir.join('test.m4')), 'ws',
+                        sample_rate=32*u.MHz, time=time0,
+                        ntrack=64, bps=1, fanout=4) as fw:
+            assert fw.sample_shape == (16,)
+            assert fw.sample_shape.nchan == 16
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.

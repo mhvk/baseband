@@ -48,18 +48,17 @@ class VLBIStreamBase(VLBIFileBase):
     """VLBI file wrapper, allowing access as a stream of data."""
 
     _frame_class = None
+    _squeezed_shape = None
 
     def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
                  thread_ids, samples_per_frame, frames_per_second=None,
-                 sample_rate=None):
+                 sample_rate=None, squeeze=True):
         super(VLBIStreamBase, self).__init__(fh_raw)
         self.header0 = header0
         self._sample_shape = sample_shape
-        # self.nchan = nchan
         self.bps = bps
         self.complex_data = complex_data
         self.thread_ids = thread_ids
-        # self.nthread = nchan if thread_ids is None else len(thread_ids)
         self.samples_per_frame = samples_per_frame
         if frames_per_second is None:
             frames_per_second = sample_rate.to(u.Hz).value / samples_per_frame
@@ -72,6 +71,31 @@ class VLBIStreamBase(VLBIFileBase):
 
         self.frames_per_second = frames_per_second
         self.offset = 0
+        self.squeeze = squeeze
+
+    @property
+    def sample_shape(self):
+        """Shape of a data sample (possibly squeezed).
+        """
+        if self.squeeze:
+            if not self._squeezed_shape:
+                dims = np.array(self._sample_shape)
+                keep_dims = (dims > 1)
+                try:
+                    field_names = np.array(self._sample_shape._fields)
+                except AttributeError:
+                    self._squeezed_shape = tuple(dims[keep_dims])
+                else:
+                    sqz_shp = namedtuple('SampleShape', field_names[keep_dims])
+                    self._squeezed_shape = sqz_shp(*dims[keep_dims])
+            return self._squeezed_shape
+        return self._sample_shape
+
+    def _unsqueeze(self, data):
+        unity_dims = np.where(np.array(self._sample_shape) == 1)[0] + 1
+        for dim in unity_dims:
+            data = np.expand_dims(data, axis=dim)
+        return data
 
     def _get_time(self, header):
         """Get time from a header."""
@@ -117,9 +141,9 @@ class VLBIStreamBase(VLBIFileBase):
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
-                "    samples_per_frame={s.samples_per_frame},"
-                " nchan={s._sample_shape.nchan},"
-                " frames_per_second={s.frames_per_second}, bps={s.bps},\n"
+                "    frames_per_second={s.frames_per_second},"
+                " samples_per_frame={s.samples_per_frame},\n"
+                "    sample_shape={s.sample_shape}, bps={s.bps},\n"
                 "    {t}(start) time={s.time0.isot}>"
                 .format(s=self, t=('thread_ids={0}, '.format(self.thread_ids)
                                    if self.thread_ids else '')))
@@ -127,11 +151,9 @@ class VLBIStreamBase(VLBIFileBase):
 
 class VLBIStreamReaderBase(VLBIStreamBase):
 
-    _squeezed_shape = None
-
     def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
                  thread_ids, samples_per_frame, frames_per_second=None,
-                 sample_rate=None):
+                 sample_rate=None, squeeze=True):
 
         if frames_per_second is None and sample_rate is None:
             try:
@@ -147,7 +169,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         super(VLBIStreamReaderBase, self).__init__(
             fh_raw, header0, sample_shape, bps, complex_data, thread_ids,
-            samples_per_frame, frames_per_second, sample_rate)
+            samples_per_frame, frames_per_second, sample_rate, squeeze)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
@@ -198,29 +220,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         fh.seek(oldpos)
         return max_frame + 1
-
-    def _get_squeezed_shape(self, format_name):
-        """Generates sample shape with dimensions of length unity removed.
-
-        Parameters
-        ----------
-        format_name : str
-            Name of file format, to include in sample shape docstring.
-
-        Returns
-        -------
-        squeezed_shape : collections.namedtuple
-            Squeezed shape with unity dimensions removed.
-        """
-        if self.squeeze:
-            if not self._squeezed_shape:
-                field_names = np.array(self._sample_shape._fields)
-                dims = np.array(self._sample_shape)
-                keep_dims = (dims > 1)
-                sqz_shp = namedtuple('sample_shape', field_names[keep_dims])
-                self._squeezed_shape = sqz_shp(*dims[keep_dims])
-            return self._squeezed_shape
-        return self._sample_shape
 
     @lazyproperty
     def header1(self):
@@ -296,7 +295,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             warnings.warn("Closing with partial buffer remaining."
                           "Writing padded frame, marked as invalid.")
             self.write(np.zeros((self.samples_per_frame - extra,) +
-                                self._sample_shape), invalid_data=True)
+                                self.sample_shape), invalid_data=True)
             assert self.offset % self.samples_per_frame == 0
         return super(VLBIStreamWriterBase, self).close()
 

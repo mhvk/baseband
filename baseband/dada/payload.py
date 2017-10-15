@@ -43,7 +43,7 @@ class DADAPayload(VLBIPayloadBase):
     _encoders = {
         8: encode_8bit}
 
-    _sample_shape_cls = namedtuple('sample_shape', 'npol, nchan')
+    _sample_shape_cls = namedtuple('SampleShape', 'npol, nchan')
 
     def __init__(self, words, header=None, bps=8, sample_shape=(),
                  complex_data=False):
@@ -97,20 +97,3 @@ class DADAPayload(VLBIPayloadBase):
                               else (payloadsize // cls._dtype_word.itemsize,))
             fh.seek(offset + words.size * words.dtype.itemsize)
         return cls(words, header=header, **kwargs)
-
-    @classmethod
-    def fromdata(cls, data, bps=2):
-        """Encode data as payload.
-
-        Parameters
-        ----------
-        data : `numpy.ndarray`
-            Data to be encoded. The last dimension is taken as the number of
-            channels.
-        bps : int
-            Number of bits per sample to use (for complex data, for real and
-            imaginary part separately; default: 2).
-        """
-        payload = super(DADAPayload, cls).fromdata(data, bps=bps)
-        payload.sample_shape = cls._sample_shape_cls(*data.shape[1:])
-        return payload
