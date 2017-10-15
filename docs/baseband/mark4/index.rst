@@ -15,10 +15,10 @@ Usage
 This section covers Mark 4-specific features of Baseband.  Tutorials for general
 usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
 The examples below use the small sample file ``baseband/data/sample.m4``,
-and assumes Numpy and Baseband's DADA module has been imported::
+and assumes Baseband's Mark 4 module, and Numpy, have been imported::
 
-    >>> from baseband.data import SAMPLE_DADA
-    >>> from baseband import dada
+    >>> from baseband import mark4
+    >>> from baseband.data import SAMPLE_MARK4
     >>> import numpy as np
 
 Opening in Mark 4 file with :func:`~baseband.mark4.open` in binary mode provides
@@ -30,8 +30,6 @@ in the number of tracks used to `~baseband.mark4.base.Mark4StreamReader.read_fra
 and the decade the data were taken, since those numbers cannot be inferred from
 the data themselves::
 
-    >>> from baseband import mark4
-    >>> from baseband.data import SAMPLE_MARK4
     >>> fh = mark4.open(SAMPLE_MARK4, 'rb')
     >>> fh.find_frame(ntrack=64)    # Find first frame.
     2696

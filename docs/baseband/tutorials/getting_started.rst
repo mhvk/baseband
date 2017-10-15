@@ -72,7 +72,7 @@ would use the `~baseband.vdif.base.VDIFStreamReader.read` method::
 The sample VDIF file has 8 concurrent frequency bands, or "channels", which are
 mapped as the columns of the array.
 
-We can access information from the header by printing ``fh``::
+We can access information about the file by printing ``fh``::
 
     >>> fh
     <VDIFStreamReader name=... offset=12
@@ -93,10 +93,6 @@ start of file, using ``fh.seek``, before reading::
     >>> d_complete.shape
     (40000, 8)
 
-.. note::
-
-    ``fh.read()`` returns a **copy** of the data from ``fh``.
-
 We can also move the pointer with respect to the end of file by passing ``2``
 as a second argument (as with `io.BufferedReader` pointers)::
 
@@ -106,10 +102,16 @@ as a second argument (as with `io.BufferedReader` pointers)::
     >>> np.array_equal(d_complete[-100:], d_end)
     True
 
-``-100`` means 100 counts before the end of file, so ``d_end`` is equal to
+``-100`` means 100 samples before the end of file, so ``d_end`` is equal to
 the last 100 entries of ``d_complete``.  Baseband only keeps the most recently
-accessed data frame in memory, so selective decoding using ``seek`` and
-``read`` is useful when examining extremely large files.
+accessed data frame in memory, making it possible to analyze (normally large)
+files through selective decoding using ``seek`` and ``read``.
+
+.. note::
+
+    Cation should be used when decoding large blocks of data using
+    ``fh.read``.  For typical files, the resulting arrays are far too
+    large to hold in memory.
 
 To determine where the pointer is located, we use ``fh.tell()``::
 

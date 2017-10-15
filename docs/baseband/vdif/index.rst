@@ -68,9 +68,6 @@ extended with methods to read both::
     >>> fh.close()
 
 As with other formats, ``fr.data`` is a read-only property of the frame. 
-``fs.data``, though, is a lazy property which, when it is first called, decodes
-the entire frame set payload into a `numpy.ndarray`.  The values in ``fs.data``
-can freely be modified, but are *not* transmitted back to the raw payload data.
 
 To set up a file for writing needs quite a bit of header information. Not
 coincidentally, what is given by the reader above suffices::
@@ -153,7 +150,7 @@ When the number of frames per second is not input by the user and cannot be
 deduced from header information (if EDV = 1, 3 or 4, the frame rate can be
 derived from the sampling rate found in the header), Baseband tries to
 determine the frame rate using the private method ``_get_frame_rate`` in
-`~baseband.vdif.base.VDIFStreamReader`.  This function raises
+:class:`~baseband.vdif.base.VDIFStreamReader`.  This function raises
 `EOFError` if the file contains less than one second of data, or is corrupt.
 In either case the file can be opened still by explicitly passing in the frame
 rate to :func:`~baseband.vdif.open` via the `frames_per_second` argument.
