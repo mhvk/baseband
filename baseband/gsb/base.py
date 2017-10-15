@@ -312,12 +312,6 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
 
     def write(self, data):
         """Write data, buffering by frames as needed."""
-        #if squeezed and data.ndim < 3:
-        #    if (self.header0.mode == 'phased' and
-        #            self._sample_shape.nthread == 1):
-        #        data = np.expand_dims(data, axis=1)
-        #    if self._sample_shape.nchan == 1:
-        #        data = np.expand_dims(data, axis=-1)
         if self.squeeze:
             data = self._unsqueeze(data)
 
