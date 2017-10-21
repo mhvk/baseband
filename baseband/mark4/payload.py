@@ -234,7 +234,7 @@ class Mark4Payload(VLBIPayloadBase):
         s = fh.read(header.payloadsize)
         if len(s) < header.payloadsize:
             raise EOFError("Could not read full payload.")
-        return cls(np.fromstring(s, dtype=header.stream_dtype), header)
+        return cls(np.frombuffer(s, dtype=header.stream_dtype), header)
 
     @classmethod
     def fromdata(cls, data, header):

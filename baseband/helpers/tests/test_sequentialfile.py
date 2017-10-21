@@ -20,7 +20,7 @@ class Sequencer(object):
 class TestSequentialFileReader(object):
     def setup(self):
         self.data = b'abcdefghijklmnopqrstuvwxyz'
-        self.uint8_data = np.fromstring(self.data, dtype=np.uint8)
+        self.uint8_data = np.frombuffer(self.data, dtype=np.uint8)
         self.size = len(self.data)
         self.files = ['file{:1d}.raw'.format(i) for i in range(3)]
         self.max_file_size = 10
@@ -171,7 +171,7 @@ class TestSequentialFileReader(object):
 class TestSequentialFileWriter(object):
     def _setup(self, tmpdir):
         self.data = b'abcdefghijklmnopqrstuvwxyz'
-        self.uint8_data = np.fromstring(self.data, dtype=np.uint8)
+        self.uint8_data = np.frombuffer(self.data, dtype=np.uint8)
         self.files = [str(tmpdir.join('file{:1d}.raw'.format(i)))
                       for i in range(3)]
 

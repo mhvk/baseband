@@ -293,7 +293,7 @@ class Mark4Header(Mark4TrackHeader):
         dtype = cls._stream_dtype(ntrack)
         size = ntrack * 5 * 32 // 8
         try:
-            stream = np.fromstring(fh.read(size), dtype=dtype)
+            stream = np.frombuffer(fh.read(size), dtype=dtype)
             assert len(stream) * dtype.itemsize == size
         except (ValueError, AssertionError):
             raise EOFError("Could not read full Mark 4 Header.")
