@@ -79,7 +79,7 @@ class VLBIPayloadBase(object):
         s = fh.read(payloadsize)
         if len(s) < payloadsize:
             raise EOFError("Could not read full payload.")
-        return cls(np.fromstring(s, dtype=cls._dtype_word), *args, **kwargs)
+        return cls(np.frombuffer(s, dtype=cls._dtype_word), *args, **kwargs)
 
     def tofile(self, fh):
         """Write VLBI payload to filehandle."""

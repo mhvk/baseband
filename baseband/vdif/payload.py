@@ -163,7 +163,7 @@ class VDIFPayload(VLBIPayloadBase):
         s = fh.read(header.payloadsize)
         if len(s) < header.payloadsize:
             raise EOFError("Could not read full payload.")
-        return cls(np.fromstring(s, dtype=cls._dtype_word), header)
+        return cls(np.frombuffer(s, dtype=cls._dtype_word), header)
 
     @classmethod
     def fromdata(cls, data, header=None, bps=2, edv=None):

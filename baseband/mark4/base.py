@@ -99,7 +99,7 @@ class Mark4FileReader(VLBIFileBase):
         for frame in iterate:
             fh.seek(frame)
 
-            data = np.fromstring(fh.read(block), dtype=np.uint8)
+            data = np.frombuffer(fh.read(block), dtype=np.uint8)
             assert len(data) == block
             # Find header pattern.
             databits1 = nbits[data]
@@ -127,7 +127,7 @@ class Mark4FileReader(VLBIFileBase):
                             break
 
                 fh.seek(check + 32 * 2 * ntrack // 8)
-                check_data = np.fromstring(fh.read(len(nunset)),
+                check_data = np.frombuffer(fh.read(len(nunset)),
                                            dtype=np.uint8)
                 databits2 = nbits[check_data]
                 if np.all(databits2 >= 6):
