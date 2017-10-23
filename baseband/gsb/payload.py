@@ -81,6 +81,13 @@ class GSBPayload(VLBIPayloadBase):
     _sample_shape_cls_nthread = namedtuple('SampleShape', 'nthread, nchan')
 
     @classmethod
+    def _sample_shape_cls(cls, *args):
+        if len(args) == 1:
+            return cls._sample_shape_cls_1thread(*args)
+        else:
+            return cls._sample_shape_cls_nthread(*args)
+
+    @classmethod
     def fromfile(cls, fh, payloadsize=None, bps=4, nchan=1,
                  complex_data=False):
         """Read payloads from several threads.
@@ -103,14 +110,14 @@ class GSBPayload(VLBIPayloadBase):
             Whether data is complex or float.  Default: False.
         """
         if hasattr(fh, 'read'):
-            sample_shape = cls._sample_shape_cls_1thread(nchan)
+            sample_shape = cls._sample_shape_cls(nchan)
             return super(GSBPayload,
                          cls).fromfile(fh, payloadsize=payloadsize,
                                        bps=bps, sample_shape=sample_shape,
                                        complex_data=complex_data)
 
         nthread = len(fh)
-        sample_shape_1thread = cls._sample_shape_cls_1thread(nchan)
+        sample_shape_1thread = cls._sample_shape_cls(nchan)
         payloads = [[super(GSBPayload,
                            cls).fromfile(fh1, payloadsize=payloadsize, bps=bps,
                                          sample_shape=sample_shape_1thread,
@@ -132,31 +139,9 @@ class GSBPayload(VLBIPayloadBase):
                 for payload, part in zip(payload_set, thread):
                     part[:] = payload.words.reshape(-1, bpfs // 8)
 
-        sample_shape_nthread = cls._sample_shape_cls_nthread(nthread, nchan)
+        sample_shape_nthread = cls._sample_shape_cls(nthread, nchan)
         return cls(words.ravel(), bps=bps, sample_shape=sample_shape_nthread,
                    complex_data=complex_data)
-
-    @classmethod
-    def fromdata(cls, data, bps=2):
-        """Encode data as payload.
-
-        Parameters
-        ----------
-        data : `numpy.ndarray`
-            Data to be encoded. The last dimension is taken as the number of
-            channels.
-        bps : int
-            Number of bits per sample to use (for complex data, for real and
-            imaginary part separately; default: 2).
-        """
-        payload = super(GSBPayload, cls).fromdata(data, bps=bps)
-        if len(data.shape[1:]) == 1:
-            payload.sample_shape = cls._sample_shape_cls_1thread(
-                *data.shape[1:])
-        else:
-            payload.sample_shape = cls._sample_shape_cls_nthread(
-                *data.shape[1:])
-        return payload
 
     def tofile(self, fh):
         try:

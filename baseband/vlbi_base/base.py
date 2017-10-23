@@ -75,27 +75,29 @@ class VLBIStreamBase(VLBIFileBase):
 
     @property
     def sample_shape(self):
-        """Shape of a data sample (possibly squeezed).
-        """
+        """Shape of a data sample (possibly squeezed)."""
         if self.squeeze:
             if not self._squeezed_shape:
-                dims = np.array(self._sample_shape)
-                keep_dims = (dims > 1)
-                try:
-                    field_names = np.array(self._sample_shape._fields)
-                except AttributeError:
-                    self._squeezed_shape = tuple(dims[keep_dims])
+                field_names = getattr(self._sample_shape, '_fields', None)
+                sqz_dims = [dim for dim in self._sample_shape if dim > 1]
+                if field_names is None:
+                    self._squeezed_shape = tuple(sqz_dims)
                 else:
-                    sqz_shp = namedtuple('SampleShape', field_names[keep_dims])
-                    self._squeezed_shape = sqz_shp(*dims[keep_dims])
+                    sqz_names = [field for field, dim in
+                                 zip(field_names, self._sample_shape) if
+                                 dim > 1]
+                    sqz_shp_cls = namedtuple('SampleShape',
+                                             ','.join(sqz_names))
+                    self._squeezed_shape = sqz_shp_cls(*sqz_dims)
             return self._squeezed_shape
         return self._sample_shape
 
     def _unsqueeze(self, data):
-        unity_dims = np.where(np.array(self._sample_shape) == 1)[0] + 1
-        for dim in unity_dims:
-            data = np.expand_dims(data, axis=dim)
-        return data
+        new_shape = list(data.shape)
+        for i, dim in enumerate(self._sample_shape):
+            if dim == 1:
+                new_shape.insert(i + 1, 1)
+        return data.reshape(new_shape)
 
     def _get_time(self, header):
         """Get time from a header."""

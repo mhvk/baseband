@@ -291,14 +291,15 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         Returns
         -------
         out : array of float
-            Dimensions are (sample-time, channel) with dimensions
-            of length unity possibly removed (if ``squeeze`` is `True`).
+            Dimensions are (sample-time, channel), with dimensions of length
+            unity possibly removed if the file was opened with ``squeeze=True``
+            (which is the default).
         """
         if out is None:
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            result = np.empty((self._sample_shape.nchan, count),
+            result = np.empty(self._sample_shape + (count,),
                               dtype=self._frame.dtype).T
             out = result.squeeze() if self.squeeze else result
         else:
@@ -350,7 +351,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
     header : `~baseband.mark4.Mark4Header`
         Header for the first frame, holding start time information, etc.
     squeeze : bool, optional
-        If `True` (default), `write` accepts squeezed arrays as input,
+        If `True` (default), ``write`` accepts squeezed arrays as input,
         and adds channel and thread dimensions if unity.
     **kwargs
         If no header is give, an attempt is made to construct the header from
@@ -456,7 +457,7 @@ sample_rate : `~astropy.units.Quantity`, optional
 header : `~baseband.mark4.Mark4Header`
     Header for the first frame, holding time information, etc.
 squeeze : bool, optional
-    If `True` (default), `write` accepts squeezed arrays as input,
+    If `True` (default), ``write`` accepts squeezed arrays as input,
     and adds channel and thread dimensions if unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one

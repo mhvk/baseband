@@ -442,9 +442,11 @@ class TestGSB(object):
                       header=header) as fh_w:
             # Write data.
             fh_w.write(onepol)
+            assert fh_w.sample_shape == (1, onepol.shape[2])
             # Write data again, but reversed and squeezed
             fh_w.squeeze = True
             fh_w.write(onepol[::-1].squeeze())
+            assert fh_w.sample_shape == (onepol.shape[2],)
             assert fh_w.tell() == onepol.shape[0] * 2
             assert_quantity_allclose(fh_w.tell(unit=u.s), 0.5 * u.s)
             assert fh_w._header['seq_nr'] == fh_w.header0['seq_nr'] + 3
@@ -479,6 +481,7 @@ class TestGSB(object):
                          nchan=twopol.shape[2], nthread=twopol.shape[1],
                          complex_data=True, header=header) as fh_w:
             # Write data twice.
+            assert fh_w.sample_shape == (2, twopol.shape[2])
             fh_w.write(twopol)
             fh_w.write(twopol[::-1])
             assert fh_w.tell() == twopol.shape[0] * 2

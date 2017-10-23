@@ -222,7 +222,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            result = np.empty((self._sample_shape.nchan, count),
+            result = np.empty(self._sample_shape + (count,),
                               dtype=self._frame.dtype).T
             out = result.squeeze() if self.squeeze else result
         else:
@@ -286,7 +286,7 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
     header : `~baseband.mark5b.Mark5BHeader`, optional
         Header for the first frame, holding time information, etc.
     squeeze : bool, optional
-        If `True` (default), `write` accepts squeezed arrays as input,
+        If `True` (default), ``write`` accepts squeezed arrays as input,
         and adds channel and thread dimensions if unity.
     **kwargs
         If no header is give, an attempt is made to construct the header from
@@ -401,7 +401,7 @@ bps : int
 header : :class:`~baseband.mark5b.Mark5BHeader`, optional
     Header for the first frame, holding time information, etc.
 squeeze : bool, optional
-    If `True` (default), `write` accepts squeezed arrays as input,
+    If `True` (default), ``write`` accepts squeezed arrays as input,
     and adds channel and thread dimensions if unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one

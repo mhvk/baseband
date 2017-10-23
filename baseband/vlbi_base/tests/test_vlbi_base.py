@@ -6,11 +6,12 @@ import io
 import numpy as np
 import pytest
 from astropy.tests.helper import catch_warnings
+from collections import namedtuple
 from ..utils import bcd_encode, bcd_decode, CRC
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
 from ..frame import VLBIFrameBase
-from ..base import VLBIFileBase
+from ..base import VLBIFileBase, VLBIStreamBase
 
 
 def encode_1bit(values):
@@ -422,6 +423,29 @@ class TestVLBIBase(object):
             fh.close()
             assert fh.closed
             assert fh.fh_raw.closed
+
+    def test_streambase_squeeze(self):
+        # Tests stream base's sample shape concatenation routines.
+        smp_shp_cls = namedtuple('SampleShape',
+                                 'n1, n2, n3, n4, n5, n6, n7, n8')
+        sample_shape = smp_shp_cls(1, 17, 3, 2, 1, 5, 1, 1)
+        sb = VLBIStreamBase(None, None, sample_shape, 1, False,
+                            None, 1000, 1000, squeeze=False)
+        assert sb.sample_shape == sample_shape
+        sb.squeeze = True
+        assert sb.sample_shape == (17, 3, 2, 5)
+        data = np.empty((100, 17, 3, 2, 5), dtype='float32')
+        assert sb._unsqueeze(data).shape[1:] == sample_shape
+        smp_shp_cls_s = namedtuple('SampleShape',
+                                   'n1')
+        sample_shape_short = smp_shp_cls_s(1)
+        sbs = VLBIStreamBase(None, None, sample_shape_short, 1, False,
+                             None, 1000, 1000, squeeze=False)
+        assert sbs.sample_shape == sample_shape_short
+        sbs.squeeze = True
+        assert sbs.sample_shape == ()
+        data = np.empty(100, dtype='float32')
+        assert sbs._unsqueeze(data).shape[1:] == sample_shape_short
 
 
 def test_crc():

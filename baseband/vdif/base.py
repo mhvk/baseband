@@ -429,7 +429,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     header : :class:`~baseband.vdif.VDIFHeader`, optional
         Header for the first frame, holding time information, etc.
     squeeze : bool, optional
-        If `True` (default), `write` accepts squeezed arrays as input,
+        If `True` (default), ``write`` accepts squeezed arrays as input,
         and adds channel and thread dimensions if unity.
     **kwargs
         If no header is give, an attempt is made to construct the header from
@@ -548,7 +548,7 @@ frames_per_second : int, optional
 sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each channel in each thread is sampled.
 squeeze : bool, optional
-    If `True` (default), `write` accepts squeezed arrays as input,
+    If `True` (default), ``write`` accepts squeezed arrays as input,
     and adds channel and thread dimensions if unity.
 header : `~baseband.vdif.VDIFHeader`, optional
     Header for the first frame, holding time information, etc.

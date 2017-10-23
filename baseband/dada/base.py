@@ -252,8 +252,8 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         -------
         out : array of float or complex
             Dimensions are (sample-time, thread (polarization), channel), with
-            dimensions of length unity possibly removed (if ``squeeze`` is
-            `True`).
+            dimensions of length unity possibly removed if the file
+            was opened with ``squeeze=True`` (which is the default).
         """
         if out is None:
             if count is None or count < 0:
@@ -308,7 +308,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
     header : :class:`~baseband.dada.DADAHeader`
         Header for the file, holding time information, etc.
     squeeze : bool, optional
-        If `True` (default), `write` accepts squeezed arrays as input,
+        If `True` (default), ``write`` accepts squeezed arrays as input,
         and adds channel and thread dimensions if unity.
     """
     def __init__(self, fh_raw, header, squeeze=True):
@@ -382,7 +382,7 @@ squeeze : bool, optional
 header : `~baseband.dada.DADAHeader`, optional
     Header for the first frame, holding time information, etc.
 squeeze : bool, optional
-    If `True` (default), `write` accepts squeezed arrays as input,
+    If `True` (default), ``write`` accepts squeezed arrays as input,
     and adds channel and thread dimensions if unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one

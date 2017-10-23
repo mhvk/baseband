@@ -235,7 +235,9 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         Returns
         -------
         out : array of float or complex
-            Dimensions are (sample-time, vlbi-thread, channel).
+            Dimensions are (sample-time, thread (polarization), channel), with
+            dimensions of length unity possibly removed if the file
+            was opened with ``squeeze=True`` (which is the default).
         """
         if out is None:
             if count is None or count < 0:
