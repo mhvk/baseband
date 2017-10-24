@@ -43,7 +43,7 @@ class DADAPayload(VLBIPayloadBase):
     _encoders = {
         8: encode_8bit}
 
-    _sample_shape_cls = namedtuple('SampleShape', 'npol, nchan')
+    _sample_shape_maker = namedtuple('SampleShape', 'npol, nchan')
 
     def __init__(self, words, header=None, bps=8, sample_shape=(),
                  complex_data=False):
@@ -51,7 +51,6 @@ class DADAPayload(VLBIPayloadBase):
             bps = header.bps
             sample_shape = header.sample_shape
             complex_data = header.complex_data
-        sample_shape = self._sample_shape_cls(*sample_shape)
         super(DADAPayload, self).__init__(words, sample_shape=sample_shape,
                                           bps=bps, complex_data=complex_data)
 

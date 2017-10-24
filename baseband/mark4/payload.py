@@ -211,7 +211,7 @@ class Mark4Payload(VLBIPayloadBase):
                  (8, 2, 2): decode_8chan_2bit_fanout2,
                  (8, 2, 4): decode_8chan_2bit_fanout4}
 
-    _sample_shape_cls = namedtuple('SampleShape', 'nchan')
+    _sample_shape_maker = namedtuple('SampleShape', 'nchan')
 
     def __init__(self, words, header=None, nchan=1, bps=2, fanout=1):
         if header is not None:
@@ -221,9 +221,8 @@ class Mark4Payload(VLBIPayloadBase):
             self._size = header.payloadsize
         self._dtype_word = MARK4_DTYPES[nchan * bps * fanout]
         self.fanout = fanout
-        sample_shape = self._sample_shape_cls(nchan)
         super(Mark4Payload, self).__init__(words, bps=bps,
-                                           sample_shape=sample_shape,
+                                           sample_shape=(nchan,),
                                            complex_data=False)
         self._coder = (self.sample_shape.nchan, bps, fanout)
 

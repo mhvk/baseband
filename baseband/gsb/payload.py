@@ -77,15 +77,15 @@ class GSBPayload(VLBIPayloadBase):
                  8: decode_8bit}
     _dtype_word = np.int8
 
-    _sample_shape_cls_1thread = namedtuple('SampleShape', 'nchan')
-    _sample_shape_cls_nthread = namedtuple('SampleShape', 'nthread, nchan')
+    _sample_shape_maker_1thread = namedtuple('SampleShape', 'nchan')
+    _sample_shape_maker_nthread = namedtuple('SampleShape', 'nthread, nchan')
 
     @classmethod
-    def _sample_shape_cls(cls, *args):
+    def _sample_shape_maker(cls, *args):
         if len(args) == 1:
-            return cls._sample_shape_cls_1thread(*args)
+            return cls._sample_shape_maker_1thread(*args)
         else:
-            return cls._sample_shape_cls_nthread(*args)
+            return cls._sample_shape_maker_nthread(*args)
 
     @classmethod
     def fromfile(cls, fh, payloadsize=None, bps=4, nchan=1,
@@ -110,17 +110,15 @@ class GSBPayload(VLBIPayloadBase):
             Whether data is complex or float.  Default: False.
         """
         if hasattr(fh, 'read'):
-            sample_shape = cls._sample_shape_cls(nchan)
             return super(GSBPayload,
                          cls).fromfile(fh, payloadsize=payloadsize,
-                                       bps=bps, sample_shape=sample_shape,
+                                       bps=bps, sample_shape=(nchan,),
                                        complex_data=complex_data)
 
         nthread = len(fh)
-        sample_shape_1thread = cls._sample_shape_cls(nchan)
         payloads = [[super(GSBPayload,
                            cls).fromfile(fh1, payloadsize=payloadsize, bps=bps,
-                                         sample_shape=sample_shape_1thread,
+                                         sample_shape=(nchan,),
                                          complex_data=complex_data)
                      for fh1 in fh_set] for fh_set in fh]
         if nthread == 1:
@@ -139,8 +137,7 @@ class GSBPayload(VLBIPayloadBase):
                 for payload, part in zip(payload_set, thread):
                     part[:] = payload.words.reshape(-1, bpfs // 8)
 
-        sample_shape_nthread = cls._sample_shape_cls(nthread, nchan)
-        return cls(words.ravel(), bps=bps, sample_shape=sample_shape_nthread,
+        return cls(words.ravel(), bps=bps, sample_shape=(nthread, nchan),
                    complex_data=complex_data)
 
     def tofile(self, fh):

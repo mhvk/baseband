@@ -44,11 +44,14 @@ class VLBIPayloadBase(object):
     _encoders = {}
     _decoders = {}
     # Placeholder for sample shape named tuple.
-    _sample_shape_cls = tuple
+    _sample_shape_maker = None
 
     def __init__(self, words, bps=2, sample_shape=(), complex_data=False):
         self.words = words
-        self.sample_shape = sample_shape
+        if self._sample_shape_maker is not None:
+            self.sample_shape = self._sample_shape_maker(*sample_shape)
+        else:
+            self.sample_shape = sample_shape
         self.bps = bps
         self.complex_data = complex_data
         self._bpfs = (bps * (2 if complex_data else 1) *
@@ -100,12 +103,7 @@ class VLBIPayloadBase(object):
             Number of bits per sample to use (for complex data, for real and
             imaginary part separately; default: 2).
         """
-        try:
-            sample_shape = cls._sample_shape_cls(*data.shape[1:])
-        # If _sample_shape_cls is an unnamed tuple (or list), the above returns
-        # a TypeError, so we try initialization without dereferencing.
-        except TypeError:
-            sample_shape = cls._sample_shape_cls(data.shape[1:])
+        sample_shape = data.shape[1:]
         complex_data = data.dtype.kind == 'c'
         try:
             encoder = cls._encoders[bps]

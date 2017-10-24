@@ -166,7 +166,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
     squeeze : bool, optional
-        If `True` (default), remove channel and thread dimensions if unity.
+        If `True` (default), remove any dimensions of length unity from
+        decoded data.
     """
 
     _frame_class = Mark5BFrame
@@ -179,7 +180,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         self._frame = self.read_frame(ref_mjd=ref_mjd, nchan=nchan, bps=bps)
         self._frame_data = None
         header = self._frame.header
-        sample_shape = (Mark5BPayload._sample_shape_cls(len(thread_ids)) if
+        sample_shape = (Mark5BPayload._sample_shape_maker(len(thread_ids)) if
                         thread_ids else self._frame.payload.sample_shape)
         super(Mark5BStreamReader, self).__init__(
             fh_raw, header0=header, sample_shape=sample_shape, bps=bps,
@@ -208,15 +209,16 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         fill_value : float or complex
             Value to use for invalid or missing data.
         out : `None` or array
-            Array to store the data in. If given, ``count`` will be inferred.
-            If ``squeeze`` is `True`, ``out`` must have squeezed sample
-            dimensions.
+            Array to store the data in. If given, ``count`` will be inferred
+            from the first dimension.  The other dimension should equal
+            ``sample_shape``.
 
         Returns
         -------
         out : array of float or complex
-            Dimensions are (sample-time, channel) with dimensions
-            of length unity possibly removed (if ``squeeze`` is `True`).
+            The first dimension is sample-time, and the second, given by
+            ``sample_shape``, is (channel,).  Any dimension of length unity is
+            removed if ``self.squeeze=True``.
         """
         if out is None:
             if count is None or count < 0:
@@ -287,7 +289,7 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
         Header for the first frame, holding time information, etc.
     squeeze : bool, optional
         If `True` (default), ``write`` accepts squeezed arrays as input,
-        and adds channel and thread dimensions if unity.
+        and adds channel and thread dimensions if they have length unity.
     **kwargs
         If no header is give, an attempt is made to construct the header from
         these.  For a standard header, the following suffices.
@@ -305,7 +307,7 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
                  nchan=1, bps=2, header=None, squeeze=True, **kwargs):
         if header is None:
             header = Mark5BHeader.fromvalues(**kwargs)
-        sample_shape = Mark5BPayload._sample_shape_cls(nchan)
+        sample_shape = Mark5BPayload._sample_shape_maker(nchan)
         super(Mark5BStreamWriter, self).__init__(
             raw, header0=header, sample_shape=sample_shape, bps=bps,
             complex_data=False, thread_ids=None,
@@ -384,7 +386,8 @@ frames_per_second : int, optional
 sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each thread is sampled (bandwidth * 2; frequency units).
 squeeze : bool, optional
-    If `True` (default), remove channel and thread dimensions if unity.
+    If `True` (default), remove any dimensions of length unity from
+    decoded data.
 
 --- For writing a stream : (see `~baseband.mark5b.base.Mark5BStreamWriter`)
 
@@ -402,7 +405,7 @@ header : :class:`~baseband.mark5b.Mark5BHeader`, optional
     Header for the first frame, holding time information, etc.
 squeeze : bool, optional
     If `True` (default), ``write`` accepts squeezed arrays as input,
-    and adds channel and thread dimensions if unity.
+    and adds channel and thread dimensions if they have length unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.  See

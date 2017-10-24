@@ -211,7 +211,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
     squeeze : bool, optional
-        If `True` (default), remove channel and thread dimensions if unity.
+        If `True` (default), remove any dimensions of length unity from
+        decoded data.
     """
 
     _frame_class = Mark4Frame
@@ -226,7 +227,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
-        sample_shape = (Mark4Payload._sample_shape_cls(len(thread_ids)) if
+        sample_shape = (Mark4Payload._sample_shape_maker(len(thread_ids)) if
                         thread_ids else self._frame.payload.sample_shape)
         super(Mark4StreamReader, self).__init__(
             fh_raw, header0=header, sample_shape=sample_shape,
@@ -284,16 +285,16 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         fill_value : float
             Value to use for invalid or missing data.
         out : `None` or array
-            Array to store the data in. If given, ``count`` will be inferred.
-            If ``squeeze`` is `True`, ``out`` must have squeezed sample
-            dimensions.
+            Array to store the data in. If given, ``count`` will be inferred
+            from the first dimension.  The other dimension should equal
+            ``sample_shape``.
 
         Returns
         -------
         out : array of float
-            Dimensions are (sample-time, channel), with dimensions of length
-            unity possibly removed if the file was opened with ``squeeze=True``
-            (which is the default).
+            The first dimension is sample-time, and the second, given by
+            ``sample_shape``, is (channel,).  Any dimension of length unity is
+            removed if ``self.squeeze=True``.
         """
         if out is None:
             if count is None or count < 0:
@@ -352,7 +353,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
         Header for the first frame, holding start time information, etc.
     squeeze : bool, optional
         If `True` (default), ``write`` accepts squeezed arrays as input,
-        and adds channel and thread dimensions if unity.
+        and adds channel and thread dimensions if they have length unity.
     **kwargs
         If no header is give, an attempt is made to construct the header from
         these.  For a standard header, this would include the following.
@@ -376,7 +377,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
                  header=None, squeeze=True, **kwargs):
         if header is None:
             header = Mark4Header.fromvalues(**kwargs)
-        sample_shape = Mark4Payload._sample_shape_cls(header.nchan)
+        sample_shape = Mark4Payload._sample_shape_maker(header.nchan)
         super(Mark4StreamWriter, self).__init__(
             fh_raw=raw, header0=header, sample_shape=sample_shape,
             thread_ids=range(header.nchan), bps=header.bps, complex_data=False,
@@ -445,7 +446,8 @@ frames_per_second : int, optional
 sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each thread is sampled (bandwidth * 2; frequency units).
 squeeze : bool, optional
-    If `True` (default), remove channel and thread dimensions if unity.
+    If `True` (default), remove any dimensions of length unity from
+    decoded data.
 
 --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
 
@@ -458,7 +460,7 @@ header : `~baseband.mark4.Mark4Header`
     Header for the first frame, holding time information, etc.
 squeeze : bool, optional
     If `True` (default), ``write`` accepts squeezed arrays as input,
-    and adds channel and thread dimensions if unity.
+    and adds channel and thread dimensions if they have length unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.  See

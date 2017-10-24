@@ -185,7 +185,8 @@ class DADAStreamBase(VLBIStreamBase):
         Specific threads to use.  By default, as many as there are
         polarisations ('header0["NPOL"]').
     squeeze : bool, optional
-        If `True` (default), remove channel and thread dimensions if unity.
+        If `True` (default), remove any dimensions of length unity from
+        ``sample_shape``.
     """
 
     def __init__(self, fh_raw, header0, thread_ids=None, squeeze=True):
@@ -193,8 +194,8 @@ class DADAStreamBase(VLBIStreamBase):
                              header0.samples_per_frame)
         if thread_ids is None:
             thread_ids = list(range(header0['NPOL']))
-        sample_shape = DADAPayload._sample_shape_cls(len(thread_ids),
-                                                     header0.nchan)
+        sample_shape = DADAPayload._sample_shape_maker(len(thread_ids),
+                                                       header0.nchan)
         super(DADAStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, sample_shape=sample_shape,
             bps=header0.bps, complex_data=header0.complex_data,
@@ -220,7 +221,8 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     thread_ids : list of int, optional
         Specific threads to read.  By default, all threads are read.
     squeeze : bool, optional
-        If `True` (default), remove channel and thread dimensions if unity.
+        If `True` (default), remove any dimensions of length unity from
+        decoded data.
     """
     def __init__(self, fh_raw, thread_ids=None, squeeze=True):
         header = DADAHeader.fromfile(fh_raw)
@@ -244,16 +246,16 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
             Number of samples to read.  If omitted or negative, the whole
             file is read.  Ignored if ``out`` is given.
         out : `None` or array
-            Array to store the data in. If given, ``count`` will be inferred.
-            If ``squeeze`` is `True`, ``out`` must have squeezed sample
-            dimensions.
+            Array to store the data in. If given, ``count`` will be inferred
+            from the first dimension.  The other dimensions should equal
+            ``sample_shape``.
 
         Returns
         -------
         out : array of float or complex
-            Dimensions are (sample-time, thread (polarization), channel), with
-            dimensions of length unity possibly removed if the file
-            was opened with ``squeeze=True`` (which is the default).
+            The first dimension is sample-time, and the other two, given by
+            ``sample_shape``, are (thread (polarization), channel).  Any
+            dimension of length unity is removed if ``self.squeeze=True``.
         """
         if out is None:
             if count is None or count < 0:
@@ -309,7 +311,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
         Header for the file, holding time information, etc.
     squeeze : bool, optional
         If `True` (default), ``write`` accepts squeezed arrays as input,
-        and adds channel and thread dimensions if unity.
+        and adds channel and thread dimensions if they have length unity.
     """
     def __init__(self, fh_raw, header, squeeze=True):
         assert header.get('OBS_OVERLAP', 0) == 0
@@ -375,7 +377,8 @@ thread_ids : list of int, optional
     (For DADA, the number threads equals ``header['NPOL']``, i.e.,
     the number of polarisations.)
 squeeze : bool, optional
-    If `True` (default), remove channel and thread dimensions if unity.
+    If `True` (default), remove any dimensions of length unity from
+    decoded data.
 
 --- For writing : (see :class:`~baseband.dada.base.DADAStreamWriter`)
 
@@ -383,7 +386,7 @@ header : `~baseband.dada.DADAHeader`, optional
     Header for the first frame, holding time information, etc.
 squeeze : bool, optional
     If `True` (default), ``write`` accepts squeezed arrays as input,
-    and adds channel and thread dimensions if unity.
+    and adds channel and thread dimensions if they have length unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.  See

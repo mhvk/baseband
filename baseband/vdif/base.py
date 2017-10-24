@@ -239,7 +239,7 @@ class VDIFStreamBase(VLBIStreamBase):
 
     _frame_class = VDIFFrame
 
-    _sample_shape_cls = namedtuple('SampleShape', 'nthread, nchan')
+    _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
 
     def __init__(self, fh_raw, header0, thread_ids, frames_per_second=None,
                  sample_rate=None, squeeze=True):
@@ -249,7 +249,7 @@ class VDIFStreamBase(VLBIStreamBase):
             except AttributeError:
                 pass  # super below will scan file to get framerate.
 
-        sample_shape = self._sample_shape_cls(len(thread_ids), header0.nchan)
+        sample_shape = self._sample_shape_maker(len(thread_ids), header0.nchan)
 
         super(VDIFStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, sample_shape=sample_shape,
@@ -296,7 +296,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each channel in each thread is sampled.
     squeeze : bool, optional
-        If `True` (default), remove channel and thread dimensions if unity.
+        If `True` (default), remove any dimensions of length unity from
+        decoded data.
     """
 
     def __init__(self, fh_raw, thread_ids=None, frames_per_second=None,
@@ -358,15 +359,16 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         fill_value : float or complex
             Value to use for invalid or missing data.
         out : `None` or array
-            Array to store the data in. If given, ``count`` will be inferred.
-            If ``squeeze`` is `True`, ``out`` must have squeezed sample
-            dimensions.
+            Array to store the data in. If given, ``count`` will be inferred
+            from the first dimension.  The other dimensions should equal
+            ``sample_shape``.
 
         Returns
         -------
         out : array of float or complex
-            Dimensions are (sample-time, vlbi-thread, channel) with dimensions
-            of length unity possibly removed (if ``squeeze`` is `True`).
+            The first dimension is sample-time, and the other two, given by
+            ``sample_shape``, are (vlbi-thread, channel).  Any dimension of
+            length unity is removed if ``self.squeeze=True``.
         """
         if out is None:
             if count is None or count < 0:
@@ -430,7 +432,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
         Header for the first frame, holding time information, etc.
     squeeze : bool, optional
         If `True` (default), ``write`` accepts squeezed arrays as input,
-        and adds channel and thread dimensions if unity.
+        and adds channel and thread dimensions if they have length unity.
     **kwargs
         If no header is give, an attempt is made to construct the header from
         these.  For a standard header, this would include the following.
@@ -536,7 +538,8 @@ frames_per_second : int
 sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each channel in each thread is sampled.
 squeeze : bool, optional
-    If `True` (default), remove channel and thread dimensions if unity.
+    If `True` (default), remove any dimensions of length unity from
+    decoded data.
 
 --- For writing : (see :class:`VDIFStreamWriter`)
 
@@ -549,7 +552,7 @@ sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each channel in each thread is sampled.
 squeeze : bool, optional
     If `True` (default), ``write`` accepts squeezed arrays as input,
-    and adds channel and thread dimensions if unity.
+    and adds channel and thread dimensions if they have length unity.
 header : `~baseband.vdif.VDIFHeader`, optional
     Header for the first frame, holding time information, etc.
 **kwargs

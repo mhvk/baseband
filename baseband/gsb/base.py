@@ -132,10 +132,10 @@ class GSBStreamBase(VLBIStreamBase):
                 "reading specific threads.")
         # sample_shape uses len(fh_raw) instead of len(thread_ids)!
         if rawdump:
-            sample_shape = GSBPayload._sample_shape_cls_1thread(nchan)
+            sample_shape = GSBPayload._sample_shape_maker_1thread(nchan)
         else:
-            sample_shape = GSBPayload._sample_shape_cls_nthread(len(fh_raw),
-                                                                nchan)
+            sample_shape = GSBPayload._sample_shape_maker_nthread(len(fh_raw),
+                                                                  nchan)
 
         super(GSBStreamBase, self).__init__(
             fh_raw, header0=header0, sample_shape=sample_shape, bps=bps,
@@ -230,14 +230,16 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         fill_value : float or complex
             Value to use for invalid or missing data.
         out : `None` or array
-            Array to store the data in. If given, count will be inferred.
+            Array to store the data in. If given, ``count`` will be inferred
+            from the first dimension.  The other dimensions should equal
+            ``sample_shape``.
 
         Returns
         -------
         out : array of float or complex
-            Dimensions are (sample-time, thread (polarization), channel), with
-            dimensions of length unity possibly removed if the file
-            was opened with ``squeeze=True`` (which is the default).
+            The first dimension is sample-time, and the other two, given by
+            ``sample_shape``, are (thread (polarization), channel).  Any
+            dimension of length unity is removed if ``self.squeeze=True``.
         """
         if out is None:
             if count is None or count < 0:
@@ -313,7 +315,15 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         self._valid = True
 
     def write(self, data):
-        """Write data, buffering by frames as needed."""
+        """Write data, buffering by frames as needed.
+
+        Parameters
+        ----------
+        data : array
+            Piece of data to be written, with sample dimensions as given by
+            ``sample_shape``. This should be properly scaled to make best use
+            of the dynamic range delivered by the encoding.
+        """
         if self.squeeze:
             data = self._unsqueeze(data)
 
@@ -405,8 +415,10 @@ def open(name, mode='rs', **kwargs):
         Total number of samples per frame.  Can also give ``payloadsize``, the
         number of bytes per payload block.
     squeeze : bool, optional
-        If `True` (default), remove channel and thread dimensions if unity.
-        If writing, accept squeezed arrays as input.
+        If `True` (default) and reading, remove any dimensions of length unity
+        from decoded data.  If `True` and writing, accept squeezed
+        arrays as input, and add channel and thread dimensions if they have
+        length unity.
 
     --- For writing a stream : (see `~baseband.gsb.base.GSBStreamWriter`)
 

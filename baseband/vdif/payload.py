@@ -131,7 +131,7 @@ class VDIFPayload(VLBIPayloadBase):
                  4: encode_4bit,
                  8: encode_8bit}
 
-    _sample_shape_cls = namedtuple('SampleShape', 'nchan')
+    _sample_shape_maker = namedtuple('SampleShape', 'nchan')
 
     def __init__(self, words, header=None,
                  nchan=1, bps=2, complex_data=False):
@@ -146,11 +146,9 @@ class VDIFPayload(VLBIPayloadBase):
                 self._encoders = Mark5BPayload._encoders
                 if complex_data:
                     raise ValueError("VDIF/Mark5B payload cannot be complex.")
-        sample_shape = self._sample_shape_cls(nchan)
         super(VDIFPayload, self).__init__(words, bps=bps,
-                                          sample_shape=sample_shape,
+                                          sample_shape=(nchan,),
                                           complex_data=complex_data)
-        self.nchan = nchan
 
     @classmethod
     def fromfile(cls, fh, header):
