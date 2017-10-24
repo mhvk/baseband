@@ -179,7 +179,7 @@ class VLBIPayloadBase(object):
         else:
             try:
                 item = item.__index__()
-            except:
+            except Exception:
                 raise TypeError("{0} object can only be indexed or sliced."
                                 .format(type(self)))
             if item < 0:

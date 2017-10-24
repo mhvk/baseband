@@ -52,14 +52,14 @@ def init_luts():
     table of levels (``decoder_levels[2]``).
     """
     b = np.arange(256)[:, np.newaxis]
-    l = np.arange(8)
-    lut1bit = decoder_levels[1][((b >> l) & 1)]
+    sl = np.arange(8)
+    lut1bit = decoder_levels[1][((b >> sl) & 1)]
     # 2-bit mode: sign bit in lower position thatn magnitude bit
     # ms=00,01,10,11 = -Hi, 1, -1, Hi (lut
     s = np.arange(0, 8, 2)  # 0, 2, 4, 6
-    m = s+1                 # 1, 3, 5, 7
-    l = (((b >> s) & 1) << 1) + ((b >> m) & 1)
-    lut2bit = decoder_levels[2][l]
+    m = s + 1               # 1, 3, 5, 7
+    sl = (((b >> s) & 1) << 1) + ((b >> m) & 1)
+    lut2bit = decoder_levels[2][sl]
     return lut1bit, lut2bit
 
 

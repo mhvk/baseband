@@ -37,7 +37,7 @@ class TimeGSB(TimeString):
                 iy[...], im[...], id[...], ihr[...], imin[...], sec = (
                     int(component) for component in components[:-1])
                 dsec[...] = sec + float(components[-1])
-        except:
+        except Exception:
             raise ValueError('Time {0} does not match {1} format'
                              .format(timestr, self.name))
 

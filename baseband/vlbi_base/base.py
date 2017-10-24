@@ -237,10 +237,10 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """
         try:
             offset = offset.__index__()
-        except:
+        except Exception:
             try:
                 offset = offset - self.time0
-            except:
+            except Exception:
                 pass
             else:
                 whence = 0
