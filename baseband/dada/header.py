@@ -282,7 +282,7 @@ class DADAHeader(OrderedDict):
         except AttributeError as exc:
             try:
                 return self[attr.upper()]
-            except:
+            except Exception:
                 raise exc
 
     @property

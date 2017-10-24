@@ -66,7 +66,7 @@ def make_parser(word_index, bit_index, bit_length, default=None):
         assert bit_index == 0
 
         def parser(words):
-            return words[word_index] + words[word_index+1] * (1 << 32)
+            return words[word_index] + words[word_index + 1] * (1 << 32)
 
     else:
         bit_mask = (1 << bit_length) - 1  # e.g., bit_length=8 -> 0xff
@@ -117,7 +117,7 @@ def make_setter(word_index, bit_index, bit_length, default=None):
             word1 = value & (1 << 32) - 1
             word2 = value >> 32
             words[word_index] = word1
-            words[word_index+1] = word2
+            words[word_index + 1] = word2
             return words
 
         word = words[word_index]
@@ -319,7 +319,7 @@ class VLBIHeaderBase(object):
         word0 = self.words[0]
         try:
             self.words[0] = 0
-        except:
+        except Exception:
             return False
         else:
             self.words[0] = word0
