@@ -90,7 +90,8 @@ class VLBIStreamBase(VLBIFileBase):
                                              ','.join(sqz_names))
                     self._squeezed_shape = sqz_shp_cls(*sqz_dims)
             return self._squeezed_shape
-        return self._sample_shape
+        else:
+            return self._sample_shape
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)
