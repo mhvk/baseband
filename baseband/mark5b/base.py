@@ -4,6 +4,7 @@ from astropy import units as u
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase, make_opener)
 from .header import Mark5BHeader
+from .payload import Mark5BPayload
 from .frame import Mark5BFrame
 
 
@@ -158,29 +159,35 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         Reference MJD (rounded to thousands), to remove ambiguities in the
         time stamps.  By default, will be inferred from the file creation date.
     thread_ids: list of int, optional
-        Specific threads to read.  By default, all threads are read.
+        Specific channels to read.  By default, all channels are read.
     frames_per_second : int, optional
         Needed to calculate timestamps. If not given, will be inferred from
         ``sample_rate``, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
         Rate at which each thread is sampled (bandwidth * 2; frequency units).
+    squeeze : bool, optional
+        If `True` (default), remove any dimensions of length unity from
+        decoded data.
     """
 
     _frame_class = Mark5BFrame
 
     def __init__(self, fh_raw, nchan, bps=2, ref_mjd=None, thread_ids=None,
-                 frames_per_second=None, sample_rate=None):
+                 frames_per_second=None, sample_rate=None, squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
         self._frame = self.read_frame(ref_mjd=ref_mjd, nchan=nchan, bps=bps)
         self._frame_data = None
         header = self._frame.header
+        sample_shape = (Mark5BPayload._sample_shape_maker(len(thread_ids)) if
+                        thread_ids else self._frame.payload.sample_shape)
         super(Mark5BStreamReader, self).__init__(
-            fh_raw, header0=header, nchan=nchan, bps=bps, complex_data=False,
-            thread_ids=thread_ids,
+            fh_raw, header0=header, sample_shape=sample_shape, bps=bps,
+            complex_data=False, thread_ids=thread_ids,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
-            frames_per_second=frames_per_second, sample_rate=sample_rate)
+            frames_per_second=frames_per_second, sample_rate=sample_rate,
+            squeeze=squeeze)
 
     @property
     def size(self):
@@ -189,7 +196,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             self.frames_per_second)) + 1
         return n_frames * self.samples_per_frame
 
-    def read(self, count=None, fill_value=0., squeeze=True, out=None):
+    def read(self, count=None, fill_value=0., out=None):
         """Read count samples.
 
         The range retrieved can span multiple frames.
@@ -198,29 +205,31 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         ----------
         count : int
             Number of samples to read.  If omitted or negative, the whole
-            file is read.
+            file is read.  Ignored if ``out`` is given.
         fill_value : float or complex
             Value to use for invalid or missing data.
-        squeeze : bool
-            If `True` (default), remove channel and thread dimensions if unity.
         out : `None` or array
-            Array to store the data in. If given, count will be inferred,
-            and squeeze is set to `False`.
+            Array to store the data in. If given, ``count`` will be inferred
+            from the first dimension.  The other dimension should equal
+            ``sample_shape``.
 
         Returns
         -------
         out : array of float or complex
-            Dimensions are (sample-time, vlbi-thread, channel).
+            The first dimension is sample-time, and the second, given by
+            ``sample_shape``, is (channel,).  Any dimension of length unity is
+            removed if ``self.squeeze=True``.
         """
         if out is None:
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            out = np.empty((self.nthread, count),
-                           dtype=self._frame.dtype).T
+            result = np.empty(self._sample_shape + (count,),
+                              dtype=self._frame.dtype).T
+            out = result.squeeze() if self.squeeze else result
         else:
             count = out.shape[0]
-            squeeze = False
+            result = self._unsqueeze(out) if self.squeeze else out
 
         offset0 = self.offset
         while count > 0:
@@ -242,18 +251,19 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            out[sample:sample + nsample] = data[sample_offset:
-                                                sample_offset + nsample]
+            result[sample:sample + nsample] = data[sample_offset:
+                                                   sample_offset + nsample]
             self.offset += nsample
             count -= nsample
 
-        return out.squeeze() if squeeze else out
+        return out
 
     def _read_frame(self):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
         self._frame = self.read_frame(ref_mjd=self.header0.kday,
-                                      nchan=self.nchan, bps=self.bps)
+                                      nchan=self._sample_shape.nchan,
+                                      bps=self.bps)
         # Convert payloads to data array.
         self._frame_data = self._frame.data
 
@@ -277,6 +287,9 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
         Bits per sample.  Default is 2.
     header : `~baseband.mark5b.Mark5BHeader`, optional
         Header for the first frame, holding time information, etc.
+    squeeze : bool, optional
+        If `True` (default), ``write`` accepts squeezed arrays as input,
+        and adds channel and thread dimensions if they have length unity.
     **kwargs
         If no header is give, an attempt is made to construct the header from
         these.  For a standard header, the following suffices.
@@ -291,26 +304,40 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
     _frame_class = Mark5BFrame
 
     def __init__(self, raw, frames_per_second=None, sample_rate=None,
-                 nchan=1, bps=2, header=None, **kwargs):
+                 nchan=1, bps=2, header=None, squeeze=True, **kwargs):
         if header is None:
             header = Mark5BHeader.fromvalues(**kwargs)
+        sample_shape = Mark5BPayload._sample_shape_maker(nchan)
         super(Mark5BStreamWriter, self).__init__(
-            raw, header0=header, nchan=nchan, bps=bps, complex_data=False,
-            thread_ids=None,
+            raw, header0=header, sample_shape=sample_shape, bps=bps,
+            complex_data=False, thread_ids=None,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
-            frames_per_second=frames_per_second, sample_rate=sample_rate)
-        self._data = np.zeros((self.samples_per_frame, self.nchan), np.float32)
+            frames_per_second=frames_per_second, sample_rate=sample_rate,
+            squeeze=squeeze)
+
+        self._data = np.zeros((self.samples_per_frame,
+                               self._sample_shape.nchan), np.float32)
         self._valid = True
 
-    def write(self, data, squeezed=True, invalid_data=False):
-        """Write data, buffering by frames as needed."""
-        if squeezed and data.ndim < 2:
-            data = np.expand_dims(data, axis=1 if self.nthread == 1 else 0)
+    def write(self, data, invalid_data=False):
+        """Write data, buffering by frames as needed.
 
-        if data.ndim != 2 or data.shape[1] != self.nthread:
+        Parameters
+        ----------
+        data : array
+            Piece of data to be written, with sample dimensions as given by
+            ``sample_shape``. This should be properly scaled to make best use
+            of the dynamic range delivered by the encoding.
+        invalid_data : bool, optional
+            Whether the current data is valid.  Defaults to `False`.
+        """
+        if self.squeeze:
+            data = self._unsqueeze(data)
+
+        if data.ndim != 2 or data.shape[1] != self._sample_shape.nchan:
             raise ValueError('cannot write an array with shape {0} to a '
                              'stream with {1} threads'
-                             .format(data.shape, self.nthread))
+                             .format(data.shape, self._sample_shape.nchan))
 
         count = data.shape[0]
         sample = 0
@@ -358,6 +385,9 @@ frames_per_second : int, optional
     ``sample_rate``, or by scanning the file.
 sample_rate : `~astropy.units.Quantity`, optional
     Rate at which each thread is sampled (bandwidth * 2; frequency units).
+squeeze : bool, optional
+    If `True` (default), remove any dimensions of length unity from
+    decoded data.
 
 --- For writing a stream : (see `~baseband.mark5b.base.Mark5BStreamWriter`)
 
@@ -373,6 +403,9 @@ bps : int
     Bits per sample.  Default is 2.
 header : :class:`~baseband.mark5b.Mark5BHeader`, optional
     Header for the first frame, holding time information, etc.
+squeeze : bool, optional
+    If `True` (default), ``write`` accepts squeezed arrays as input,
+    and adds channel and thread dimensions if they have length unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.  See

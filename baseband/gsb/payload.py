@@ -10,6 +10,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
+from collections import namedtuple
 
 from ..vlbi_base.payload import VLBIPayloadBase
 
@@ -76,6 +77,16 @@ class GSBPayload(VLBIPayloadBase):
                  8: decode_8bit}
     _dtype_word = np.int8
 
+    _sample_shape_maker_1thread = namedtuple('SampleShape', 'nchan')
+    _sample_shape_maker_nthread = namedtuple('SampleShape', 'nthread, nchan')
+
+    @classmethod
+    def _sample_shape_maker(cls, *args):
+        if len(args) == 1:
+            return cls._sample_shape_maker_1thread(*args)
+        else:
+            return cls._sample_shape_maker_nthread(*args)
+
     @classmethod
     def fromfile(cls, fh, payloadsize=None, bps=4, nchan=1,
                  complex_data=False):
@@ -94,7 +105,7 @@ class GSBPayload(VLBIPayloadBase):
             Number of bits per sample part (i.e., per channel and per real or
             imaginary component).  Default: 4.
         nchan : int
-            Number of fourier channels.  Default: 1.
+            Number of Fourier channels.  Default: 1.
         complex_data : bool
             Whether data is complex or float.  Default: False.
         """

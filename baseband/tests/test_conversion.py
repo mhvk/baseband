@@ -29,10 +29,10 @@ class TestVDIFMark5B(object):
             # A not-at-the-start header for checking times.
             m5h2 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=ref_mjd)
         # Create VDIF headers based on both the Mark 5B header and payload.
-        header1 = vdif.VDIFHeader.from_mark5b_header(m5h1, nchan=m5pl.nchan,
-                                                     bps=m5pl.bps)
-        header2 = vdif.VDIFHeader.from_mark5b_header(m5h2, nchan=m5pl.nchan,
-                                                     bps=m5pl.bps)
+        header1 = vdif.VDIFHeader.from_mark5b_header(
+            m5h1, nchan=m5pl.sample_shape.nchan, bps=m5pl.bps)
+        header2 = vdif.VDIFHeader.from_mark5b_header(
+            m5h2, nchan=m5pl.sample_shape.nchan, bps=m5pl.bps)
         for i, (m5h, header) in enumerate(((m5h1, header1), (m5h2, header2))):
             assert m5h['frame_nr'] == i
             # Check all direct information is set correctly.
@@ -48,7 +48,8 @@ class TestVDIFMark5B(object):
             assert header.framesize == 10032
             assert header.size == 32
             assert header.payloadsize == m5h.payloadsize
-            assert header.samples_per_frame == 10000*8//m5pl.bps//m5pl.nchan
+            assert (header.samples_per_frame ==
+                    10000 * 8 // m5pl.bps // m5pl.sample_shape.nchan)
 
         # A copy might remove any `kday` keywords set, but should still work
         # (Regression test for #34)
@@ -76,8 +77,8 @@ class TestVDIFMark5B(object):
         with open(SAMPLE_M5B, 'rb') as fh:
             m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
-        header = vdif.VDIFHeader.from_mark5b_header(m5h, nchan=m5pl.nchan,
-                                                    bps=m5pl.bps)
+        header = vdif.VDIFHeader.from_mark5b_header(
+            m5h, nchan=m5pl.sample_shape.nchan, bps=m5pl.bps)
         # Create VDIF payload from the Mark 5B encoded payload.
         payload = vdif.VDIFPayload(m5pl.words, header)
         # Check that the payload (i.e., encoded data) is the same.
@@ -124,7 +125,7 @@ class TestVDIF0VDIF1(object):
                 h1w = f1w.header0
                 assert list(h1w.words[:4]) == list(h0.words[:4])
                 assert h1w.framerate == 10. * u.kHz
-                assert h1w.bandwidth == 1.28 * f0.nchan * u.MHz
+                assert h1w.bandwidth == 1.28 * f0.sample_shape.nchan * u.MHz
                 f1w.write(d0)
                 f1w.fh_raw.flush()
 
@@ -134,7 +135,7 @@ class TestVDIF0VDIF1(object):
                     d1r = f1r.read(1024)
                 assert h1r.words[:4] == h0.words[:4]
                 assert h1r.framerate == 10. * u.kHz
-                assert h1r.bandwidth == 1.28 * f0.nchan * u.MHz
+                assert h1r.bandwidth == 1.28 * f0.sample_shape.nchan * u.MHz
                 assert np.all(d1r == d0)
 
 
@@ -380,7 +381,7 @@ class TestDADAToVDIF1(object):
             assert fv.offset == offset1
             assert np.abs(fv.tell(unit='time') - time1) < 2.*u.ns
             vh = fv.header0
-            vnthread = fv.nthread
+            vnthread = fv.sample_shape.nthread
         assert np.allclose(dv, data)
 
         # Convert VDIF file back to DADA.

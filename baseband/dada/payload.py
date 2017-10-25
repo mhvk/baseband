@@ -3,6 +3,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
+from collections import namedtuple
 
 from ..vlbi_base.payload import VLBIPayloadBase
 
@@ -41,6 +42,8 @@ class DADAPayload(VLBIPayloadBase):
         8: decode_8bit}
     _encoders = {
         8: encode_8bit}
+
+    _sample_shape_maker = namedtuple('SampleShape', 'npol, nchan')
 
     def __init__(self, words, header=None, bps=8, sample_shape=(),
                  complex_data=False):

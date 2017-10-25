@@ -151,7 +151,7 @@ class VDIFFrame(VLBIFrameBase):
         """
         m5h, m5pl = mark5b_frame.header, mark5b_frame.payload
         header = cls._header_class.from_mark5b_header(
-            m5h, nchan=m5pl.nchan, bps=m5pl.bps,
+            m5h, nchan=m5pl.sample_shape.nchan, bps=m5pl.bps,
             invalid_data=not mark5b_frame.valid, **kwargs)
         payload = cls._payload_class(m5pl.words, header)
         return cls(header, payload, verify)
