@@ -53,10 +53,11 @@ and assume the `numpy` and `baseband.vdif` modules have been imported::
     >>> from baseband import vdif
     >>> from baseband.data import SAMPLE_VDIF
 
-Baseband defines the :class:`~baseband.vdif.VDIFFrameSet` data container for
-storing a frame set as well as :class:`~baseband.vdif.VDIFFrame` one for storing
-a single frame. Opening in a VDIF file binary mode provides a file reader
-extended with methods to read both::
+Simple reading and writing of VDIF files can be done entirely using
+:func:`~baseband.vdif.open`. Opening in binary mode provides a normal file
+reader, but extended with methods to read a :class:`~baseband.vdif.VDIFFrameSet`
+data container for storing a frame set as well as
+:class:`~baseband.vdif.VDIFFrame` one for storing a single frame::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rb')
     >>> fs = fh.read_frameset()
@@ -67,7 +68,25 @@ extended with methods to read both::
     (20000, 1)
     >>> fh.close()
 
-As with other formats, ``fr.data`` is a read-only property of the frame. 
+As with other formats, ``fr.data`` is a read-only property of the frame.
+
+Opening in stream mode wraps the low-level routines such that reading
+and writing is in units of samples.  It also provides access to header
+information::
+
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
+    >>> fh
+    <VDIFStreamReader name=... offset=0
+        frames_per_second=1600, samples_per_frame=20000,
+        sample_shape=SampleShape(nthread=8),
+        complex_data=False, bps=2, edv=3, station=65532,
+        (start) time=2014-06-16T05:56:07.000000000>
+    >>> d = fh.read(12)
+    >>> d.shape
+    (12, 8)
+    >>> d[:, 0].astype(int)  # first thread
+    array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
+    >>> fh.close()
 
 To set up a file for writing needs quite a bit of header information. Not
 coincidentally, what is given by the reader above suffices::
@@ -91,9 +110,9 @@ coincidentally, what is given by the reader above suffices::
     True
     >>> fh.close()
 
-Example to copy a VDIF file.  Here, we use the ``sort=False`` option to ensure
-the frames are written exactly in the same order, so the files should be
-identical.::
+Here is a simple example to copy a VDIF file.  We use the ``sort=False`` option
+to ensure the frames are written exactly in the same order, so the files should
+be identical::
 
     >>> with vdif.open(SAMPLE_VDIF, 'rb') as fr, vdif.open('try.vdif', 'wb') as fw:
     ...     while True:
@@ -104,8 +123,9 @@ identical.::
 
 For small files, one could just do::
 
-    >>> with vdif.open(SAMPLE_VDIF, 'rs') as fr, vdif.open(
-    ...         'try.vdif', 'ws', header=fr.header0, nthread=fr.nthread) as fw:
+    >>> with vdif.open(SAMPLE_VDIF, 'rs') as fr, \
+    ...         vdif.open('try.vdif', 'ws', header=fr.header0,
+    ...                   nthread=fr.sample_shape.nthread) as fw:
     ...     fw.write(fr.read())
 
 This copies everything to memory, though, and some header information is lost.

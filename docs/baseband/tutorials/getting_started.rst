@@ -5,7 +5,7 @@ Getting Started
 ***************
 
 This tutorial covers the basic features of Baseband.  It assumes that Numpy and
-the Astropy Units module have been imported::
+the Astropy units module have been imported::
 
     >>> import numpy as np
     >>> import astropy.units as u
@@ -19,7 +19,7 @@ Opening Files
 -------------
 
 Each format supported by Baseband has a master input/output function,
-accessible by importing the corresponding format module. For example, to read
+accessible by importing the corresponding format module.  For example, to read
 the sample VDIF file that comes with Baseband (sample files can all be found in
 the `baseband.data` module)::
 
@@ -31,7 +31,7 @@ To close the file::
 
     >>> fh.close()
 
-The same syntax can be used to open a file of any format.  To open Baseband's
+Similar syntax can be used to open a file of any format.  To open Baseband's
 sample DADA file, for example::
 
     >>> from baseband import dada
@@ -44,20 +44,21 @@ In general, file I/O and data manipulation use the same syntax across all
 file formats.  When using ``open`` for Mark 4 and Mark 5B files, however, two
 keywords - ``ntrack``, and ``decade`` - may need to be set manually.  For these
 and VDIF, ``frames_per_second`` may also need to be passed if it can't be read
-or inferred from the file. Notes on such features and quirks of individual
-formats can be found within the :ref:`Specific file format
-<specific_file_formats_toc>` section.
+or inferred from the file.  Notes on such features and quirks of individual
+formats can be found in the docstrings of their ``open`` functions, and
+within the :ref:`Specific file format <specific_file_formats_toc>`
+documentation.
 
-For now, let's go back to using VDIF files.
+For the rest of this section, let's go back to using VDIF files.
 
 Decoding Data and the Sample File Pointer
 -----------------------------------------
 
-We gave `~baseband.vdif.open` the ``'rs'`` flag, which opens the file in 
+We gave `~baseband.vdif.open` the `'rs'` flag, which opens the file in 
 "stream reader" mode.  The function returns an instance of
 `~baseband.vdif.base.VDIFStreamReader`, a wrapper around `io.BufferedReader`
-that adds methods to decode files as data frames and seek to and read individual
-data samples.  To read the first 12 data samples into an `~numpy.ndarray`, we
+that adds methods to decode files as data frames and seek to and read data
+samples.  To decode the first 12 data samples into an `~numpy.ndarray`, we
 would use the `~baseband.vdif.base.VDIFStreamReader.read` method::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
@@ -69,23 +70,55 @@ would use the `~baseband.vdif.base.VDIFStreamReader.read` method::
     >>> d[:, 0].astype(int)  # First thread.
     array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
-The sample VDIF file has 8 concurrent frequency bands, or "channels", which are
-mapped as the columns of the array.
+As discussed in detail in the :ref:`VDIF section <vdif>`, VDIF files are
+sequences of "frames", each of which is comprised of a header (which holds
+information like the time at which the data was taken) and a block of
+data.  Multiple concurrent time streams can be stored within a single frame;
+each of these is called a "channel".  Moreover, groups of channels can be
+stored over multiple frames, each of which is called a "thread".  Our sample
+file is an "8-thread, single-channel file" (8 concurrent time streams with 1
+stream per frame), and in the example above, ``fh.read`` decoded the first 12
+samples from all 8 threads, mapping thread number to the second axis of the
+decoded data array.  Reading files with multiple threads and channels will
+produce 3-dimensional arrays.
+
+If you want to know the shape of a single complete sample - the set of samples
+from all available threads and channels for a given point in time - it is
+accessible through::
+
+    >>> fh.sample_shape
+    SampleShape(nthread=8)
+
+By default, dimensions of length unity are removed from the sample shape.  To
+retain them, set the ``fh.squeeze`` attribute to `False`:
+
+    >>> fh.squeeze = False
+    >>> fh.sample_shape              # Sample shape now keeps channel dimension.
+    SampleShape(nthread=8, nchan=1)
+    >>> d2 = fh.read(12)
+    >>> d2.shape                     # Decoded data has channel dimension.
+    (12, 8, 1)
+    >>> fh.squeeze = True            # Set back to `True` for rest of section.
+
+The ``squeeze`` attribute defaults to `False` for all stream readers and
+writers, but this behaviour can be overridden by passing ``squeeze=False`` to
+``open``
 
 We can access information about the file by printing ``fh``::
 
     >>> fh
-    <VDIFStreamReader name=... offset=12
-        nthread=8, samples_per_frame=20000, nchan=1,
-        frames_per_second=1600, complex_data=False, bps=2, edv=3,
-        station=65532, (start) time=2014-06-16T05:56:07.000000000>
+    <VDIFStreamReader name=... offset=24
+        frames_per_second=1600, samples_per_frame=20000,
+        sample_shape=SampleShape(nthread=8),
+        complex_data=False, bps=2, edv=3, station=65532,
+        (start) time=2014-06-16T05:56:07.000000000>
 
 The ``offset`` gives the current location of the sample file pointer - it's at
-``12`` since we have just read in 12 samples.  If we called ``fh.read(12)``
-again we would get the next 12 samples.  If we instead called  ``fh.read()``, it
-would read from the pointer's *current* position to the end of the file.  If we
-wanted all the data in one array, we would move the file pointer back to the
-start of file, using ``fh.seek``, before reading::
+``24`` since we have just read in 24 (complete) samples.  If we called
+``fh.read(12)`` again we would get the next 12 samples.  If we instead called 
+``fh.read()``, it would read from the pointer's *current* position to the end
+of the file.  If we wanted all the data in one array, we would move the file
+pointer back to the start of file, using ``fh.seek``, before reading::
 
     >>> fh.seek(0)      # Seek to sample 0.  Seek returns its offset in counts.
     0
@@ -94,7 +127,7 @@ start of file, using ``fh.seek``, before reading::
     (40000, 8)
 
 We can also move the pointer with respect to the end of file by passing ``2``
-as a second argument (as with `io.BufferedReader` pointers)::
+as a second argument::
 
     >>> fh.seek(-100, 2)    # Second arg is 0 (start of file) by default.
     39900
@@ -139,7 +172,7 @@ Passing the string ``'time'`` reports the pointer's location in absolute time::
 
 We can also pass an absolute `astropy.time.Time`, or a positive or negative time
 difference `~astropy.time.TimeDelta` or `astropy.units.Quantity` to ``seek``. 
-If the offset is a `~!astropy.time.Time` object, the second argument to seek is
+If the offset is a `~astropy.time.Time` object, the second argument to seek is
 ignored.
 
 ::
@@ -167,7 +200,35 @@ lookup::
     >>> header0['frame_length']
     629
 
-The full list of keywords is available by printing out ``header0.keys()``.
+The full list of keywords is available by printing out ``header0``::
+
+    >>> header0
+    <VDIFHeader3 invalid_data: False,
+                 legacy_mode: False,
+                 seconds: 14363767,
+                 _1_30_2: 0,
+                 ref_epoch: 28,
+                 frame_nr: 0,
+                 vdif_version: 1,
+                 lg2_nchan: 0,
+                 frame_length: 629,
+                 complex_data: False,
+                 bits_per_sample: 1,
+                 thread_id: 1,
+                 station_id: 65532,
+                 edv: 3,
+                 sampling_unit: True,
+                 sampling_rate: 16,
+                 sync_pattern: 0xacabfeed,
+                 loif_tuning: 859832320,
+                 _7_28_4: 15,
+                 dbe_unit: 2,
+                 if_nr: 0,
+                 subband: 1,
+                 sideband: True,
+                 major_rev: 1,
+                 minor_rev: 5,
+                 personality: 131>
 
 A number of derived properties, such as the time (as a `~astropy.time.Time`
 object), are also available through the header object.  
@@ -175,8 +236,8 @@ object), are also available through the header object.
     >>> header0.time
     <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.000000000>
 
-These are listed in the API under each header class's entry.  For example,
-the sample VDIF file's headers are of class::
+These are listed in the API for each header class.  For example, the sample
+VDIF file's headers are of class::
 
     >>> type(header0)
     <class 'baseband.vdif.header.VDIFHeader3'>
@@ -186,19 +247,21 @@ and so its attributes can be found `here <baseband.vdif.header.VDIFHeader3>`.
 Opening Specific Threads/Channels From Files
 --------------------------------------------
 
-In general, files can contain multiple channels of an observation, and for VDIF
-in particular different channels can be bundled into "threads".  If we were
-only interested in specific threads/channels, we can select them using the
+By default, ``fh.read()`` returns all threads and channels available.  If we
+were only interested in decoding specific threads, we can select them using the
 ``thread_ids`` keyword::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs', thread_ids=[2, 3])
+    >>> fh.sample_shape
+    SampleShape(nthread=2)
     >>> d = fh.read(20000)
     >>> d.shape
     (20000, 2)
     >>> fh.close()
 
-For VDIF, this selects the specified threads (each of which may have multiple
-channels), while for others this selects the specified channels.
+For VDIF, ``thread_ids`` selects the specified **threads** (each of which may
+have multiple channels), while for others this selects the specified
+**channels**.
 
 
 .. _getting_started_writing:
@@ -211,17 +274,18 @@ Writing to a File
 
 To write data to disk, we again use ``open``.  Writing data in a particular
 format requires both the header and data samples.  For modifying an existing
-file, we have the old header as well as the old data handy.
+file, we have both the old header and old data handy.
 
-As a simple example, let's read in the single-channel, 8-threaded sample VDIF
-file and rewrite it as an 8-channel, single-thread one, which for example, may
-be necessary for compatibility with certain data reduction codes::
+As a simple example, let's read in the 8-thread, single-channel sample VDIF
+file and rewrite it as an single-thread, 8-channel one, which, for example, may
+be necessary for compatibility with `DSPSR
+<https://github.com/demorest/dspsr>`_::
 
     >>> import baseband.vdif as vdif
     >>> from baseband.data import SAMPLE_VDIF
     >>> fr = vdif.open(SAMPLE_VDIF, 'rs')
     >>> fw = vdif.open('test_vdif.vdif', 'ws',
-    ...                nthread=fr.nchan, nchan=fr.nthread,
+    ...                nthread=1, nchan=fr.sample_shape.nthread,
     ...                frames_per_second=fr.frames_per_second,
     ...                samples_per_frame=fr.samples_per_frame // 8,
     ...                complex_data=fr.complex_data,
@@ -237,13 +301,20 @@ file structure.  If we possess the *exact* first header of the file, it can
 simply be passed to ``open`` via the ``header`` keyword.  In the example above,
 though, we manually switch the values of ``nthread`` and ``nchan``.  Because
 VDIF EDV = 3 requires each frame's payload to contain 5000 bytes, and ``nchan``
-is a factor of 8 larger, we decrease ``samples_per_frame``, the number of
-complete (i.e. all channels included) samples per frame, by a factor of 8.
+is now a factor of 8 larger, we decrease ``samples_per_frame``, the number of
+complete (i.e. all threads and channels included) samples per frame, by a
+factor of 8.
 
-Writing the data to file (noting that in this case we do not need to reshape
-the data's dimensions),
+Encoding samples and writing data to file is done by passing data arrays into
+``fw``'s `~baseband.vdif.base.VDIFStreamWriter.write` method.  The first
+dimension of the arrays is sample number, and the remaining dimensions must be
+as given by ``fw.sample_shape``::
 
-::
+    >>> fw.sample_shape
+    SampleShape(nchan=8)
+
+In this case, the required dimensions are the same as the arrays from
+``fr.read``.  We can thus write the data to file using::
 
     >>> while fr.tell() < fr.size:
     ...     fw.write(fr.read(fr.samples_per_frame))
@@ -255,17 +326,15 @@ For our sample file, we could simply have written
     ``fw.write(fr.read())``
 
 instead of the loop, but for large files, reading and writing should be done in
-smaller chunks as shown above to minimize memory usage.  Baseband stores only
-the data frame or frame set being read or written to in memory.
+smaller chunks to minimize memory usage.  Baseband stores only the data frame
+or frame set being read or written to in memory.
 
 We can check the validity of our new file by re-opening it::
 
     >>> fr = vdif.open(SAMPLE_VDIF, 'rs')
     >>> fh = vdif.open('test_vdif.vdif', 'rs')
-    >>> fh.nchan
-    8
-    >>> fh.nthread
-    1
+    >>> fh.sample_shape
+    SampleShape(nchan=8)
     >>> np.all(fr.read() == fh.read())
     True
     >>> fr.close()
@@ -287,18 +356,18 @@ values into `vdif.open <baseband.vdif.open>` to create one.
     >>> spf = 640       # fanout * 160 = 640 invalid samples per Mark 4 frame
     >>> f_rate = (fr.frames_per_second * fr.samples_per_frame / spf)*u.Hz
     >>> fw = vdif.open('m4convert.vdif', 'ws', edv=1, nthread=1,
-    ...                samples_per_frame=spf, nchan=fr.nchan,
+    ...                samples_per_frame=spf, nchan=fr.sample_shape.nchan,
     ...                framerate=f_rate, complex_data=fr.complex_data, 
     ...                bps=fr.bps, time=fr.time0)
 
 We choose ``edv = 1`` since it's the simplest VDIF EDV whose header includes a
-frame rate. The concept of threads does not exist in Mark 4, so it effectively
-has ``nthread = 1``.  As discussed in the :ref:`Mark 4 documentation <mark4>`,
-the data at the start of each frame is effectively overwritten by the header
-and are represented by invalid samples in the stream reader.  We set
-``samples_per_frame`` to ``640`` so that each section of invalid data is
-captured in a single frame.  The framerate is then set to 50 kHz for
-consistency.
+frame rate. The concept of threads does not exist in Mark 4, so the file
+effectively has ``nthread = 1``.  As discussed in the :ref:`Mark 4
+documentation <mark4>`, the data at the start of each frame is effectively
+overwritten by the header and are represented by invalid samples in the stream
+reader.  We set ``samples_per_frame`` to ``640`` so that each section of
+invalid data is captured in a single frame.  The framerate is then set to 50
+kHz for consistency.
 
 We now write the data to file, manually flagging each invalid data frame::
 

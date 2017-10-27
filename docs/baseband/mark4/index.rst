@@ -15,11 +15,11 @@ Usage
 This section covers Mark 4-specific features of Baseband.  Tutorials for general
 usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
 The examples below use the small sample file ``baseband/data/sample.m4``,
-and assumes Baseband's Mark 4 module, and Numpy, have been imported::
+and assumes `numpy` and `baseband.mark4` modules have been imported::
 
+    >>> import numpy as np
     >>> from baseband import mark4
     >>> from baseband.data import SAMPLE_MARK4
-    >>> import numpy as np
 
 Opening in Mark 4 file with :func:`~baseband.mark4.open` in binary mode provides
 a normal file reader but extended with methods to read a
@@ -43,9 +43,16 @@ low-level routines such that reading and writing is in units of samples.  It
 also provides access to header information.::
 
     >>> fh = mark4.open(SAMPLE_MARK4, 'rs', ntrack=64, decade=2010)
+    >>> fh
+    <Mark4StreamReader name=... offset=0
+        frames_per_second=400, samples_per_frame=80000,
+        sample_shape=SampleShape(nchan=8), bps=2,
+        (start) time=2014-06-16T07:38:12.47500>
     >>> d = fh.read(6400)
     >>> d.shape
     (6400, 8)
+    >>> d[635:645, 0].astype(int)  # first thread
+    array([ 0,  0,  0,  0,  0, -1,  1,  3,  1, -1])
     >>> fh.close()
 
 For Mark 4 files, the header takes the place of the first 160 samples of each
