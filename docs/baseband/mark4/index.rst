@@ -21,7 +21,7 @@ and assumes `numpy` and `baseband.mark4` modules have been imported::
     >>> from baseband import mark4
     >>> from baseband.data import SAMPLE_MARK4
 
-Opening in Mark 4 file with :func:`~baseband.mark4.open` in binary mode provides
+Opening a Mark 4 file with :func:`~baseband.mark4.open` in binary mode provides
 a normal file reader but extended with methods to read a
 :class:`~baseband.mark4.Mark4Frame`.  Mark 4 data files generally do not start 
 (or end) at a frame boundary, so in binary mode one has to seek the first frame

@@ -183,7 +183,7 @@ ignored.
     24000
     >>> fh.seek(0.25*u.ms, 1)  # Seek 0.25 ms from current position.
     32000
-    >>> # Seek to time index 2014/06/16 5:56:07.001125
+    >>> # Seek to specific time.
     >>> fh.seek(Time('2014-06-16T05:56:07.001125'))
     36000
     >>> fh.close()
@@ -354,10 +354,10 @@ values into `vdif.open <baseband.vdif.open>` to create one.
     >>> from baseband.data import SAMPLE_MARK4
     >>> fr = mark4.open(SAMPLE_MARK4, 'rs', ntrack=64, decade=2010)
     >>> spf = 640       # fanout * 160 = 640 invalid samples per Mark 4 frame
-    >>> f_rate = (fr.frames_per_second * fr.samples_per_frame / spf)*u.Hz
+    >>> fps = fr.frames_per_second * fr.samples_per_frame / spf
     >>> fw = vdif.open('m4convert.vdif', 'ws', edv=1, nthread=1,
     ...                samples_per_frame=spf, nchan=fr.sample_shape.nchan,
-    ...                framerate=f_rate, complex_data=fr.complex_data, 
+    ...                frames_per_second=fps, complex_data=fr.complex_data, 
     ...                bps=fr.bps, time=fr.time0)
 
 We choose ``edv = 1`` since it's the simplest VDIF EDV whose header includes a
@@ -386,3 +386,11 @@ Lastly, we check our new file::
     True
     >>> fr.close()
     >>> fh.close()
+
+For file format conversion in general, we have to consider how to properly
+scale our data to make the best use of the dynamic range of the new encoded
+format. For VLBI formats like VDIF, Mark 4 and Mark 5B, samples of the same
+size have the same scale, which is why we did not have to rescale our data when
+writing 2-bits-per-sample Mark 4 data to a 2-bits-per-sample VDIF file. 
+Rescaling is necessary, though, to convert DADA or GSB to VDIF.  For examples
+of rescaling, see the ``baseband/tests/test_conversion.py`` file.
