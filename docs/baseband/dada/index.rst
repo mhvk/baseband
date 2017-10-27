@@ -12,15 +12,20 @@ ASCII header of typically 4096 bytes followed by a payload.
 Usage
 =====
 
-All files should be opened using :func:`~baseband.dada.open`.  Single files can
-be opened in binary mode, which provides a normal file reader but extended with
-methods to read a :class:`~baseband.dada.DADAFrame`.  For dada files, which
-consist of just a single header and payload, such frames contain all the data.
-
-::
+This section covers DADA-specific features of Baseband.  Tutorials for general
+usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
+The examples below use the small sample file ``baseband/data/sample.dada``,
+and assume the `baseband.dada` module has been imported::
 
     >>> from baseband import dada
     >>> from baseband.data import SAMPLE_DADA
+
+Single files can be opened with :func:`~baseband.dada.open` in binary mode. 
+Dada files consist of just a single header and payload, and can be read into a
+single :class:`~baseband.dada.DADAFrame`.
+
+::
+
     >>> fh = dada.open(SAMPLE_DADA, 'rb')
     >>> frame = fh.read_frame()
     >>> frame.shape
@@ -37,7 +42,7 @@ are loaded into memory (since the sample file is encoded using 8 bits, the
 above example thus loads 12 bytes into memory).
 
 Opening in stream mode wraps the low-level routines such that reading and
-writing is in units of samples, and one has access to header information.
+writing is in units of samples, and provides access to header information.
 
 ::
 

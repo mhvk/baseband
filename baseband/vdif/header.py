@@ -40,6 +40,11 @@ class VDIFHeaderMeta(type):
     """
     Registry of VDIF Header EDV types, using the ``VDIF_HEADER_CLASSES``
     dict.  Checks for keyword and subclass conflicts before registering.
+
+    This metaclass automatically registers any subclass of
+    ``~baseband.vdif.header.VDIFHeader``.  This feature can be used to insert
+    new EDV types into ``VDIF_HEADER_CLASSES``; see the :ref:`New VDIF EDV
+    <new_edv>` tutorial.
     """
     _registry = VDIF_HEADER_CLASSES
 
