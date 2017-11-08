@@ -314,6 +314,7 @@ class VLBIHeaderBase(object):
 
     @property
     def mutable(self):
+        """If `True`, header can be modified."""
         if isinstance(self.words, tuple):
             return False
         word0 = self.words[0]

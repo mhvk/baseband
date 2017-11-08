@@ -54,10 +54,10 @@ class VLBIStreamBase(VLBIFileBase):
                  thread_ids, samples_per_frame, frames_per_second=None,
                  sample_rate=None, squeeze=True):
         super(VLBIStreamBase, self).__init__(fh_raw)
-        self.header0 = header0
+        self._header0 = header0
         self._sample_shape = sample_shape
-        self.bps = bps
-        self.complex_data = complex_data
+        self._bps = bps
+        self._complex_data = complex_data
         self.thread_ids = thread_ids
         self.samples_per_frame = samples_per_frame
         if frames_per_second is None:
@@ -72,6 +72,16 @@ class VLBIStreamBase(VLBIFileBase):
         self.frames_per_second = frames_per_second
         self.offset = 0
         self.squeeze = squeeze
+
+    @property
+    def squeeze(self):
+        """If `True`, remove any dimensions of length unity from
+        arrays after decoding, and add them when encoding."""
+        return self._squeeze
+
+    @squeeze.setter
+    def squeeze(self, squeeze):
+        self._squeeze = squeeze
 
     @property
     def sample_shape(self):
@@ -108,8 +118,32 @@ class VLBIStreamBase(VLBIFileBase):
 
     @lazyproperty
     def time0(self):
-        """Start time."""
+        """Start time of file."""
         return self._get_time(self.header0)
+
+    @property
+    def header0(self):
+        """First header of file."""
+        return self._header0
+
+    @property
+    def bps(self):
+        """Bits per sample."""
+        return self._bps
+
+    @property
+    def complex_data(self):
+        """If `True`, decoded data is complex."""
+        return self._complex_data
+
+    @property
+    def thread_ids(self):
+        """Specific threads/channels to read."""
+        return self._thread_ids
+
+    @thread_ids.setter
+    def thread_ids(self, ids):
+        self._thread_ids = ids
 
     def tell(self, unit=None):
         """Current offset in file.

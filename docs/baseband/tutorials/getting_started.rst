@@ -188,6 +188,11 @@ ignored.
     36000
     >>> fh.close()
 
+We can retrieve the time of the first sample in the file using ``time0``::
+
+    >>> fh.time0
+    <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.000000000>
+
 Extracting Header Information
 -----------------------------
 
