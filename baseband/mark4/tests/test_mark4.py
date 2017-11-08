@@ -560,7 +560,7 @@ class TestMark4(object):
                             sample_rate=32*u.MHz) as f2:
                 assert f2.header0 == frame.header
                 with pytest.raises(ValueError):
-                    f2.header1
+                    f2._header1
 
     def test_stream_invalid(self):
         with pytest.raises(ValueError):

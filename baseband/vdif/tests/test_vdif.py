@@ -512,9 +512,9 @@ class TestVDIF(object):
             with pytest.raises(ValueError):
                 fh.seek(0, 3)
             assert fh.size == 40000
-            assert abs(fh.time1 - fh.header1.time - u.s /
+            assert abs(fh._time1 - fh._header1.time - u.s /
                        fh.frames_per_second) < 1. * u.ns
-            assert abs(fh.time1 - fh.time0 - u.s * fh.size /
+            assert abs(fh._time1 - fh.time0 - u.s * fh.size /
                        fh.samples_per_frame / fh.frames_per_second) < 1. * u.ns
 
         assert record.shape == (12, 8)
@@ -564,7 +564,7 @@ class TestVDIF(object):
             assert fh._sample_shape.nchan == 2
             assert fh._sample_shape.nthread == 2
             assert fh.time0 == Time('2010-01-01')
-            assert fh.time1 == fh.time0 + 1.5 * u.s
+            assert fh._time1 == fh.time0 + 1.5 * u.s
             fh.seek(16)
             record = fh.read(16)
         assert np.all(record == data)
@@ -621,7 +621,7 @@ class TestVDIF(object):
             with vdif.open(s, 'rs') as f2:
                 assert f2.header0 == frame.header
                 with pytest.raises(ValueError):
-                    f2.header1
+                    f2._header1
 
     def test_io_invalid(self):
         with pytest.raises(TypeError):
@@ -673,7 +673,7 @@ def test_arochime_vdif():
         assert d.shape == (5, 2, 1024)
         assert d.dtype.kind == 'c'
         t1 = fh.tell(unit='time')
-        assert abs(t1 - fh.time1) < 1. * u.ns
+        assert abs(t1 - fh._time1) < 1. * u.ns
         assert abs(t1 - t0 - u.s * (fh.size / fh.samples_per_frame /
                                     fh.frames_per_second)) < 1. * u.ns
 

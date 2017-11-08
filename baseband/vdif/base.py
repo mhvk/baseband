@@ -321,7 +321,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
                                                squeeze)
 
     @lazyproperty
-    def header1(self):
+    def _header1(self):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         # Go to end of file.

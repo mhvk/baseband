@@ -307,7 +307,7 @@ class TestMark5B(object):
             assert fh.fh_raw.tell() == header.framesize
             assert fh.samples_per_frame == 5000
             assert fh.frames_per_second == 6400
-            header1 = fh.header1
+            header1 = fh._header1
             assert fh.size == 20000
             record = fh.read(12)
             assert fh.tell() == 12

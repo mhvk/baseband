@@ -225,7 +225,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return max_frame + 1
 
     @lazyproperty
-    def header1(self):
+    def _header1(self):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek(-self.header0.framesize, 2)
@@ -239,14 +239,14 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return header1
 
     @lazyproperty
-    def time1(self):
+    def _time1(self):
         """Time of the sample just beyond the last one in the file."""
-        return self._get_time(self.header1) + u.s / self.frames_per_second
+        return self._get_time(self._header1) + u.s / self.frames_per_second
 
     @property
     def size(self):
         """Number of samples in the file."""
-        return int(round((self.time1 - self.time0).to(u.s).value *
+        return int(round((self._time1 - self.time0).to(u.s).value *
                          self.frames_per_second * self.samples_per_frame))
 
     def seek(self, offset, whence=0):

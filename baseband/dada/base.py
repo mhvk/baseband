@@ -231,7 +231,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         self._get_frame(0)
 
     @lazyproperty
-    def header1(self):
+    def _header1(self):
         """Header of the last file for this stream."""
         self.fh_raw.seek(-self.header0.framesize, 2)
         frame1 = self.read_frame(memmap=True)

@@ -273,8 +273,8 @@ class TestDADA(object):
                           (time0 + 10002 / (16*u.MHz))) < 1. * u.ns
             fh.seek(fh.time0 + 1000 / (16*u.MHz))
             assert fh.tell() == 1000
-            assert fh.header1 == fh.header0
-            assert np.abs(fh.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert fh._header1 == fh.header0
+            assert np.abs(fh._time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         assert record1.shape == (12, 2)
         assert np.all(record1[:3] == np.array(
@@ -299,7 +299,7 @@ class TestDADA(object):
             assert fh.time0 == time0
             assert np.abs(fh.tell(unit='time') -
                           (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
-            assert fh.time1 == fh.tell(unit='time')
+            assert fh._time1 == fh.tell(unit='time')
         assert np.all(data == self.payload.data.squeeze())
         # Try single polarisation, and check initialisation by header keywords.
         h = self.header
@@ -314,7 +314,7 @@ class TestDADA(object):
         with dada.open(filename, 'rs') as fh:
             data = fh.read()
             assert np.abs(fh.time0 - time0) < 1.*u.ns
-            assert np.abs(fh.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fh._time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data == self.payload.data[:, 0, 0])
 
         # Try reading a single polarization.
@@ -399,9 +399,9 @@ class TestDADA(object):
         with dada.open(filenames, 'rs') as fr:
             assert fr.time0 == time0
             assert fr.tell(unit='time') == time0
-            assert np.abs(fr.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr._time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
             data2 = fr.read()
-            assert fr.tell(unit='time') == fr.time1
+            assert fr.tell(unit='time') == fr._time1
         assert np.all(data2 == data)
 
     def test_template_stream(self, tmpdir):
@@ -420,16 +420,16 @@ class TestDADA(object):
 
         with dada.open(template.format(frame_nr=1), 'rs') as fr:
             data1 = fr.read()
-            assert fr.tell(unit='time') == fr.time1
+            assert fr.tell(unit='time') == fr._time1
             assert np.abs(fr.time0 - (time0 + 4000 / (16.*u.MHz))) < 1.*u.ns
-            assert np.abs(fr.time1 - (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr._time1 - (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data1 == data[4000:8000])
 
         with dada.open(template, 'rs') as fr:
             assert fr.tell(unit='time') == time0
             data2 = fr.read()
-            assert fr.time1 == fr.tell(unit='time')
-            assert np.abs(fr.time1 -
+            assert fr._time1 == fr.tell(unit='time')
+            assert np.abs(fr._time1 -
                           (header.time + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data2 == data)
 
@@ -452,9 +452,9 @@ class TestDADA(object):
                                 3 * header.payloadsize)
         with dada.open(name3, 'rs') as fr:
             assert np.abs(fr.time0 - (time0 + 6000 / (16.*u.MHz))) < 1.*u.ns
-            assert np.abs(fr.time1 - (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr._time1 - (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
             data1 = fr.read()
-            assert fr.time1 == fr.tell(unit='time')
+            assert fr._time1 == fr.tell(unit='time')
         assert np.all(data1 == data[6000:8000])
 
         # we cannot just open using the same template, since UTC_START is
@@ -470,8 +470,8 @@ class TestDADA(object):
             assert np.abs(fr.tell(unit='time') -
                           (time0 + 6000 / (16.*u.MHz))) < 1.*u.ns
             data2 = fr.read()
-            assert fr.tell(unit='time') == fr.time1
-            assert np.abs(fr.time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert fr.tell(unit='time') == fr._time1
+            assert np.abs(fr._time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data2 == data[6000:])
 
         # just to check internal checks are OK.
