@@ -1,7 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE.rst
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-import io
+
 import pytest
 import numpy as np
 from astropy import units as u
@@ -115,24 +115,24 @@ class TestVDIFMark5B(object):
 
 class TestVDIF0VDIF1(object):
     """Conversion between EDV versions."""
-    with vdif.open(SAMPLE_MWA, 'rs', sample_rate=1.28*u.MHz) as f0:
-        h0 = f0.header0
-        d0 = f0.read(1024)
-        with io.BytesIO() as s:
+
+    def test_stream(self, tmpdir):
+        with vdif.open(SAMPLE_MWA, 'rs', sample_rate=1.28*u.MHz) as f0:
+            h0 = f0.header0
+            d0 = f0.read(1024)
             kwargs = dict(h0)
             kwargs['edv'] = 1
-            with vdif.open(s, 'ws', frames_per_second=10000, **kwargs) as f1w:
+            fl = str(tmpdir.join('test1.vdif'))
+            with vdif.open(fl, 'ws', frames_per_second=10000, **kwargs) as f1w:
                 h1w = f1w.header0
                 assert list(h1w.words[:4]) == list(h0.words[:4])
                 assert h1w.framerate == 10. * u.kHz
                 assert h1w.bandwidth == 1.28 * f0.sample_shape.nchan * u.MHz
                 f1w.write(d0)
-                f1w.fh_raw.flush()
 
-                s.seek(0)
-                with vdif.open(s, 'rs') as f1r:
-                    h1r = f1r.header0
-                    d1r = f1r.read(1024)
+            with vdif.open(fl, 'rs') as f1r:
+                h1r = f1r.header0
+                d1r = f1r.read(1024)
                 assert h1r.words[:4] == h0.words[:4]
                 assert h1r.framerate == 10. * u.kHz
                 assert h1r.bandwidth == 1.28 * f0.sample_shape.nchan * u.MHz
@@ -215,26 +215,25 @@ class TestVDIF3ToMark5B(object):
         header = mark5b.Mark5BHeader.fromvalues(time=vh.time)
         assert header.time == vh.time
 
-    def test_stream(self):
+    def test_stream(self, tmpdir):
         with vdif.open(SAMPLE_VDIF, 'rs') as fr:
             vh = fr.header0
             data = fr.read(20000)  # enough to fill two Mark 5B frames.
 
-        with io.BytesIO() as s, mark5b.open(s, 'ws', nchan=data.shape[1],
-                                            bps=vh.bps, time=vh.time,
-                                            sample_rate=vh.bandwidth*2) as fw:
+        fl = str(tmpdir.join('test.m5b'))
+        with mark5b.open(fl, 'ws', nchan=data.shape[1], bps=vh.bps,
+                         time=vh.time, sample_rate=vh.bandwidth*2) as fw:
             fw.write(data)
-            fw.fh_raw.flush()
-            s.seek(0)
-            with vdif.open(SAMPLE_VDIF, 'rs') as fv, mark5b.open(
-                    s, 'rs', nchan=8, bps=2, ref_mjd=57000,
-                    sample_rate=32.*u.MHz) as fm:
-                assert fv.header0.time == fm.header0.time
-                dv = fv.read(20000)
-                dm = fm.read(20000)
-                assert np.all(dm == dv)
-                assert fm.offset == fv.offset
-                assert fm.tell(unit='time') == fv.tell(unit='time')
+
+        with vdif.open(SAMPLE_VDIF, 'rs') as fv, mark5b.open(
+                fl, 'rs', nchan=8, bps=2, ref_mjd=57000,
+                sample_rate=32.*u.MHz) as fm:
+            assert fv.header0.time == fm.header0.time
+            dv = fv.read(20000)
+            dm = fm.read(20000)
+            assert np.all(dm == dv)
+            assert fm.offset == fv.offset
+            assert fm.tell(unit='time') == fv.tell(unit='time')
 
 
 class TestMark4ToVDIF1(object):
@@ -255,54 +254,54 @@ class TestMark4ToVDIF1(object):
             bandwidth=16.*u.MHz, payloadsize=640*2//8, complex_data=False)
         assert abs(header.time - m4h.time) < 2. * u.ns
 
-    def test_stream(self):
+    def test_stream(self, tmpdir):
         with mark4.open(SAMPLE_M4, 'rs', ntrack=64, decade=2010,
                         sample_rate=32.*u.MHz) as fr:
-            m4h = fr.header0
-            header = vdif.VDIFHeader.fromvalues(
-                edv=1, bps=m4h.bps, nchan=1, station='Ar', time=m4h.time,
+            m4header0 = fr.header0
+            time0 = fr.time0
+            vheader0 = vdif.VDIFHeader.fromvalues(
+                edv=1, bps=m4header0.bps, nchan=1, station='Ar', time=time0,
                 bandwidth=16.*u.MHz, payloadsize=640*2//8, complex_data=False)
-            assert abs(header.time - m4h.time) < 2. * u.ns
+            assert abs(vheader0.time - time0) < 2. * u.ns
             data = fr.read(80000)  # full Mark 4 frame
+            offset1 = fr.tell()
             time1 = fr.tell(unit='time')
+            number_of_bytes = fr.fh_raw.tell() - 0xa88
 
-        with io.BytesIO() as s, vdif.open(s, 'ws', nthread=data.shape[1],
-                                          header=header) as fw:
-            assert (fw.tell(unit='time') - header.time) < 2. * u.ns
+        with open(SAMPLE_M4, 'rb') as fh:
+            fh.seek(0xa88)
+            orig_bytes = fh.read(number_of_bytes)
+
+        fl = str(tmpdir.join('test.vdif'))
+        with vdif.open(fl, 'ws', nthread=data.shape[1], header=vheader0) as fw:
+            assert (fw.tell(unit='time') - time0) < 2. * u.ns
             # Write first VDIF frame, matching Mark 4 Header, hence invalid.
             fw.write(data[:160], invalid_data=True)
             # Write remaining VDIF frames, with valid data.
             fw.write(data[160:])
             assert (fw.tell(unit='time') - time1) < 2. * u.ns
-            fw.fh_raw.flush()
-            s.seek(0)
-            with mark4.open(SAMPLE_M4, 'rs', ntrack=64, decade=2010,
-                            sample_rate=32.*u.MHz) as fm, vdif.open(
-                                s, 'rs') as fv:
-                assert abs(fm.header0.time - fv.header0.time) < 2. * u.ns
-                dm = fm.read(80000)
-                dv = fv.read(80000)
-                assert np.all(dm == dv)
-                assert fm.offset == fv.offset
-                assert (abs(fm.tell(unit='time') - fv.tell(unit='time')) <
-                        2.*u.ns)
 
-                # Convert VDIF file back to Mark 4, and check byte-for-byte.
-                hv = fv.header0
-                with io.BytesIO() as s2, mark4.open(
-                        s2, 'ws', sample_rate=hv.bandwidth*2,
-                        time=hv.time, ntrack=64, bps=2, fanout=4,
-                        bcd_headstack1=0x3344, bcd_headstack2=0x1122,
-                        lsb_output=True, system_id=108) as fw:
-                    fw.write(dv)
-                    number_of_bytes = s2.tell()
-                    fm_raw = fm.fh_raw
-                    assert number_of_bytes == fm_raw.tell() - 0xa88
-                    s2.seek(0)
-                    fm_raw.seek(0xa88)
-                    orig_bytes = fm_raw.read(number_of_bytes)
-                    conv_bytes = s2.read(number_of_bytes)
-                    assert orig_bytes == conv_bytes
+        with vdif.open(fl, 'rs') as fv:
+            expected = vheader0.copy()
+            expected['invalid_data'] = True
+            assert fv.header0 == expected
+            assert abs(fv.header0.time - time0) < 2. * u.ns
+            dv = fv.read(80000)
+            assert np.all(dv == data)
+            assert fv.offset == offset1
+            assert abs(fv.tell(unit='time') - time1) < 2.*u.ns
+
+        # Convert VDIF file back to Mark 4, and check byte-for-byte.
+        fl2 = str(tmpdir.join('test.m4'))
+        with mark4.open(fl2, 'ws', sample_rate=vheader0.bandwidth*2,
+                        time=vheader0.time, ntrack=64, bps=2, fanout=4,
+                        system_id=108) as fw:
+            fw.write(dv)
+
+        with open(fl2, 'rb') as fh:
+            conv_bytes = fh.read()
+            assert len(conv_bytes) == len(conv_bytes)
+            assert orig_bytes == conv_bytes
 
 
 class TestDADAToVDIF1(object):
