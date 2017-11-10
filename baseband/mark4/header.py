@@ -389,23 +389,20 @@ class Mark4Header(Mark4TrackHeader):
         ----------
         ntrack : int
             Number of Mark 4 bitstreams.
-        decade : int, or None
+        decade : int, optional
             Decade the observations were taken (needed to remove ambiguity in
-            the Mark 4 time stamp).
+            the Mark 4 time stamp; not needed if a ``time`` is given).
         **kwargs :
             Values used to initialize header keys or methods.
 
         --- Header keywords : (minimum for a complete header)
 
         time : `~astropy.time.Time` instance
-            Sets bcd-encoded unit year, day, hour, minute, second, fraction,
-            as well as the decade.
+            Time of the first sample.
         bps : int
             Bits per sample.
         fanout : int
-            Number of tracks over which a given channel is spread out. Together
-            with ``ntrack`` and ``bps``, this defines ``headstack_id``,
-            ``track_id``, ``fan_out``, ``magnitude_bit``, and ``converter_id``.
+            Number of tracks over which a given channel is spread out.
         """
         # set defaults based on ntrack for cases where it is known.
         if ntrack == 64:
@@ -414,7 +411,8 @@ class Mark4Header(Mark4TrackHeader):
         elif ntrack == 32:
             kwargs.setdefault('headstack_id', np.zeros(32, dtype=int))
             kwargs.setdefault('track_id', np.arange(2, 34))
-        # set number of sidebands to default if no information is given.
+        # set number of sidebands to default if no information is given,
+        # so that the header will be valid.
         if not any(key in kwargs for key in ('lsb_output', 'converter_id',
                                              'converter')):
             kwargs.setdefault('nsb', 1)
@@ -576,9 +574,18 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def converters(self):
-        """Converted ID and sideband used for each channel."""
+        """Converted ID and sideband used for each channel.
+
+        Returns a structured array with numerical 'converter' and boolean
+        'lsb' entries (where `True` means lower sideband).
+
+        Can be set with a similar structured array or a `dict`; if just an
+        an array is passed in, it will be assumed that the sideband has been
+        set beforehand (e.g., by setting ``nsb``) and that the array holds
+        the converter IDs.
+        """
         ta_ch = self.track_assignment[0, :, 0]
-        converters = np.empty(len(ta_ch), [("converter", "i4"), ("lsb", "b")])
+        converters = np.empty(len(ta_ch), [("converter", int), ("lsb", bool)])
         converters['converter'] = self['converter_id'][ta_ch]
         converters['lsb'] = self['lsb_output'][ta_ch]
         return converters
