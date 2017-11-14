@@ -75,13 +75,15 @@ class VLBIStreamBase(VLBIFileBase):
 
     @property
     def squeeze(self):
-        """If `True`, remove any dimensions of length unity from
-        arrays after decoding, and add them when encoding."""
+        """Whether data arrays have arrays with length unity removed.
+
+        If `True`, such dimensions are removed in reading, and added back in
+        writing."""
         return self._squeeze
 
     @squeeze.setter
     def squeeze(self, squeeze):
-        self._squeeze = squeeze
+        self._squeeze = bool(squeeze)
 
     @property
     def sample_shape(self):
@@ -135,12 +137,12 @@ class VLBIStreamBase(VLBIFileBase):
 
     @property
     def bps(self):
-        """Bits per sample."""
+        """Number of bits for each part (real or imaginary) of a sample."""
         return self._bps
 
     @property
     def complex_data(self):
-        """If `True`, decoded data is complex."""
+        """Whether the decoded data is complex."""
         return self._complex_data
 
     @property

@@ -258,11 +258,12 @@ class TestMark4ToVDIF1(object):
         with mark4.open(SAMPLE_M4, 'rs', ntrack=64, decade=2010,
                         sample_rate=32.*u.MHz) as fr:
             m4header0 = fr.header0
-            time0 = fr.time0
+            time_start = fr.time_start
             vheader0 = vdif.VDIFHeader.fromvalues(
-                edv=1, bps=m4header0.bps, nchan=1, station='Ar', time=time0,
-                bandwidth=16.*u.MHz, payloadsize=640*2//8, complex_data=False)
-            assert abs(vheader0.time - time0) < 2. * u.ns
+                edv=1, bps=m4header0.bps, nchan=1, station='Ar',
+                time=time_start, bandwidth=16.*u.MHz,
+                payloadsize=640*2//8, complex_data=False)
+            assert abs(vheader0.time - time_start) < 2. * u.ns
             data = fr.read(80000)  # full Mark 4 frame
             offset1 = fr.tell()
             time1 = fr.tell(unit='time')
@@ -274,7 +275,7 @@ class TestMark4ToVDIF1(object):
 
         fl = str(tmpdir.join('test.vdif'))
         with vdif.open(fl, 'ws', nthread=data.shape[1], header=vheader0) as fw:
-            assert (fw.tell(unit='time') - time0) < 2. * u.ns
+            assert (fw.tell(unit='time') - time_start) < 2. * u.ns
             # Write first VDIF frame, matching Mark 4 Header, hence invalid.
             fw.write(data[:160], invalid_data=True)
             # Write remaining VDIF frames, with valid data.
@@ -285,7 +286,7 @@ class TestMark4ToVDIF1(object):
             expected = vheader0.copy()
             expected['invalid_data'] = True
             assert fv.header0 == expected
-            assert abs(fv.header0.time - time0) < 2. * u.ns
+            assert abs(fv.header0.time - time_start) < 2. * u.ns
             dv = fv.read(80000)
             assert np.all(dv == data)
             assert fv.offset == offset1
