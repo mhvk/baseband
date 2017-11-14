@@ -360,7 +360,7 @@ class TestDADAToVDIF1(object):
             ddh = fr.header0
             dada_data = fr.read()
             offset1 = fr.tell()
-            time1 = fr.tell(unit='time')
+            time_end = fr.tell(unit='time')
 
         header = self.get_vdif_header(ddh)
         data = self.get_vdif_data(dada_data)
@@ -371,14 +371,14 @@ class TestDADAToVDIF1(object):
             assert (fw.tell(unit='time') - header.time) < 2. * u.ns
             # Write all data in since frameset, made of two frames.
             fw.write(data)
-            assert (fw.tell(unit='time') - time1) < 2. * u.ns
+            assert (fw.tell(unit='time') - time_end) < 2. * u.ns
             assert fw.offset == offset1
 
         with vdif.open(vdif_file, 'rs') as fv:
             assert abs(fv.header0.time - ddh.time) < 2. * u.ns
             dv = fv.read()
             assert fv.offset == offset1
-            assert np.abs(fv.tell(unit='time') - time1) < 2.*u.ns
+            assert np.abs(fv.tell(unit='time') - time_end) < 2.*u.ns
             vh = fv.header0
             vnthread = fv.sample_shape.nthread
         assert np.allclose(dv, data)

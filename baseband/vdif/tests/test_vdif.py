@@ -496,13 +496,13 @@ class TestVDIF(object):
             assert repr(fh).startswith('<VDIFStreamReader')
             assert fh.tell() == 0
             assert header == fh.header0
-            assert fh.time0 == fh.header0.time
-            assert abs(fh.tell(unit='time') - fh.time0) < 1. * u.ns
+            assert fh.time_start == fh.header0.time
+            assert abs(fh.tell(unit='time') - fh.time_start) < 1. * u.ns
             record = fh.read(12)
             assert fh.tell() == 12
             t12 = fh.tell(unit='time')
             s12 = 12 / fh.samples_per_frame / fh.frames_per_second * u.s
-            assert abs(t12 - fh.time0 - s12) < 1. * u.ns
+            assert abs(t12 - fh.time_start - s12) < 1. * u.ns
             fh.seek(10, 1)
             fh.tell() == 22
             fh.seek(t12)
@@ -512,9 +512,9 @@ class TestVDIF(object):
             with pytest.raises(ValueError):
                 fh.seek(0, 3)
             assert fh.size == 40000
-            assert abs(fh._time1 - fh._header1.time - u.s /
+            assert abs(fh.time_end - fh._header_last.time - u.s /
                        fh.frames_per_second) < 1. * u.ns
-            assert abs(fh._time1 - fh.time0 - u.s * fh.size /
+            assert abs(fh.time_end - fh.time_start - u.s * fh.size /
                        fh.samples_per_frame / fh.frames_per_second) < 1. * u.ns
 
         assert record.shape == (12, 8)
@@ -563,8 +563,8 @@ class TestVDIF(object):
             assert fh.header0.bps == 2
             assert fh._sample_shape.nchan == 2
             assert fh._sample_shape.nthread == 2
-            assert fh.time0 == Time('2010-01-01')
-            assert fh._time1 == fh.time0 + 1.5 * u.s
+            assert fh.time_start == Time('2010-01-01')
+            assert fh.time_end == fh.time_start + 1.5 * u.s
             fh.seek(16)
             record = fh.read(16)
         assert np.all(record == data)
@@ -621,7 +621,7 @@ class TestVDIF(object):
             with vdif.open(s, 'rs') as f2:
                 assert f2.header0 == frame.header
                 with pytest.raises(ValueError):
-                    f2._header1
+                    f2._header_last
 
     def test_io_invalid(self):
         with pytest.raises(TypeError):
@@ -666,14 +666,14 @@ def test_arochime_vdif():
         assert fh.samples_per_frame == 1
         t0 = fh.tell(unit='time')
         assert abs(t0 - Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
-        assert abs(t0 - fh.time0) < 1. * u.ns
+        assert abs(t0 - fh.time_start) < 1. * u.ns
         assert fh.header0.edv == 0
         assert fh.size == 5
         d = fh.read()
         assert d.shape == (5, 2, 1024)
         assert d.dtype.kind == 'c'
         t1 = fh.tell(unit='time')
-        assert abs(t1 - fh._time1) < 1. * u.ns
+        assert abs(t1 - fh.time_end) < 1. * u.ns
         assert abs(t1 - t0 - u.s * (fh.size / fh.samples_per_frame /
                                     fh.frames_per_second)) < 1. * u.ns
 

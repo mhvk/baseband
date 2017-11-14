@@ -273,7 +273,7 @@ class VDIFStreamBase(VLBIStreamBase):
                 "    sample_shape={s.sample_shape},\n"
                 "    complex_data={s.complex_data},"
                 " bps={h.bps}, edv={h.edv}, station={h.station},\n"
-                "    (start) time={s.time0}>"
+                "    time_start={s.time_start}>"
                 .format(s=self, h=self.header0))
 
 
@@ -321,7 +321,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
                                                squeeze)
 
     @lazyproperty
-    def _header1(self):
+    def _header_last(self):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         # Go to end of file.
@@ -333,18 +333,18 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         maximum = 2 * self._sample_shape.nthread * self.header0.framesize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
-            header1 = self.find_header(
+            header_last = self.find_header(
                 template_header=self.header0,
                 maximum=maximum, forward=False)
-            if header1 is None or raw_size - self.fh_raw.tell() > maximum:
+            if header_last is None or raw_size - self.fh_raw.tell() > maximum:
                 raise ValueError("Corrupt VDIF? No thread_id={0} frame in "
                                  "last {1} bytes."
                                  .format(self.header0['thread_id'], maximum))
 
-            found = header1['thread_id'] == self.header0['thread_id']
+            found = header_last['thread_id'] == self.header0['thread_id']
 
         self.fh_raw.seek(raw_offset)
-        return header1
+        return header_last
 
     def read(self, count=None, fill_value=0., out=None):
         """Read count samples.

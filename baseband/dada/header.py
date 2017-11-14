@@ -54,7 +54,7 @@ class DADAHeader(OrderedDict):
 
     _properties = ('payloadsize', 'framesize', 'bps', 'complex_data',
                    'sample_shape', 'bandwidth', 'sideband', 'tsamp',
-                   'samples_per_frame', 'offset', 'time0', 'time')
+                   'samples_per_frame', 'offset', 'time_start', 'time')
     """Properties accessible/usable in initialisation for all headers."""
 
     _defaults = [('HEADER', 'DADA'),
@@ -383,7 +383,7 @@ class DADAHeader(OrderedDict):
                                 self['NPOL'] * self['NCHAN'] + 7) // 8))
 
     @property
-    def time0(self):
+    def time_start(self):
         """Start time of the observation."""
         mjd_int, frac = self['MJD_START'].split('.')
         mjd_int = int(mjd_int)
@@ -391,13 +391,14 @@ class DADAHeader(OrderedDict):
         # replace '-' between date and time with a 'T' and convert to Time
         return Time(mjd_int, frac, scale='utc', format='mjd')
 
-    @time0.setter
-    def time0(self, time0):
-        time0 = Time(time0, scale='utc', format='isot', precision=9)
-        self['UTC_START'] = (time0.isot.replace('T', '-')
+    @time_start.setter
+    def time_start(self, time_start):
+        time_start = Time(time_start, scale='utc', format='isot', precision=9)
+        self['UTC_START'] = (time_start.isot.replace('T', '-')
                              .replace('.000000000', ''))
-        mjd_int = int(time0.mjd)
-        mjd_frac = (time0 - Time(mjd_int, format='mjd', scale=time0.scale)).jd
+        mjd_int = int(time_start.mjd)
+        mjd_frac = (time_start - Time(mjd_int, format='mjd',
+                                      scale=time_start.scale)).jd
         if mjd_frac < 0:
             mjd_int -= 1
             mjd_frac += 1.
@@ -407,7 +408,7 @@ class DADAHeader(OrderedDict):
     @property
     def time(self):
         """Start time the part of the observation covered by this header."""
-        return self.time0 + self.offset
+        return self.time_start + self.offset
 
     @time.setter
     def time(self, time):
@@ -421,7 +422,7 @@ class DADAHeader(OrderedDict):
         time : `~astropy.time.Time`
             Time for the first sample associated with this header.
         """
-        self.time0 = time - self.offset
+        self.time_start = time - self.offset
 
     def __eq__(self, other):
         """Whether headers have the same keys with the same values."""

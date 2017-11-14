@@ -70,12 +70,13 @@ class TestDADA(object):
         assert header3 == header
         assert header3.mutable is True
         # check attribute setting.
-        header3.time0 = header.time0 - 0.5 * u.day
-        assert np.abs(header3.time0 - (header.time0 - 0.5 * u.day)) < 1 * u.ns
+        header3.time_start = header.time_start - 0.5 * u.day
+        assert np.abs(header3.time_start -
+                      (header.time_start - 0.5 * u.day)) < 1 * u.ns
         assert np.abs(header3.time - (header.time - 0.5 * u.day)) < 1 * u.ns
         # check against rounding.
         just_below_int = Time(55000, -1e-15, format='mjd')
-        header3.time0 = just_below_int
+        header3.time_start = just_below_int
         assert header3['MJD_START'] == '54999.999999999999999'
         header3['NCHAN'] = 2
         assert header3['NCHAN'] == 2
@@ -84,7 +85,8 @@ class TestDADA(object):
         # # Try initialising with properties instead of keywords.
         # Here, we first just try the start time.
         header4 = dada.DADAHeader.fromvalues(
-            time0=header.time0, offset=header.time-header.time0,
+            time_start=header.time_start,
+            offset=header.time-header.time_start,
             bps=header.bps, complex_data=header.complex_data,
             bandwidth=header.bandwidth, sideband=header.sideband,
             samples_per_frame=header.samples_per_frame,
@@ -258,11 +260,11 @@ class TestDADA(object):
         assert frame9 == frame
 
     def test_filestreamer(self, tmpdir):
-        time0 = self.header.time
+        time_start = self.header.time
         with dada.open(SAMPLE_FILE, 'rs') as fh:
             assert fh.header0 == self.header
             assert fh.size == 16000
-            assert fh.time0 == time0
+            assert fh.time_start == time_start
             record1 = fh.read(12)
             assert fh.tell() == 12
             fh.seek(10000)
@@ -270,11 +272,12 @@ class TestDADA(object):
             record2 = fh.read(out=record2)
             assert fh.tell() == 10002
             assert np.abs(fh.tell(unit='time') -
-                          (time0 + 10002 / (16*u.MHz))) < 1. * u.ns
-            fh.seek(fh.time0 + 1000 / (16*u.MHz))
+                          (time_start + 10002 / (16*u.MHz))) < 1. * u.ns
+            fh.seek(fh.time_start + 1000 / (16*u.MHz))
             assert fh.tell() == 1000
-            assert fh._header1 == fh.header0
-            assert np.abs(fh._time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert fh._header_last == fh.header0
+            assert np.abs(fh.time_end -
+                          (time_start + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         assert record1.shape == (12, 2)
         assert np.all(record1[:3] == np.array(
@@ -290,16 +293,16 @@ class TestDADA(object):
         with dada.open(filename, 'ws', header=self.header,
                        squeeze=False) as fw:
             fw.write(self.payload.data)
-            assert fw.time0 == time0
+            assert fw.time_start == time_start
             assert np.abs(fw.tell(unit='time') -
-                          (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+                          (time_start + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         with dada.open(filename, 'rs') as fh:
             data = fh.read()
-            assert fh.time0 == time0
+            assert fh.time_start == time_start
             assert np.abs(fh.tell(unit='time') -
-                          (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
-            assert fh._time1 == fh.tell(unit='time')
+                          (time_start + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert fh.time_end == fh.tell(unit='time')
         assert np.all(data == self.payload.data.squeeze())
         # Try single polarisation, and check initialisation by header keywords.
         h = self.header
@@ -307,14 +310,14 @@ class TestDADA(object):
                        complex_data=h.complex_data, bandwidth=h.bandwidth,
                        payloadsize=32000, nthread=1, nchan=1) as fw:
             fw.write(self.payload.data[:, 0, 0])
-            assert np.abs(fw.time0 - time0) < 1.*u.ns
+            assert np.abs(fw.time_start - time_start) < 1.*u.ns
             assert np.abs(fw.tell(unit='time') -
-                          (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+                          (time_start + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         with dada.open(filename, 'rs') as fh:
             data = fh.read()
-            assert np.abs(fh.time0 - time0) < 1.*u.ns
-            assert np.abs(fh._time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fh.time_start - time_start) < 1.*u.ns
+            assert np.abs(fh.time_end - (time_start + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data == self.payload.data[:, 0, 0])
 
         # Try reading a single polarization.
@@ -374,38 +377,38 @@ class TestDADA(object):
             assert np.all(data[10:] == fwr._frame.invalid_data_value)
 
     def test_multiple_files_stream(self, tmpdir):
-        time0 = self.header.time
+        time_start = self.header.time
         data = self.payload.data.squeeze()
         header = self.header.copy()
         header.payloadsize = self.header.payloadsize // 2
         filenames = (str(tmpdir.join('a.dada')),
                      str(tmpdir.join('b.dada')))
         with dada.open(filenames, 'ws', header=header) as fw:
-            time0 = fw.time0
+            time_start = fw.time_start
             fw.write(data[:1000])
             time1000 = fw.tell(unit='time')
             fw.write(data[1000:])
             time_end = fw.tell(unit='time')
-        assert time0 == header.time
-        assert np.abs(time1000 - (time0 + 1000 / (16.*u.MHz))) < 1.*u.ns
-        assert np.abs(time_end - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+        assert time_start == header.time
+        assert np.abs(time1000 - (time_start + 1000 / (16.*u.MHz))) < 1.*u.ns
+        assert np.abs(time_end - (time_start + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         with dada.open(filenames[1], 'rs') as fr:
             assert np.abs(fr.tell(unit='time') -
-                          (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
+                          (time_start + 8000 / (16.*u.MHz))) < 1.*u.ns
             data1 = fr.read()
         assert np.all(data1 == data[8000:])
 
         with dada.open(filenames, 'rs') as fr:
-            assert fr.time0 == time0
-            assert fr.tell(unit='time') == time0
-            assert np.abs(fr._time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert fr.time_start == time_start
+            assert fr.tell(unit='time') == time_start
+            assert np.abs(fr.time_end - (time_start + 16000 / (16.*u.MHz))) < 1.*u.ns
             data2 = fr.read()
-            assert fr.tell(unit='time') == fr._time1
+            assert fr.tell(unit='time') == fr.time_end
         assert np.all(data2 == data)
 
     def test_template_stream(self, tmpdir):
-        time0 = self.header.time
+        time_start = self.header.time
         data = self.payload.data.squeeze()
         header = self.header.copy()
         header.payloadsize = self.header.payloadsize // 4
@@ -420,16 +423,18 @@ class TestDADA(object):
 
         with dada.open(template.format(frame_nr=1), 'rs') as fr:
             data1 = fr.read()
-            assert fr.tell(unit='time') == fr._time1
-            assert np.abs(fr.time0 - (time0 + 4000 / (16.*u.MHz))) < 1.*u.ns
-            assert np.abs(fr._time1 - (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
+            assert fr.tell(unit='time') == fr.time_end
+            assert np.abs(fr.time_start -
+                          (time_start + 4000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.time_end -
+                          (time_start + 8000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data1 == data[4000:8000])
 
         with dada.open(template, 'rs') as fr:
-            assert fr.tell(unit='time') == time0
+            assert fr.tell(unit='time') == time_start
             data2 = fr.read()
-            assert fr._time1 == fr.tell(unit='time')
-            assert np.abs(fr._time1 -
+            assert fr.time_end == fr.tell(unit='time')
+            assert np.abs(fr.time_end -
                           (header.time + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data2 == data)
 
@@ -439,22 +444,24 @@ class TestDADA(object):
                        .join('{utc_start}_{obs_offset:016d}.000000.dada'))
         with dada.open(template, 'ws', header=header) as fw:
             fw.write(data[:7000])
-            assert fw.time0 == header.time
+            assert fw.time_start == header.time
             assert np.abs(fw.tell(unit='time') -
-                          (time0 + 7000 / (16.*u.MHz))) < 1.*u.ns
+                          (time_start + 7000 / (16.*u.MHz))) < 1.*u.ns
             assert fw._frame_nr == 3
             fw.write(data[7000:])
             assert np.abs(fw.tell(unit='time') -
-                          (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+                          (time_start + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         name3 = template.format(utc_start=header['UTC_START'],
                                 obs_offset=header['OBS_OFFSET'] +
                                 3 * header.payloadsize)
         with dada.open(name3, 'rs') as fr:
-            assert np.abs(fr.time0 - (time0 + 6000 / (16.*u.MHz))) < 1.*u.ns
-            assert np.abs(fr._time1 - (time0 + 8000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.time_start -
+                          (time_start + 6000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.time_end -
+                          (time_start + 8000 / (16.*u.MHz))) < 1.*u.ns
             data1 = fr.read()
-            assert fr._time1 == fr.tell(unit='time')
+            assert fr.time_end == fr.tell(unit='time')
         assert np.all(data1 == data[6000:8000])
 
         # we cannot just open using the same template, since UTC_START is
@@ -468,10 +475,11 @@ class TestDADA(object):
                       FILE_SIZE=header['FILE_SIZE'])
         with dada.open(template, 'rs', **kwargs) as fr:
             assert np.abs(fr.tell(unit='time') -
-                          (time0 + 6000 / (16.*u.MHz))) < 1.*u.ns
+                          (time_start + 6000 / (16.*u.MHz))) < 1.*u.ns
             data2 = fr.read()
-            assert fr.tell(unit='time') == fr._time1
-            assert np.abs(fr._time1 - (time0 + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert fr.tell(unit='time') == fr.time_end
+            assert np.abs(fr.time_end -
+                          (time_start + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data2 == data[6000:])
 
         # just to check internal checks are OK.

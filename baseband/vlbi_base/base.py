@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 from collections import namedtuple
 from astropy import units as u
-from astropy.utils import lazyproperty
+from astropy.utils import lazyproperty, deprecated
 
 
 __all__ = ['u_sample', 'VLBIStreamBase', 'VLBIStreamReaderBase',
@@ -117,9 +117,16 @@ class VLBIStreamBase(VLBIFileBase):
         return header.time
 
     @lazyproperty
-    def time0(self):
+    def time_start(self):
         """Start time of file."""
         return self._get_time(self.header0)
+
+    @deprecated('0.X', name='time0', alternative='time_start',
+                obj_type='attribute')
+    def get_time0(self):
+        return self.time_start
+
+    time0 = property(get_time0, None, None)
 
     @property
     def header0(self):
@@ -164,7 +171,7 @@ class VLBIStreamBase(VLBIFileBase):
             return self.offset
 
         if unit == 'time':
-            return self.time0 + self.tell(unit=u.s)
+            return self.time_start + self.tell(unit=u.s)
 
         return (self.offset * u_sample).to(unit, equivalencies=[(u.s, u.Unit(
             self.samples_per_frame * self.frames_per_second * u_sample))])
@@ -181,7 +188,7 @@ class VLBIStreamBase(VLBIFileBase):
                 "    frames_per_second={s.frames_per_second},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
-                "    {t}(start) time={s.time0.isot}>"
+                "    {t}time_start={s.time_start.isot}>"
                 .format(s=self, t=('thread_ids={0}, '.format(self.thread_ids)
                                    if self.thread_ids else '')))
 
@@ -259,28 +266,35 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return max_frame + 1
 
     @lazyproperty
-    def _header1(self):
+    def _header_last(self):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek(-self.header0.framesize, 2)
-        header1 = self.find_header(template_header=self.header0,
-                                   maximum=10*self.header0.framesize,
-                                   forward=False)
+        header_last = self.find_header(template_header=self.header0,
+                                       maximum=10*self.header0.framesize,
+                                       forward=False)
         self.fh_raw.seek(raw_offset)
-        if header1 is None:
+        if header_last is None:
             raise ValueError("Corrupt VLBI frame? No frame in last {0} bytes."
                              .format(10 * self.header0.framesize))
-        return header1
+        return header_last
 
     @lazyproperty
-    def _time1(self):
+    def time_end(self):
         """Time of the sample just beyond the last one in the file."""
-        return self._get_time(self._header1) + u.s / self.frames_per_second
+        return self._get_time(self._header_last) + u.s / self.frames_per_second
+
+    @deprecated('0.X', name='time1', alternative='time_end',
+                obj_type='attribute')
+    def get_time1(self):
+        return self.time_end
+
+    time1 = property(get_time1, None, None)
 
     @property
     def size(self):
         """Number of samples in the file."""
-        return int(round((self._time1 - self.time0).to(u.s).value *
+        return int(round((self.time_end - self.time_start).to(u.s).value *
                          self.frames_per_second * self.samples_per_frame))
 
     def seek(self, offset, whence=0):
@@ -303,7 +317,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             offset = offset.__index__()
         except Exception:
             try:
-                offset = offset - self.time0
+                offset = offset - self.time_start
             except Exception:
                 pass
             else:

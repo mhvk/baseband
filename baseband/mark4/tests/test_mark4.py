@@ -319,7 +319,7 @@ class TestMark4(object):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
             header0 = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
-            time0 = header0.time
+            time_start = header0.time
             # use framesize, since header adds to payload.
             samples_per_frame = header0.framesize * 8 // 2 // 8
             frame_rate = 32. * u.MHz / samples_per_frame
@@ -331,7 +331,7 @@ class TestMark4(object):
                 except EOFError:
                     break
                 header_time = frame.header.time
-                expected = time0 + frame_nr * frame_duration
+                expected = time_start + frame_nr * frame_duration
                 assert abs(header_time - expected) < 1. * u.ns
 
     def test_find_header(self, tmpdir):
@@ -461,25 +461,25 @@ class TestMark4(object):
 
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz) as fh:
-            time0 = fh.tell(unit='time')
+            time_start = fh.tell(unit='time')
             record = fh.read()
             fh_raw_tell1 = fh.fh_raw.tell()
-            time1 = fh.tell(unit='time')
+            time_end = fh.tell(unit='time')
 
         rewritten_file = str(tmpdir.join('rewritten.m4'))
         with mark4.open(rewritten_file, 'ws', sample_rate=32*u.MHz,
-                        time=time0, ntrack=64, bps=2, fanout=4) as fw:
+                        time=time_start, ntrack=64, bps=2, fanout=4) as fw:
             # write in bits and pieces and with some invalid data as well.
             fw.write(record[:11])
             fw.write(record[11:80000])
             fw.write(record[80000:], invalid_data=True)
-            assert fw.tell(unit='time') == time1
+            assert fw.tell(unit='time') == time_end
 
         with mark4.open(rewritten_file, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz, thread_ids=[3, 4]) as fh:
-            assert fh.tell(unit='time') == time0
+            assert fh.tell(unit='time') == time_start
             record2 = fh.read(160000)
-            assert fh.tell(unit='time') == time1
+            assert fh.tell(unit='time') == time_end
             assert np.all(record2[:80000] == record[:80000, 3:5])
             assert np.all(record2[80000:] == 0.)
 
@@ -522,7 +522,7 @@ class TestMark4(object):
             assert np.all(out.squeeze() == record[:12, 0])
 
         with mark4.open(str(tmpdir.join('test.m4')), 'ws',
-                        sample_rate=32*u.MHz, time=time0,
+                        sample_rate=32*u.MHz, time=time_start,
                         ntrack=64, bps=1, fanout=4) as fw:
             assert fw.sample_shape == (16,)
             assert fw.sample_shape.nchan == 16
@@ -560,7 +560,7 @@ class TestMark4(object):
                             sample_rate=32*u.MHz) as f2:
                 assert f2.header0 == frame.header
                 with pytest.raises(ValueError):
-                    f2._header1
+                    f2._header_last
 
     def test_stream_invalid(self):
         with pytest.raises(ValueError):
@@ -594,8 +594,8 @@ class Test32TrackFanout4():
                         frames_per_second=400) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 80000
-            time0 = fh.time0
-            assert time0.yday == '2015:011:01:23:10.48500'
+            time_start = fh.time_start
+            assert time_start.yday == '2015:011:01:23:10.48500'
             record = fh.read(160000)
             fh_raw_tell1 = fh.fh_raw.tell()
             assert fh_raw_tell1 == 169656
@@ -617,7 +617,7 @@ class Test32TrackFanout4():
         # Note: this test would not work if we wrote only a single record.
         with mark4.open(fl, 'rs', ntrack=32, decade=2010,
                         frames_per_second=400) as fh:
-            assert fh.time0 == time0
+            assert fh.time_start == time_start
             record2 = fh.read(1000)
             assert np.all(record2 == record[:1000])
 
@@ -655,8 +655,8 @@ class Test32TrackFanout2():
                         frames_per_second=400) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 40000
-            time0 = fh.time0
-            assert time0.yday == '2017:063:04:42:26.02500'
+            time_start = fh.time_start
+            assert time_start.yday == '2017:063:04:42:26.02500'
             record = fh.read(80000)
             fh_raw_tell1 = fh.fh_raw.tell()
             assert fh_raw_tell1 == 160000 + 17436
@@ -678,7 +678,7 @@ class Test32TrackFanout2():
         # Note: this test would not work if we wrote only a single record.
         with mark4.open(fl, 'rs', ntrack=32, decade=2010,
                         frames_per_second=400) as fh:
-            assert fh.time0 == time0
+            assert fh.time_start == time_start
             record2 = fh.read(1000)
             assert np.all(record2 == record[:1000])
 

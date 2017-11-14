@@ -111,7 +111,7 @@ We can access information about the file by printing ``fh``::
         frames_per_second=1600, samples_per_frame=20000,
         sample_shape=SampleShape(nthread=8),
         complex_data=False, bps=2, edv=3, station=65532,
-        (start) time=2014-06-16T05:56:07.000000000>
+        time_start=2014-06-16T05:56:07.000000000>
 
 The ``offset`` gives the current location of the sample file pointer - it's at
 ``24`` since we have just read in 24 (complete) samples.  If we called
@@ -188,10 +188,13 @@ ignored.
     36000
     >>> fh.close()
 
-We can retrieve the time of the first sample in the file using ``time0``::
+We can retrieve the time of the first sample in the file using ``time_start``,
+and the time immediately after the last sample using ``time_end``::
 
-    >>> fh.time0
+    >>> fh.time_start
     <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.000000000>
+    >>> fh.time_end
+    <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.001250000>
 
 Extracting Header Information
 -----------------------------
@@ -293,9 +296,9 @@ be necessary for compatibility with `DSPSR
     ...                nthread=1, nchan=fr.sample_shape.nthread,
     ...                frames_per_second=fr.frames_per_second,
     ...                samples_per_frame=fr.samples_per_frame // 8,
-    ...                complex_data=fr.complex_data,
-    ...                bps=fr.bps, edv=fr.header0.edv,
-    ...                station=fr.header0.station, time=fr.time0)
+    ...                complex_data=fr.complex_data, bps=fr.bps,
+    ...                edv=fr.header0.edv, station=fr.header0.station,
+    ...                time=fr.time_start)
 
 The minimal parameters needed to generate a file are listed under the
 documentation for each format's ``open``, though comprehensive lists can be
@@ -363,7 +366,7 @@ values into `vdif.open <baseband.vdif.open>` to create one.
     >>> fw = vdif.open('m4convert.vdif', 'ws', edv=1, nthread=1,
     ...                samples_per_frame=spf, nchan=fr.sample_shape.nchan,
     ...                frames_per_second=fps, complex_data=fr.complex_data, 
-    ...                bps=fr.bps, time=fr.time0)
+    ...                bps=fr.bps, time=fr.time_start)
 
 We choose ``edv = 1`` since it's the simplest VDIF EDV whose header includes a
 frame rate. The concept of threads does not exist in Mark 4, so the file
