@@ -279,6 +279,15 @@ class TestDADA(object):
             assert fh._last_header == fh.header0
             assert np.abs(fh.stop_time -
                           (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
+            # Test seeker works with both int and str values for whence
+            assert fh.seek(13, 0) == fh.seek(13, 'start')
+            assert fh.seek(-13, 2) == fh.seek(-13, 'end')
+            fhseek_int = fh.seek(17, 1)
+            fh.seek(-17, 'current')
+            fhseek_str = fh.seek(17, 'current')
+            assert fhseek_int == fhseek_str
+            with pytest.raises(ValueError):
+                fh.seek(0, 'last')
 
         assert record1.shape == (12, 2)
         assert np.all(record1[:3] == np.array(
