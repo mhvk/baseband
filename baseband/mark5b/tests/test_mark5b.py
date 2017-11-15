@@ -228,7 +228,8 @@ class TestMark5B(object):
                 except EOFError:
                     break
                 header_time = frame.header.time
-                expected = start_time + frame.header['frame_nr'] * frame_duration
+                expected = (start_time +
+                            frame.header['frame_nr'] * frame_duration)
                 assert abs(header_time - expected) < 1. * u.ns
 
         # On the last frame, also check one can recover the time if 'frac_sec'
@@ -323,6 +324,15 @@ class TestMark5B(object):
             fh.seek(-10, 2)
             assert fh.tell() == fh.size - 10
             record3 = fh.read()
+            # Test seeker works with both int and str values for whence
+            assert fh.seek(13, 0) == fh.seek(13, 'start')
+            assert fh.seek(-13, 2) == fh.seek(-13, 'end')
+            fhseek_int = fh.seek(17, 1)
+            fh.seek(-17, 'current')
+            fhseek_str = fh.seek(17, 'current')
+            assert fhseek_int == fhseek_str
+            with pytest.raises(ValueError):
+                fh.seek(0, 'last')
 
         assert header_last['frame_nr'] == 3
         assert header_last['user'] == header['user']
