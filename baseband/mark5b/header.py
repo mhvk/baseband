@@ -44,9 +44,9 @@ class Mark5BHeader(VLBIHeaderBase):
     words : tuple of int, or None
         Eight (or four for legacy VDIF) 32-bit unsigned int header words.
         If ``None``, set to a tuple of zeros for later initialisation.
-    ref_mjd : float, or None
-        MJD within 500 days of the observation time, used to infer the
-        full MJD from the time information in the header (which only has
+    ref_mjd : int, or None
+        Reference MJD within 500 days of the observation time, used to infer
+        the full MJD from the time information in the header (which only has
         last 3 digits of the MJD).
     kday : int, or None
         Explicit thousands of MJD.
@@ -82,12 +82,12 @@ class Mark5BHeader(VLBIHeaderBase):
         elif ref_mjd is not None:
             ref_kday, ref_jday = divmod(ref_mjd, 1000)
             if words is None:
-                jday = 0.
+                jday = 0
             else:
                 # self is not yet initialised, so get jday from words directly
                 jday = bcd_decode(
                     self._header_parser.parsers['bcd_jday'](words))
-            self.kday = int(ref_kday + round((ref_jday - jday)/1000)) * 1000
+            self.kday = int(ref_kday + round((ref_jday - jday) / 1000)) * 1000
         super(Mark5BHeader, self).__init__(words, verify=verify, **kwargs)
 
     def verify(self):

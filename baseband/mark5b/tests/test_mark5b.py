@@ -178,10 +178,10 @@ class TestMark5B(object):
 
     def test_frame(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            header = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
+            header = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000)
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
             fh.seek(0)
-            frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
+            frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000)
 
         assert frame.header == header
         assert frame.payload == payload
@@ -193,7 +193,7 @@ class TestMark5B(object):
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
-            frame2 = mark5b.Mark5BFrame.fromfile(s, ref_mjd=57000.,
+            frame2 = mark5b.Mark5BFrame.fromfile(s, ref_mjd=57000,
                                                  nchan=frame.shape[1],
                                                  bps=frame.payload.bps)
         assert frame2 == frame
@@ -216,7 +216,7 @@ class TestMark5B(object):
 
     def test_header_times(self):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
+            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000)
             start_time = header0.time
             samples_per_frame = header0.payloadsize * 8 // 2 // 8
             frame_rate = 32. * u.MHz / samples_per_frame
@@ -224,7 +224,7 @@ class TestMark5B(object):
             fh.seek(0)
             while True:
                 try:
-                    frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
+                    frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000)
                 except EOFError:
                     break
                 header_time = frame.header.time
@@ -254,7 +254,7 @@ class TestMark5B(object):
         # since otherwise they run *very* slow.  This is somehow related to
         # pytest, since speed is not a big issue running stuff on its own.
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
+            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000)
             fh.seek(0)
             header_0 = fh.find_header(template_header=header0)
             assert fh.tell() == 0
@@ -266,7 +266,8 @@ class TestMark5B(object):
             header_16b = fh.find_header(template_header=header0, forward=False)
             assert fh.tell() == 0
             fh.seek(-10000, 2)
-            header_m10000b = fh.find_header(template_header=header0,
+            header_m10000b = fh.find_header(kday=header0.kday,
+                                            framesize=header0.framesize,
                                             forward=False)
             assert fh.tell() == 3 * header0.framesize
             fh.seek(-30, 2)
@@ -282,7 +283,8 @@ class TestMark5B(object):
             s.write(f.read())
         with mark5b.open(m5_test, 'rb') as fh:
             fh.seek(0)
-            header_0 = fh.find_header(template_header=header0)
+            header_0 = fh.find_header(kday=header0.kday,
+                                      framesize=header0.framesize)
             assert fh.tell() == 0
             fh.seek(10000)
             header_10000f = fh.find_header(template_header=header0,
@@ -318,9 +320,8 @@ class TestMark5B(object):
             assert fh.fh_raw.tell() == 3. * header.framesize
             assert fh.current_time == fh.tell(unit='time')
             assert np.abs(fh.current_time -
-                          (fh.start_time + 10002 / (32*u.MHz))) < 1. * u.ns
-            fh.seek(fh.start_time + 1000 / (32*u.MHz))
-            assert fh.tell() == 1000
+                          (fh.start_time + 10002 / (32 * u.MHz))) < 1. * u.ns
+            fh.seek(fh.start_time + 1000 / (32 * u.MHz))
             fh.seek(-10, 2)
             assert fh.tell() == fh.size - 10
             record3 = fh.read()
@@ -351,6 +352,19 @@ class TestMark5B(object):
                       np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
                                 [-1, +1, -3, +3, -3, +1, +3, +1]]))
         assert record3.shape == (10, 8)
+
+        # Check passing a time object into ref_mjd.
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                         sample_rate=32*u.MHz,
+                         ref_mjd=Time('2015-01-01')) as fh:
+            assert fh.header0 == header
+            assert fh._header_last == header_last
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                         sample_rate=32*u.MHz,
+                         ref_mjd=Time('2013-01-01')) as fh:
+            assert fh.header0 == header
+            assert fh._header_last == header_last
+
         # Read only some selected threads.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2, thread_ids=[4, 5],
                          sample_rate=32*u.MHz, ref_mjd=57000) as fh:

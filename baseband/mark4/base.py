@@ -149,6 +149,29 @@ class Mark4FileReader(VLBIFileBase):
 
         Read the header at that location and return it.
         The file pointer is left at the start of the header.
+
+        Parameters
+        ----------
+        template_header : :class:`~baseband.mark4.Mark4Header`, optional
+            Template Mark 4 header, from which `ntrack` and `decade` are
+            extracted.
+        ntrack : int, optional
+            Number of tracks used to store the data.  Required if
+            ``template_header`` is ``None``.
+        decade : int, optional
+            Decade the observations were taken (needed to remove ambiguity in
+            the Mark 4 time stamp).  Required if ``template_header`` is
+            ``None``.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default is twice the
+            framesize.
+        forward : bool, optional
+            Seek forward if ``True`` (default), backward if ``False``.
+
+        Returns
+        -------
+        header : :class:`~baseband.mark4.Mark4Header`, or None
+            Retrieved Mark 4 header, or ``None`` if nothing found.
         """
         if template_header is not None:
             ntrack = template_header.ntrack
@@ -201,8 +224,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     ntrack : int
         Number of tracks used to store the data.
     decade : int, or `~astropy.time.Time`
-        Year rounded to decade, to remove ambiguities in the time stamps.
-        By default, it will be inferred from the file creation date.
+        Decade the observations were taken (needed to remove ambiguity in the
+        Mark 4 time stamp).
     thread_ids: list of int, optional
         Specific threads/channels to read.  By default, all are read.
     frames_per_second : int, optional
@@ -223,6 +246,11 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
         self.offset0 = self.find_frame(ntrack=ntrack)
+        # If decade is an astropy.time.Time object, extract decade.
+        try:
+            decade = decade.__index__()
+        except AttributeError:
+            decade = 10 * (decade.datetime.year // 10)
         self._frame = self.read_frame(ntrack, decade)
         self._frame_data = None
         self._frame_nr = None

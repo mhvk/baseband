@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division, print_function,
 import pytest
 import numpy as np
 from astropy import units as u
+from astropy.time import Time
 from astropy.tests.helper import catch_warnings
 from ... import mark4
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
@@ -352,12 +353,14 @@ class TestMark4(object):
                                             forward=True)
             assert fh.tell() == 0xa88 + header0.framesize
             fh.seek(0xa87)
-            header_0xa87b = fh.find_header(template_header=header0,
+            header_0xa87b = fh.find_header(ntrack=header0.ntrack,
+                                           decade=header0.decade,
                                            forward=False)
             assert header_0xa87b is None
             assert fh.tell() == 0xa87
             fh.seek(0xa88)
-            header_0xa88f = fh.find_header(template_header=header0)
+            header_0xa88f = fh.find_header(ntrack=header0.ntrack,
+                                           decade=header0.decade)
             assert fh.tell() == 0xa88
             fh.seek(0xa88)
             header_0xa88b = fh.find_header(template_header=header0,
@@ -458,6 +461,14 @@ class TestMark4(object):
         assert record2.shape == (2, 8)
         assert np.all(record2[0] == 0.)
         assert not np.any(record2[1] == 0.)
+
+        # Check passing a time object into decade.
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64,
+                        decade=Time('2018:364:23:59:59')) as fh:
+            assert header == fh.header0
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64,
+                        decade=Time(56039.5, format='mjd')) as fh:
+            assert header == fh.header0
 
         # Test if _get_frame_rate automatic frame rate calculator works,
         # returns same header and payload info.
