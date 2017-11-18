@@ -21,13 +21,12 @@ class TestVDIFMark5B(object):
     def test_header(self):
         """Check Mark 5B header information can be stored in a VDIF header."""
         with open(SAMPLE_M5B, 'rb') as fh:
-            # A rough start time is needed for Mark 5B to calculate time.
-            ref_mjd = Time('2014-06-01').mjd
-            m5h1 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=ref_mjd)
+            # start time kiloday is needed for Mark 5B to calculate time.
+            m5h1 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             # For the payload, pass in how data is encoded.
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
             # A not-at-the-start header for checking times.
-            m5h2 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=ref_mjd)
+            m5h2 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
         # Create VDIF headers based on both the Mark 5B header and payload.
         header1 = vdif.VDIFHeader.from_mark5b_header(
             m5h1, nchan=m5pl.sample_shape.nchan, bps=m5pl.bps)
@@ -75,7 +74,7 @@ class TestVDIFMark5B(object):
         """Check Mark 5B payloads can used in a Mark5B VDIF payload."""
         # Get Mark 5B header, payload, and construct VDIF header, as above.
         with open(SAMPLE_M5B, 'rb') as fh:
-            m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
+            m5h = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
         header = vdif.VDIFHeader.from_mark5b_header(
             m5h, nchan=m5pl.sample_shape.nchan, bps=m5pl.bps)
@@ -101,7 +100,8 @@ class TestVDIFMark5B(object):
         with mark5b.open(SAMPLE_M5B, 'rb') as fh:
             # pick second frame just to be different from header checks above.
             fh.seek(10016)
-            m5f = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
+            m5f = fh.read_frame(nchan=8, bps=2,
+                                ref_time=Time(57000, format='mjd'))
         assert m5f['frame_nr'] == 1
         frame = vdif.VDIFFrame.from_mark5b_frame(m5f)
         assert frame.size == 10032
@@ -144,7 +144,7 @@ class TestMark5BToVDIF3(object):
 
     def test_header(self):
         with open(SAMPLE_M5B, 'rb') as fh:
-            m5h = mark5b.Mark5BHeader.fromfile(fh, Time('2014-06-01').mjd)
+            m5h = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
         # check that we have enough information to create VDIF EDV 3 header.
         header = vdif.VDIFHeader.fromvalues(
@@ -158,7 +158,7 @@ class TestMark5BToVDIF3(object):
         # self-describe this.  Furthermore, we need to pass in a rough time,
         # and the rate at which samples were taken, so that absolute times can
         # be calculated.
-        with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, ref_mjd=57000,
+        with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, kday=56000,
                          sample_rate=32.*u.MHz) as fr:
             m5h = fr.header0
             # create VDIF header from Mark 5B stream information.
@@ -178,7 +178,7 @@ class TestMark5BToVDIF3(object):
             assert (fw.tell(unit='time') - time1) < 2. * u.ns
 
         # check two files contain same information.
-        with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, ref_mjd=57000,
+        with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, kday=56000,
                          sample_rate=32.*u.MHz) as fm, vdif.open(vdif_file,
                                                                  'rs') as fv:
             assert fm.header0.time == fv.header0.time
@@ -226,7 +226,7 @@ class TestVDIF3ToMark5B(object):
             fw.write(data)
 
         with vdif.open(SAMPLE_VDIF, 'rs') as fv, mark5b.open(
-                fl, 'rs', nchan=8, bps=2, ref_mjd=57000,
+                fl, 'rs', nchan=8, bps=2, ref_time=Time(57000, format='mjd'),
                 sample_rate=32.*u.MHz) as fm:
             assert fv.header0.time == fm.header0.time
             dv = fv.read(20000)

@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division, print_function,
 import pytest
 import numpy as np
 from astropy import units as u
+from astropy.time import Time
 from astropy.tests.helper import catch_warnings
 from ... import mark4
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
@@ -103,11 +104,20 @@ class TestMark4(object):
             system_id=108)
         assert header4 == header
         assert header4.mutable is True
-        # Check decade.
-        header5 = mark4.Mark4Header(header.words, decade=2015)
-        assert header5.time == header.time
-        header6 = mark4.Mark4Header(header.words, decade=2019)
-        assert header6.time == header.time
+        # Check that passing a year into decade leads to an error.
+        with pytest.raises(AssertionError):
+            mark4.Mark4Header(header.words, decade=2014)
+        # Check that passing approximate ref_time is equivalent to passing a
+        # decade.
+        with open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            header5 = mark4.Mark4Header.fromfile(
+                fh, ntrack=64, ref_time=Time('2010:351:12:00:00.0'))
+            assert header5 == header
+            fh.seek(0xa88)
+            header6 = mark4.Mark4Header.fromfile(
+                fh, ntrack=64, ref_time=Time('2018:113:16:30:00.0'))
+            assert header6 == header
         # Check changing properties.
         header7 = header.copy()
         assert header7 == header
@@ -158,18 +168,43 @@ class TestMark4(object):
         assert header10 == header9
         header11 = Mark4TrackHeader.fromvalues(decade=2010, **header9)
         assert header11 == header9
-        with pytest.raises(AssertionError):  # missing decade
-            Mark4TrackHeader.fromvalues(**header9)
+        # Check passing decade=None still reads the header, and we can set
+        # decade afterward.
+        with open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            header12 = mark4.Mark4Header.fromfile(fh, ntrack=64)
+            assert header12.decade is None
+            header12.decade = 2010
+            assert header12 == header
         with pytest.raises(IndexError):
             header[65]
         with pytest.raises(ValueError):
             header[np.array([[0, 1], [2, 3]])]
         # check that one can construct crazy headers, even if not much works.
-        header12 = mark4.Mark4Header(None, ntrack=53, decade=2010,
+        header13 = mark4.Mark4Header(None, ntrack=53, decade=2010,
                                      verify=False)
-        header12.time = header.time
-        assert header12.ntrack == 53
-        assert abs(header12.time - header.time) < 1. * u.ns
+        header13.time = header.time
+        assert header13.ntrack == 53
+        assert abs(header13.time - header.time) < 1. * u.ns
+
+    def test_infer_decade(self):
+        # Check that infer_decade returns proper decade for
+        # ref_time.year - 5 < year <= ref_time.year + 5.
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2014:1:12:00:00'), 5)
+        assert decade == 2010
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2009:362:19:27:33'), 5)
+        assert decade == 2000
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2009:362:19:27:33'), 3)
+        assert decade == 2010
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2018:117:6:42:15'), 2)
+        assert decade == 2020
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2018:117:6:42:15'), 4)
+        assert decade == 2010
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
@@ -316,6 +351,19 @@ class TestMark4(object):
         with pytest.raises(IndexError):
             frame[10:20]
 
+        # Check passing in a reference time.
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            frame6 = fh.read_frame(ntrack=64,
+                                   ref_time=Time('2009:345:15:00:00'))
+            assert frame6 == frame
+
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            frame7 = fh.read_frame(ntrack=64,
+                                   ref_time=Time('2019:1:9:00:00'))
+            assert frame7 == frame
+
     def test_header_times(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
@@ -353,12 +401,14 @@ class TestMark4(object):
                                             forward=True)
             assert fh.tell() == 0xa88 + header0.framesize
             fh.seek(0xa87)
-            header_0xa87b = fh.find_header(template_header=header0,
+            header_0xa87b = fh.find_header(ntrack=header0.ntrack,
+                                           decade=header0.decade,
                                            forward=False)
             assert header_0xa87b is None
             assert fh.tell() == 0xa87
             fh.seek(0xa88)
-            header_0xa88f = fh.find_header(template_header=header0)
+            header_0xa88f = fh.find_header(ntrack=header0.ntrack,
+                                           decade=header0.decade)
             assert fh.tell() == 0xa88
             fh.seek(0xa88)
             header_0xa88b = fh.find_header(template_header=header0,
@@ -487,6 +537,14 @@ class TestMark4(object):
         assert np.all(record2[0] == 0.)
         assert not np.any(record2[1] == 0.)
 
+        # Check passing a time object into decade.
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64,
+                        ref_time=Time('2018:364:23:59:59')) as fh:
+            assert header == fh.header0
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64,
+                        ref_time=Time(56039.5, format='mjd')) as fh:
+            assert header == fh.header0
+
         # Test if _get_frame_rate automatic frame rate calculator works,
         # returns same header and payload info.
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fh:
@@ -525,10 +583,10 @@ class TestMark4(object):
                         sample_rate=32*u.MHz, thread_ids=[3, 4]) as fh:
             assert fh.time == start_time
             assert fh.time == fh.tell(unit='time')
-            record2 = fh.read(160000)
+            record5 = fh.read(160000)
             assert fh.time == stop_time
-            assert np.all(record2[:80000] == record[:80000, 3:5])
-            assert np.all(record2[80000:] == 0.)
+            assert np.all(record5[:80000] == record[:80000, 3:5])
+            assert np.all(record5[80000:] == 0.)
 
         # Check files can be made byte-for-byte identical.  Here, we use the
         # original header so we set stuff like head_stack, etc.
@@ -573,6 +631,24 @@ class TestMark4(object):
                         ntrack=64, bps=1, fanout=4) as fw:
             assert fw.sample_shape == (16,)
             assert fw.sample_shape.nchan == 16
+
+        # Test writing across decades.
+        start_time = Time('2019:365:23:59:59.9975', precision=9)
+        decadal_file = str(tmpdir.join('decade.m4'))
+        with mark4.open(decadal_file, 'ws', sample_rate=32*u.MHz,
+                        time=start_time, ntrack=64, bps=2, fanout=4) as fw:
+            # write in bits and pieces and with some invalid data as well.
+            fw.write(record)
+
+        with mark4.open(decadal_file, 'rs', ntrack=64, decade=2010,
+                        sample_rate=32*u.MHz) as fh:
+            assert abs(fh.start_time - start_time) < 1. * u.ns
+            assert fh.header0.decade == 2010
+            record6 = fh.read()
+            assert np.all(record6 == record)
+            assert (abs(fh.time - Time('2020:1:00:00:00.0025', precision=9)) <
+                    1. * u.ns)
+            assert fh._frame.header.decade == 2020
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.

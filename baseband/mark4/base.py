@@ -1,5 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE.rst
 import numpy as np
+from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase)
@@ -22,16 +23,19 @@ class Mark4FileReader(VLBIFileBase):
     Adds ``read_frame`` and ``find_frame`` methods to the VLBI file wrapper.
     """
 
-    def read_frame(self, ntrack, decade):
+    def read_frame(self, ntrack, decade=None, ref_time=None):
         """Read a single frame (header plus payload).
 
         Parameters
         ----------
         ntrack : int
             Number of Mark 4 bitstreams.
-        decade : int
-            Decade the observations were taken (needed to remove ambiguity in
-            the Mark 4 time stamp).
+        decade : int, or None, optional
+            Decade in which the observations were taken.  Can instead pass an
+            approximate `ref_time`.
+        ref_time : `~astropy.time.Time`, or None, optional
+            Reference time within 4 years of the observation time.  Used only
+            if `decade` is ``None``.
 
         Returns
         -------
@@ -40,7 +44,8 @@ class Mark4FileReader(VLBIFileBase):
             :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
             respectively.
         """
-        return Mark4Frame.fromfile(self.fh_raw, ntrack=ntrack, decade=decade)
+        return Mark4Frame.fromfile(self.fh_raw, ntrack, decade=decade,
+                                   ref_time=ref_time)
 
     def find_frame(self, ntrack, maximum=None, forward=True):
         """Look for the first occurrence of a frame, from the current position.
@@ -186,9 +191,9 @@ class Mark4FileReader(VLBIFileBase):
             Number of tracks used to store the data.  Required if
             ``template_header`` is ``None``.
         decade : int, optional
-            Decade the observations were taken (needed to remove ambiguity in
-            the Mark 4 time stamp).  Required if ``template_header`` is
-            ``None``.
+            Decade in which the observations were taken, needed to remove
+            ambiguity in the Mark 4 time stamp.  Required if
+            ``template_header`` is ``None``.
         maximum : int, optional
             Maximum number of bytes to search through.  Default is twice the
             framesize.
@@ -206,8 +211,7 @@ class Mark4FileReader(VLBIFileBase):
         offset = self.find_frame(ntrack, maximum, forward)
         if offset is None:
             return None
-        header = Mark4Header.fromfile(self.fh_raw, ntrack=ntrack,
-                                      decade=decade)
+        header = Mark4Header.fromfile(self.fh_raw, ntrack, decade=decade)
         self.fh_raw.seek(offset)
         return header
 
@@ -247,13 +251,17 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     Parameters
     ----------
     fh_raw : `~baseband.mark4.Mark4FileReader`
-        file handle to the raw Mark 4 data stream.
+        File handle to the raw Mark 4 data stream.
     ntrack : int, or None
         Number of tracks used to store the data.  If ``None``, will attempt to
         automatically detect it by scanning the file.
-    decade : int, or `~astropy.time.Time`
-        Year rounded to decade, to remove ambiguities in the time stamps.
-        By default, it will be inferred from the file creation date.
+    decade : int, or None, optional
+        Decade of the observation start time (eg. ``2010`` for 2018), needed to
+        remove ambiguity in the Mark 4 time stamp.  Can instead pass an
+        approximate `ref_time`.
+    ref_time : `~astropy.time.Time`, or None, optional
+        Reference time within 4 years of the start time of the observations.
+        Used only if `decade` is ``None``.
     thread_ids: list of int, optional
         Specific threads/channels to read.  By default, all are read.
     frames_per_second : int, optional
@@ -268,8 +276,9 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
 
     _frame_class = Mark4Frame
 
-    def __init__(self, fh_raw, ntrack=None, decade=None, thread_ids=None,
-                 frames_per_second=None, sample_rate=None, squeeze=True):
+    def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None,
+                 thread_ids=None, frames_per_second=None, sample_rate=None,
+                 squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
@@ -285,7 +294,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             assert self.offset0 is not None, (
                 "Could not find a first frame using ntrack={}. Perhaps "
                 "try ntrack=None for auto-determination.".format(ntrack))
-        self._frame = self.read_frame(ntrack, decade)
+        self._frame = self.read_frame(ntrack, decade=decade, ref_time=ref_time)
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
@@ -320,7 +329,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         Unlike VLBIStreamReaderBase._get_frame_rate, this function reads
         only two consecutive frames, extracting their timestamps to determine
         how much time has elapsed.  It will return an EOFError if there is
-        only one frame.
+        only one frame.  It cannot seek past decade increments.
         """
         oldpos = fh.tell()
         header0 = header_template.fromfile(fh, header_template.ntrack,
@@ -333,6 +342,16 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         # to 160 ms.
         tdelta = header1.ms[0] - header0.ms[0]
         return int(np.round(1000. / tdelta))
+
+    @lazyproperty
+    def _last_header(self):
+        """Last header of the file."""
+        last_header = super(Mark4StreamReader, self)._last_header
+        # decade correction.
+        header_unit_year = last_header['bcd_unit_year'][0]
+        last_header.decade = Mark4Header.infer_decade(self.header0.time,
+                                                      header_unit_year)
+        return last_header
 
     def read(self, count=None, fill_value=0., out=None):
         """Read count samples.
@@ -396,7 +415,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         frame_nr = self.offset // self.samples_per_frame
         self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
         self._frame = self.read_frame(ntrack=self.header0.ntrack,
-                                      decade=self.header0.decade)
+                                      ref_time=self.header0.time)
+        # Convert payloads to data array.
         self._frame_nr = frame_nr
 
 
@@ -501,6 +521,13 @@ open = make_opener('Mark4', globals(), doc="""
 
 ntrack : int
     Number of tracks used to store the data.
+decade : int, or None, optional
+    Decade of the observation start time (eg. ``2010`` for 2018), needed to
+    remove ambiguity in the Mark 4 time stamp.  Can instead pass an approximate
+    `ref_time`.
+ref_time : `~astropy.time.Time`, or None, optional
+    Reference time within 4 years of the start time of the observations.  Used
+    only if `decade` is ``None``.
 thread_ids: list of int, optional
     Specific threads/channels to read.  By default, all are read.
 frames_per_second : int, optional

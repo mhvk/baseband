@@ -1,5 +1,6 @@
 import numpy as np
 from astropy import units as u
+from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase, make_opener)
@@ -18,16 +19,19 @@ class Mark5BFileReader(VLBIFileBase):
     Adds ``read_frame`` and ``find_header`` methods to the VLBI file wrapper.
     """
 
-    def read_frame(self, ref_mjd, nchan, bps=2):
+    def read_frame(self, nchan, kday=None, ref_time=None, bps=2):
         """Read a single frame (header plus payload).
 
         Parameters
         ----------
-        ref_time : int
-            Used to determine the thousands in the Mark 5B header time.
-            Thus, should be within 500 days of the actual observing time.
         nchan : int
             Number of channels encoded in the payload.
+        kday : int, or None, optional
+            Explicit thousands of MJD of the observation time.  Can instead
+            pass an approximate `ref_time`.
+        ref_time : `~astropy.time.Time`, or None, optional
+            Reference time within 500 days of the observation time, used to
+            infer the full MJD.  Used only if `kday` is ``None``.
         bps : int
             Bits per sample (default=2).
 
@@ -37,15 +41,38 @@ class Mark5BFileReader(VLBIFileBase):
             With ``header`` and ``data`` properties that return the
             Mark5BHeader and data encoded in the frame, respectively.
         """
-        return Mark5BFrame.fromfile(self.fh_raw, nchan=nchan, bps=bps,
-                                    ref_mjd=ref_mjd)
+        return Mark5BFrame.fromfile(self.fh_raw, nchan, kday=kday,
+                                    ref_time=ref_time, bps=bps)
 
-    def find_header(self, template_header=None, kday=None, framesize=None,
+    def find_header(self, template_header=None, framesize=None, kday=None,
                     maximum=None, forward=True):
         """Look for the first occurrence of a frame.
 
         Search is from the current position.  If given, a template_header
         is used to initialize the framesize, as well as kday in the header.
+
+        Parameters
+        ----------
+        template_header : :class:`~baseband.mark5b.Mark5BHeader`, optional
+            Template Mark 5B header, from which `kday` and `framesize`
+            are extracted.
+        framesize : int, optional
+            Size of a frame, in bytes.  Required if `template_header` is
+            ``None``.
+        kday : int, optional
+            Explicit thousands of MJD of the observation time, used to infer
+            the full MJD.  If `template_header` and `kday` are both ``None``,
+            any header returned will have its `kday` set to ``None``.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default is twice the
+            framesize.
+        forward : bool, optional
+            Seek forward if ``True`` (default), backward if ``False``.
+
+        Returns
+        -------
+        header : :class:`~baseband.mark5b.Mark5BHeader`, or None
+            Retrieved Mark 5B header, or ``None`` if nothing found.
         """
         fh = self.fh_raw
         if template_header:
@@ -113,6 +140,7 @@ class Mark5BFileWriter(VLBIFileBase):
 
     Adds ``write_frame`` method to the VLBI binary file wrapper.
     """
+
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
 
@@ -155,9 +183,13 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         Number of threads/channels stored in the file.
     bps : int, optional
         Bits per sample.  Default: 2.
-    ref_mjd : int, or `~astropy.time.Time` instance
-        Reference MJD (rounded to thousands), to remove ambiguities in the
-        time stamps.  By default, will be inferred from the file creation date.
+    kday : int, or None, optional
+        Explicit thousands of MJD of the observation start time (eg. ``57000``
+        for MJD 57999), used to infer the full MJD from the header's time
+        information.  Can instead pass an approximate `ref_time`.
+    ref_time : `~astropy.time.Time`, or None, optional
+        Reference time within 500 days of the observation start time, used
+        to infer the full MJD.  Only used if `kday` is ``None``.
     thread_ids: list of int, optional
         Specific channels to read.  By default, all channels are read.
     frames_per_second : int, optional
@@ -172,12 +204,14 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
 
     _frame_class = Mark5BFrame
 
-    def __init__(self, fh_raw, nchan, bps=2, ref_mjd=None, thread_ids=None,
-                 frames_per_second=None, sample_rate=None, squeeze=True):
+    def __init__(self, fh_raw, nchan, bps=2, kday=None, ref_time=None,
+                 thread_ids=None, frames_per_second=None, sample_rate=None,
+                 squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
-        self._frame = self.read_frame(ref_mjd=ref_mjd, nchan=nchan, bps=bps)
+        self._frame = self.read_frame(ref_time=ref_time, kday=kday,
+                                      nchan=nchan, bps=bps)
         self._frame_data = None
         header = self._frame.header
         sample_shape = (Mark5BPayload._sample_shape_maker(len(thread_ids)) if
@@ -195,6 +229,15 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             (self._last_header.time - self.header0.time).to(u.s).value *
             self.frames_per_second)) + 1
         return n_frames * self.samples_per_frame
+
+    @lazyproperty
+    def _last_header(self):
+        """Last header of the file."""
+        last_header = super(Mark5BStreamReader, self)._last_header
+        # kday correction.
+        last_header.kday = Mark5BHeader.infer_kday(self.header0.time,
+                                                   last_header.jday)
+        return last_header
 
     def read(self, count=None, fill_value=0., out=None):
         """Read count samples.
@@ -235,13 +278,15 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         while count > 0:
             dt, frame_nr, sample_offset = self._frame_info()
             dt_expected = (self._frame.seconds - self.header0.seconds +
-                           86400 * (self._frame.jday - self.header0.jday))
+                           86400 * (self._frame.kday + self._frame.jday -
+                                    self.header0.kday - self.header0.jday))
             if(dt != dt_expected or
                frame_nr != self._frame['frame_nr']):
                 # Read relevant frame, reusing data array from previous frame.
                 self._read_frame()
                 dt_expected = (self._frame.seconds - self.header0.seconds +
-                               86400 * (self._frame.jday - self.header0.jday))
+                               86400 * (self._frame.kday + self._frame.jday -
+                                        self.header0.kday - self.header0.jday))
                 assert dt == dt_expected
                 assert frame_nr == self._frame['frame_nr']
 
@@ -264,7 +309,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     def _read_frame(self, fill_value=0.):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
-        self._frame = self.read_frame(ref_mjd=self.header0.kday,
+        self._frame = self.read_frame(ref_time=self.header0.time,
                                       nchan=self._sample_shape.nchan,
                                       bps=self.bps)
 
@@ -376,9 +421,13 @@ nchan : int
     Number of threads/channels stored in the file.
 bps : int, optional
     Bits per sample.  Default: 2.
-ref_mjd : int, or `~astropy.time.Time` instance
-    Reference MJD (rounded to thousands), to remove ambiguities in the
-    time stamps.  By default, will be inferred from the file creation date.
+kday : int, or None, optional
+    Explicit thousands of MJD of the observation start time (eg. ``57000`` for
+    MJD 57999), used to infer the full MJD from the header's time information.
+    Can instead pass an approximate `ref_time`.
+ref_time : `~astropy.time.Time`, or None, optional
+    Reference time within 500 days of the observation start time, used to infer
+    the full MJD.  Only used if `kday` is ``None``.
 thread_ids: list of int, optional
     Specific threads to read.  By default, all threads are read.
 frames_per_second : int, optional
