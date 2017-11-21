@@ -422,6 +422,33 @@ class TestMark4(object):
             assert header_100f == header0
             assert header_m1000b == header0
 
+    def test_find_frame_and_ntrack(self):
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+            offset0 = fh.find_frame(ntrack=64)
+            assert offset0 == 2696
+            fh.seek(0)
+            offset0_auto, ntrack_auto = fh.find_frame_and_ntrack()
+            assert offset0_auto == offset0
+            assert ntrack_auto == 64
+
+        with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
+            # Seek past first frame header; find second frame.
+            fh.seek(10000)
+            offset0 = fh.find_frame(ntrack=32)
+            assert offset0 == 89656
+            fh.seek(10000)
+            offset0_auto, ntrack_auto = fh.find_frame_and_ntrack()
+            assert offset0_auto == offset0
+            assert ntrack_auto == 32
+
+        with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
+            offset0 = fh.find_frame(ntrack=32)
+            assert offset0 == 17436
+            fh.seek(0)
+            offset0_auto, ntrack_auto = fh.find_frame_and_ntrack()
+            assert offset0_auto == offset0
+            assert ntrack_auto == 32
+
     def test_filestreamer(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)
@@ -478,6 +505,15 @@ class TestMark4(object):
             record3 = fh.read(642)
 
         assert np.all(record3 == record)
+
+        # Test if automatic ntrack and frame rate detectors work together.
+        with mark4.open(SAMPLE_FILE, 'rs', decade=2010) as fh:
+            assert header == fh.header0
+            assert fh.frames_per_second * fh.samples_per_frame == 32000000
+            fh.seek(80000 + 639)
+            record4 = fh.read(2)
+
+        assert np.all(record4 == record2)
 
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz) as fh:
@@ -572,14 +608,32 @@ class TestMark4(object):
                 open(str(tmpdir.join('test.m4')), 'w+b') as s:
             fh.seek(0xa88)
             frame = fh.read_frame(ntrack=64, decade=2010)
+            # Write single frame to file.
             frame.tofile(s)
+            # Now add lots of data without headers.
+            for i in range(5):
+                frame.payload.tofile(s)
+            s.seek(0)
+            # With too many payload samples for one frame, f2.find_frame
+            # will fail.
+            with pytest.raises(AssertionError):
+                f2 = mark4.open(s, 'rs', ntrack=64, decade=2010,
+                                sample_rate=32*u.MHz)
+
+        with mark4.open(SAMPLE_FILE, 'rb') as fh, \
+                open(str(tmpdir.join('test.m4')), 'w+b') as s:
+            fh.seek(0xa88)
+            frame0 = fh.read_frame(ntrack=64, decade=2010)
+            frame1 = fh.read_frame(ntrack=64, decade=2010)
+            frame0.tofile(s)
+            frame1.tofile(s)
             # now add lots of data without headers.
             for i in range(15):
-                frame.payload.tofile(s)
+                frame1.payload.tofile(s)
             s.seek(0)
             with mark4.open(s, 'rs', ntrack=64, decade=2010,
                             sample_rate=32*u.MHz) as f2:
-                assert f2.header0 == frame.header
+                assert f2.header0 == frame0.header
                 with pytest.raises(ValueError):
                     f2._header_last
 
