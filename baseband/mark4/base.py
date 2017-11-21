@@ -149,7 +149,9 @@ class Mark4FileReader(VLBIFileBase):
 
         Uses ``find_frame`` to look for the first occurrence of a frame from
         the current position while cycling through all supported ``ntrack``
-        values.
+        values.  Returns the value of ``ntrack`` for which ``find_frame`` is
+        successful (it will fail for incorrect values), alongside the
+        found frame offset.
 
         Parameters
         ----------
@@ -234,7 +236,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         file handle to the raw Mark 4 data stream.
     ntrack : int, or None
         Number of tracks used to store the data.  If ``None``, will attempt to
-        determine it by scanning the file.
+        automatically detect it by scanning the file.
     decade : int, or `~astropy.time.Time`
         Year rounded to decade, to remove ambiguities in the time stamps.
         By default, it will be inferred from the file creation date.
@@ -262,10 +264,9 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             self.offset0, ntrack = self.find_frame_and_ntrack()
         else:
             self.offset0 = self.find_frame(ntrack=ntrack)
-        if self.offset0 is None:
-            raise Exception('Could not find the first occurrence of a header.'
-                            'If automatic ntrack detection was used, try'
-                            'passing in an explicit ntrack.')
+        assert self.offset0 is not None, (
+            "Could not find the first occurrence of a header.  If automatic "
+            "ntrack detection was used, try passing in an explicit ntrack.")
         self._frame = self.read_frame(ntrack, decade)
         self._frame_data = None
         self._frame_nr = None
