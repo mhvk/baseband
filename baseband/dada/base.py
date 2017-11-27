@@ -171,7 +171,7 @@ class DADAFileWriter(VLBIFileBase):
 
 
 class DADAStreamBase(VLBIStreamBase):
-    """DADA file wrapper, which combines threads into streams.
+    """DADA file wrapper, allowing access as a stream of data.
 
     Parameters
     ----------
@@ -183,7 +183,7 @@ class DADAStreamBase(VLBIStreamBase):
         encoding, etc.
     thread_ids : list of int, optional
         Specific threads to use.  By default, as many as there are
-        polarisations ('header0["NPOL"]').
+        polarizations ('header0["NPOL"]').
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         ``sample_shape``.
@@ -209,7 +209,7 @@ class DADAStreamBase(VLBIStreamBase):
 
 
 class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
-    """DADA format stream reader.
+    """DADA format reader.
 
     This wrapper allows one to access a DADA file as a continues series of
     samples.
@@ -217,7 +217,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     Parameters
     ----------
     fh_raw : filehandle
-        file handle of the (first) raw DADA stream.
+        File handle of the (first) raw DADA stream.
     thread_ids : list of int, optional
         Specific threads to read.  By default, all threads are read.
     squeeze : bool, optional
@@ -375,7 +375,7 @@ opener = make_opener('DADA', globals(), doc="""
 thread_ids : list of int, optional
     Specific threads to read.  By default, all threads are read.
     (For DADA, the number threads equals ``header['NPOL']``, i.e.,
-    the number of polarisations.)
+    the number of polarizations.)
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.

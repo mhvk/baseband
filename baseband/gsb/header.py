@@ -167,7 +167,7 @@ class GSBHeader(VLBIHeaderBase):
                 mode = cls._mode
             else:
                 if set(kwargs.keys()) & {'gps', 'gps_time',
-                                         'seq_nr', 'sub_int'}:
+                                         'seq_nr', 'mem_block'}:
                     mode = 'phased'
                 else:
                     raise TypeError("Cannot construct a GSB header from "
@@ -180,7 +180,7 @@ class GSBHeader(VLBIHeaderBase):
             if cls._mode is not None:
                 mode = cls._mode
             else:
-                if set(kwargs.keys()) & {'gps', 'seq_nr', 'sub_int'}:
+                if set(kwargs.keys()) & {'gps', 'seq_nr', 'mem_block'}:
                     mode = 'phased'
                 else:
                     mode = 'rawdump'
@@ -254,7 +254,7 @@ class GSBPhasedHeader(GSBRawdumpHeader):
     _header_parser = GSBRawdumpHeader._header_parser + HeaderParser(
         (('gps', (7, 7, ' '.join, str_split)),
          ('seq_nr', (14, 1, int, str, 1)),
-         ('sub_int', (15, 1, int, str, 1))),
+         ('mem_block', (15, 1, int, str, 1))),
         make_parser=make_parser,
         make_setter=make_setter,
         get_default=get_default)
