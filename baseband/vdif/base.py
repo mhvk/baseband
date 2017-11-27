@@ -235,7 +235,7 @@ class VDIFFileWriter(VLBIFileBase):
 
 
 class VDIFStreamBase(VLBIStreamBase):
-    """VDIF file wrapper, which combines threads into streams."""
+    """VDIF file wrapper, allowing access as a stream of data."""
 
     _frame_class = VDIFFrame
 
@@ -286,8 +286,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 
     Parameters
     ----------
-    fh_raw : `~baseband.vdif.VDIFFileReader` instance
-        file handle of the raw VDIF stream
+    fh_raw : `~baseband.vdif.base.VDIFFileReader` instance
+        File handle of the raw VDIF stream
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
     frames_per_second : int
@@ -420,7 +420,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
 
     Parameters
     ----------
-    raw : `~baseband.vdif.VDIFFileWriter`
+    raw : `~baseband.vdif.base.VDIFFileWriter`
         Which will write filled sets of frames to storage.
     nthread : int
         Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
@@ -436,7 +436,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
         If `True` (default), ``write`` accepts squeezed arrays as input,
         and adds channel and thread dimensions if they have length unity.
     **kwargs
-        If no header is give, an attempt is made to construct the header from
+        If no header is given, an attempt is made to construct the header from
         these.  For a standard header, this would include the following.
 
     --- Header keywords : (see :meth:`~baseband.vdif.VDIFHeader.fromvalues`)
