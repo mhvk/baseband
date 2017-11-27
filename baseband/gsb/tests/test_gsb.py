@@ -44,7 +44,7 @@ class TestGSB(object):
         assert header['pc'] == h_raw[:28]
         assert header['gps'] == h_raw[29:60]
         assert header['seq_nr'] == 9980
-        assert header['sub_int'] == 4
+        assert header['mem_block'] == 4
         assert abs(header.pc_time -
                    Time('2013-07-25T19:32:51.733965')) < 1.*u.ns
         assert header.gps_time == header.time
@@ -52,7 +52,7 @@ class TestGSB(object):
                    Time('2013-07-25T19:32:51.5492352')) < 1.*u.ns
         assert header.mutable is False
         with pytest.raises(TypeError):
-            header['sub_int'] = 0
+            header['mem_block'] = 0
 
         with open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
             header.tofile(s)
@@ -75,7 +75,7 @@ class TestGSB(object):
         header4 = gsb.GSBHeader.fromvalues(time=header.time,
                                            pc_time=header.pc_time,
                                            seq_nr=header['seq_nr'],
-                                           sub_int=header['sub_int'])
+                                           mem_block=header['mem_block'])
         assert header4 == header
         assert header4.mutable is True
         header5 = header.copy()
@@ -153,7 +153,7 @@ class TestGSB(object):
         assert header2['pc'] == h2_raw[:28]
         assert header2['gps'] == h2_raw[29:60]
         assert header2['seq_nr'] == 9990
-        assert header2['sub_int'] == 6
+        assert header2['mem_block'] == 6
         assert abs(header2.pc_time -
                    Time('2013-07-25T19:32:54.250583')) < 1.*u.ns
         assert header2.gps_time == header2.time
@@ -169,7 +169,7 @@ class TestGSB(object):
         assert header3['pc'] == h3_raw[:28]
         assert header3['gps'] == h3_raw[29:60]
         assert header3['seq_nr'] == 10013
-        assert header3['sub_int'] == 5
+        assert header3['mem_block'] == 5
         assert abs(header3.pc_time -
                    Time('2013-07-25T19:33:00.038495')) < 1.*u.ns
         assert header3.gps_time == header3.time
