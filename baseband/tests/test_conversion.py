@@ -258,12 +258,12 @@ class TestMark4ToVDIF1(object):
         with mark4.open(SAMPLE_M4, 'rs', ntrack=64, decade=2010,
                         sample_rate=32.*u.MHz) as fr:
             m4header0 = fr.header0
-            time_start = fr.time_start
+            start_time = fr.start_time
             vheader0 = vdif.VDIFHeader.fromvalues(
                 edv=1, bps=m4header0.bps, nchan=1, station='Ar',
-                time=time_start, bandwidth=16.*u.MHz,
+                time=start_time, bandwidth=16.*u.MHz,
                 payloadsize=640*2//8, complex_data=False)
-            assert abs(vheader0.time - time_start) < 2. * u.ns
+            assert abs(vheader0.time - start_time) < 2. * u.ns
             data = fr.read(80000)  # full Mark 4 frame
             offset1 = fr.tell()
             time1 = fr.tell(unit='time')
@@ -275,7 +275,7 @@ class TestMark4ToVDIF1(object):
 
         fl = str(tmpdir.join('test.vdif'))
         with vdif.open(fl, 'ws', nthread=data.shape[1], header=vheader0) as fw:
-            assert (fw.tell(unit='time') - time_start) < 2. * u.ns
+            assert (fw.tell(unit='time') - start_time) < 2. * u.ns
             # Write first VDIF frame, matching Mark 4 Header, hence invalid.
             fw.write(data[:160], invalid_data=True)
             # Write remaining VDIF frames, with valid data.
@@ -286,7 +286,7 @@ class TestMark4ToVDIF1(object):
             expected = vheader0.copy()
             expected['invalid_data'] = True
             assert fv.header0 == expected
-            assert abs(fv.header0.time - time_start) < 2. * u.ns
+            assert abs(fv.header0.time - start_time) < 2. * u.ns
             dv = fv.read(80000)
             assert np.all(dv == data)
             assert fv.offset == offset1
@@ -361,7 +361,7 @@ class TestDADAToVDIF1(object):
             ddh = fr.header0
             dada_data = fr.read()
             offset1 = fr.tell()
-            time_end = fr.tell(unit='time')
+            stop_time = fr.tell(unit='time')
 
         header = self.get_vdif_header(ddh)
         data = self.get_vdif_data(dada_data)
@@ -372,14 +372,14 @@ class TestDADAToVDIF1(object):
             assert (fw.tell(unit='time') - header.time) < 2. * u.ns
             # Write all data in since frameset, made of two frames.
             fw.write(data)
-            assert (fw.tell(unit='time') - time_end) < 2. * u.ns
+            assert (fw.tell(unit='time') - stop_time) < 2. * u.ns
             assert fw.offset == offset1
 
         with vdif.open(vdif_file, 'rs') as fv:
             assert abs(fv.header0.time - ddh.time) < 2. * u.ns
             dv = fv.read()
             assert fv.offset == offset1
-            assert np.abs(fv.tell(unit='time') - time_end) < 2.*u.ns
+            assert np.abs(fv.tell(unit='time') - stop_time) < 2.*u.ns
             vh = fv.header0
             vnthread = fv.sample_shape.nthread
         assert np.allclose(dv, data)

@@ -51,7 +51,7 @@ writing is in units of samples, and provides access to header information.
     <DADAStreamReader name=... offset=0
         frames_per_second=1000.0, samples_per_frame=16000,
         sample_shape=SampleShape(npol=2), bps=8,
-        thread_ids=[0, 1], time_start=2013-07-02T01:39:20.000>
+        thread_ids=[0, 1], start_time=2013-07-02T01:39:20.000>
     >>> d = fh.read(10000)
     >>> d.shape
     (10000, 2)

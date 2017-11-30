@@ -165,7 +165,7 @@ class GSBStreamBase(VLBIStreamBase):
                 "    frames_per_second={s.frames_per_second:.3f},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
-                "    {t}time_start={s.time_start.isot}>"
+                "    {t}start_time={s.start_time.isot}>"
                 .format(s=self, dn=data_name, t=(
                     'thread_ids={0}, '.format(self.thread_ids) if
                     self.thread_ids else '')))
@@ -263,7 +263,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 self._read_frame(fill_value)
                 assert np.isclose(self._frame_nr, self.frames_per_second *
                                   (self._frame.header.time -
-                                   self.time_start).to(u.s).value)
+                                   self.start_time).to(u.s).value)
 
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)

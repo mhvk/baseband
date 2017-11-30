@@ -80,7 +80,7 @@ information::
         frames_per_second=1600, samples_per_frame=20000,
         sample_shape=SampleShape(nthread=8),
         complex_data=False, bps=2, edv=3, station=65532,
-        time_start=2014-06-16T05:56:07.000000000>
+        start_time=2014-06-16T05:56:07.000000000>
     >>> d = fh.read(12)
     >>> d.shape
     (12, 8)

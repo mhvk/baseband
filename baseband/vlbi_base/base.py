@@ -119,16 +119,21 @@ class VLBIStreamBase(VLBIFileBase):
         return header.time
 
     @lazyproperty
-    def time_start(self):
+    def start_time(self):
         """Start time of file."""
         return self._get_time(self.header0)
 
-    @deprecated('0.X', name='time0', alternative='time_start',
+    @deprecated('0.X', name='time0', alternative='start_time',
                 obj_type='attribute')
     def get_time0(self):
-        return self.time_start
+        return self.start_time
 
     time0 = property(get_time0, None, None)
+
+    @property
+    def current_time(self):
+        """Time of the current offset in file."""
+        return self.tell(unit='time')
 
     @property
     def header0(self):
@@ -173,7 +178,7 @@ class VLBIStreamBase(VLBIFileBase):
             return self.offset
 
         if unit == 'time':
-            return self.time_start + self.tell(unit=u.s)
+            return self.start_time + self.tell(unit=u.s)
 
         return (self.offset * u_sample).to(unit, equivalencies=[(u.s, u.Unit(
             self.samples_per_frame * self.frames_per_second * u_sample))])
@@ -190,7 +195,7 @@ class VLBIStreamBase(VLBIFileBase):
                 "    frames_per_second={s.frames_per_second},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
-                "    {t}time_start={s.time_start.isot}>"
+                "    {t}start_time={s.start_time.isot}>"
                 .format(s=self, t=('thread_ids={0}, '.format(self.thread_ids)
                                    if self.thread_ids else '')))
 
@@ -282,21 +287,21 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return header_last
 
     @lazyproperty
-    def time_end(self):
-        """Time of the sample just beyond the last one in the file."""
+    def stop_time(self):
+        """Time at the end of the file, just after the last sample."""
         return self._get_time(self._header_last) + u.s / self.frames_per_second
 
-    @deprecated('0.X', name='time1', alternative='time_end',
+    @deprecated('0.X', name='time1', alternative='stop_time',
                 obj_type='attribute')
     def get_time1(self):
-        return self.time_end
+        return self.stop_time
 
     time1 = property(get_time1, None, None)
 
     @property
     def size(self):
         """Number of samples in the file."""
-        return int(round((self.time_end - self.time_start).to(u.s).value *
+        return int(round((self.stop_time - self.start_time).to(u.s).value *
                          self.frames_per_second * self.samples_per_frame))
 
     def seek(self, offset, whence=0):
@@ -319,7 +324,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             offset = offset.__index__()
         except Exception:
             try:
-                offset = offset - self.time_start
+                offset = offset - self.start_time
             except Exception:
                 pass
             else:

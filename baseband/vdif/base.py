@@ -273,7 +273,7 @@ class VDIFStreamBase(VLBIStreamBase):
                 "    sample_shape={s.sample_shape},\n"
                 "    complex_data={s.complex_data},"
                 " bps={h.bps}, edv={h.edv}, station={h.station},\n"
-                "    time_start={s.time_start}>"
+                "    start_time={s.start_time}>"
                 .format(s=self, h=self.header0))
 
 
