@@ -58,9 +58,35 @@ SAMPLE_AROCHIME_VDIF = _full_path('sample_arochime.vdif')
 SAMPLE_DADA = _full_path('sample.dada')
 """DADA sample from Effelsberg, with header adapted to shortened size."""
 
-SAMPLE_GSB_HEADER = _full_path('sample_gsb.timestamp')
-"""GSB header sample from 2013/07/26 GMRT observations of PSR J1810+1744,
-adapted to shortened size.
+SAMPLE_GSB_RAWDUMP_HEADER = _full_path('gsb/sample_gsb_rawdump.timestamp')
+"""GSB rawdump header sample.
+
+First 10 header entries of node 5 rawdump data from 2015-04-27 GMRT
+observations of the Crab pulsar.
+"""
+
+SAMPLE_GSB_RAWDUMP = _full_path('gsb/sample_gsb_rawdump.dat')
+"""GSB rawdump sample.  samples_per_frame=8192
+
+First 81920 samples of node 5 rawdump data from 2015-04-27 GMRT observations of
+the Crab pulsar.
+"""
+
+SAMPLE_GSB_PHASED_HEADER = _full_path('gsb/sample_gsb_phased.timestamp')
+"""GSB phased header sample.
+
+10 header entries, starting from seq_nr=9994, from 2013-07-27 GMRT observations
+of PSR J1810+1744.
+"""
+
+SAMPLE_GSB_PHASED = ((_full_path('gsb/sample_gsb_phased.Pol-L1.dat'),
+                      _full_path('gsb/sample_gsb_phased.Pol-L2.dat')),
+                     (_full_path('gsb/sample_gsb_phased.Pol-R1.dat'),
+                      _full_path('gsb/sample_gsb_phased.Pol-R2.dat')))
+"""GSB phased sample.  samples_per_frame=8
+
+80 complete samples, starting from seq_nr=9994, from 2013-07-27 GMRT
+observations of PSR J1810+1744, rewritten so each frame has 8 complete samples.
 """
 
 SAMPLE_DRAO_CORRUPT = _full_path('sample_drao_corrupted.vdif')

@@ -1,55 +1,62 @@
 # Licensed under the GPLv3 - see LICENSE.rst
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
 import pytest
 import io
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from astropy.tests.helper import assert_quantity_allclose
 from ... import gsb
 from ..payload import decode_4bit, encode_4bit
-from ...data import SAMPLE_GSB_HEADER as SAMPLE_HEADER
-
-
-# Test on 2016-AUG-19, using GMRT crab data
-# sshfs login.scinet.utoronto.ca
-# /scratch2/p/pen/franzk/data/GMRT/ddtb144_04oct2015/a gmrt
-# ipython  # not python3 for scintellometry
-# from astropy import units as u
-# from baseband import gsb; from scintellometry.io import gmrt
-# gmrt_base = 'gmrt/crab-04-10-15.raw'
-# tsf = gmrt_base + '.timestamp'
-# raws = [[gmrt_base + '.Pol-' + pol + part + '.dat' for part in ('1', '2')]
-#         for pol in ('L', 'R')]
-# fh_gsb = gsb.open(tsf, raw=raws, mode='rs', bps=8, samples_per_frame=2**14,
-#                   complex_data=True, nchan=512)
-# fh_gmrt = gmrt.GMRTPhasedData(tsf, raws[0], 2**23, 512, 200./3*u.MHz,
-#                               170*u.MHz, True)
-# Note: GMRTPhasedData can only read single polarisation at a time.
-# fh_gsb.seek(2**15)
-# np.all(fh_gmrt.seek_record_read(2**25, 2048) == fh_gsb.read(2)[:, 0])
+from ...data import (SAMPLE_GSB_RAWDUMP_HEADER as SAMPLE_RAWDUMP_HEADER,
+                     SAMPLE_GSB_RAWDUMP as SAMPLE_RAWDUMP,
+                     SAMPLE_GSB_PHASED_HEADER as SAMPLE_PHASED_HEADER,
+                     SAMPLE_GSB_PHASED as SAMPLE_PHASED)
 
 
 class TestGSB(object):
-    def setup(self):
-        self.rawdump_ts = '2015 04 27 18 45 00 0.000000240'
-        self.data = np.clip(np.round(np.random.uniform(-8.5, 7.5, size=2048)),
-                            -8, 7).reshape(-1, 1)
 
-    def test_header(self, tmpdir):
-        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
+    def test_rawdump_header(self):
+        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh:
+            header = gsb.GSBHeader.fromfile(fh, verify=True)
+        assert header.mode == 'rawdump'
+        assert header['pc'] == '2015 04 27 18 45 00 0.000000240'
+        # Includes UTC offset.
+        assert abs(header.time -
+                   Time('2015-04-27T13:15:00.000000240')) < 1.*u.ns
+        header2 = gsb.GSBHeader.fromkeys(**header)
+        assert header2 == header
+        header3 = gsb.GSBHeader.fromvalues(mode='rawdump', **header2)
+        assert header3 == header2
+        with pytest.raises(TypeError):
+            gsb.GSBHeader.fromvalues(**header)
+        with pytest.raises(TypeError):
+            gsb.GSBHeader(None)
+        # Check that recovering with the actual header type works as well.
+        header4 = type(header).fromkeys(**header)
+        assert header4 == header
+        # Check that trying to initialize a phased header doesn't work.
+        with pytest.raises(KeyError):
+            gsb.header.GSBPhasedHeader.fromkeys(**header)
+        header5 = header.copy()
+        assert header5 == header
+
+    def test_phased_header(self, tmpdir):
+        with open(SAMPLE_PHASED_HEADER, 'rt') as fh:
             header = gsb.GSBHeader.fromfile(fh, verify=True)
             fh.seek(0)
             h_raw = fh.readline().strip()
         assert header.mode == 'phased'
         assert header['pc'] == h_raw[:28]
         assert header['gps'] == h_raw[29:60]
-        assert header['seq_nr'] == 9980
-        assert header['mem_block'] == 4
+        assert header['seq_nr'] == 9995
+        assert header['mem_block'] == 3
         assert abs(header.pc_time -
-                   Time('2013-07-25T19:32:51.733965')) < 1.*u.ns
+                   Time('2013-07-27T21:23:55.517535')) < 1.*u.ns
         assert header.gps_time == header.time
         assert abs(header.time -
-                   Time('2013-07-25T19:32:51.5492352')) < 1.*u.ns
+                   Time('2013-07-27T21:23:55.3241088')) < 1.*u.ns
         assert header.mutable is False
         with pytest.raises(TypeError):
             header['mem_block'] = 0
@@ -90,104 +97,98 @@ class TestGSB(object):
         with pytest.raises(ValueError):
             header5.time
 
-        # Quick checks on rawdump mode
-        header6 = gsb.GSBHeader(self.rawdump_ts.split())
-        assert header6.mode == 'rawdump'
-        assert header6['pc'] == self.rawdump_ts
-        assert abs(header6.time -
-                   Time('2015-04-27T13:15:00.000000240')) < 1. * u.ns
-        header7 = gsb.GSBHeader.fromkeys(**header6)
-        assert header7 == header6
-        header8 = gsb.GSBHeader.fromvalues(mode='rawdump', **header6)
-        assert header8 == header6
-        with pytest.raises(TypeError):
-            gsb.GSBHeader.fromvalues(**header6)
-        with pytest.raises(TypeError):
-            gsb.GSBHeader(None)
-        # Check that recovering with the actual header type works as well.
-        header9 = type(header).fromkeys(**header)
-        assert header9 == header
-        with pytest.raises(KeyError):
-            type(header).fromkeys(**header6)
-        header10 = type(header6).fromkeys(**header6)
-        assert header10 == header6
-        with pytest.raises(KeyError):
-            type(header6).fromkeys(**header)
-
     def test_rawdump_header_seek_offset(self):
-        header = gsb.GSBHeader(tuple(self.rawdump_ts.split()))
-        header_size = len(self.rawdump_ts) + 1
+        fh = open(SAMPLE_RAWDUMP_HEADER, 'rt')
+
+        header = gsb.GSBHeader.fromfile(fh, verify=True)
+        # Includes 1 trailing blank space, one carriage return.
+        header_size = header.size
+        assert header_size == len(' '.join(header.words)) + 2
         assert header.seek_offset(1) == header_size
-        assert header.seek_offset(10) == 10 * header_size
+        assert header.seek_offset(12) == 12 * header_size
+
+        # Note that text pointers can't seek from current position.
+        # Seek 2nd header.
+        fh.seek(header.seek_offset(1))
+        header1 = gsb.GSBHeader.fromfile(fh, verify=True)
+        assert abs(header1.time -
+                   Time('2015-04-27T13:15:00.251658480')) < 1.*u.ns
+
+        fh.seek(header.seek_offset(9))
+        header2 = gsb.GSBHeader.fromfile(fh, verify=True)
+        assert abs(header2.time -
+                   Time('2015-04-27T13:15:02.264924400')) < 1.*u.ns
+
+        fh.close()
 
     def test_phased_header_seek_offset(self):
-        fh = gsb.open(SAMPLE_HEADER, 'rt')
+        fh = open(SAMPLE_PHASED_HEADER, 'rt')
         header1 = gsb.GSBHeader.fromfile(fh, verify=True)
         fh.seek(0)
-        header_size = len(fh.readline())
-        # Sample file contains trailing white space
-        assert header_size - header1.seek_offset(1) == 1
-        # Check that seek_offset is working properly
-        n_1000_0 = 1000 - 9980
-        offset_to_1000_0 = header1.seek_offset(n_1000_0, size=header_size)
+        header_size = header1.size
+        assert header_size == header1.seek_offset(1)
+        assert header_size == len(fh.readline())
+        # Check that seek_offset is working properly.
+        n_1000_0 = 1000 - 9995
+        offset_to_1000_0 = header1.seek_offset(n_1000_0)
         assert offset_to_1000_0 == n_1000_0 * header_size
-        # Go to 1000
-        assert (header1.seek_offset(n_1000_0 - 1, size=header_size) ==
+        # Go to 1000.
+        assert (header1.seek_offset(n_1000_0 - 1) ==
                 (n_1000_0 - 1) * header_size + 1)
-        # Go to 100 (header decreases by 1 chr)
-        assert (header1.seek_offset(n_1000_0 - 900, size=header_size) ==
+        # Go to 100 (header decreases by 1 chr).
+        assert (header1.seek_offset(n_1000_0 - 900) ==
                 (n_1000_0 - 900) * header_size + 900)
-        # Go to 99 (header decreases by 2 chr)
-        assert (header1.seek_offset(n_1000_0 - 901, size=header_size) ==
+        # Go to 99 (header decreases by 2 chr).
+        assert (header1.seek_offset(n_1000_0 - 901) ==
                 (n_1000_0 - 901) * header_size + 902)
-        # Go to 100001
-        assert (header1.seek_offset(n_1000_0 + 99001, size=header_size) ==
+        # Go to 100001.
+        assert (header1.seek_offset(n_1000_0 + 99001) ==
                 (n_1000_0 + 99001) * header_size + 90002)
 
-        # Try retrieving headers using seek_offset
-        fh.seek(header1.seek_offset(10, size=header_size))
+        # Try retrieving headers using seek_offset.
+        fh.seek(header1.seek_offset(3))
         header2 = gsb.GSBHeader.fromfile(fh, verify=True)
-        fh.seek(10 * header_size)
+        fh.seek(3 * header_size)
         h2_raw = fh.readline().strip()
         assert header2.mode == 'phased'
         assert header2['pc'] == h2_raw[:28]
         assert header2['gps'] == h2_raw[29:60]
-        assert header2['seq_nr'] == 9990
+        assert header2['seq_nr'] == 9998
         assert header2['mem_block'] == 6
         assert abs(header2.pc_time -
-                   Time('2013-07-25T19:32:54.250583')) < 1.*u.ns
+                   Time('2013-07-27T21:23:56.272643')) < 1.*u.ns
         assert header2.gps_time == header2.time
         assert abs(header2.time -
-                   Time('2013-07-25T19:32:54.0658176')) < 1.*u.ns
+                   Time('2013-07-27T21:23:56.079083520')) < 1.*u.ns
 
-        # Retrieve beyond sequence number 10000
-        fh.seek(header1.seek_offset(33, size=header_size))
+        # Retrieve beyond sequence number 10000.
+        fh.seek(header1.seek_offset(8))
         header3 = gsb.GSBHeader.fromfile(fh, verify=True)
-        fh.seek(33 * header_size + 13)
+        fh.seek(8 * header_size + 3)
         h3_raw = fh.readline().strip()
         assert header3.mode == 'phased'
         assert header3['pc'] == h3_raw[:28]
         assert header3['gps'] == h3_raw[29:60]
-        assert header3['seq_nr'] == 10013
-        assert header3['mem_block'] == 5
+        assert header3['seq_nr'] == 10003
+        assert header3['mem_block'] == 3
         assert abs(header3.pc_time -
-                   Time('2013-07-25T19:33:00.038495')) < 1.*u.ns
+                   Time('2013-07-27T21:23:57.530805')) < 1.*u.ns
         assert header3.gps_time == header3.time
         assert abs(header3.time -
-                   Time('2013-07-25T19:32:59.85395712')) < 1.*u.ns
+                   Time('2013-07-27T21:23:57.337374720')) < 1.*u.ns
 
         fh.close()
 
     def test_header_non_gmrt(self):
-        # Assume file is non-GMRT
-        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
+        # Assume file is non-GMRT.
+        with open(SAMPLE_PHASED_HEADER, 'rt') as fh:
             header = gsb.GSBHeader.fromfile(fh, verify=True,
                                             utc_offset=0.*u.hr)
         assert abs(header.pc_time -
-                   Time('2013-07-26T01:02:51.733965')) < 1.*u.ns
+                   Time('2013-07-28T02:53:55.517535')) < 1.*u.ns
         assert header.gps_time == header.time
         assert abs(header.time -
-                   Time('2013-07-26T01:02:51.5492352')) < 1.*u.ns
+                   Time('2013-07-28T02:53:55.3241088')) < 1.*u.ns
 
     def test_decoding(self):
         """Check that 4-bit encoding works."""
@@ -206,58 +207,111 @@ class TestGSB(object):
         d2 = decode_4bit(b2)
         assert np.all(d2 == areal2)
 
-    def test_payload(self, tmpdir):
-        payload1 = gsb.GSBPayload.fromdata(self.data, bps=4)
-        assert np.all(payload1.data == self.data)
-        assert payload1.sample_shape == (1,)
-        assert payload1.sample_shape.nchan == 1
-        payload2 = gsb.GSBPayload.fromdata(self.data[:1024], bps=8)
-        assert np.all(payload2.data == self.data[:1024])
-        cmplx = self.data[::2] + 1j * self.data[1::2]
-        payload3 = gsb.GSBPayload.fromdata(cmplx, bps=4)
-        assert np.all(payload3.data == cmplx)
-        assert np.all(payload3.words == payload1.words)
-        payload4 = gsb.GSBPayload.fromdata(cmplx[:512], bps=8)
-        assert np.all(payload4.data == cmplx[:512])
-        assert np.all(payload4.words == payload2.words)
-        channelized = self.data.reshape(-1, 512)
-        payload5 = gsb.GSBPayload.fromdata(channelized, bps=4)
-        assert payload5.shape == channelized.shape
-        assert payload5.sample_shape == (512,)
-        assert payload5.sample_shape.nchan == 512
-        assert np.all(payload5.words == payload1.words)
-        with open(str(tmpdir.join('test.dat')), 'w+b') as s:
-            payload1.tofile(s)
-            s.seek(0)
-            payload6 = gsb.GSBPayload.fromfile(s, bps=4,
-                                               payloadsize=payload1.size)
-        assert np.all(payload6.words == payload1.words)
-        assert payload6 == payload1
+    def test_payload(self):
+        with open(SAMPLE_RAWDUMP, 'rb') as fh:
+            # For rawdump, payloadsize = (
+            #   8192 samples/frame * 0.5 bytes/sample)
+            payload1 = gsb.GSBPayload.fromfile(fh, payloadsize=2**12)
+            # Values from reading original raw file.
+            assert np.all(payload1.data[:20].ravel() == np.array(
+                [0., -2., -2., 0., 4., -1., -2., -1., 1., 2., -1., 1.,
+                 -1., 1., -2., 0., -1., -2., 1., -1.], dtype=np.float32))
+            assert payload1.data.shape == (8192, 1)
+            assert payload1.sample_shape == (1,)
+            assert payload1.sample_shape.nchan == 1
+            # Passing ``None`` to `payloadsize`throws an error.
+            with pytest.raises(ValueError):
+                gsb.GSBPayload.fromfile(fh, payloadsize=None)
+            payload2 = gsb.GSBPayload.fromdata(payload1.data, bps=4)
+            assert np.all(payload2.data == payload1.data)
+            payload3 = gsb.GSBPayload(payload1.words, bps=4,
+                                      sample_shape=payload1.sample_shape)
+            assert np.all(payload3.data == payload1.data)
 
-    @pytest.mark.parametrize('bps', (4, 8))
-    def test_phased_payload_minimal(self, bps, tmpdir):
-        payload = gsb.GSBPayload.fromdata(self.data[:1024*8//bps], bps=bps)
-        # create a "fake" phased payload by writing the same data to files
-        with open(str(tmpdir.join('test1.dat')), 'w+b') as s1, \
-                open(str(tmpdir.join('test2.dat')), 'w+b') as s2:
-            payload.tofile(s1)
-            payload.tofile(s2)
-            s1.seek(0)
-            s2.seek(0)
-            if bps == 4:
-                with pytest.raises(TypeError):
-                    gsb.GSBPayload.fromfile([[s1], [s2]], bps=bps,
-                                            payloadsize=payload.size)
-            else:
-                phased = gsb.GSBPayload.fromfile([[s1], [s2]], bps=bps,
-                                                 payloadsize=payload.size)
-                assert np.all(phased.data == payload.data[:, np.newaxis])
+        with open(SAMPLE_PHASED[0][0], 'rb') as fh:
+            # For 1 file in phased, payloadsize = (
+            #   4 full samples/file * 512 channels/full sample *
+            #   2 complex elements/channel * 1 bytes/element)
+            payload4 = gsb.GSBPayload.fromfile(fh, payloadsize=2**12, bps=8,
+                                               complex_data=True)
+            assert np.all(payload4.data[:20].ravel() == np.array(
+                [30. + 12.j, -1. + 8.j, 7. + 19.j, -25. - 5.j, 26. + 14.j,
+                 -9. + 0.j, -4. - 1.j, 7. + 6.j, 3. + 5.j, 1. - 2.j,
+                 1. - 5.j, 10. - 6.j, 15. - 11.j, -6. + 13.j, 7. + 0.j,
+                 -10. - 1.j, -8. + 7.j, 13. + 7.j, -1. + 1.j, 0. + 4.j],
+                dtype=np.complex64))
+            assert payload4.data.shape == (2048, 1)
+            assert payload4.sample_shape == (1,)
+            assert payload4.sample_shape.nchan == 1
+            payload5 = gsb.GSBPayload.fromdata(payload4.data, bps=8)
+            assert np.all(payload5.words == payload4.words)
+            payload6 = gsb.GSBPayload(payload4.words, bps=8, complex_data=True,
+                                      sample_shape=payload4.sample_shape)
+            assert np.all(payload6.data == payload4.data)
+
+        # Test encoding then decoding consistency via `fromdata`.
+        payload7 = gsb.payload.GSBPayload.fromdata(payload4.data.real, bps=8)
+        assert np.all(payload7.data == payload4.data.real)
+        # Encode complex data.
+        payload8 = gsb.GSBPayload.fromdata(payload4.data, bps=8)
+        assert np.all(payload8.data == payload4.data)
+        assert np.all(payload8.words == payload8.words)
+        # Encode channelized data.
+        channelized = payload4.data.reshape(-1, 512)
+        payload9 = gsb.GSBPayload.fromdata(channelized, bps=8)
+        assert payload9.shape == channelized.shape
+        assert payload9.sample_shape == (512,)
+        assert payload9.sample_shape.nchan == 512
+        assert np.all(payload9.words == payload4.words)
+
+    def test_phased_payload(self):
+        """Test passing tuple into GSBPayload.fromfile.
+
+        (Check that the same result is obtained with a set of single files.)
+        """
+        # Open tuple of tuple of binary file handles.
+        fh = [[open(thread, 'rb') for thread in pol]
+              for pol in SAMPLE_PHASED]
+        # Same payloadsize calculation as for phased in test_payload.
+        payloadsize = 2**12
+        phased = gsb.GSBPayload.fromfile(fh, bps=8, complex_data=True,
+                                         nchan=512, payloadsize=payloadsize)
+        assert phased.shape == (8, 2, 512)
+        assert phased.sample_shape == (2, 512)
+        # Open equivalent sequence of individual payloads, and extract data.
+        idata = np.empty([2, 2, 2048], dtype=np.complex64)
+        for i, pol in enumerate(SAMPLE_PHASED):
+            for j, thread in enumerate(pol):
+                with open(thread, 'rb') as ft:
+                    ftpayload = gsb.GSBPayload.fromfile(
+                        ft, payloadsize=2**12, bps=8, complex_data=True)
+                    idata[i, j] = ftpayload.data[:, 0]
+        # Channelize and merge threads.
+        idata = idata.reshape(2, 8, 512).transpose(1, 0, 2)
+        assert np.all(phased.data == idata)
+        # Raises error for incorrect bps * nchan.
+        with pytest.raises(TypeError):
+            gsb.GSBPayload.fromfile(fh, bps=4, nchan=1,
+                                    payloadsize=payloadsize)
+        # Close file handles.
+        for pol in fh:
+            for thread in pol:
+                thread.close()
 
     def test_rawdump_frame(self, tmpdir):
-        header1 = gsb.GSBHeader(self.rawdump_ts.split())
-        frame1 = gsb.GSBFrame.fromdata(self.data, header1, bps=4)
-        assert np.all(frame1.data == self.data)
-        assert frame1.size == len(self.data) // 2
+        # Load rawdump frame.
+        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as ft, \
+                open(SAMPLE_RAWDUMP, 'rb') as fraw:
+            frame1 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12, bps=4)
+        # Open sections individually.
+        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh:
+            header1 = gsb.GSBHeader.fromfile(fh, verify=True)
+        with open(SAMPLE_RAWDUMP, 'rb') as fh:
+            payload1 = gsb.GSBPayload.fromfile(fh, payloadsize=2**12)
+        # Compare the two.
+        assert header1 == frame1.header
+        assert np.all(payload1.data == frame1.payload.data)
+
         frame2 = gsb.GSBFrame(frame1.header, frame1.payload)
         assert frame2 == frame1
         with open(str(tmpdir.join('test.timestamp')), 'w+t') as sh, \
@@ -269,242 +323,281 @@ class TestGSB(object):
                                            payloadsize=frame1.size)
         assert frame3 == frame1
 
-    def test_phased_frame(self, tmpdir):
-        data = self.data.reshape(-1, 1, 2)
-        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
-            header1 = gsb.GSBHeader.fromfile(fh, verify=True)
-        frame1 = gsb.GSBFrame.fromdata(data, header1, bps=4)
-        assert frame1.shape == data.shape
-        assert np.all(frame1.data == data)
-        assert frame1.size == data.size // 2
-        cmplx = data[::2] + 1j * data[1::2]
-        frame2 = gsb.GSBFrame.fromdata(cmplx, header1, bps=4)
-        assert frame2.dtype.kind == 'c'
-        assert np.all(frame2.data == cmplx)
-        assert frame2.valid is True
-        frame2.valid = False
-        assert frame2.valid is False
-        assert np.all(frame2.data == 0.)
-        frame2.valid = True
-        assert frame2.valid is True
-        assert np.all(frame2.data == cmplx)
-        with open(str(tmpdir.join('test.timestamp')), 'w+t') as sh, \
-                open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
-                open(str(tmpdir.join('test1.dat')), 'w+b') as sp1:
-            frame1.tofile(sh, ((sp0, sp1),))
-            assert sp0.tell() == frame1.size // 2
-            assert sp1.tell() == frame1.size // 2
-            for s in sh, sp0, sp1:
-                s.flush()
-                s.seek(0)
+    def seek_phased_rawfiles(self, fraw, offset):
+        for pol in fraw:
+            for thread in pol:
+                thread.seek(offset)
 
-            frame3 = gsb.GSBFrame.fromfile(sh, ((sp0, sp1),), bps=4,
-                                           payloadsize=data.size // 4,
-                                           nchan=2)
-        assert frame3 == frame1
-        # Two polarisations, 16 channels
-        twopol = cmplx.reshape(-1, 2, 16)
-        frame4 = gsb.GSBFrame.fromdata(twopol, header1, bps=4)
-        assert frame4.size == frame1.size  # number of bytes doesn't change.
-        assert frame4.shape == twopol.shape
-        assert np.all(frame4.data == twopol)
+    def close_phased_rawfiles(self, fraw):
+        for pol in fraw:
+            for thread in pol:
+                thread.close()
+
+    def test_phased_frame(self, tmpdir):
+        # Load phased frame.
+        fraw = [[open(thread, 'rb') for thread in pol]
+                for pol in SAMPLE_PHASED]
+        with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
+            frame1 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12, bps=8,
+                                           nchan=512, complex_data=True)
+        self.seek_phased_rawfiles(fraw, 0)
+        # Open sections individually.
+        with open(SAMPLE_PHASED_HEADER, 'rt') as fh:
+            header1 = gsb.GSBHeader.fromfile(fh, verify=True)
+        payload1 = gsb.GSBPayload.fromfile(fraw, bps=8, complex_data=True,
+                                           nchan=512, payloadsize=2**12)
+        # Compare the two.
+        assert frame1.dtype.kind == 'c'
+        assert header1 == frame1.header
+        assert frame1.shape == payload1.shape
+        assert np.all(frame1.payload.data == payload1.data)
+        assert frame1.valid is True
+        frame1.valid = False
+        assert frame1.valid is False
+        assert np.all(frame1.data == 0.)
+        frame1.valid = True
+        assert frame1.valid is True
+        assert np.all(frame1.payload.data == payload1.data)
+        self.close_phased_rawfiles(fraw)
+
+        # Try only right polarization.
+        fraw = [[open(thread, 'rb') for thread in SAMPLE_PHASED[1]]]
+        with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
+            frame2 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12, bps=8,
+                                           nchan=512, complex_data=True)
+        self.seek_phased_rawfiles(fraw, 0)
+        payload2 = gsb.GSBPayload.fromfile(fraw, bps=8, complex_data=True,
+                                           nchan=512, payloadsize=2**12)
+        assert frame2.shape == payload2.shape
+        assert np.all(frame2.payload.data == payload2.data)
+        self.close_phased_rawfiles(fraw)
+
+        frame3 = gsb.GSBFrame.fromdata(payload1.data, header1, bps=8)
+        assert frame3.shape == frame1.shape
+        assert np.all(frame3.data == frame1.data)
+        # Test writing phased data to multiple files.
         with open(str(tmpdir.join('test.timestamp')), 'w+t') as sh, \
                 open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
                 open(str(tmpdir.join('test1.dat')), 'w+b') as sp1, \
                 open(str(tmpdir.join('test2.dat')), 'w+b') as sp2, \
                 open(str(tmpdir.join('test3.dat')), 'w+b') as sp3:
-            frame4.tofile(sh, ((sp0, sp1), (sp2, sp3)))
+            frame1.tofile(sh, ((sp0, sp1), (sp2, sp3)))
             for s in sp0, sp1, sp2, sp3:
-                assert s.tell() == frame4.payload.size // 4
                 s.flush()
                 s.seek(0)
             sh.flush()
             sh.seek(0)
-            frame5 = gsb.GSBFrame.fromfile(sh, ((sp0, sp1), (sp2, sp3)),
-                                           bps=4, payloadsize=data.size // 8,
-                                           complex_data=True, nchan=16)
-        assert frame5 == frame4
+            frame4 = gsb.GSBFrame.fromfile(sh, ((sp0, sp1), (sp2, sp3)),
+                                           bps=8, payloadsize=2**12,
+                                           complex_data=True, nchan=512)
+        assert frame4 == frame1
 
     def test_timestamp_io(self, tmpdir):
-        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
-            header = gsb.GSBHeader.fromfile(fh, verify=True)
-        tmpfile = str(tmpdir.join('timestamps.txt'))
-        with gsb.open(tmpfile, 'wt') as fh_w:
-            fh_w.write_timestamp(header)
-            fh_w.write_timestamp(**header)
+        """Tests GSBTimeStampIO in base.py."""
+        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh:
+            header1 = gsb.GSBHeader.fromfile(fh, verify=True)
+        testfile = str(tmpdir.join('test.timestamp'))
+        with gsb.open(testfile, 'wt') as fw:
+            fw.write_timestamp(header=header1)
+        with gsb.open(testfile, 'rt') as fh:
+            header2 = fh.read_timestamp()
+            assert header2 == header1
 
-        with gsb.open(tmpfile, 'rt') as fh_r:
-            for i in range(2):
-                header2 = fh_r.read_timestamp()
-                assert header2 == header
-
-        # check that extra arguments raise TypeError
+        # Check that extra arguments raise TypeError.
         with pytest.raises(TypeError):
-            gsb.open(tmpfile, 'rt', raw='bla')
+            gsb.open(testfile, 'rt', raw='bla')
 
     def test_rawfile_io(self, tmpdir):
-        payload = gsb.GSBPayload.fromdata(self.data, bps=4)
-        tmpfile = str(tmpdir.join('payload.bin'))
-        with gsb.open(tmpfile, 'wb') as fh_w:
-            fh_w.write_payload(payload)
-            fh_w.write_payload(payload.data, bps=payload.bps)
-
-        with gsb.open(tmpfile, 'rb') as fh_r:
-            for i in range(2):
-                payload2 = fh_r.read_payload(
-                    payload.size, bps=payload.bps,
-                    nchan=payload.sample_shape[-1],
-                    complex_data=payload.complex_data)
-                assert payload2 == payload
+        """Tests GSBFileReader and GSBFileWriter in base.py."""
+        with open(SAMPLE_RAWDUMP, 'rb') as fh:
+            payload1 = gsb.GSBPayload.fromfile(fh, payloadsize=2**12)
+        testfile = str(tmpdir.join('test.dat'))
+        with gsb.open(testfile, 'wb') as fw:
+            fw.write_payload(payload1, bps=4)
+        with gsb.open(testfile, 'rb') as fh:
+            payload2 = fh.read_payload(2**12)
+            assert payload2 == payload1
 
         # check that extra arguments raise TypeError
         with pytest.raises(TypeError):
-            gsb.open(tmpfile, 'rb', bps=2)
+            gsb.open(SAMPLE_RAWDUMP, 'rb', bps=2)
 
     def test_raw_stream(self, tmpdir):
-        header = gsb.GSBHeader(self.rawdump_ts.split())
-        payload = gsb.GSBPayload.fromdata(self.data, bps=4)
-        # Test on files here, file handles below
-        ts_file = str(tmpdir.join('ts.dat'))
-        raw_file = str(tmpdir.join('raw0.dat'))
-        with gsb.open(ts_file, 'wt') as sh:
-            sh.write_timestamp(header)
-        with open(raw_file, 'wb') as sp:
-            payload.tofile(sp)
-
-        # Open here with payloadsize given, below with samples_per_frame
-        with gsb.open(ts_file, mode='rs', raw=raw_file,
-                      payloadsize=payload.size, frames_per_second=1) as fh_r:
-            assert fh_r.header0 == header
-            data = fh_r.read()
-            assert fh_r.tell() == len(data)
-            assert_quantity_allclose(fh_r.tell(unit=u.s), 1. * u.s)
-            assert fh_r._last_header == header
-            # recheck with output array given
-            out = np.zeros_like(self.data).squeeze()
+        # Open here with payloadsize given, below with samples_per_frame.
+        with gsb.open(SAMPLE_RAWDUMP_HEADER, mode='rs', raw=SAMPLE_RAWDUMP,
+                      payloadsize=2**12, squeeze=False) as fh_r:
+            with open(SAMPLE_RAWDUMP_HEADER, 'rt') as ft, \
+                    open(SAMPLE_RAWDUMP, 'rb') as fraw:
+                frame1 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
+                                               bps=4)
+            assert fh_r.header0.time == fh_r.start_time
+            assert fh_r.header0 == frame1.header
+            assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
+            # Seek last offset.
+            with open(SAMPLE_RAWDUMP_HEADER, 'rt') as ft, \
+                    open(SAMPLE_RAWDUMP, 'rb') as fraw:
+                ft.seek(frame1.header.seek_offset(9))
+                fraw.seek(9 * fh_r._payloadsize)
+                frame10 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
+                                                bps=4)
+            assert fh_r._last_header == frame10.header
+            fh_r.seek(-10, 2)
+            assert np.all(fh_r.read(10) == frame10.data[-10:])
+            # Check validity of current and stopping time
+            assert abs(fh_r.stop_time -
+                       Time('2015-04-27T13:15:02.516582640')) < 1.*u.ns
+            assert abs(fh_r.stop_time - fh_r.time) < 1.*u.ns
             fh_r.seek(0)
-            fh_r.read(out=out)
-            # check that non-squeezed output is identical in content
-            fh_r.squeeze = False
-            out2 = np.zeros_like(self.data)
+            data1 = fh_r.read()
+            assert fh_r.tell() == len(data1)
+            assert data1.shape[0] == fh_r.size
+            fh_r.seek(0)
+            out1 = np.empty_like(data1)
+            fh_r.read(out=out1)
+            assert np.all(out1 == data1)
+            fh_r.seek(0)
+            fh_r.squeeze = True
+            out2 = np.empty((fh_r.size,) + fh_r.sample_shape)
             fh_r.seek(0)
             fh_r.read(out=out2)
-        assert np.all(data == self.data.ravel())
-        assert np.all(out == self.data.squeeze())
-        assert np.all(out2 == self.data)
+            assert np.all(out2 == out1.squeeze())
+            # To compare with directly psasing samples_per_frame below.
+            spf_from_payloadsize = fh_r.samples_per_frame
+            # For testing proper file closing below.
+            header0 = fh_r.header0
 
-        with io.open(str(tmpdir.join('test_time.dat')), 'w+b') as sh, \
-                open(str(tmpdir.join('test.dat')), 'w+b') as sp, \
-                gsb.open(sh, 'ws', raw=sp, sample_rate=4096*u.Hz,
-                         samples_per_frame=payload.nsample, **header) as fh_w:
-            fh_w.write(self.data.ravel())
-            fh_w.write(self.data.ravel())
-            assert fh_w.tell() == 2 * len(self.data)
-            assert_quantity_allclose(fh_w.tell(unit=u.s), 1. * u.s)
+        with gsb.open(SAMPLE_RAWDUMP_HEADER, mode='rs', raw=SAMPLE_RAWDUMP,
+                      samples_per_frame=2**13) as fh_r, \
+                io.open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
+                open(str(tmpdir.join('test.dat')), 'w+b') as sp:
+            fh_w = gsb.open(sh, 'ws', raw=sp, samples_per_frame=2**13,
+                            frames_per_second=fh_r.frames_per_second,
+                            header=fh_r.header0)
+            fh_w.write(fh_r.read())
             fh_w.flush()
             sh.seek(0)
             sp.seek(0)
-            with gsb.open(sh, mode='rs', raw=sp,
-                          samples_per_frame=payload.nsample) as fh_r:
-                assert fh_r.header0 == header
-                assert np.isclose(fh_r.frames_per_second, 2)
-                data = fh_r.read(len(self.data) * 2)
-                assert_quantity_allclose(
-                    (fh_r._last_header.time - fh_r.header0.time).to(u.s),
-                    u.s/fh_r.frames_per_second)
-            assert np.all(data.reshape(2, -1) == self.data.ravel())
+            fh_r.seek(0)
+            with gsb.open(sh, mode='rs', raw=sp, samples_per_frame=2**13,
+                          frames_per_second=fh_r.frames_per_second) as fh_n:
+                assert fh_n.header0 == fh_r.header0
+                assert fh_n._last_header == fh_r._last_header
+                assert fh_n.size == fh_r.size
+                assert fh_n.sample_shape == fh_r.sample_shape
+                assert fh_n.start_time == fh_r.start_time
+                assert np.all(fh_n.read() == fh_r.read())
+                assert abs(fh_n.stop_time - fh_n.time) < 1.*u.ns
+                assert abs(fh_n.stop_time - fh_r.stop_time) < 1.*u.ns
+            # Check that passing samples_per_frame is identical to passing
+            # payloadsize.
+            fh_r.seek(0)
+            assert fh_r.samples_per_frame == spf_from_payloadsize
+            assert np.all(fh_r.read() == data1.squeeze())
+            fh_w.close()
 
         # Test that opening that raises an exception correctly handles
         # file closing. (Note that the timestamp file always gets closed).
         with io.open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
                 open(str(tmpdir.join('test.dat')), 'w+b') as sp:
             with pytest.raises(u.UnitsError):
-                gsb.open(sh, 'ws', raw=sp, sample_rate=4096*u.m,
-                         samples_per_frame=payload.nsample, **header)
+                gsb.open(sh, 'ws', raw=sp, sample_rate=3.9736/u.m,
+                         samples_per_frame=2**13, **header0)
             assert not sp.closed
 
-    @pytest.mark.parametrize('bps', (4, 8))
-    def test_phased_stream(self, bps, tmpdir):
-        with gsb.open(SAMPLE_HEADER, 'rt') as fh:
-            header = gsb.GSBHeader.fromfile(fh, verify=True)
-        # Single polarisation
-        cmplx = self.data[::2] + 1j * self.data[1::2]
-        onepol = cmplx.reshape(-1, 1, 16)
-        # Test on files here, file handles below
-        ts_file = str(tmpdir.join('ts.dat'))
-        raw0_file = str(tmpdir.join('raw0.dat'))
-        raw1_file = str(tmpdir.join('raw1.dat'))
-        with gsb.open(ts_file, 'ws', raw=(raw0_file, raw1_file),
-                      bps=bps, sample_rate=256*u.Hz,
-                      samples_per_frame=onepol.shape[0] // 2,
-                      nchan=onepol.shape[2], nthread=1,
-                      complex_data=True, squeeze=False,
-                      header=header) as fh_w:
-            # Write data.
-            fh_w.write(onepol)
-            assert fh_w.sample_shape == (1, onepol.shape[2])
-            # Write data again, but reversed and squeezed
-            fh_w.squeeze = True
-            fh_w.write(onepol[::-1].squeeze())
-            assert fh_w.sample_shape == (onepol.shape[2],)
-            assert fh_w.tell() == onepol.shape[0] * 2
-            assert_quantity_allclose(fh_w.tell(unit=u.s), 0.5 * u.s)
-            assert fh_w._header['seq_nr'] == fh_w.header0['seq_nr'] + 3
-            fh_w.flush()
-            assert fh_w.fh_raw[0][0].tell() == 2048 * bps // 8
+    def test_phased_stream(self, tmpdir):
+        # Open here with payloadsize given, below with samples_per_frame.
+        with gsb.open(SAMPLE_PHASED_HEADER, mode='rs', raw=SAMPLE_PHASED,
+                      payloadsize=2**12, squeeze=False) as fh_r:
+            fraw = [[open(thread, 'rb') for thread in pol]
+                    for pol in SAMPLE_PHASED]
+            with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
+                frame1 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
+                                               bps=8, nchan=512,
+                                               complex_data=True)
+            assert fh_r.header0.time == fh_r.start_time
+            assert fh_r.header0 == frame1.header
+            assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
+            # Seek last offset.
+            with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
+                ft.seek(frame1.header.seek_offset(9))
+                self.seek_phased_rawfiles(fraw, 9 * fh_r._payloadsize)
+                frame10 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
+                                                nchan=512, bps=8,
+                                                complex_data=True)
+            assert fh_r._last_header == frame10.header
+            fh_r.seek(-8, 2)
+            assert np.all(fh_r.read(8) == frame10.data)
+            # Check validity of current and stopping time
+            assert abs(fh_r.stop_time -
+                       Time('2013-07-27T21:23:57.8406912')) < 1.*u.ns
+            assert abs(fh_r.stop_time - fh_r.time) < 1.*u.ns
+            fh_r.seek(0)
+            data1 = fh_r.read()
+            assert fh_r.tell() == len(data1)
+            assert data1.shape[0] == fh_r.size
+            fh_r.seek(0)
+            out1 = np.empty_like(data1)
+            fh_r.read(out=out1)
+            assert np.all(out1 == data1)
+            fh_r.seek(0)
+            fh_r.squeeze = True
+            out2 = np.empty((fh_r.size,) + fh_r.sample_shape,
+                            dtype=np.complex64)
+            fh_r.seek(0)
+            fh_r.read(out=out2)
+            assert np.all(out2 == out1.squeeze())
+            # To compare with directly psasing samples_per_frame below.
+            spf_from_payloadsize = fh_r.samples_per_frame
+            self.close_phased_rawfiles(fraw)
 
-        with gsb.open(ts_file, mode='rs', raw=(raw0_file, raw1_file),
-                      bps=bps, samples_per_frame=onepol.shape[0] // 2,
-                      nchan=onepol.shape[2]) as fh_r:
-            assert fh_r.header0 == header
-            assert np.isclose(fh_r.frames_per_second, 8.)
-            data = fh_r.read(onepol.shape[0] * 2)
-            assert fh_r.tell() == onepol.shape[0] * 2
-            assert (fh_r._frame.header['seq_nr'] ==
-                    fh_r.header0['seq_nr'] + 3)
-            assert_quantity_allclose(fh_r.tell(unit=u.s), 0.5 * u.s)
-            assert fh_r.fh_raw[0][0].tell() == 2048 * bps // 8
-            assert fh_r._frame.header == fh_r._last_header
+        # Try only right polarization.
+        with gsb.open(SAMPLE_PHASED_HEADER, mode='rs', raw=SAMPLE_PHASED[1],
+                      payloadsize=2**12, squeeze=False) as fh_r:
+            fraw = [[open(thread, 'rb') for thread in SAMPLE_PHASED[1]]]
+            with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
+                frame1 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
+                                               bps=8, nchan=512,
+                                               complex_data=True)
+            assert fh_r.header0.time == fh_r.start_time
+            assert fh_r.header0 == frame1.header
+            assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
+            self.close_phased_rawfiles(fraw)
 
-        assert np.all(data[:onepol.shape[0]] == onepol.squeeze())
-        assert np.all(data[onepol.shape[0]:] == onepol[::-1].squeeze())
-        # Two polarisations, 16 channels
-        twopol = cmplx.reshape(-1, 2, 16)
-        with io.open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
+        # Try writing to file by passing header keywords into open.
+        with gsb.open(SAMPLE_PHASED_HEADER, mode='rs', raw=SAMPLE_PHASED,
+                      samples_per_frame=2**3) as fh_r, \
+                io.open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
                 open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
                 open(str(tmpdir.join('test1.dat')), 'w+b') as sp1, \
                 open(str(tmpdir.join('test2.dat')), 'w+b') as sp2, \
-                open(str(tmpdir.join('test3.dat')), 'w+b') as sp3, \
-                gsb.open(sh, 'ws', raw=((sp0, sp1), (sp2, sp3)),
-                         bps=bps, sample_rate=128*u.Hz,
-                         samples_per_frame=twopol.shape[0] // 2,
-                         nchan=twopol.shape[2], nthread=twopol.shape[1],
-                         complex_data=True, header=header) as fh_w:
-            # Write data twice.
-            assert fh_w.sample_shape == (2, twopol.shape[2])
-            fh_w.write(twopol)
-            fh_w.write(twopol[::-1])
-            assert fh_w.tell() == twopol.shape[0] * 2
-            assert_quantity_allclose(fh_w.tell(unit=u.s), 0.5 * u.s)
-            assert fh_w._header['seq_nr'] == fh_w.header0['seq_nr'] + 3
+                open(str(tmpdir.join('test3.dat')), 'w+b') as sp3:
+            fraw = ((sp0, sp1), (sp2, sp3))
+            fh_w = gsb.open(sh, 'ws', raw=fraw, samples_per_frame=2**3,
+                            frames_per_second=fh_r.frames_per_second,
+                            **fh_r.header0)
+            fh_w.write(fh_r.read())
             fh_w.flush()
-            assert sp0.tell() == 1024 * bps // 8
-            for fh in sh, sp0, sp1, sp2, sp3:
-                fh.seek(0)
-            with gsb.open(sh, mode='rs', raw=((sp0, sp1), (sp2, sp3)),
-                          bps=bps, samples_per_frame=twopol.shape[0] // 2,
-                          nchan=twopol.shape[2]) as fh_r:
-                assert fh_r.header0 == header
-                assert np.isclose(fh_r.frames_per_second, 8.)
-                data = fh_r.read(twopol.shape[0] * 2)
-                assert fh_r.tell() == twopol.shape[0] * 2
-                assert (fh_r._frame.header['seq_nr'] ==
-                        fh_r.header0['seq_nr'] + 3)
-                assert_quantity_allclose(fh_r.tell(unit=u.s), 0.5 * u.s)
-                assert sp0.tell() == 1024 * bps // 8
-                assert fh_r._frame.header == fh_r._last_header
-            assert np.all(data[:twopol.shape[0]] == twopol)
-            assert np.all(data[twopol.shape[0]:] == twopol[::-1])
+            sh.seek(0)
+            self.seek_phased_rawfiles(fraw, 0)
+            fh_r.seek(0)
+            with gsb.open(sh, mode='rs', raw=fraw, samples_per_frame=2**3,
+                          frames_per_second=fh_r.frames_per_second) as fh_n:
+                assert fh_n.header0 == fh_r.header0
+                # PC time will not be the same.
+                for key in ('gps', 'seq_nr', 'mem_block'):
+                    assert fh_n._last_header[key] == fh_r._last_header[key]
+                assert fh_n.size == fh_r.size
+                assert fh_n.sample_shape == fh_r.sample_shape
+                assert fh_n.start_time == fh_r.start_time
+                assert np.all(fh_n.read() == fh_r.read())
+                assert abs(fh_n.stop_time - fh_n.time) < 1.*u.ns
+                assert abs(fh_n.stop_time - fh_r.stop_time) < 1.*u.ns
+            # Check that passing samples_per_frame is identical to passing
+            # payloadsize.
+            fh_r.seek(0)
+            assert fh_r.samples_per_frame == spf_from_payloadsize
+            assert np.all(fh_r.read() == data1)
+            fh_w.close()
 
     def test_stream_invalid(self, tmpdir):
         with pytest.raises(ValueError):
