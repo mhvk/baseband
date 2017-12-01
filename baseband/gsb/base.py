@@ -226,11 +226,10 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                  complex_data=None, samples_per_frame=None, payloadsize=None,
                  frames_per_second=None, sample_rate=None, squeeze=True):
         header0 = fh_ts.read_timestamp()
-        self._header0_size = fh_ts.tell()
         if frames_per_second is None and sample_rate is None:
             header1 = fh_ts.read_timestamp()
             assert (fh_ts.tell() ==
-                    header0.seek_offset(2, size=self._header0_size))
+                    header0.seek_offset(2))
             frames_per_second = (1. / (header1.time -
                                        header0.time).to(u.s)).value
         fh_ts.seek(0)
@@ -247,7 +246,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     def _last_header(self):
         """Last header of the timestamp file."""
         fh_ts_offset = self.fh_ts.tell()
-        from_end = 3 * self._header0_size // 2
+        from_end = 3 * self.header0.size // 2
         self.fh_ts.seek(0, 2)
         if self.fh_ts.tell() < from_end:
             # only one line in file
@@ -321,8 +320,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
     def _read_frame(self, fill_value=0., out=None):
         frame_nr = self.offset // self.samples_per_frame
-        self.fh_ts.seek(self.header0.seek_offset(frame_nr,
-                                                 size=self._header0_size))
+        self.fh_ts.seek(self.header0.seek_offset(frame_nr))
         if self.header0.mode == 'rawdump':
             self.fh_raw.seek(frame_nr * self._payloadsize)
         else:

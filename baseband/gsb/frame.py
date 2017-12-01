@@ -48,7 +48,7 @@ class GSBFrame(VLBIFrameBase):
             To the timestamp file.  The next line will be read.
         fh_raw : file_handle or tuple
             Should be a single handle for a Rawdump data frame, or a tuple
-            containing tuples with pairs of handles for a Phased data.  E.g.,
+            containing tuples with pairs of handles for phased data.  E.g.,
             ``((L1, L2), (R1, R2))`` for left and right polarisations.
         payloadsize : int
             Size of the individual payloads.  Default: 4 MiB.
