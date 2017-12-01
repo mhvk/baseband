@@ -22,9 +22,9 @@ __all__ = ['TimeGSB', 'GSBHeader', 'GSBRawdumpHeader', 'GSBPhasedHeader']
 
 
 class TimeGSB(TimeString):
-    """GSB header date-time format ``'YYYY MM DD HH MM SS.SSSSSS'``.
+    """GSB header date-time format ``'YYYY MM DD HH MM SS 0.SSSSSS'``.
 
-    For example, 2000 01 01 00 00 00.000000 is midnight on January 1, 2000.
+    For example, 2000 01 01 00 00 00 0.000000 is midnight on January 1, 2000.
     """
     # Implicitly uses the metaclass astropy.time.formats.TimeFormatMeta to
     # register with astropy.Time.
@@ -109,6 +109,10 @@ class GSBHeader(VLBIHeaderBase):
     mode : str, or None
         Mode in which data was taken: 'phased' or 'rawdump'. If not given, it
         is determined from the words.
+    size : int, or None
+        Number of characters in the header, including trailing blank spaces and
+        carriage returns.  If not given, is determined from the words assuming
+        one trailing blank space and one CR.
     verify : bool
         Whether to do basic verification of integrity.  Default: `True`.
 
@@ -120,7 +124,8 @@ class GSBHeader(VLBIHeaderBase):
     _mode = None
     _gsb_header_classes = {}
 
-    def __new__(cls, words, mode=None, utc_offset=5.5*u.hr, verify=True):
+    def __new__(cls, words, mode=None, size=None, utc_offset=5.5*u.hr,
+                verify=True):
 
         if mode is None:
             if words is None:
@@ -133,11 +138,14 @@ class GSBHeader(VLBIHeaderBase):
         # We intialise VDIFHeader subclasses, so their __init__ will be called.
         return self
 
-    def __init__(self, words, mode=None, utc_offset=5.5*u.hr, verify=True):
+    def __init__(self, words, mode=None, size=None, utc_offset=5.5*u.hr,
+                 verify=True):
         if words is None:
-            self.words = [''] * self._size
+            self.words = [''] * self._number_of_words
         else:
             self.words = words
+        if size is not None:
+            self._size = size
         if mode is not None:
             self._mode = mode
         self.utc_offset = utc_offset
@@ -146,11 +154,22 @@ class GSBHeader(VLBIHeaderBase):
 
     def verify(self):
         assert self.mode == self.__class__._mode
-        assert len(self.words) == self._size
+        assert len(self.words) == self._number_of_words
 
     @property
     def mode(self):
         return self._mode
+
+    @property
+    def size(self):
+        """Size of the header in characters.
+
+        Assumes the string terminates in one blank space and one carriage
+        return.
+        """
+        if self._size is None:
+            self._size = len(' '.join(self.words)) + 2
+        return self._size
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
@@ -159,15 +178,17 @@ class GSBHeader(VLBIHeaderBase):
         Arguments are the same as for class initialisation.  The header
         constructed will be immutable.
         """
+        start_pos = fh.tell()
         s = fh.readline()
-        return cls(tuple(s.split()), *args, **kwargs)
+        size = fh.tell() - start_pos
+        return cls(tuple(s.split()), mode=None, size=size, *args, **kwargs)
 
     def tofile(self, fh):
         """Write GSB header as a line to the filehandle."""
         return fh.write(' '.join(self.words) + '\n')
 
     @classmethod
-    def fromvalues(cls, mode=None, *args, **kwargs):
+    def fromvalues(cls, mode=None, size=None, *args, **kwargs):
         if mode is None:
             if cls._mode is not None:
                 mode = cls._mode
@@ -178,10 +199,10 @@ class GSBHeader(VLBIHeaderBase):
                 else:
                     raise TypeError("Cannot construct a GSB header from "
                                     "values without knowing the mode.")
-        return super(GSBHeader, cls).fromvalues(mode, *args, **kwargs)
+        return super(GSBHeader, cls).fromvalues(mode, size, *args, **kwargs)
 
     @classmethod
-    def fromkeys(cls, mode=None, *args, **kwargs):
+    def fromkeys(cls, mode=None, size=None, *args, **kwargs):
         if mode is None:
             if cls._mode is not None:
                 mode = cls._mode
@@ -190,7 +211,7 @@ class GSBHeader(VLBIHeaderBase):
                     mode = 'phased'
                 else:
                     mode = 'rawdump'
-        return super(GSBHeader, cls).fromkeys(mode, *args, **kwargs)
+        return super(GSBHeader, cls).fromkeys(mode, size, *args, **kwargs)
 
     def seek_offset(self, n, size=None):
         """Offset in bytes needed to move a file pointer to another header.
@@ -204,11 +225,11 @@ class GSBHeader(VLBIHeaderBase):
         n : int
             The number of headers to move to, relative to the present header.
         size : int, optional
-            The size in bytes of the present header (if not given, it will
-            be calculated assuming the termination string is a single CR).
+            The size in bytes of the present header (if not given, will use
+            the header's `size` property).
         """
         if size is None:
-            size = len(' '.join(self.words)) + 1
+            size = self.size
         return n * size
 
     def __eq__(self, other):
@@ -227,7 +248,7 @@ class GSBRawdumpHeader(GSBHeader):
     """GSB rawdump header."""
 
     _mode = 'rawdump'
-    _size = 7
+    _number_of_words = 7
     _pc_time_precision = 9
     _properties = ('pc_time', 'time')
 
@@ -255,7 +276,7 @@ class GSBPhasedHeader(GSBRawdumpHeader):
     """GSB phased header."""
 
     _mode = 'phased'
-    _size = GSBRawdumpHeader._size + 7 + 2
+    _number_of_words = GSBRawdumpHeader._number_of_words + 7 + 2
     _pc_time_precision = 6
     _properties = ('time', 'gps_time') + GSBRawdumpHeader._properties
 
@@ -299,11 +320,11 @@ class GSBPhasedHeader(GSBRawdumpHeader):
         n : int
             The number of headers to move to, relative to the present header.
         size : int, optional
-            The size in bytes of the present header (if not given, it will
-            be calculated assuming the termination string is a single CR).
+            The size in bytes of the present header (if not given, will use
+            the header's `size` property).
         """
         if size is None:
-            size = len(' '.join(self.words)) + 1
+            size = self.size
         # Initial guess assuming all headers have same size.
         guess = n * size
         # Get number of digits of current sequence number.
