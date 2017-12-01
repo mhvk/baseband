@@ -76,9 +76,9 @@ class Mark5BFrame(VLBIFrameBase):
         ----------
         fh : filehandle
             To read the header and payload from.
-        ref_mjd : float
-            MJD within 500 days of the actual observation, to resolve 1000-day
-            ambiguities in the Mark 5B timestamp.
+        ref_mjd : int
+            Reference MJD within 500 days of the observation time, used to
+            infer the full MJD from the time information in the header.
         nchan : int
             Number of channels encoded in the payload.
         bps : int

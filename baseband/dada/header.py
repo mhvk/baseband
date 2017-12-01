@@ -13,6 +13,7 @@ from collections import OrderedDict
 import astropy.units as u
 from astropy.time import Time
 from astropy.extern import six
+from astropy.utils import deprecated
 
 
 __all__ = ['DADAHeader']
@@ -54,7 +55,7 @@ class DADAHeader(OrderedDict):
 
     _properties = ('payloadsize', 'framesize', 'bps', 'complex_data',
                    'sample_shape', 'bandwidth', 'sideband', 'tsamp',
-                   'samples_per_frame', 'offset', 'time0', 'time')
+                   'samples_per_frame', 'offset', 'start_time', 'time')
     """Properties accessible/usable in initialisation for all headers."""
 
     _defaults = [('HEADER', 'DADA'),
@@ -383,7 +384,7 @@ class DADAHeader(OrderedDict):
                                 self['NPOL'] * self['NCHAN'] + 7) // 8))
 
     @property
-    def time0(self):
+    def start_time(self):
         """Start time of the observation."""
         mjd_int, frac = self['MJD_START'].split('.')
         mjd_int = int(mjd_int)
@@ -391,23 +392,31 @@ class DADAHeader(OrderedDict):
         # replace '-' between date and time with a 'T' and convert to Time
         return Time(mjd_int, frac, scale='utc', format='mjd')
 
-    @time0.setter
-    def time0(self, time0):
-        time0 = Time(time0, scale='utc', format='isot', precision=9)
-        self['UTC_START'] = (time0.isot.replace('T', '-')
+    @start_time.setter
+    def start_time(self, start_time):
+        start_time = Time(start_time, scale='utc', format='isot', precision=9)
+        self['UTC_START'] = (start_time.isot.replace('T', '-')
                              .replace('.000000000', ''))
-        mjd_int = int(time0.mjd)
-        mjd_frac = (time0 - Time(mjd_int, format='mjd', scale=time0.scale)).jd
+        mjd_int = int(start_time.mjd)
+        mjd_frac = (start_time - Time(mjd_int, format='mjd',
+                                      scale=start_time.scale)).jd
         if mjd_frac < 0:
             mjd_int -= 1
             mjd_frac += 1.
         self['MJD_START'] = ('{0:05d}'.format(mjd_int) +
                              ('{0:17.15f}'.format(mjd_frac))[1:])
 
+    @deprecated('0.X', name='time0', alternative='start_time',
+                obj_type='attribute')
+    def get_time0(self):
+        return self.start_time
+
+    time0 = property(get_time0, None, None)
+
     @property
     def time(self):
         """Start time the part of the observation covered by this header."""
-        return self.time0 + self.offset
+        return self.start_time + self.offset
 
     @time.setter
     def time(self, time):
@@ -421,7 +430,7 @@ class DADAHeader(OrderedDict):
         time : `~astropy.time.Time`
             Time for the first sample associated with this header.
         """
-        self.time0 = time - self.offset
+        self.start_time = time - self.offset
 
     def __eq__(self, other):
         """Whether headers have the same keys with the same values."""

@@ -47,7 +47,7 @@ also provides access to header information.::
     <Mark4StreamReader name=... offset=0
         frames_per_second=400, samples_per_frame=80000,
         sample_shape=SampleShape(nchan=8), bps=2,
-        (start) time=2014-06-16T07:38:12.47500>
+        start_time=2014-06-16T07:38:12.47500>
     >>> d = fh.read(6400)
     >>> d.shape
     (6400, 8)

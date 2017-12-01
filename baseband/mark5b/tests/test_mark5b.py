@@ -178,10 +178,10 @@ class TestMark5B(object):
 
     def test_frame(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            header = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
+            header = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000)
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
             fh.seek(0)
-            frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
+            frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000)
 
         assert frame.header == header
         assert frame.payload == payload
@@ -193,7 +193,7 @@ class TestMark5B(object):
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
-            frame2 = mark5b.Mark5BFrame.fromfile(s, ref_mjd=57000.,
+            frame2 = mark5b.Mark5BFrame.fromfile(s, ref_mjd=57000,
                                                  nchan=frame.shape[1],
                                                  bps=frame.payload.bps)
         assert frame2 == frame
@@ -216,19 +216,20 @@ class TestMark5B(object):
 
     def test_header_times(self):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
-            time0 = header0.time
+            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000)
+            start_time = header0.time
             samples_per_frame = header0.payloadsize * 8 // 2 // 8
             frame_rate = 32. * u.MHz / samples_per_frame
             frame_duration = 1. / frame_rate
             fh.seek(0)
             while True:
                 try:
-                    frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000.)
+                    frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000)
                 except EOFError:
                     break
                 header_time = frame.header.time
-                expected = time0 + frame.header['frame_nr'] * frame_duration
+                expected = (start_time +
+                            frame.header['frame_nr'] * frame_duration)
                 assert abs(header_time - expected) < 1. * u.ns
 
         # On the last frame, also check one can recover the time if 'frac_sec'
@@ -253,7 +254,7 @@ class TestMark5B(object):
         # since otherwise they run *very* slow.  This is somehow related to
         # pytest, since speed is not a big issue running stuff on its own.
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
+            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000)
             fh.seek(0)
             header_0 = fh.find_header(template_header=header0)
             assert fh.tell() == 0
@@ -265,7 +266,8 @@ class TestMark5B(object):
             header_16b = fh.find_header(template_header=header0, forward=False)
             assert fh.tell() == 0
             fh.seek(-10000, 2)
-            header_m10000b = fh.find_header(template_header=header0,
+            header_m10000b = fh.find_header(kday=header0.kday,
+                                            framesize=header0.framesize,
                                             forward=False)
             assert fh.tell() == 3 * header0.framesize
             fh.seek(-30, 2)
@@ -281,7 +283,8 @@ class TestMark5B(object):
             s.write(f.read())
         with mark5b.open(m5_test, 'rb') as fh:
             fh.seek(0)
-            header_0 = fh.find_header(template_header=header0)
+            header_0 = fh.find_header(kday=header0.kday,
+                                      framesize=header0.framesize)
             assert fh.tell() == 0
             fh.seek(10000)
             header_10000f = fh.find_header(template_header=header0,
@@ -307,7 +310,7 @@ class TestMark5B(object):
             assert fh.fh_raw.tell() == header.framesize
             assert fh.samples_per_frame == 5000
             assert fh.frames_per_second == 6400
-            header1 = fh.header1
+            header_last = fh._header_last
             assert fh.size == 20000
             record = fh.read(12)
             assert fh.tell() == 12
@@ -315,21 +318,30 @@ class TestMark5B(object):
             record2 = fh.read(2)
             assert fh.tell() == 10002
             assert fh.fh_raw.tell() == 3. * header.framesize
-            assert np.abs(fh.tell(unit='time') -
-                          (fh.time0 + 10002 / (32*u.MHz))) < 1. * u.ns
-            fh.seek(fh.time0 + 1000 / (32*u.MHz))
-            assert fh.tell() == 1000
+            assert fh.current_time == fh.tell(unit='time')
+            assert np.abs(fh.current_time -
+                          (fh.start_time + 10002 / (32 * u.MHz))) < 1. * u.ns
+            fh.seek(fh.start_time + 1000 / (32 * u.MHz))
             fh.seek(-10, 2)
             assert fh.tell() == fh.size - 10
             record3 = fh.read()
+            # Test seeker works with both int and str values for whence
+            assert fh.seek(13, 0) == fh.seek(13, 'start')
+            assert fh.seek(-13, 2) == fh.seek(-13, 'end')
+            fhseek_int = fh.seek(17, 1)
+            fh.seek(-17, 'current')
+            fhseek_str = fh.seek(17, 'current')
+            assert fhseek_int == fhseek_str
+            with pytest.raises(ValueError):
+                fh.seek(0, 'last')
 
-        assert header1['frame_nr'] == 3
-        assert header1['user'] == header['user']
-        assert header1['bcd_jday'] == header['bcd_jday']
-        assert header1['bcd_seconds'] == header['bcd_seconds']
-        assert header1['bcd_fraction'] == 4
-        assert (round((1./((header1.time-header.time)/3.)).to(u.Hz).value) ==
-                6400)
+        assert header_last['frame_nr'] == 3
+        assert header_last['user'] == header['user']
+        assert header_last['bcd_jday'] == header['bcd_jday']
+        assert header_last['bcd_seconds'] == header['bcd_seconds']
+        assert header_last['bcd_fraction'] == 4
+        frate = (1. / ((header_last.time - header.time) / 3.)).to(u.Hz).value
+        assert round(frate) == 6400
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:3] ==
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
@@ -340,6 +352,19 @@ class TestMark5B(object):
                       np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
                                 [-1, +1, -3, +3, -3, +1, +3, +1]]))
         assert record3.shape == (10, 8)
+
+        # Check passing a time object into ref_mjd.
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                         sample_rate=32*u.MHz,
+                         ref_mjd=Time('2015-01-01')) as fh:
+            assert fh.header0 == header
+            assert fh._header_last == header_last
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                         sample_rate=32*u.MHz,
+                         ref_mjd=Time('2013-01-01')) as fh:
+            assert fh.header0 == header
+            assert fh._header_last == header_last
+
         # Read only some selected threads.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2, thread_ids=[4, 5],
                          sample_rate=32*u.MHz, ref_mjd=57000) as fh:
@@ -348,12 +373,12 @@ class TestMark5B(object):
         # Read all data and check that it can be written out.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, ref_mjd=57000) as fh:
-            time0 = fh.tell(unit='time')
+            start_time = fh.current_time
             record = fh.read(20000)
-            time1 = fh.tell(unit='time')
+            stop_time = fh.current_time
 
         m5_test = str(tmpdir.join('test.m5b'))
-        with mark5b.open(m5_test, 'ws', time=time0, nchan=8,
+        with mark5b.open(m5_test, 'ws', time=start_time, nchan=8,
                          bps=2, sample_rate=32*u.MHz) as fw:
             # Write in pieces to ensure squeezed data can be handled,
             # And add in an invalid frame for good measure.
@@ -361,19 +386,19 @@ class TestMark5B(object):
             fw.write(record[11:5000])
             fw.write(record[5000:10000], invalid_data=True)
             fw.write(record[10000:])
-            assert fw.tell(unit='time') == time1
+            assert fw.current_time == stop_time
 
         with mark5b.open(m5_test, 'rs', nchan=8, bps=2, sample_rate=32*u.MHz,
                          ref_mjd=57000) as fh:
-            assert fh.tell(unit='time') == time0
+            assert fh.current_time == start_time
             record2 = fh.read(20000)
-            assert fh.tell(unit='time') == time1
+            assert fh.current_time == stop_time
             assert np.all(record2[:5000] == record[:5000])
             assert np.all(record2[5000:10000] == 0.)
             assert np.all(record2[10000:] == record[10000:])
 
         # Check files can be made byte-for-byte identical.
-        with mark5b.open(m5_test, 'ws', time=time0, nchan=8, bps=2,
+        with mark5b.open(m5_test, 'ws', time=start_time, nchan=8, bps=2,
                          sample_rate=32*u.MHz, user=header['user'],
                          internal_tvg=header['internal_tvg'],
                          frame_nr=header['frame_nr']) as fw:
@@ -395,7 +420,7 @@ class TestMark5B(object):
                          sample_rate=10*u.kHz, ref_mjd=57000) as fh:
             record5 = fh.read()     # Read across days.
             assert np.all(record5 == record)
-            assert fh.tell(unit='time').iso == '2014-06-14 00:00:01.000000000'
+            assert fh.current_time.iso == '2014-06-14 00:00:01.000000000'
 
         # Test that squeeze attribute works on read (including in-place read)
         # and write, but can be turned off if needed.
@@ -422,7 +447,7 @@ class TestMark5B(object):
             assert fh.tell() == 12
             assert np.all(out.squeeze() == record[:12, 0])
 
-        with mark5b.open(m5_test, 'ws', time=time0, nchan=1, bps=2,
+        with mark5b.open(m5_test, 'ws', time=start_time, nchan=1, bps=2,
                          sample_rate=32*u.MHz) as fw:
             assert fw.sample_shape == ()
             fw.write(record[:10000, 0])

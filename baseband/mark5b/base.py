@@ -23,9 +23,9 @@ class Mark5BFileReader(VLBIFileBase):
 
         Parameters
         ----------
-        ref_time : int
-            Used to determine the thousands in the Mark 5B header time.
-            Thus, should be within 500 days of the actual observing time.
+        ref_mjd : int
+            Reference MJD within 500 days of the observation time, used to
+            infer the full MJD from the time information in the header.
         nchan : int
             Number of channels encoded in the payload.
         bps : int
@@ -46,6 +46,28 @@ class Mark5BFileReader(VLBIFileBase):
 
         Search is from the current position.  If given, a template_header
         is used to initialize the framesize, as well as kday in the header.
+
+        Parameters
+        ----------
+        template_header : :class:`~baseband.mark5b.Mark5BHeader`, optional
+            Template Mark 5B header, from which `kday` and `framesize`
+            are extracted.
+        kday : int, optional
+            Explicit thousands of MJD of the observation time.  Required if
+            `template_header` is ``None``.
+        framesize : int, optional
+            Size of a frame, in bytes.  Required if `template_header` is
+            ``None``.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default is twice the
+            framesize.
+        forward : bool, optional
+            Seek forward if ``True`` (default), backward if ``False``.
+
+        Returns
+        -------
+        header : :class:`~baseband.mark5b.Mark5BHeader`, or None
+            Retrieved Mark 5B header, or ``None`` if nothing found.
         """
         fh = self.fh_raw
         if template_header:
@@ -113,6 +135,7 @@ class Mark5BFileWriter(VLBIFileBase):
 
     Adds ``write_frame`` method to the VLBI binary file wrapper.
     """
+
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
 
@@ -156,8 +179,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     bps : int, optional
         Bits per sample.  Default: 2.
     ref_mjd : int, or `~astropy.time.Time` instance
-        Reference MJD (rounded to thousands), to remove ambiguities in the
-        time stamps.  By default, will be inferred from the file creation date.
+        Reference MJD within 500 days of the observation time, used to infer
+        the full MJD from the time information in the header.
     thread_ids: list of int, optional
         Specific channels to read.  By default, all channels are read.
     frames_per_second : int, optional
@@ -177,6 +200,11 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
+        # If ref_mjd is astropy.time.Time object, extract mjd.
+        try:
+            ref_mjd = ref_mjd.__index__()
+        except AttributeError:
+            ref_mjd = int(ref_mjd.mjd)
         self._frame = self.read_frame(ref_mjd=ref_mjd, nchan=nchan, bps=bps)
         self._frame_data = None
         header = self._frame.header
@@ -192,7 +220,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     @property
     def size(self):
         n_frames = int(round(
-            (self.header1.time - self.header0.time).to(u.s).value *
+            (self._header_last.time - self.header0.time).to(u.s).value *
             self.frames_per_second)) + 1
         return n_frames * self.samples_per_frame
 
@@ -261,7 +289,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     def _read_frame(self):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
-        self._frame = self.read_frame(ref_mjd=self.header0.kday,
+        self._frame = self.read_frame(ref_mjd=int(self.header0.time.mjd),
                                       nchan=self._sample_shape.nchan,
                                       bps=self.bps)
         # Convert payloads to data array.
@@ -376,8 +404,8 @@ nchan : int
 bps : int, optional
     Bits per sample.  Default: 2.
 ref_mjd : int, or `~astropy.time.Time` instance
-    Reference MJD (rounded to thousands), to remove ambiguities in the
-    time stamps.  By default, will be inferred from the file creation date.
+    Reference MJD within 500 days of the observation time, used to infer
+    the full MJD from the time information in the header.
 thread_ids: list of int, optional
     Specific threads to read.  By default, all threads are read.
 frames_per_second : int, optional

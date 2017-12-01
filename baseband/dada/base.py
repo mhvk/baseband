@@ -231,11 +231,11 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         self._get_frame(0)
 
     @lazyproperty
-    def header1(self):
+    def _header_last(self):
         """Header of the last file for this stream."""
         self.fh_raw.seek(-self.header0.framesize, 2)
-        frame1 = self.read_frame(memmap=True)
-        return frame1.header
+        frame_last = self.read_frame(memmap=True)
+        return frame_last.header
 
     def read(self, count=None, out=None):
         """Read count samples.
