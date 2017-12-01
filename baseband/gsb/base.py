@@ -375,7 +375,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         Rate at which each channel in each polarization is sampled.  Can give
         ``frames_per_second`` instead.
     squeeze : bool, optional
-        If `True` (default), ``write` accepts squeezed arrays as input, and
+        If `True` (default), ``write`` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
     **kwargs
         If no header is given, an attempt is made to construct one from
@@ -389,11 +389,12 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         otherwise.
     time : `~astropy.time.Time`
         Header time (from the GPS-based timestamp).  (One can alternatively
-        pass a string of format 'YYYY MM DD HH MM SS.SSSSSS' to the key `gps`.)
+        pass a string of format ``'YYYY MM DD HH MM SS.SSSSSS'`` to the key
+        `gps`.)
     pc_time : `~astropy.time.Time`
         PC-based time; less accurate than GPS time and not used by Baseband.
-        (One can alternatively pass a string of format 'YYYY MM DD HH MM
-        SS.SSSSSS' to the key `pc`.)
+        (One can alternatively pass a string of format ``'YYYY MM DD HH MM
+        SS.SSSSSS'`` to the key `pc`.)
     seq_nr : int
         Frame number.
     mem_block : int
@@ -452,7 +453,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
                         gps_time=self.header0.gps_time + time_offset,
                         pc_time=self.header0.pc_time + time_offset,
                         seq_nr=(frame_nr + self.header0['seq_nr']),
-                        mem_block=(self.header0['mem_block'] + frame_nr % 8))
+                        mem_block=((self.header0['mem_block'] + frame_nr) % 8))
                 else:
                     self._header = self.header0.__class__.fromvalues(
                         time=self.header0.time + time_offset)

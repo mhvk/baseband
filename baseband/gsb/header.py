@@ -22,6 +22,12 @@ __all__ = ['TimeGSB', 'GSBHeader', 'GSBRawdumpHeader', 'GSBPhasedHeader']
 
 
 class TimeGSB(TimeString):
+    """GSB header date-time format ``'YYYY MM DD HH MM SS.SSSSSS'``.
+
+    For example, 2000 01 01 00 00 00.000000 is midnight on January 1, 2000.
+    """
+    # Implicitly uses the metaclass astropy.time.formats.TimeFormatMeta to
+    # register with astropy.Time.
 
     name = 'gsb'
 
@@ -218,6 +224,7 @@ else:
 
 
 class GSBRawdumpHeader(GSBHeader):
+    """GSB rawdump header."""
 
     _mode = 'rawdump'
     _size = 7
@@ -245,6 +252,7 @@ class GSBRawdumpHeader(GSBHeader):
 
 
 class GSBPhasedHeader(GSBRawdumpHeader):
+    """GSB phased header."""
 
     _mode = 'phased'
     _size = GSBRawdumpHeader._size + 7 + 2
