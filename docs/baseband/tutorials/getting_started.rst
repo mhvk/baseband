@@ -190,13 +190,13 @@ ignored.
 We can retrieve the time of the first sample in the file using ``start_time``,
 the time immediately after the last sample using ``stop_time``, and the time
 of the pointer's current location (equivalent to ``fh.tell(unit='time')``)
-using ``current_time``::
+using ``time``::
 
     >>> fh.start_time
     <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.000000000>
     >>> fh.stop_time
     <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.001250000>
-    >>> fh.current_time
+    >>> fh.time
     <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.001125000>
     >>> fh.close()
 

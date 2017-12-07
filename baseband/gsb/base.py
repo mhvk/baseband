@@ -200,7 +200,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         self._frame_nr = None
 
     @lazyproperty
-    def _header_last(self):
+    def _last_header(self):
         """Last header of the timestamp file."""
         fh_ts_offset = self.fh_ts.tell()
         from_end = 3 * self._header0_size // 2

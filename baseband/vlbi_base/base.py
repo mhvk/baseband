@@ -120,7 +120,10 @@ class VLBIStreamBase(VLBIFileBase):
 
     @lazyproperty
     def start_time(self):
-        """Start time of file."""
+        """Start time of the file.
+
+        See also `time` for the time of the sample pointer's current offset.
+        """
         return self._get_time(self.header0)
 
     @deprecated('0.X', name='time0', alternative='start_time',
@@ -131,8 +134,11 @@ class VLBIStreamBase(VLBIFileBase):
     time0 = property(get_time0, None, None)
 
     @property
-    def current_time(self):
-        """Time of the current offset in file."""
+    def time(self):
+        """Time of the sample pointer's current offset in file.
+
+        See also `start_time` for the start time of the file.
+        """
         return self.tell(unit='time')
 
     @property
@@ -273,23 +279,27 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return max_frame + 1
 
     @lazyproperty
-    def _header_last(self):
+    def _last_header(self):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek(-self.header0.framesize, 2)
-        header_last = self.find_header(template_header=self.header0,
+        last_header = self.find_header(template_header=self.header0,
                                        maximum=10*self.header0.framesize,
                                        forward=False)
         self.fh_raw.seek(raw_offset)
-        if header_last is None:
+        if last_header is None:
             raise ValueError("Corrupt VLBI frame? No frame in last {0} bytes."
                              .format(10 * self.header0.framesize))
-        return header_last
+        return last_header
 
     @lazyproperty
     def stop_time(self):
-        """Time at the end of the file, just after the last sample."""
-        return self._get_time(self._header_last) + u.s / self.frames_per_second
+        """Time at the end of the file, just after the last sample.
+
+        See also `start_time` for the start time of the file, and `time` for
+        the time of the sample pointer's current offset.
+        """
+        return self._get_time(self._last_header) + u.s / self.frames_per_second
 
     @deprecated('0.X', name='time1', alternative='stop_time',
                 obj_type='attribute')

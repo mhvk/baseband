@@ -461,10 +461,10 @@ class TestMark4(object):
 
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz) as fh:
-            start_time = fh.current_time
+            start_time = fh.time
             record = fh.read()
             fh_raw_tell1 = fh.fh_raw.tell()
-            stop_time = fh.current_time
+            stop_time = fh.time
 
         rewritten_file = str(tmpdir.join('rewritten.m4'))
         with mark4.open(rewritten_file, 'ws', sample_rate=32*u.MHz,
@@ -477,10 +477,10 @@ class TestMark4(object):
 
         with mark4.open(rewritten_file, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz, thread_ids=[3, 4]) as fh:
-            assert fh.current_time == start_time
-            assert fh.current_time == fh.tell(unit='time')
+            assert fh.time == start_time
+            assert fh.time == fh.tell(unit='time')
             record2 = fh.read(160000)
-            assert fh.current_time == stop_time
+            assert fh.time == stop_time
             assert np.all(record2[:80000] == record[:80000, 3:5])
             assert np.all(record2[80000:] == 0.)
 
@@ -561,7 +561,7 @@ class TestMark4(object):
                             sample_rate=32*u.MHz) as f2:
                 assert f2.header0 == frame.header
                 with pytest.raises(ValueError):
-                    f2._header_last
+                    f2._last_header
 
     def test_stream_invalid(self):
         with pytest.raises(ValueError):

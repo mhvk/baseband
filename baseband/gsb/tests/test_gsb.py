@@ -379,7 +379,7 @@ class TestGSB(object):
             data = fh_r.read()
             assert fh_r.tell() == len(data)
             assert_quantity_allclose(fh_r.tell(unit=u.s), 1. * u.s)
-            assert fh_r._header_last == header
+            assert fh_r._last_header == header
             # recheck with output array given
             out = np.zeros_like(self.data).squeeze()
             fh_r.seek(0)
@@ -410,7 +410,7 @@ class TestGSB(object):
                 assert np.isclose(fh_r.frames_per_second, 2)
                 data = fh_r.read(len(self.data) * 2)
                 assert_quantity_allclose(
-                    (fh_r._header_last.time - fh_r.header0.time).to(u.s),
+                    (fh_r._last_header.time - fh_r.header0.time).to(u.s),
                     u.s/fh_r.frames_per_second)
             assert np.all(data.reshape(2, -1) == self.data.ravel())
 
@@ -464,7 +464,7 @@ class TestGSB(object):
                     fh_r.header0['seq_nr'] + 3)
             assert_quantity_allclose(fh_r.tell(unit=u.s), 0.5 * u.s)
             assert fh_r.fh_raw[0][0].tell() == 2048 * bps // 8
-            assert fh_r._frame.header == fh_r._header_last
+            assert fh_r._frame.header == fh_r._last_header
 
         assert np.all(data[:onepol.shape[0]] == onepol.squeeze())
         assert np.all(data[onepol.shape[0]:] == onepol[::-1].squeeze())
@@ -502,7 +502,7 @@ class TestGSB(object):
                         fh_r.header0['seq_nr'] + 3)
                 assert_quantity_allclose(fh_r.tell(unit=u.s), 0.5 * u.s)
                 assert sp0.tell() == 1024 * bps // 8
-                assert fh_r._frame.header == fh_r._header_last
+                assert fh_r._frame.header == fh_r._last_header
             assert np.all(data[:twopol.shape[0]] == twopol)
             assert np.all(data[twopol.shape[0]:] == twopol[::-1])
 

@@ -497,11 +497,11 @@ class TestVDIF(object):
             assert fh.tell() == 0
             assert header == fh.header0
             assert fh.start_time == fh.header0.time
-            assert abs(fh.current_time - fh.start_time) < 1. * u.ns
-            assert fh.current_time == fh.tell(unit='time')
+            assert abs(fh.time - fh.start_time) < 1. * u.ns
+            assert fh.time == fh.tell(unit='time')
             record = fh.read(12)
             assert fh.tell() == 12
-            t12 = fh.current_time
+            t12 = fh.time
             s12 = 12 / fh.samples_per_frame / fh.frames_per_second * u.s
             assert abs(t12 - fh.start_time - s12) < 1. * u.ns
             fh.seek(10, 1)
@@ -513,7 +513,7 @@ class TestVDIF(object):
             with pytest.raises(ValueError):
                 fh.seek(0, 3)
             assert fh.size == 40000
-            assert abs(fh.stop_time - fh._header_last.time - u.s /
+            assert abs(fh.stop_time - fh._last_header.time - u.s /
                        fh.frames_per_second) < 1. * u.ns
             assert abs(fh.stop_time - fh.start_time - u.s * fh.size /
                        fh.samples_per_frame / fh.frames_per_second) < 1. * u.ns
@@ -622,7 +622,7 @@ class TestVDIF(object):
             with vdif.open(s, 'rs') as f2:
                 assert f2.header0 == frame.header
                 with pytest.raises(ValueError):
-                    f2._header_last
+                    f2._last_header
 
     def test_io_invalid(self):
         with pytest.raises(TypeError):
@@ -638,7 +638,7 @@ def test_mwa_vdif():
     with vdif.open(SAMPLE_MWA, 'rs', sample_rate=1.28*u.MHz) as fh:
         assert fh.samples_per_frame == 128
         assert fh.frames_per_second == 10000
-        assert fh.current_time == Time('2015-10-03T20:49:45.000')
+        assert fh.time == Time('2015-10-03T20:49:45.000')
         assert fh.header0.edv == 0
 
 
@@ -665,7 +665,7 @@ def test_arochime_vdif():
     # Now test the actual data stream.
     with vdif.open(SAMPLE_AROCHIME, 'rs', frames_per_second=390625) as fh:
         assert fh.samples_per_frame == 1
-        t0 = fh.current_time
+        t0 = fh.time
         assert abs(t0 - Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
         assert abs(t0 - fh.start_time) < 1. * u.ns
         assert fh.header0.edv == 0
@@ -673,7 +673,7 @@ def test_arochime_vdif():
         d = fh.read()
         assert d.shape == (5, 2, 1024)
         assert d.dtype.kind == 'c'
-        t1 = fh.current_time
+        t1 = fh.time
         assert abs(t1 - fh.stop_time) < 1. * u.ns
         assert abs(t1 - t0 - u.s * (fh.size / fh.samples_per_frame /
                                     fh.frames_per_second)) < 1. * u.ns
