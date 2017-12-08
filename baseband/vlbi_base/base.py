@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 from collections import namedtuple
 from astropy import units as u
-from astropy.utils import lazyproperty
+from astropy.utils import lazyproperty, deprecated
 
 
 __all__ = ['u_sample', 'VLBIStreamBase', 'VLBIStreamReaderBase',
@@ -54,10 +54,10 @@ class VLBIStreamBase(VLBIFileBase):
                  thread_ids, samples_per_frame, frames_per_second=None,
                  sample_rate=None, squeeze=True):
         super(VLBIStreamBase, self).__init__(fh_raw)
-        self.header0 = header0
+        self._header0 = header0
         self._sample_shape = sample_shape
-        self.bps = bps
-        self.complex_data = complex_data
+        self._bps = bps
+        self._complex_data = complex_data
         self.thread_ids = thread_ids
         self.samples_per_frame = samples_per_frame
         if frames_per_second is None:
@@ -72,6 +72,18 @@ class VLBIStreamBase(VLBIFileBase):
         self.frames_per_second = frames_per_second
         self.offset = 0
         self.squeeze = squeeze
+
+    @property
+    def squeeze(self):
+        """Whether data arrays have arrays with length unity removed.
+
+        If `True`, such dimensions are removed in reading, and added back in
+        writing."""
+        return self._squeeze
+
+    @squeeze.setter
+    def squeeze(self, squeeze):
+        self._squeeze = bool(squeeze)
 
     @property
     def sample_shape(self):
@@ -107,9 +119,53 @@ class VLBIStreamBase(VLBIFileBase):
         return header.time
 
     @lazyproperty
-    def time0(self):
-        """Start time."""
+    def start_time(self):
+        """Start time of the file.
+
+        See also `time` for the time of the sample pointer's current offset,
+        and (if available) `stop_time` for the time at the end of the file.
+        """
         return self._get_time(self.header0)
+
+    @deprecated('0.X', name='time0', alternative='start_time',
+                obj_type='attribute')
+    def get_time0(self):
+        return self.start_time
+
+    time0 = property(get_time0, None, None)
+
+    @property
+    def time(self):
+        """Time of the sample pointer's current offset in file.
+
+        See also `start_time` for the start time, and (if available)
+        `stop_time` for the end time, of the file.
+        """
+        return self.tell(unit='time')
+
+    @property
+    def header0(self):
+        """First header of file."""
+        return self._header0
+
+    @property
+    def bps(self):
+        """Number of bits for each part (real or imaginary) of a sample."""
+        return self._bps
+
+    @property
+    def complex_data(self):
+        """Whether the decoded data is complex."""
+        return self._complex_data
+
+    @property
+    def thread_ids(self):
+        """Specific threads/channels to read."""
+        return self._thread_ids
+
+    @thread_ids.setter
+    def thread_ids(self, ids):
+        self._thread_ids = ids
 
     def tell(self, unit=None):
         """Current offset in file.
@@ -130,7 +186,7 @@ class VLBIStreamBase(VLBIFileBase):
             return self.offset
 
         if unit == 'time':
-            return self.time0 + self.tell(unit=u.s)
+            return self.start_time + self.tell(unit=u.s)
 
         return (self.offset * u_sample).to(unit, equivalencies=[(u.s, u.Unit(
             self.samples_per_frame * self.frames_per_second * u_sample))])
@@ -147,7 +203,7 @@ class VLBIStreamBase(VLBIFileBase):
                 "    frames_per_second={s.frames_per_second},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
-                "    {t}(start) time={s.time0.isot}>"
+                "    {t}start_time={s.start_time.isot}>"
                 .format(s=self, t=('thread_ids={0}, '.format(self.thread_ids)
                                    if self.thread_ids else '')))
 
@@ -225,28 +281,39 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return max_frame + 1
 
     @lazyproperty
-    def header1(self):
+    def _last_header(self):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek(-self.header0.framesize, 2)
-        header1 = self.find_header(template_header=self.header0,
-                                   maximum=10*self.header0.framesize,
-                                   forward=False)
+        last_header = self.find_header(template_header=self.header0,
+                                       maximum=10*self.header0.framesize,
+                                       forward=False)
         self.fh_raw.seek(raw_offset)
-        if header1 is None:
+        if last_header is None:
             raise ValueError("Corrupt VLBI frame? No frame in last {0} bytes."
                              .format(10 * self.header0.framesize))
-        return header1
+        return last_header
 
     @lazyproperty
-    def time1(self):
-        """Time of the sample just beyond the last one in the file."""
-        return self._get_time(self.header1) + u.s / self.frames_per_second
+    def stop_time(self):
+        """Time at the end of the file, just after the last sample.
+
+        See also `start_time` for the start time of the file, and `time` for
+        the time of the sample pointer's current offset.
+        """
+        return self._get_time(self._last_header) + u.s / self.frames_per_second
+
+    @deprecated('0.X', name='time1', alternative='stop_time',
+                obj_type='attribute')
+    def get_time1(self):
+        return self.stop_time
+
+    time1 = property(get_time1, None, None)
 
     @property
     def size(self):
         """Number of samples in the file."""
-        return int(round((self.time1 - self.time0).to(u.s).value *
+        return int(round((self.stop_time - self.start_time).to(u.s).value *
                          self.frames_per_second * self.samples_per_frame))
 
     def seek(self, offset, whence=0):
@@ -269,7 +336,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             offset = offset.__index__()
         except Exception:
             try:
-                offset = offset - self.time0
+                offset = offset - self.start_time
             except Exception:
                 pass
             else:

@@ -217,7 +217,7 @@ class TestMark5B(object):
     def test_header_times(self):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
             header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000.)
-            time0 = header0.time
+            start_time = header0.time
             samples_per_frame = header0.payloadsize * 8 // 2 // 8
             frame_rate = 32. * u.MHz / samples_per_frame
             frame_duration = 1. / frame_rate
@@ -228,7 +228,7 @@ class TestMark5B(object):
                 except EOFError:
                     break
                 header_time = frame.header.time
-                expected = time0 + frame.header['frame_nr'] * frame_duration
+                expected = start_time + frame.header['frame_nr'] * frame_duration
                 assert abs(header_time - expected) < 1. * u.ns
 
         # On the last frame, also check one can recover the time if 'frac_sec'
@@ -307,7 +307,7 @@ class TestMark5B(object):
             assert fh.fh_raw.tell() == header.framesize
             assert fh.samples_per_frame == 5000
             assert fh.frames_per_second == 6400
-            header1 = fh.header1
+            last_header = fh._last_header
             assert fh.size == 20000
             record = fh.read(12)
             assert fh.tell() == 12
@@ -315,21 +315,22 @@ class TestMark5B(object):
             record2 = fh.read(2)
             assert fh.tell() == 10002
             assert fh.fh_raw.tell() == 3. * header.framesize
-            assert np.abs(fh.tell(unit='time') -
-                          (fh.time0 + 10002 / (32*u.MHz))) < 1. * u.ns
-            fh.seek(fh.time0 + 1000 / (32*u.MHz))
+            assert fh.time == fh.tell(unit='time')
+            assert np.abs(fh.time -
+                          (fh.start_time + 10002 / (32*u.MHz))) < 1. * u.ns
+            fh.seek(fh.start_time + 1000 / (32*u.MHz))
             assert fh.tell() == 1000
             fh.seek(-10, 2)
             assert fh.tell() == fh.size - 10
             record3 = fh.read()
 
-        assert header1['frame_nr'] == 3
-        assert header1['user'] == header['user']
-        assert header1['bcd_jday'] == header['bcd_jday']
-        assert header1['bcd_seconds'] == header['bcd_seconds']
-        assert header1['bcd_fraction'] == 4
-        assert (round((1./((header1.time-header.time)/3.)).to(u.Hz).value) ==
-                6400)
+        assert last_header['frame_nr'] == 3
+        assert last_header['user'] == header['user']
+        assert last_header['bcd_jday'] == header['bcd_jday']
+        assert last_header['bcd_seconds'] == header['bcd_seconds']
+        assert last_header['bcd_fraction'] == 4
+        frate = (1. / ((last_header.time - header.time) / 3.)).to(u.Hz).value
+        assert round(frate) == 6400
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:3] ==
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
@@ -348,12 +349,12 @@ class TestMark5B(object):
         # Read all data and check that it can be written out.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, ref_mjd=57000) as fh:
-            time0 = fh.tell(unit='time')
+            start_time = fh.time
             record = fh.read(20000)
-            time1 = fh.tell(unit='time')
+            stop_time = fh.time
 
         m5_test = str(tmpdir.join('test.m5b'))
-        with mark5b.open(m5_test, 'ws', time=time0, nchan=8,
+        with mark5b.open(m5_test, 'ws', time=start_time, nchan=8,
                          bps=2, sample_rate=32*u.MHz) as fw:
             # Write in pieces to ensure squeezed data can be handled,
             # And add in an invalid frame for good measure.
@@ -361,19 +362,19 @@ class TestMark5B(object):
             fw.write(record[11:5000])
             fw.write(record[5000:10000], invalid_data=True)
             fw.write(record[10000:])
-            assert fw.tell(unit='time') == time1
+            assert fw.time == stop_time
 
         with mark5b.open(m5_test, 'rs', nchan=8, bps=2, sample_rate=32*u.MHz,
                          ref_mjd=57000) as fh:
-            assert fh.tell(unit='time') == time0
+            assert fh.time == start_time
             record2 = fh.read(20000)
-            assert fh.tell(unit='time') == time1
+            assert fh.time == stop_time
             assert np.all(record2[:5000] == record[:5000])
             assert np.all(record2[5000:10000] == 0.)
             assert np.all(record2[10000:] == record[10000:])
 
         # Check files can be made byte-for-byte identical.
-        with mark5b.open(m5_test, 'ws', time=time0, nchan=8, bps=2,
+        with mark5b.open(m5_test, 'ws', time=start_time, nchan=8, bps=2,
                          sample_rate=32*u.MHz, user=header['user'],
                          internal_tvg=header['internal_tvg'],
                          frame_nr=header['frame_nr']) as fw:
@@ -395,7 +396,7 @@ class TestMark5B(object):
                          sample_rate=10*u.kHz, ref_mjd=57000) as fh:
             record5 = fh.read()     # Read across days.
             assert np.all(record5 == record)
-            assert fh.tell(unit='time').iso == '2014-06-14 00:00:01.000000000'
+            assert fh.time.iso == '2014-06-14 00:00:01.000000000'
 
         # Test that squeeze attribute works on read (including in-place read)
         # and write, but can be turned off if needed.
@@ -422,7 +423,7 @@ class TestMark5B(object):
             assert fh.tell() == 12
             assert np.all(out.squeeze() == record[:12, 0])
 
-        with mark5b.open(m5_test, 'ws', time=time0, nchan=1, bps=2,
+        with mark5b.open(m5_test, 'ws', time=start_time, nchan=1, bps=2,
                          sample_rate=32*u.MHz) as fw:
             assert fw.sample_shape == ()
             fw.write(record[:10000, 0])
