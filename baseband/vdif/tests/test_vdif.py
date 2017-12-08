@@ -512,6 +512,15 @@ class TestVDIF(object):
             assert fh.tell() == 0
             with pytest.raises(ValueError):
                 fh.seek(0, 3)
+            # Test seeker works with both int and str values for whence
+            assert fh.seek(13, 0) == fh.seek(13, 'start')
+            assert fh.seek(-13, 2) == fh.seek(-13, 'end')
+            fhseek_int = fh.seek(17, 1)
+            fh.seek(-17, 'current')
+            fhseek_str = fh.seek(17, 'current')
+            assert fhseek_int == fhseek_str
+            with pytest.raises(ValueError):
+                fh.seek(0, 'last')
             assert fh.size == 40000
             assert abs(fh.stop_time - fh._last_header.time - u.s /
                        fh.frames_per_second) < 1. * u.ns

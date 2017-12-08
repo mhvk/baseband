@@ -330,7 +330,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         whence : int
             Like regular seek, the offset is taken to be from the start if
             ``whence=0`` (default), from the current position if ``1``,
-            and from the end if ``2``.  Ignored if ``offset`` is a time.`
+            and from the end if ``2``.  One can use ``'start'``, ``'current'``,
+            or ``'end'`` for ``0``, ``1``, or ``2``, respectively.  Ignored if
+            ``offset`` is a time.`
         """
         try:
             offset = offset.__index__()
@@ -346,14 +348,15 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 self.samples_per_frame * self.frames_per_second * u_sample))])
             offset = int(round(offset.value))
 
-        if whence == 0:
+        if whence == 0 or whence == 'start':
             self.offset = offset
-        elif whence == 1:
+        elif whence == 1 or whence == 'current':
             self.offset += offset
-        elif whence == 2:
+        elif whence == 2 or whence == 'end':
             self.offset = self.size + offset
         else:
-            raise ValueError("invalid 'whence'; should be 0, 1, or 2.")
+            raise ValueError("invalid 'whence'; should be 0 or 'start', 1 or"
+                             "'current', or 2 or 'end'.")
 
         return self.offset
 

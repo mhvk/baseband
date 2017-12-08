@@ -439,6 +439,15 @@ class TestMark4(object):
             assert fh.tell() == 80641
             # Raw file should be just after frame 1.
             assert fh.fh_raw.tell() == 0xa88 + 2 * fh.header0.framesize
+            # Test seeker works with both int and str values for whence
+            assert fh.seek(13, 0) == fh.seek(13, 'start')
+            assert fh.seek(-13, 2) == fh.seek(-13, 'end')
+            fhseek_int = fh.seek(17, 1)
+            fh.seek(-17, 'current')
+            fhseek_str = fh.seek(17, 'current')
+            assert fhseek_int == fhseek_str
+            with pytest.raises(ValueError):
+                fh.seek(0, 'last')
 
         assert record.shape == (642, 8)
         assert np.all(record[:640] == 0.)
