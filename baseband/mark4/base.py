@@ -67,8 +67,9 @@ class Mark4FileReader(VLBIFileBase):
 
         Returns
         -------
-        offset : int
-            Byte offset of the first frame.
+        offset : int, or `None`
+            Byte offset of the next frame.  `None` if the search was not
+            successful.
         """
         fh = self.fh_raw
         nset = np.ones(32 * ntrack // 8, dtype=np.int16)
@@ -144,40 +145,31 @@ class Mark4FileReader(VLBIFileBase):
         fh.seek(file_pos)
         return None
 
-    def find_frame_and_ntrack(self, maximum=None, forward=True):
-        """Finds start of the next frame, and number of tracks ``ntrack``.
+    def determine_ntrack(self, maximum=None):
+        """Determines the number of tracks, by seeking the next frame.
 
         Uses ``find_frame`` to look for the first occurrence of a frame from
-        the current position while cycling through all supported ``ntrack``
-        values.  Returns the value of ``ntrack`` for which ``find_frame`` is
-        successful (it will fail for incorrect values), alongside the
-        found frame offset.
+        the current position for all supported ``ntrack`` values.  Returns the
+        first ``ntrack`` for which ``find_frame`` is successful, leaving the
+        file pointer at the start of the frame.
 
         Parameters
         ----------
         maximum : int, optional
             Maximum number of bytes forward to search through.
             Default is the framesize (20000 * ntrack // 8).
-        forward : bool, optional
-            Whether to search forwards or backwards.  Default is forwards.
 
         Returns
         -------
-        offset : int
-            Byte offset of the first frame.
-        ntrack : int
-            Number of tracks.
+        ntrack : int or `None`
+            Number of tracks. `None` if no frame was found.
         """
         # Currently only 32 and 64-track frames supported.
         for nt in 32, 64:
-            frame_start = self.find_frame(nt, maximum=maximum, forward=forward)
-            if frame_start:
-                break
+            if self.find_frame(nt, maximum=maximum) is not None:
+                return nt
 
-        if frame_start is None:
-            nt = None
-
-        return frame_start, nt
+        return None
 
     def find_header(self, template_header=None, ntrack=None, decade=None,
                     maximum=None, forward=True):
@@ -261,12 +253,16 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         self.fh_raw = fh_raw
         # Find offset for first header, and ntrack if not specified.
         if ntrack is None:
-            self.offset0, ntrack = self.find_frame_and_ntrack()
+            ntrack = self.determine_ntrack()
+            assert ntrack is not None, (
+                "Could not automatically determine the number of tracks. "
+                "Try passing in an explicit ntrack.")
+            self.offset0 = self.fh_raw.tell()
         else:
             self.offset0 = self.find_frame(ntrack=ntrack)
-        assert self.offset0 is not None, (
-            "Could not find the first occurrence of a header.  If automatic "
-            "ntrack detection was used, try passing in an explicit ntrack.")
+            assert self.offset0 is not None, (
+                "Could not find a first frame using ntrack={}. Perhaps "
+                "try ntrack=None for auto-determination.".format(ntrack))
         self._frame = self.read_frame(ntrack, decade)
         self._frame_data = None
         self._frame_nr = None

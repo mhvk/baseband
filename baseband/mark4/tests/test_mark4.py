@@ -419,14 +419,14 @@ class TestMark4(object):
             assert header_100f == header0
             assert header_m1000b == header0
 
-    def test_find_frame_and_ntrack(self):
+    def test_determine_ntrack(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             offset0 = fh.find_frame(ntrack=64)
             assert offset0 == 2696
             fh.seek(0)
-            offset0_auto, ntrack_auto = fh.find_frame_and_ntrack()
-            assert offset0_auto == offset0
-            assert ntrack_auto == 64
+            ntrack = fh.determine_ntrack()
+            assert ntrack == 64
+            assert fh.fh_raw.tell() == offset0
 
         with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
             # Seek past first frame header; find second frame.
@@ -434,17 +434,17 @@ class TestMark4(object):
             offset0 = fh.find_frame(ntrack=32)
             assert offset0 == 89656
             fh.seek(10000)
-            offset0_auto, ntrack_auto = fh.find_frame_and_ntrack()
-            assert offset0_auto == offset0
-            assert ntrack_auto == 32
+            ntrack = fh.determine_ntrack()
+            assert fh.fh_raw.tell() == offset0
+            assert ntrack == 32
 
         with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
             offset0 = fh.find_frame(ntrack=32)
             assert offset0 == 17436
             fh.seek(0)
-            offset0_auto, ntrack_auto = fh.find_frame_and_ntrack()
-            assert offset0_auto == offset0
-            assert ntrack_auto == 32
+            ntrack = fh.determine_ntrack()
+            assert fh.fh_raw.tell() == offset0
+            assert ntrack == 32
 
     def test_filestreamer(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
