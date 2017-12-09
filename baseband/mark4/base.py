@@ -58,10 +58,10 @@ class Mark4FileReader(VLBIFileBase):
         Parameters
         ----------
         ntrack : int
-            Number of "tape tracks".
+            Number of tracks used to store the data.
         maximum : int, optional
             Maximum number of bytes forward to search through.
-            Default is the framesize (20000 * ntrack // 8).
+            Default is twice the framesize (20000 * ntrack // 8).
         forward : bool, optional
             Whether to search forwards or backwards.  Default is forwards.
 
@@ -177,6 +177,28 @@ class Mark4FileReader(VLBIFileBase):
 
         Read the header at that location and return it.
         The file pointer is left at the start of the header.
+
+        Parameters
+        ----------
+        template_header : `~baseband.mark4.Mark4Header`, optional
+            Template Mark 4 header, from which `ntrack` and `decade` are read.
+        ntrack : int, optional
+            Number of tracks used to store the data.  Required if
+            ``template_header`` is ``None``.
+        decade : int, optional
+            Decade the observations were taken (needed to remove ambiguity in
+            the Mark 4 time stamp).  Required if ``template_header`` is
+            ``None``.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default is twice the
+            framesize.
+        forward : bool, optional
+            Seek forward if ``True`` (default), backward if ``False``.
+
+        Returns
+        -------
+        header : :class:`~baseband.mark4.Mark4Header`, or None
+            Retrieved Mark 4 header, or ``None`` if nothing found.
         """
         if template_header is not None:
             ntrack = template_header.ntrack
