@@ -325,7 +325,7 @@ class Mark4Header(Mark4TrackHeader):
         elif ntrack == 32:
             return ta
         else:
-            raise ValueError("Have mark 4 track assignments only for "
+            raise ValueError("Have Mark 4 track assignments only for "
                              "ntrack=32 or 64, not {0}".format(ntrack))
 
     @property

@@ -58,16 +58,18 @@ class Mark4FileReader(VLBIFileBase):
         Parameters
         ----------
         ntrack : int
-            Number of "tape tracks".
+            Number of tracks used to store the data.
         maximum : int, optional
             Maximum number of bytes forward to search through.
-            Default is the framesize (20000 * ntrack // 8).
+            Default is twice the framesize (20000 * ntrack // 8).
         forward : bool, optional
             Whether to search forwards or backwards.  Default is forwards.
 
         Returns
         -------
-        offset : int
+        offset : int, or `None`
+            Byte offset of the next frame.  `None` if the search was not
+            successful.
         """
         fh = self.fh_raw
         nset = np.ones(32 * ntrack // 8, dtype=np.int16)
@@ -143,12 +145,60 @@ class Mark4FileReader(VLBIFileBase):
         fh.seek(file_pos)
         return None
 
+    def determine_ntrack(self, maximum=None):
+        """Determines the number of tracks, by seeking the next frame.
+
+        Uses ``find_frame`` to look for the first occurrence of a frame from
+        the current position for all supported ``ntrack`` values.  Returns the
+        first ``ntrack`` for which ``find_frame`` is successful, leaving the
+        file pointer at the start of the frame.
+
+        Parameters
+        ----------
+        maximum : int, optional
+            Maximum number of bytes forward to search through.
+            Default is the framesize (20000 * ntrack // 8).
+
+        Returns
+        -------
+        ntrack : int or `None`
+            Number of tracks. `None` if no frame was found.
+        """
+        # Currently only 32 and 64-track frames supported.
+        for nt in 32, 64:
+            if self.find_frame(nt, maximum=maximum) is not None:
+                return nt
+
+        return None
+
     def find_header(self, template_header=None, ntrack=None, decade=None,
                     maximum=None, forward=True):
         """Look for the first occurrence of a frame, from the current position.
 
         Read the header at that location and return it.
         The file pointer is left at the start of the header.
+
+        Parameters
+        ----------
+        template_header : `~baseband.mark4.Mark4Header`, optional
+            Template Mark 4 header, from which `ntrack` and `decade` are read.
+        ntrack : int, optional
+            Number of tracks used to store the data.  Required if
+            ``template_header`` is ``None``.
+        decade : int, optional
+            Decade the observations were taken (needed to remove ambiguity in
+            the Mark 4 time stamp).  Required if ``template_header`` is
+            ``None``.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default is twice the
+            framesize.
+        forward : bool, optional
+            Seek forward if ``True`` (default), backward if ``False``.
+
+        Returns
+        -------
+        header : :class:`~baseband.mark4.Mark4Header`, or None
+            Retrieved Mark 4 header, or ``None`` if nothing found.
         """
         if template_header is not None:
             ntrack = template_header.ntrack
@@ -198,8 +248,9 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     ----------
     fh_raw : `~baseband.mark4.Mark4FileReader`
         file handle to the raw Mark 4 data stream.
-    ntrack : int
-        Number of tracks used to store the data.
+    ntrack : int, or None
+        Number of tracks used to store the data.  If ``None``, will attempt to
+        automatically detect it by scanning the file.
     decade : int, or `~astropy.time.Time`
         Year rounded to decade, to remove ambiguities in the time stamps.
         By default, it will be inferred from the file creation date.
@@ -217,12 +268,23 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
 
     _frame_class = Mark4Frame
 
-    def __init__(self, fh_raw, ntrack, decade=None, thread_ids=None,
+    def __init__(self, fh_raw, ntrack=None, decade=None, thread_ids=None,
                  frames_per_second=None, sample_rate=None, squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
-        self.offset0 = self.find_frame(ntrack=ntrack)
+        # Find offset for first header, and ntrack if not specified.
+        if ntrack is None:
+            ntrack = self.determine_ntrack()
+            assert ntrack is not None, (
+                "Could not automatically determine the number of tracks. "
+                "Try passing in an explicit ntrack.")
+            self.offset0 = self.fh_raw.tell()
+        else:
+            self.offset0 = self.find_frame(ntrack=ntrack)
+            assert self.offset0 is not None, (
+                "Could not find a first frame using ntrack={}. Perhaps "
+                "try ntrack=None for auto-determination.".format(ntrack))
         self._frame = self.read_frame(ntrack, decade)
         self._frame_data = None
         self._frame_nr = None
