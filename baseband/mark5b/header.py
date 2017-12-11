@@ -44,12 +44,8 @@ class Mark5BHeader(VLBIHeaderBase):
     words : tuple of int, or None
         Eight (or four for legacy VDIF) 32-bit unsigned int header words.
         If ``None``, set to a tuple of zeros for later initialisation.
-    ref_mjd : int, or None
-        Reference MJD within 500 days of the observation time, used to infer
-        the full MJD from the time information in the header (which only has
-        last 3 digits of the MJD).
     kday : int, or None
-        Explicit thousands of MJD.
+        Explicit thousands of MJD (eg. ``57000`` for MJD 57999).
     verify : bool
         Whether to do basic verification of integrity.  Default: `True`.
 
@@ -76,18 +72,9 @@ class Mark5BHeader(VLBIHeaderBase):
 
     kday = None
 
-    def __init__(self, words, ref_mjd=None, kday=None, verify=True, **kwargs):
+    def __init__(self, words, kday=None, verify=True, **kwargs):
         if kday is not None:
             self.kday = kday
-        elif ref_mjd is not None:
-            ref_kday, ref_jday = divmod(ref_mjd, 1000)
-            if words is None:
-                jday = 0
-            else:
-                # self is not yet initialised, so get jday from words directly
-                jday = bcd_decode(
-                    self._header_parser.parsers['bcd_jday'](words))
-            self.kday = int(ref_kday + round((ref_jday - jday) / 1000)) * 1000
         super(Mark5BHeader, self).__init__(words, verify=verify, **kwargs)
 
     def verify(self):
@@ -96,6 +83,9 @@ class Mark5BHeader(VLBIHeaderBase):
         assert (self['sync_pattern'] ==
                 self._header_parser.defaults['sync_pattern'])
         assert self.kday is None or (33000 < self.kday < 400000)
+        if self.kday is not None:
+            assert self.kday % 1000 == 0, ("kday must be explicit "
+                                           "thousands of MJD.")
 
     def copy(self, **kwargs):
         return super(Mark5BHeader, self).copy(kday=self.kday, **kwargs)
@@ -191,7 +181,7 @@ class Mark5BHeader(VLBIHeaderBase):
         """
         ns = bcd_decode(self['bcd_fraction']) * 100000
         # "unround" the nanoseconds
-        return 156250 * ((ns+156249) // 156250)
+        return 156250 * ((ns + 156249) // 156250)
 
     @ns.setter
     def ns(self, ns):
@@ -249,7 +239,7 @@ class Mark5BHeader(VLBIHeaderBase):
     def set_time(self, time):
         self.kday = int(time.mjd // 1000) * 1000
         self.jday = int(time.mjd - self.kday)
-        ns = int(round((time - Time(self.kday+self.jday, format='mjd')).sec *
+        ns = int(round((time - Time(self.kday + self.jday, format='mjd')).sec *
                        1e9))
         sec, ns = divmod(ns, 1000000000)
         self.seconds = sec

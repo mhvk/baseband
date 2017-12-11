@@ -69,16 +69,17 @@ class Mark5BFrame(VLBIFrameBase):
         super(Mark5BFrame, self).__init__(header, payload, valid, verify)
 
     @classmethod
-    def fromfile(cls, fh, ref_mjd, nchan, bps=2, valid=None, verify=True):
+    def fromfile(cls, fh, kday, nchan, bps=2, valid=None, verify=True):
         """Read a frame from a filehandle.
 
         Parameters
         ----------
         fh : filehandle
             To read the header and payload from.
-        ref_mjd : int
-            Reference MJD within 500 days of the observation time, used to
-            infer the full MJD from the time information in the header.
+        kday : int, optional
+            Explicit thousands of MJD of the observation start time (eg.
+            ``57000`` for MJD 57999), used to infer the full MJD from header's
+            time information.
         nchan : int
             Number of channels encoded in the payload.
         bps : int
@@ -86,7 +87,7 @@ class Mark5BFrame(VLBIFrameBase):
         verify : bool
             Whether to do basic checks of frame integrity (default: `True`).
         """
-        header = cls._header_class.fromfile(fh, ref_mjd, verify=verify)
+        header = cls._header_class.fromfile(fh, kday, verify=verify)
         payload = cls._payload_class.fromfile(fh, nchan, bps)
         return cls(header, payload, valid, verify)
 

@@ -56,8 +56,7 @@ from ...data import SAMPLE_MARK5B as SAMPLE_FILE
 class TestMark5B(object):
     def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
-            header = mark5b.Mark5BHeader.fromfile(
-                fh, ref_mjd=Time('2014-06-01').mjd)
+            header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
         assert header.size == 16
         assert header.kday == 56000.
         assert header.jday == 821
@@ -82,28 +81,33 @@ class TestMark5B(object):
             user=header['user'], internal_tvg=header['internal_tvg'],
             frame_nr=header['frame_nr'])
         assert header4 == header
-        # Check ref_mjd
-        header5 = mark5b.Mark5BHeader(header.words,
-                                      ref_mjd=(header.time.mjd - 499.))
-        assert header5.time == header.time
-        header6 = mark5b.Mark5BHeader(header.words,
-                                      ref_mjd=(header.time.mjd + 499.))
-        assert header6.time == header.time
         # check payload and framesize setters
-        header6.payload = 10000
-        header6.framesize = 10016
+        header5 = mark5b.Mark5BHeader(header.words, kday=56000)
+        header5.time == header.time
+        header5.payload = 10000
+        header5.framesize = 10016
         with pytest.raises(ValueError):
-            header6.payloadsize = 9999
+            header5.payloadsize = 9999
         with pytest.raises(ValueError):
-            header6.framesize = 20
+            header5.framesize = 20
         # Regression tests
-        header7 = header.copy()
-        assert header7 == header  # This checks header.words
+        header6 = header.copy()
+        assert header6 == header  # This checks header.words
         # Check kday gets copied as well
-        assert header7.kday == header.kday
+        assert header6.kday == header.kday
         # Check ns rounding works correctly.
-        header7.time = Time('2016-09-10T12:26:40.000000000')
-        assert header7.ns == 0
+        header6.time = Time('2016-09-10T12:26:40.000000000')
+        assert header6.ns == 0
+        # Check that passing exact MJD to kday gives an error.
+        with pytest.raises(AssertionError):
+            mark5b.Mark5BHeader.fromkeys(56821, **header)
+        # Check passing kday=None still reads the header, and we can set kday
+        # afterward.
+        with open(SAMPLE_FILE, 'rb') as fh:
+            header8 = mark5b.Mark5BHeader.fromfile(fh, kday=None)
+            assert header8.kday is None
+            header8.kday = 56000
+            assert header8 == header
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
@@ -178,10 +182,10 @@ class TestMark5B(object):
 
     def test_frame(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            header = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000)
+            header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
             fh.seek(0)
-            frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000)
+            frame = fh.read_frame(nchan=8, bps=2, kday=56000)
 
         assert frame.header == header
         assert frame.payload == payload
@@ -193,30 +197,40 @@ class TestMark5B(object):
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
-            frame2 = mark5b.Mark5BFrame.fromfile(s, ref_mjd=57000,
+            frame2 = mark5b.Mark5BFrame.fromfile(s, kday=56000,
                                                  nchan=frame.shape[1],
                                                  bps=frame.payload.bps)
         assert frame2 == frame
-        frame3 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2)
+
+        # Check passing in reference time.
+        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
+            frame3 = fh.read_frame(nchan=8, bps=2,
+                                   ref_time=Time('2014-06-13 12:00:00'))
         assert frame3 == frame
-        # todo: this should take ref_mjd
-        frame4 = mark5b.Mark5BFrame.fromdata(payload.data, bps=2,
-                                             kday=56000, **header)
+        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
+            frame4 = fh.read_frame(nchan=8, bps=2,
+                                   ref_time=Time('2015-12-13 12:00:00'))
         assert frame4 == frame
-        assert frame4.time == frame.time
-        frame5 = mark5b.Mark5BFrame(header, payload, valid=False)
-        assert frame5.valid is False
-        assert np.all(frame5.data == 0.)
-        frame5.valid = True
+
+        frame5 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2)
         assert frame5 == frame
-        frame6 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2,
+        frame6 = mark5b.Mark5BFrame.fromdata(payload.data, bps=2,
+                                             kday=56000, **header)
+        assert frame6 == frame
+        assert frame6.time == frame.time
+        frame7 = mark5b.Mark5BFrame(header, payload, valid=False)
+        assert frame7.valid is False
+        assert np.all(frame7.data == 0.)
+        frame7.valid = True
+        assert frame7 == frame
+        frame8 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2,
                                              valid=False)
-        assert frame6.valid is False
-        assert np.all(frame6.payload.words == 0x11223344)
+        assert frame8.valid is False
+        assert np.all(frame8.payload.words == 0x11223344)
 
     def test_header_times(self):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000)
+            header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             start_time = header0.time
             samples_per_frame = header0.payloadsize * 8 // 2 // 8
             frame_rate = 32. * u.MHz / samples_per_frame
@@ -224,7 +238,7 @@ class TestMark5B(object):
             fh.seek(0)
             while True:
                 try:
-                    frame = fh.read_frame(nchan=8, bps=2, ref_mjd=57000)
+                    frame = fh.read_frame(nchan=8, bps=2, kday=56000)
                 except EOFError:
                     break
                 header_time = frame.header.time
@@ -249,12 +263,34 @@ class TestMark5B(object):
         with pytest.raises(ValueError):
             header.get_time(frame_nr=1)
 
+    def test_ref_time_to_kday(self):
+        # Check ref_time_to_kday returns proper kday for
+        # ref_time - 500 <= MJD < ref_time + 500
+        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
+            Time(57500, format='mjd'), 882)
+        assert kday == 57000
+        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
+            Time(57500, format='mjd'), 120)
+        assert kday == 57000
+        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
+            Time(57113, format='mjd'), 882)
+        assert kday == 56000
+        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
+            Time(57762, format='mjd'), 120)
+        assert kday == 58000
+        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
+            Time(57762, format='mjd'), 262)
+        assert kday == 57000
+        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
+            Time(57762, format='mjd'), 261)
+        assert kday == 58000
+
     def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,
         # since otherwise they run *very* slow.  This is somehow related to
         # pytest, since speed is not a big issue running stuff on its own.
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            header0 = mark5b.Mark5BHeader.fromfile(fh, ref_mjd=57000)
+            header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             fh.seek(0)
             header_0 = fh.find_header(template_header=header0)
             assert fh.tell() == 0
@@ -305,7 +341,7 @@ class TestMark5B(object):
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
 
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
-                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
+                         sample_rate=32*u.MHz, kday=56000) as fh:
             assert header == fh.header0
             assert fh.fh_raw.tell() == header.framesize
             assert fh.samples_per_frame == 5000
@@ -354,26 +390,27 @@ class TestMark5B(object):
                                 [-1, +1, -3, +3, -3, +1, +3, +1]]))
         assert record3.shape == (10, 8)
 
-        # Check passing a time object into ref_mjd.
+        # Check passing a time object.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz,
-                         ref_mjd=Time('2015-01-01')) as fh:
+                         ref_time=Time('2015-01-01')) as fh:
             assert fh.header0 == header
-            assert fh._header_last == header_last
+            assert fh._last_header == last_header
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz,
-                         ref_mjd=Time('2013-01-01')) as fh:
+                         ref_time=Time('2013-01-01')) as fh:
             assert fh.header0 == header
-            assert fh._header_last == header_last
+            assert fh._last_header == last_header
 
         # Read only some selected threads.
-        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2, thread_ids=[4, 5],
-                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
+        with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                         thread_ids=[4, 5], sample_rate=32*u.MHz,
+                         ref_time=Time(57000, format='mjd')) as fh:
             record4 = fh.read(12)
         assert np.all(record4 == record[:, 4:6])
         # Read all data and check that it can be written out.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
-                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
+                         sample_rate=32*u.MHz, kday=56000) as fh:
             start_time = fh.time
             record = fh.read(20000)
             stop_time = fh.time
@@ -390,7 +427,7 @@ class TestMark5B(object):
             assert fw.time == stop_time
 
         with mark5b.open(m5_test, 'rs', nchan=8, bps=2, sample_rate=32*u.MHz,
-                         ref_mjd=57000) as fh:
+                         ref_time=Time(57000, format='mjd')) as fh:
             assert fh.time == start_time
             record2 = fh.read(20000)
             assert fh.time == stop_time
@@ -418,15 +455,31 @@ class TestMark5B(object):
             fw.write(record)
 
         with mark5b.open(m5_test, 'rs', nchan=8, bps=2,
-                         sample_rate=10*u.kHz, ref_mjd=57000) as fh:
+                         sample_rate=10*u.kHz, kday=56000) as fh:
             record5 = fh.read()     # Read across days.
             assert np.all(record5 == record)
-            assert fh.time.iso == '2014-06-14 00:00:01.000000000'
+            assert (abs(fh.time - Time('2014:165:00:00:01', precision=9)) <
+                    1. * u.ns)
+
+        # As above, but checking if data can be read across kday increments
+        # (2017-09-03 is MJD 57999 and 2017-09-04 is MJD 58000).
+        time_preturnover = Time('2017-09-03T23:59:59', precision=9)
+        with mark5b.open(m5_test, 'ws', time=time_preturnover,
+                         nchan=8, bps=2, sample_rate=10*u.kHz) as fw:
+            fw.write(record)
+
+        with mark5b.open(m5_test, 'rs', nchan=8, bps=2,
+                         sample_rate=10*u.kHz, kday=57000) as fh:
+            assert abs(fh.start_time - time_preturnover) < 1. * u.ns
+            record5 = fh.read()     # Read across kday.
+            assert np.all(record5 == record)
+            assert (abs(fh.time - Time('2017-09-04T00:00:01', precision=9)) <
+                    1. * u.ns)
 
         # Test that squeeze attribute works on read (including in-place read)
         # and write, but can be turned off if needed.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
-                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
+                         sample_rate=32*u.MHz, kday=56000) as fh:
             assert fh.sample_shape == (8,)
             assert fh.sample_shape.nchan == 8
             assert fh.read(1).shape == (8,)
@@ -437,7 +490,7 @@ class TestMark5B(object):
             assert np.all(out == record[:12])
 
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
-                         sample_rate=32*u.MHz, ref_mjd=57000,
+                         sample_rate=32*u.MHz, kday=56000,
                          thread_ids=[0], squeeze=False) as fh:
             assert fh.sample_shape == (1,)
             assert fh.sample_shape.nchan == 1
@@ -460,7 +513,7 @@ class TestMark5B(object):
             fw.write(np.zeros((20000, 1), dtype='float32'))
 
         with mark5b.open(m5_test, 'rs', nchan=1, bps=2,
-                         sample_rate=32*u.MHz, ref_mjd=57000) as fh:
+                         sample_rate=32*u.MHz, kday=56000) as fh:
             assert np.all(fh.read(20000) == record[:, 0])
 
     def test_stream_invalid(self):
@@ -474,7 +527,7 @@ class TestMark5B(object):
         m5_incomplete = str(tmpdir.join('incomplete.m5'))
         with catch_warnings(UserWarning) as w:
             with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
-                             sample_rate=32*u.MHz, ref_mjd=57000) as fr:
+                             sample_rate=32*u.MHz, kday=56000) as fr:
                 record = fr.read(10)
                 with mark5b.open(m5_incomplete, 'ws', header=fr.header0,
                                  nchan=8, sample_rate=32*u.MHz) as fw:
@@ -482,7 +535,7 @@ class TestMark5B(object):
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
         with mark5b.open(m5_incomplete, 'rs', nchan=8, bps=2,
-                         sample_rate=32*u.MHz, ref_mjd=57000) as fwr:
+                         sample_rate=32*u.MHz, kday=56000) as fwr:
             assert not fwr._frame.valid
             assert np.all(fwr.read(fill_value=fill_value) ==
                           fwr._frame.invalid_data_value)

@@ -157,7 +157,8 @@ class Mark4TrackHeader(VLBIHeaderBase):
         assert np.all(self['sync_pattern'] ==
                       self._header_parser.defaults['sync_pattern'])
         assert np.all((self['bcd_fraction'] & 0xf) % 5 != 4)
-        assert self.decade is not None and (1950 < self.decade < 3000)
+        if self.decade is not None:
+            assert (1950 < self.decade < 3000)
 
     @property
     def track_id(self):
