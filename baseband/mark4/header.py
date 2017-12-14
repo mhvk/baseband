@@ -324,6 +324,8 @@ class Mark4Header(Mark4TrackHeader):
             return np.concatenate((ta, ta + 32), axis=1)
         elif ntrack == 32:
             return ta
+        elif ntrack == 16:
+            return ta[:, :2, :].reshape(2, 8).T.reshape(4, 2, 2)
         else:
             raise ValueError("Have Mark 4 track assignments only for "
                              "ntrack=32 or 64, not {0}".format(ntrack))
@@ -482,11 +484,16 @@ class Mark4Header(Mark4TrackHeader):
                              "not {0}.".format(fanout))
         # In principle, one would like to go through track_assignments, but
         # we may not have bps set here yet, so just infer from tables:
-        # fanout = 4: (0,0,1,1,2,2,3,3) * ntrack / 2 / 4
+        # fanout = 4: (0,1,2,3) * ntrack / 4              if ntrack = 16
+        #             (0,0,1,1,2,2,3,3) * ntrack / 2 / 4  otherwise
         # fanout = 2: (0,0,1,1) * ntrack / 2 / 2
         # fanout = 1: (0,0) * ntrack / 2
-        self['fan_out'] = np.tile(np.repeat(np.arange(fanout), 2),
-                                  self.ntrack // 2 // fanout)
+        if self.ntrack == 16:
+            self['fan_out'] = np.tile(np.repeat(np.arange(fanout), 1),
+                                      self.ntrack // fanout)
+        else:
+            self['fan_out'] = np.tile(np.repeat(np.arange(fanout), 2),
+                                      self.ntrack // 2 // fanout)
 
     @property
     def samples_per_frame(self):

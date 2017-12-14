@@ -112,7 +112,21 @@ def decode_2chan_2bit_fanout4(frame):
     # The look-up table splits each data word into the above 8 measurements,
     # the transpose pushes channels first and fanout last, and the second
     # reshape flattens the fanout.
-    return (lut2bit3.take(frame, axis=0).transpose(1, 0, 2).reshape(2, -1).T)
+    return lut2bit3.take(frame, axis=0).transpose(1, 0, 2).reshape(2, -1).T
+
+
+def encode_2chan_2bit_fanout4(values):
+    """Encode payload for 2 channels using 2 bits, fan-out 4 (16 tracks)."""
+    # Reverse reshaping (see above).
+    values = values.reshape(-1, 4, 2).transpose(0, 2, 1)
+    bitvalues = encode_2bit_base(values)
+    # Values are -3, -1, +1, 3 -> 00, 01, 10, 11; get first bit (sign) as 1,
+    # second bit (magnitude) as 16.
+    reorder_bits = np.array([0, 16, 1, 17], dtype=np.uint8)
+    reorder_bits.take(bitvalues, out=bitvalues)
+    bitvalues <<= np.array([0, 1, 2, 3], dtype=np.uint8)
+    out = np.bitwise_or.reduce(bitvalues, axis=-1).ravel().view('<u2')
+    return out
 
 
 def decode_4chan_2bit_fanout4(frame):
@@ -226,7 +240,8 @@ class Mark4Payload(VLBIPayloadBase):
 
     _dtype_word = None
     # Decoders keyed by (nchan, nbit, fanout).
-    _encoders = {(4, 2, 4): encode_4chan_2bit_fanout4,
+    _encoders = {(2, 2, 4): encode_2chan_2bit_fanout4,
+                 (4, 2, 4): encode_4chan_2bit_fanout4,
                  (8, 2, 2): encode_8chan_2bit_fanout2,
                  (8, 2, 4): encode_8chan_2bit_fanout4}
     _decoders = {(2, 2, 4): decode_2chan_2bit_fanout4,
