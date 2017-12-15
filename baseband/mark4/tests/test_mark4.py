@@ -769,11 +769,10 @@ class Test16TrackFanout4():
         #   bcd_minute, bcd_second, bcd_fraction;
         # * ntrack, samples_per_frame, bps define headstack_id, bcd_track_id,
         #   fan_out, and magnitude_bit;
-        # * header.converter since lsb_output and converter_id are somewhat
-        #   non-standard
+        # * nsb = 1 sets lsb_output and converter_id
         header1 = mark4.Mark4Header.fromvalues(
             ntrack=16, samples_per_frame=80000, bps=2, time=header.time,
-            system_id=108, converters=header.converters)
+            system_id=108, nsb=1)
         assert header1 == header
 
     def test_file_streamer(self, tmpdir):

@@ -201,7 +201,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
                     .format(decade=self.decade//10, uy=self['bcd_unit_year'],
                             d=self['bcd_day'], h=self['bcd_hour'],
                             m=self['bcd_minute'],
-                            s=bcd_decode(self['bcd_second']) + self.ms/1000),
+                            s=bcd_decode(self['bcd_second']) + self.ms / 1000),
                     format='yday', scale='utc', precision=5)
 
     def set_time(self, time):
@@ -325,7 +325,7 @@ class Mark4Header(Mark4TrackHeader):
         elif ntrack == 32:
             return ta
         elif ntrack == 16:
-            return ta[:, :2, :].reshape(2, 8).T.reshape(4, 2, 2)
+            return ta[:, ::2, :] // 2
         else:
             raise ValueError("Have Mark 4 track assignments only for "
                              "ntrack=32 or 64, not {0}".format(ntrack))
@@ -492,8 +492,7 @@ class Mark4Header(Mark4TrackHeader):
         # fanout = 2: (0,0,1,1) * ntrack / 2 / 2
         # fanout = 1: (0,0) * ntrack / 2
         if self.ntrack == 16:
-            self['fan_out'] = np.tile(np.repeat(np.arange(fanout), 1),
-                                      self.ntrack // fanout)
+            self['fan_out'] = np.tile(np.arange(fanout), self.ntrack // fanout)
         else:
             self['fan_out'] = np.tile(np.repeat(np.arange(fanout), 2),
                                       self.ntrack // 2 // fanout)

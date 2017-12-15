@@ -110,8 +110,8 @@ def decode_2chan_2bit_fanout4(frame):
     #                byte 1: ch1/s0, ch1/s1, ch1/s2, ch1/s3
     frame = frame.view(np.uint8).reshape(-1, 2)
     # The look-up table splits each data word into the above 8 measurements,
-    # the transpose pushes channels first and fanout last, and the second
-    # reshape flattens the fanout.
+    # the transpose pushes channels first and fanout last, and the reshape
+    # flattens the fanout.
     return lut2bit3.take(frame, axis=0).transpose(1, 0, 2).reshape(2, -1).T
 
 
