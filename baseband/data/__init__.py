@@ -26,8 +26,15 @@ dd if=rg10a_ar_no0014 of=sample_32track.m4 bs=10000 count=17
 SAMPLE_MARK4_32TRACK_FANOUT2 = _full_path('sample_32track_fanout2.m4')
 """Mark 4 sample.  ntrack=32, fanout=2, bps=2.
 
-Created from a Arecibo observation of PSR B1133+16 using
+Created from an Arecibo observation of PSR B1133+16 using
 dd if=gk049c_ar_no0011.m5a of=sample_32track_fanout2.m4 bs=10000 count=18
+"""
+
+SAMPLE_MARK4_16TRACK = _full_path('sample_16track.m4')
+"""Mark 4 sample.  ntrack=16, fanout=4, bps=2.
+
+Created from the first two frames an Arecibo observation of the Crab Pulsar on
+2013/11/03.  (2013_306_raks02ae/ar/gs033a_ar_no0055.m5a)
 """
 
 SAMPLE_MARK5B = _full_path('sample.m5b')

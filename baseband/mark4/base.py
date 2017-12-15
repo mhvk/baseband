@@ -165,7 +165,7 @@ class Mark4FileReader(VLBIFileBase):
             Number of tracks. `None` if no frame was found.
         """
         # Currently only 32 and 64-track frames supported.
-        for nt in 32, 64:
+        for nt in 16, 32, 64:
             if self.find_frame(nt, maximum=maximum) is not None:
                 return nt
 

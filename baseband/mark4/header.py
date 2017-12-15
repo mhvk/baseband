@@ -201,7 +201,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
                     .format(decade=self.decade//10, uy=self['bcd_unit_year'],
                             d=self['bcd_day'], h=self['bcd_hour'],
                             m=self['bcd_minute'],
-                            s=bcd_decode(self['bcd_second']) + self.ms/1000),
+                            s=bcd_decode(self['bcd_second']) + self.ms / 1000),
                     format='yday', scale='utc', precision=5)
 
     def set_time(self, time):
@@ -324,6 +324,8 @@ class Mark4Header(Mark4TrackHeader):
             return np.concatenate((ta, ta + 32), axis=1)
         elif ntrack == 32:
             return ta
+        elif ntrack == 16:
+            return ta[:, ::2, :] // 2
         else:
             raise ValueError("Have Mark 4 track assignments only for "
                              "ntrack=32 or 64, not {0}".format(ntrack))
@@ -411,6 +413,9 @@ class Mark4Header(Mark4TrackHeader):
         elif ntrack == 32:
             kwargs.setdefault('headstack_id', np.zeros(32, dtype=int))
             kwargs.setdefault('track_id', np.arange(2, 34))
+        elif ntrack == 16:
+            kwargs.setdefault('headstack_id', np.zeros(16, dtype=int))
+            kwargs.setdefault('track_id', np.arange(2, 34, 2))
         # set number of sidebands to default if no information is given,
         # so that the header will be valid.
         if not any(key in kwargs for key in ('lsb_output', 'converter_id',
@@ -482,11 +487,15 @@ class Mark4Header(Mark4TrackHeader):
                              "not {0}.".format(fanout))
         # In principle, one would like to go through track_assignments, but
         # we may not have bps set here yet, so just infer from tables:
-        # fanout = 4: (0,0,1,1,2,2,3,3) * ntrack / 2 / 4
+        # fanout = 4: (0,1,2,3) * ntrack / 4              if ntrack = 16
+        #             (0,0,1,1,2,2,3,3) * ntrack / 2 / 4  otherwise
         # fanout = 2: (0,0,1,1) * ntrack / 2 / 2
         # fanout = 1: (0,0) * ntrack / 2
-        self['fan_out'] = np.tile(np.repeat(np.arange(fanout), 2),
-                                  self.ntrack // 2 // fanout)
+        if self.ntrack == 16:
+            self['fan_out'] = np.tile(np.arange(fanout), self.ntrack // fanout)
+        else:
+            self['fan_out'] = np.tile(np.repeat(np.arange(fanout), 2),
+                                      self.ntrack // 2 // fanout)
 
     @property
     def samples_per_frame(self):
