@@ -11,7 +11,8 @@ from ..header import Mark4TrackHeader
 from ..payload import reorder32, reorder64
 from ...data import (SAMPLE_MARK4 as SAMPLE_FILE,
                      SAMPLE_MARK4_32TRACK as SAMPLE_32TRACK,
-                     SAMPLE_MARK4_32TRACK_FANOUT2 as SAMPLE_32TRACK_FANOUT2)
+                     SAMPLE_MARK4_32TRACK_FANOUT2 as SAMPLE_32TRACK_FANOUT2,
+                     SAMPLE_MARK4_16TRACK as SAMPLE_16TRACK)
 
 # Results from mark5access on 2015-JAN-22.
 # m5d evn/Ar/gp052d_ar_no0021 MKIV1_4-512-8-2 1000
@@ -748,6 +749,70 @@ class Test32TrackFanout2():
 
         with open(fl, 'rb') as fh, open(SAMPLE_32TRACK_FANOUT2, 'rb') as fr:
             fr.seek(17436)
+            orig_bytes = fr.read(number_of_bytes)
+            conv_bytes = fh.read()
+            assert conv_bytes == orig_bytes
+
+
+class Test16TrackFanout4():
+    def test_find_frame(self):
+        with mark4.open(SAMPLE_16TRACK, 'rb') as fh:
+            assert fh.find_frame(ntrack=16) == 22124
+
+    def test_header(self):
+        with open(SAMPLE_16TRACK, 'rb') as fh:
+            fh.seek(22124)
+            header = mark4.Mark4Header.fromfile(fh, ntrack=16, decade=2010)
+
+        # Try initialising with properties instead of keywords.
+        # * time imply the decade, bcd_unit_year, bcd_day, bcd_hour,
+        #   bcd_minute, bcd_second, bcd_fraction;
+        # * ntrack, samples_per_frame, bps define headstack_id, bcd_track_id,
+        #   fan_out, and magnitude_bit;
+        # * nsb = 1 sets lsb_output and converter_id
+        header1 = mark4.Mark4Header.fromvalues(
+            ntrack=16, samples_per_frame=80000, bps=2, time=header.time,
+            system_id=108, nsb=1)
+        assert header1 == header
+
+    def test_file_streamer(self, tmpdir):
+        with mark4.open(SAMPLE_16TRACK, 'rs', ntrack=16, decade=2010,
+                        frames_per_second=400) as fh:
+            header0 = fh.header0
+            assert fh.samples_per_frame == 80000
+            start_time = fh.start_time
+            assert start_time.yday == '2013:307:06:00:00.77000'
+            record = fh.read(160000)
+            fh_raw_tell1 = fh.fh_raw.tell()
+            assert fh_raw_tell1 == 80000 + 22124
+            fh.fh_raw.seek(0)
+            preheader_junk = fh.fh_raw.read(22124)
+
+        assert np.all(record[:640] == 0.)
+        # Compare with m5d ar/gs033a_ar_no0055.m5a MKIV1_4-128-2-2 1000, and
+        # taking first 28 payload samples:
+        m5access_data = np.array(
+            [[3, -3, -1, 1, 1, 1, 1, -1, -3, 3, 3, -1, -1, 3,
+              -1, -1, 3, -3, 1, -3, -3, -1, 3, -3, -3, -3, 3, 1],
+             [1, 1, -3, -3, 3, 1, -1, 1, 3, 1, 1, 3, -3, -1,
+              -1, 1, 1, -3, -1, -1, -3, -3, 1, 3, 1, -1, 1, 3]])
+        assert np.all(record[640:668].astype(int) == m5access_data.T)
+
+        fl = str(tmpdir.join('test.m4'))
+        with mark4.open(fl, 'ws', header=header0, frames_per_second=400) as fw:
+            fw.fh_raw.write(preheader_junk)
+            fw.write(record)
+            number_of_bytes = fw.fh_raw.tell()
+            assert number_of_bytes == fh_raw_tell1
+
+        # Note: this test would not work if we wrote only a single record.
+        with mark4.open(fl, 'rs', ntrack=16, decade=2010,
+                        frames_per_second=400) as fh:
+            assert fh.start_time == start_time
+            record2 = fh.read()
+            assert np.all(record2 == record)
+
+        with open(fl, 'rb') as fh, open(SAMPLE_16TRACK, 'rb') as fr:
             orig_bytes = fr.read(number_of_bytes)
             conv_bytes = fh.read()
             assert conv_bytes == orig_bytes
