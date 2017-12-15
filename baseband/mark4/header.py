@@ -413,6 +413,9 @@ class Mark4Header(Mark4TrackHeader):
         elif ntrack == 32:
             kwargs.setdefault('headstack_id', np.zeros(32, dtype=int))
             kwargs.setdefault('track_id', np.arange(2, 34))
+        elif ntrack == 16:
+            kwargs.setdefault('headstack_id', np.zeros(16, dtype=int))
+            kwargs.setdefault('track_id', np.arange(2, 34, 2))
         # set number of sidebands to default if no information is given,
         # so that the header will be valid.
         if not any(key in kwargs for key in ('lsb_output', 'converter_id',
