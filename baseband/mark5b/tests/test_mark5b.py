@@ -460,7 +460,7 @@ class TestMark5B(object):
         with catch_warnings(UserWarning) as w:
             with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                              sample_rate=32*u.MHz, ref_mjd=57000) as fr:
-                record = fr.read(5010)
+                record = fr.read(10)
                 with mark5b.open(m5_incomplete, 'ws', header=fr.header0,
                                  nchan=8, sample_rate=32*u.MHz) as fw:
                     fw.write(record)
@@ -468,9 +468,7 @@ class TestMark5B(object):
         assert 'partial buffer' in str(w[0].message)
         with mark5b.open(m5_incomplete, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, ref_mjd=57000) as fwr:
-            assert np.all(fwr.read(5000) == record[:5000])
-            bad_data = fwr.read(fill_value=fill_value)
             assert not fwr._frame.valid
-            assert np.all(fwr.read() ==
+            assert np.all(fwr.read(fill_value=fill_value) ==
                           fwr._frame.invalid_data_value)
-            assert np.all(bad_data == fill_value)
+            assert fwr._frame.invalid_data_value == fill_value

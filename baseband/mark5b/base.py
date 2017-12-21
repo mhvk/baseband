@@ -239,12 +239,15 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             if(dt != dt_expected or
                frame_nr != self._frame['frame_nr']):
                 # Read relevant frame, reusing data array from previous frame.
-                self._read_frame(fill_value)
+                self._read_frame()
                 dt_expected = (self._frame.seconds - self.header0.seconds +
                                86400 * (self._frame.jday - self.header0.jday))
                 assert dt == dt_expected
                 assert frame_nr == self._frame['frame_nr']
 
+            # Set decoded value for invalid data.
+            self._frame.invalid_data_value = fill_value
+            # Decode data into array.
             data = self._frame.data
             if self.thread_ids:
                 data = data[:, self.thread_ids]
@@ -264,9 +267,6 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         self._frame = self.read_frame(ref_mjd=self.header0.kday,
                                       nchan=self._sample_shape.nchan,
                                       bps=self.bps)
-        # Convert payloads to data array.
-        self._frame_data = self._frame.data
-        self._frame.invalid_data_value = fill_value
 
 
 class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):

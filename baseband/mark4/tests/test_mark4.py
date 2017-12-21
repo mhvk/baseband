@@ -581,7 +581,7 @@ class TestMark4(object):
         m4_incomplete = str(tmpdir.join('incomplete.m4'))
         with catch_warnings(UserWarning) as w:
             with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fr:
-                record = fr.read(80010)
+                record = fr.read(10)
                 with mark4.open(m4_incomplete, 'ws', header=fr.header0,
                                 ntrack=64, decade=2010,
                                 sample_rate=32*u.MHz) as fw:
@@ -590,13 +590,10 @@ class TestMark4(object):
         assert 'partial buffer' in str(w[0].message)
         with mark4.open(m4_incomplete, 'rs', ntrack=64, decade=2010,
                         frames_per_second=400) as fwr:
-            # First frame is fine.
-            assert np.all(fwr.read(80000) == record[:80000])
-            bad_data = fwr.read(fill_value=fill_value)
             assert not fwr._frame.valid
-            assert np.all(bad_data ==
+            assert np.all(fwr.read(fill_value=fill_value) ==
                           fwr._frame.invalid_data_value)
-            assert np.all(bad_data == fill_value)
+            assert fwr._frame.invalid_data_value == fill_value
 
     def test_corrupt_stream(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb') as fh, \

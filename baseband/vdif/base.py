@@ -389,11 +389,14 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
                frame_nr != self._frameset['frame_nr']):
                 # Read relevant frame (possibly reusing data array from
                 # previous frame set).
-                self._read_frame_set(fill_value)
+                self._read_frame_set()
                 assert dt == (self._frameset['seconds'] -
                               self.header0['seconds'])
                 assert frame_nr == self._frameset['frame_nr']
 
+            # Set decoded value for invalid data.
+            self._frameset.invalid_data_value = fill_value
+            # Decode data into array.
             data = self._frameset.data.transpose(1, 0, 2)
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
@@ -405,12 +408,11 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 
         return out
 
-    def _read_frame_set(self, fill_value=0.):
+    def _read_frame_set(self):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._framesetsize)
         self._frameset = self.read_frameset(self.thread_ids,
                                             edv=self.header0.edv)
-        self._frameset.invalid_data_value = fill_value
 
 
 class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
