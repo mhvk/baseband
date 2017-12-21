@@ -374,7 +374,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             frame_nr, sample_offset = divmod(self.offset,
                                              self.samples_per_frame)
             if frame_nr != self._frame_nr:
-                self._read_frame()
+                self._read_frame(fill_value)
 
             data = self._frame.data
             if self.thread_ids:
@@ -389,7 +389,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
 
         return out
 
-    def _read_frame(self):
+    def _read_frame(self, fill_value=0.):
         frame_nr = self.offset // self.samples_per_frame
         self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
         self._frame = self.read_frame(ntrack=self.header0.ntrack,
@@ -397,6 +397,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         # Convert payloads to data array.
         self._frame_data = self._frame.data
         self._frame_nr = frame_nr
+        self._frame.invalid_data_value = fill_value
 
 
 class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
