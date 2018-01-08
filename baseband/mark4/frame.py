@@ -69,7 +69,6 @@ class Mark4Frame(VLBIFrameBase):
 
     _header_class = Mark4Header
     _payload_class = Mark4Payload
-    invalid_data_value = 0.
 
     def __init__(self, header, payload, valid=None, verify=True):
         self.header = header
