@@ -3,16 +3,19 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import pytest
-import io
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
+from astropy.tests.helper import catch_warnings
 from ... import gsb
 from ..payload import decode_4bit, encode_4bit
 from ...data import (SAMPLE_GSB_RAWDUMP_HEADER as SAMPLE_RAWDUMP_HEADER,
                      SAMPLE_GSB_RAWDUMP as SAMPLE_RAWDUMP,
                      SAMPLE_GSB_PHASED_HEADER as SAMPLE_PHASED_HEADER,
                      SAMPLE_GSB_PHASED as SAMPLE_PHASED)
+from astropy.extern import six
+if six.PY2:
+    from io import open
 
 
 class TestGSB(object):
@@ -432,6 +435,7 @@ class TestGSB(object):
                                                bps=4)
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
+            assert fh_r.size == 10 * fh_r.samples_per_frame
             assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
             # Seek last offset.
             with open(SAMPLE_RAWDUMP_HEADER, 'rt') as ft, \
@@ -468,7 +472,7 @@ class TestGSB(object):
 
         with gsb.open(SAMPLE_RAWDUMP_HEADER, mode='rs', raw=SAMPLE_RAWDUMP,
                       samples_per_frame=2**13) as fh_r, \
-                io.open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
+                open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
                 open(str(tmpdir.join('test.dat')), 'w+b') as sp:
             fh_w = gsb.open(sh, 'ws', raw=sp, samples_per_frame=2**13,
                             frames_per_second=fh_r.frames_per_second,
@@ -497,12 +501,39 @@ class TestGSB(object):
 
         # Test that opening that raises an exception correctly handles
         # file closing. (Note that the timestamp file always gets closed).
-        with io.open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
+        with open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
                 open(str(tmpdir.join('test.dat')), 'w+b') as sp:
             with pytest.raises(u.UnitsError):
                 gsb.open(sh, 'ws', raw=sp, sample_rate=3.9736/u.m,
                          samples_per_frame=2**13, **header0)
             assert not sp.closed
+
+        # Test that an incomplete last header leads to the second-to-last
+        # header being used, and raises a warning.
+        filename_incompletehead = str(
+            tmpdir.join('test_incomplete_header.timestamp'))
+        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
+                open(filename_incompletehead, 'wt') as fw:
+            fw.write(fh.read()[:-4])
+        with gsb.open(filename_incompletehead, mode='rs', raw=SAMPLE_RAWDUMP,
+                      payloadsize=2**12, squeeze=False) as fh_r:
+            with catch_warnings(UserWarning) as w:
+                fh_r._last_header
+            assert len(w) == 1
+            assert 'second-to-last entry' in str(w[0].message)
+            assert fh_r.size == 9 * fh_r.samples_per_frame
+        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
+                open(filename_incompletehead, 'wt') as fw:
+            fw.write(fh.read()[:45])
+        with gsb.open(filename_incompletehead, mode='rs', raw=SAMPLE_RAWDUMP,
+                      payloadsize=2**12, squeeze=False,
+                      frames_per_second=3.9736) as fh_r:
+            with catch_warnings(UserWarning) as w:
+                fh_r._last_header
+            assert len(w) == 1
+            assert 'second-to-last entry' in str(w[0].message)
+            assert fh_r.size == fh_r.samples_per_frame
+            assert fh_r._last_header == fh_r.header0
 
     def test_phased_stream(self, tmpdir):
         # Open here with payloadsize given, below with samples_per_frame.
@@ -516,6 +547,7 @@ class TestGSB(object):
                                                complex_data=True)
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
+            assert fh_r.size == 10 * fh_r.samples_per_frame
             assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
             # Seek last offset.
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
@@ -566,7 +598,7 @@ class TestGSB(object):
         # Try writing to file by passing header keywords into open.
         with gsb.open(SAMPLE_PHASED_HEADER, mode='rs', raw=SAMPLE_PHASED,
                       samples_per_frame=2**3) as fh_r, \
-                io.open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
+                open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
                 open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
                 open(str(tmpdir.join('test1.dat')), 'w+b') as sp1, \
                 open(str(tmpdir.join('test2.dat')), 'w+b') as sp2, \
@@ -599,12 +631,39 @@ class TestGSB(object):
             assert np.all(fh_r.read() == data1)
             fh_w.close()
 
+        # Test that an incomplete last header leads to the second-to-last
+        # header being used, and raises a warning.
+        filename_incompletehead = str(
+            tmpdir.join('test_incomplete_header.timestamp'))
+        with open(SAMPLE_PHASED_HEADER, 'rt') as fh, \
+                open(filename_incompletehead, 'wt') as fw:
+            fw.write(fh.read()[:-7])
+        with gsb.open(filename_incompletehead, mode='rs', raw=SAMPLE_PHASED,
+                      payloadsize=2**12, squeeze=False) as fh_r:
+            with catch_warnings(UserWarning) as w:
+                fh_r._last_header
+            assert len(w) == 1
+            assert 'second-to-last entry' in str(w[0].message)
+            assert fh_r.size == 9 * fh_r.samples_per_frame
+        with open(SAMPLE_PHASED_HEADER, 'rt') as fh, \
+                open(filename_incompletehead, 'wt') as fw:
+            fw.write(fh.read()[:97])
+        with gsb.open(filename_incompletehead, mode='rs', raw=SAMPLE_PHASED,
+                      payloadsize=2**12, squeeze=False,
+                      frames_per_second=3.9736) as fh_r:
+            with catch_warnings(UserWarning) as w:
+                fh_r._last_header
+            assert len(w) == 1
+            assert 'second-to-last entry' in str(w[0].message)
+            assert fh_r.size == fh_r.samples_per_frame
+            assert fh_r._last_header == fh_r.header0
+
     def test_stream_invalid(self, tmpdir):
         with pytest.raises(ValueError):
             # no r or w in mode
             gsb.open('ts.dat', 's')
         with pytest.raises(TypeError), \
-                io.open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
+                open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
             # TextIOBase for fh
             gsb.open(s, 'rt')
         with pytest.raises(IOError):
