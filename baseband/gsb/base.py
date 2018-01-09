@@ -5,6 +5,7 @@ import io
 import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
+import warnings
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import GSBHeader
@@ -129,7 +130,7 @@ class GSBStreamBase(VLBIStreamBase):
                                  (1 if rawdump else len(fh_raw[0])) //
                                  (nchan * (2 if complex_data else 1)))
 
-        # Temporary warning that specific thread reading isn't supported.
+        # Temporary assertion that specific thread reading isn't supported.
         if not rawdump:
             assert len(thread_ids) == len(fh_raw), (
                 "Baseband.gsb currently does not support "
@@ -246,19 +247,34 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     def _last_header(self):
         """Last header of the timestamp file."""
         fh_ts_offset = self.fh_ts.tell()
-        from_end = 3 * self.header0.size // 2
         self.fh_ts.seek(0, 2)
-        if self.fh_ts.tell() < from_end:
-            # only one line in file
+        fh_ts_len = self.fh_ts.tell()
+        if fh_ts_len == self.header0.size:
+            # Only one line in file
             return self.header0
 
         # Read last bytes in binary, since cannot seek back from end in
         # text files.
+        from_end = min(5 * self.header0.size // 2, fh_ts_len)
         self.fh_ts.buffer.seek(-from_end, 2)
         last_lines = self.fh_ts.buffer.read(from_end).strip().split(b'\n')
-        last_line = last_lines[-1].decode('ascii')
         self.fh_ts.seek(fh_ts_offset)
-        return self.header0.__class__(tuple(last_line.split()))
+        last_line = last_lines[-1].decode('ascii')
+        last_line_tuple = tuple(last_line.split())
+        # If the last header is missing characters, use the header before it
+        # (which may be the first header).
+        try:
+            assert (len(" ".join(last_line_tuple)) >=
+                    len(" ".join(self.header0.words)))
+            last_header = self.header0.__class__(last_line_tuple)
+        except Exception:
+            warnings.warn("The last header entry, '{0}', has an incorect "
+                          "length.  Using the second-to-last entry instead."
+                          .format(last_line))
+            second_last_line = last_lines[-2].decode('ascii')
+            second_last_line_tuple = tuple(second_last_line.split())
+            last_header = self.header0.__class__(second_last_line_tuple)
+        return last_header
 
     def read(self, count=None, fill_value=0., out=None):
         """Read count samples.
