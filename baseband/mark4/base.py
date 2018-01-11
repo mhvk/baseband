@@ -30,12 +30,12 @@ class Mark4FileReader(VLBIFileBase):
         ----------
         ntrack : int
             Number of Mark 4 bitstreams.
-        decade : int
-            Decade the observations were taken in, needed to remove ambiguity
-            in the Mark 4 time stamp.  Used only if `ref_time` is ``None``.
-        ref_time : `~astropy.time.Time`, optional
-            Reference time within 4 years of the start time of the
-            observations.  Can instead pass `decade`.
+        decade : int, or None, optional
+            Decade in which the observations were taken.  Can instead pass an
+            approximate `ref_time`.
+        ref_time : `~astropy.time.Time`, or None, optional
+            Reference time within 4 years of the observation time.  Used only
+            if `decade` is ``None``.
 
         Returns
         -------
@@ -44,13 +44,8 @@ class Mark4FileReader(VLBIFileBase):
             :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
             respectively.
         """
-        frame = Mark4Frame.fromfile(self.fh_raw, ntrack=ntrack, decade=decade)
-        if ref_time:
-            # Unnecessary to decode BCD for single digit.
-            header_unit_year = frame.header['bcd_unit_year'][0]
-            frame.header.decade = self.ref_time_to_decade(ref_time,
-                                                          header_unit_year)
-        return frame
+        return Mark4Frame.fromfile(self.fh_raw, ntrack, decade=decade,
+                                   ref_time=ref_time)
 
     def find_frame(self, ntrack, maximum=None, forward=True):
         """Look for the first occurrence of a frame, from the current position.
@@ -196,9 +191,9 @@ class Mark4FileReader(VLBIFileBase):
             Number of tracks used to store the data.  Required if
             ``template_header`` is ``None``.
         decade : int, optional
-            Decade the observations were taken in, needed to remove ambiguity
-            in the Mark 4 time stamp.  Required if ``template_header`` is
-            ``None``.
+            Decade in which the observations were taken, needed to remove
+            ambiguity in the Mark 4 time stamp.  Required if
+            ``template_header`` is ``None``.
         maximum : int, optional
             Maximum number of bytes to search through.  Default is twice the
             framesize.
@@ -216,26 +211,9 @@ class Mark4FileReader(VLBIFileBase):
         offset = self.find_frame(ntrack, maximum, forward)
         if offset is None:
             return None
-        header = Mark4Header.fromfile(self.fh_raw, ntrack=ntrack,
-                                      decade=decade)
+        header = Mark4Header.fromfile(self.fh_raw, ntrack, decade=decade)
         self.fh_raw.seek(offset)
         return header
-
-    @staticmethod
-    def ref_time_to_decade(ref_time, header_unit_year):
-        """Uses a reference time to determine a header's ``decade``.
-
-        Parameters
-        ----------
-        ref_time : `~astropy.time.Time`
-            Reference time within 4 years of the start time of the
-            observations.
-        header_unit_year : int
-            Unit digit of the year the observations, from the header.
-        """
-        ref_decade, ref_year = divmod(ref_time.datetime.year, 10)
-        return 10 * int(ref_decade +
-                        np.round((ref_year - header_unit_year) / 10.))
 
 
 class Mark4FileWriter(VLBIFileBase):
@@ -273,16 +251,17 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     Parameters
     ----------
     fh_raw : `~baseband.mark4.Mark4FileReader`
-        file handle to the raw Mark 4 data stream.
+        File handle to the raw Mark 4 data stream.
     ntrack : int, or None
         Number of tracks used to store the data.  If ``None``, will attempt to
         automatically detect it by scanning the file.
-    decade : int, optional
-        Decade the observations were taken in, needed to remove ambiguity in
-        the Mark 4 time stamp.  Used only if `ref_time` is ``None``.
-    ref_time : `~astropy.time.Time`, optional
+    decade : int, or None, optional
+        Decade of the observation start time (eg. ``2010`` for 2018), needed to
+        remove ambiguity in the Mark 4 time stamp.  Can instead pass an
+        approximate `ref_time`.
+    ref_time : `~astropy.time.Time`, or None, optional
         Reference time within 4 years of the start time of the observations.
-        Can instead pass `decade`.
+        Used only if `decade` is ``None``.
     thread_ids: list of int, optional
         Specific threads/channels to read.  By default, all are read.
     frames_per_second : int, optional
@@ -370,8 +349,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         last_header = super(Mark4StreamReader, self)._last_header
         # decade correction.
         header_unit_year = last_header['bcd_unit_year'][0]
-        last_header.decade = self.ref_time_to_decade(self.header0.time,
-                                                     header_unit_year)
+        last_header.decade = Mark4Header.infer_decade(self.header0.time,
+                                                      header_unit_year)
         return last_header
 
     def read(self, count=None, fill_value=0., out=None):
@@ -542,12 +521,13 @@ open = make_opener('Mark4', globals(), doc="""
 
 ntrack : int
     Number of tracks used to store the data.
-decade : int, optional
-    Decade the observations were taken in, needed to remove ambiguity in the
-    Mark 4 time stamp.  Used only if `ref_time` is ``None``.
-ref_time : `~astropy.time.Time`, optional
-    Reference time within 4 years of the start time of the observations.  Can
-    instead pass `decade`.
+decade : int, or None, optional
+    Decade of the observation start time (eg. ``2010`` for 2018), needed to
+    remove ambiguity in the Mark 4 time stamp.  Can instead pass an approximate
+    `ref_time`.
+ref_time : `~astropy.time.Time`, or None, optional
+    Reference time within 4 years of the start time of the observations.  Used
+    only if `decade` is ``None``.
 thread_ids: list of int, optional
     Specific threads/channels to read.  By default, all are read.
 frames_per_second : int, optional

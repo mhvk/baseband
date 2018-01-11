@@ -81,23 +81,29 @@ class TestMark5B(object):
             user=header['user'], internal_tvg=header['internal_tvg'],
             frame_nr=header['frame_nr'])
         assert header4 == header
+        # Check that passing approximate ref_time is equivalent to passing
+        # exact kday.
+        with open(SAMPLE_FILE, 'rb') as fh:
+            header5 = mark5b.Mark5BHeader.fromfile(
+                fh, ref_time=Time(57200, format='mjd'))
+        assert header5 == header
         # check payload and framesize setters
-        header5 = mark5b.Mark5BHeader(header.words, kday=56000)
-        header5.time == header.time
-        header5.payload = 10000
-        header5.framesize = 10016
+        header6 = mark5b.Mark5BHeader(header.words, kday=56000)
+        header6.time == header.time
+        header6.payload = 10000
+        header6.framesize = 10016
         with pytest.raises(ValueError):
-            header5.payloadsize = 9999
+            header6.payloadsize = 9999
         with pytest.raises(ValueError):
-            header5.framesize = 20
+            header6.framesize = 20
         # Regression tests
-        header6 = header.copy()
-        assert header6 == header  # This checks header.words
+        header7 = header.copy()
+        assert header7 == header  # This checks header.words
         # Check kday gets copied as well
-        assert header6.kday == header.kday
+        assert header7.kday == header.kday
         # Check ns rounding works correctly.
-        header6.time = Time('2016-09-10T12:26:40.000000000')
-        assert header6.ns == 0
+        header7.time = Time('2016-09-10T12:26:40.000000000')
+        assert header7.ns == 0
         # Check that passing exact MJD to kday gives an error.
         with pytest.raises(AssertionError):
             mark5b.Mark5BHeader.fromkeys(56821, **header)
@@ -108,6 +114,28 @@ class TestMark5B(object):
             assert header8.kday is None
             header8.kday = 56000
             assert header8 == header
+
+    def test_infer_kday(self):
+        # Check that infer_kday returns proper kday for
+        # ref_time - 500 <= MJD < ref_time + 500
+        kday = mark5b.header.Mark5BHeader.infer_kday(
+            Time(57500, format='mjd'), 882)
+        assert kday == 57000
+        kday = mark5b.header.Mark5BHeader.infer_kday(
+            Time(57500, format='mjd'), 120)
+        assert kday == 57000
+        kday = mark5b.header.Mark5BHeader.infer_kday(
+            Time(57113, format='mjd'), 882)
+        assert kday == 56000
+        kday = mark5b.header.Mark5BHeader.infer_kday(
+            Time(57762, format='mjd'), 120)
+        assert kday == 58000
+        kday = mark5b.header.Mark5BHeader.infer_kday(
+            Time(57762, format='mjd'), 262)
+        assert kday == 57000
+        kday = mark5b.header.Mark5BHeader.infer_kday(
+            Time(57762, format='mjd'), 261)
+        assert kday == 58000
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
@@ -262,28 +290,6 @@ class TestMark5B(object):
         assert header.get_time(frame_nr=0) == header0.time
         with pytest.raises(ValueError):
             header.get_time(frame_nr=1)
-
-    def test_ref_time_to_kday(self):
-        # Check ref_time_to_kday returns proper kday for
-        # ref_time - 500 <= MJD < ref_time + 500
-        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
-            Time(57500, format='mjd'), 882)
-        assert kday == 57000
-        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
-            Time(57500, format='mjd'), 120)
-        assert kday == 57000
-        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
-            Time(57113, format='mjd'), 882)
-        assert kday == 56000
-        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
-            Time(57762, format='mjd'), 120)
-        assert kday == 58000
-        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
-            Time(57762, format='mjd'), 262)
-        assert kday == 57000
-        kday = mark5b.base.Mark5BFileReader.ref_time_to_kday(
-            Time(57762, format='mjd'), 261)
-        assert kday == 58000
 
     def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,

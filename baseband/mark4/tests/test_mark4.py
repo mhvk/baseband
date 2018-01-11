@@ -104,11 +104,20 @@ class TestMark4(object):
             system_id=108)
         assert header4 == header
         assert header4.mutable is True
-        # Check decade.
-        header5 = mark4.Mark4Header(header.words, decade=2015)
-        assert header5.time == header.time
-        header6 = mark4.Mark4Header(header.words, decade=2019)
-        assert header6.time == header.time
+        # Check that passing a year into decade leads to an error.
+        with pytest.raises(AssertionError):
+            mark4.Mark4Header(header.words, decade=2014)
+        # Check that passing approximate ref_time is equivalent to passing a
+        # decade.
+        with open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            header5 = mark4.Mark4Header.fromfile(
+                fh, ntrack=64, ref_time=Time('2010:351:12:00:00.0'))
+            assert header5 == header
+            fh.seek(0xa88)
+            header6 = mark4.Mark4Header.fromfile(
+                fh, ntrack=64, ref_time=Time('2018:113:16:30:00.0'))
+            assert header6 == header
         # Check changing properties.
         header7 = header.copy()
         assert header7 == header
@@ -177,6 +186,25 @@ class TestMark4(object):
         header13.time = header.time
         assert header13.ntrack == 53
         assert abs(header13.time - header.time) < 1. * u.ns
+
+    def test_infer_decade(self):
+        # Check that infer_decade returns proper decade for
+        # ref_time.year - 5 < year <= ref_time.year + 5.
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2014:1:12:00:00'), 5)
+        assert decade == 2010
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2009:362:19:27:33'), 5)
+        assert decade == 2000
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2009:362:19:27:33'), 3)
+        assert decade == 2010
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2018:117:6:42:15'), 2)
+        assert decade == 2020
+        decade = mark4.header.Mark4Header.infer_decade(
+            Time('2018:117:6:42:15'), 4)
+        assert decade == 2010
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
@@ -468,26 +496,6 @@ class TestMark4(object):
             ntrack = fh.determine_ntrack()
             assert fh.fh_raw.tell() == offset0
             assert ntrack == 32
-
-    def test_ref_time_to_decade(self):
-        # Check ref_time_to_decade returns proper decade for
-        # ref_time - 4 <= year < ref_time + 4 (can't go up to 5 because we
-        # only pass header year info).
-        decade = mark4.base.Mark4FileReader.ref_time_to_decade(
-            Time('2014:1:12:00:00'), 5)
-        assert decade == 2010
-        decade = mark4.base.Mark4FileReader.ref_time_to_decade(
-            Time('2009:362:19:27:33'), 5)
-        assert decade == 2000
-        decade = mark4.base.Mark4FileReader.ref_time_to_decade(
-            Time('2009:362:19:27:33'), 3)
-        assert decade == 2010
-        decade = mark4.base.Mark4FileReader.ref_time_to_decade(
-            Time('2018:117:6:42:15'), 2)
-        assert decade == 2020
-        decade = mark4.base.Mark4FileReader.ref_time_to_decade(
-            Time('2018:117:6:42:15'), 4)
-        assert decade == 2010
 
     def test_filestreamer(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:

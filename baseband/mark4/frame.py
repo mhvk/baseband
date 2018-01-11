@@ -100,7 +100,7 @@ class Mark4Frame(VLBIFrameBase):
             self.header['communication_error'] = True
 
     @classmethod
-    def fromfile(cls, fh, ntrack, decade=None, verify=True):
+    def fromfile(cls, fh, ntrack, decade=None, ref_time=None, verify=True):
         """Read a frame from a filehandle.
 
         Parameters
@@ -109,13 +109,18 @@ class Mark4Frame(VLBIFrameBase):
             To read header from.
         ntrack : int
             Number of Mark 4 bitstreams.
-        decade : int, or None
-            Decade the observations were taken (needed to remove ambiguity in
-            the Mark 4 time stamp).
+        decade : int, or None, optional
+            Decade in which the observations were taken.  Can instead pass an
+            approximate `ref_time`.
+        ref_time : `~astropy.time.Time`, or None, optional
+            Reference time within 4 years of the observation time.  Used only
+            if `decade` is ``None``.
+
         verify : bool
             Whether to do basic verification of integrity.  Default: `True`.
         """
-        header = cls._header_class.fromfile(fh, ntrack, decade, verify)
+        header = cls._header_class.fromfile(fh, ntrack, decade=decade,
+                                            ref_time=ref_time, verify=verify)
         payload = cls._payload_class.fromfile(fh, header=header)
         return cls(header, payload, verify=verify)
 

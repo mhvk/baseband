@@ -44,8 +44,13 @@ class Mark5BHeader(VLBIHeaderBase):
     words : tuple of int, or None
         Eight (or four for legacy VDIF) 32-bit unsigned int header words.
         If ``None``, set to a tuple of zeros for later initialisation.
-    kday : int, or None
-        Explicit thousands of MJD (eg. ``57000`` for MJD 57999).
+    kday : int, or None, optional
+        Explicit thousands of MJD of the observation time (needed to remove
+        ambiguity in the Mark 5B time stamp).  Can instead pass an approximate
+        `ref_time`.
+    ref_time : `~astropy.time.Time`, or None, optional
+        Reference time within 500 days of the observation time, used to infer
+        the full MJD.  Used only if `kday` is ``None``.
     verify : bool
         Whether to do basic verification of integrity.  Default: `True`.
 
@@ -72,10 +77,14 @@ class Mark5BHeader(VLBIHeaderBase):
 
     kday = None
 
-    def __init__(self, words, kday=None, verify=True, **kwargs):
+    def __init__(self, words, kday=None, ref_time=None, verify=True, **kwargs):
+        super(Mark5BHeader, self).__init__(words, verify=False, **kwargs)
         if kday is not None:
             self.kday = kday
-        super(Mark5BHeader, self).__init__(words, verify=verify, **kwargs)
+        elif ref_time is not None:
+            self.kday = self.infer_kday(ref_time, self.jday)
+        if verify:
+            self.verify()
 
     def verify(self):
         """Verify header integrity."""
@@ -125,6 +134,26 @@ class Mark5BHeader(VLBIHeaderBase):
                               base=2)
             if verify:
                 self.verify()
+
+    @staticmethod
+    def infer_kday(ref_time, header_jday):
+        """Uses a reference time to determine a header's ``kday``.
+
+        Parameters
+        ----------
+        ref_time : `~astropy.time.Time`
+            Reference time within 500 days of the observation time.
+        header_jday : int
+            Correct jday from the header.
+
+        Returns
+        -------
+        kday : int
+            Explicit thousands of MJD of the observation time.
+        """
+        ref_kday, ref_jday = divmod(ref_time.mjd, 1000)
+        return 1000 * int(ref_kday + np.round((ref_jday -
+                                               header_jday) / 1000.))
 
     @property
     def payloadsize(self):
