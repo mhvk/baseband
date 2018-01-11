@@ -454,7 +454,8 @@ class TestMark5B(object):
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
-    def test_incomplete_stream(self, tmpdir):
+    @pytest.mark.parametrize('fill_value', (0., -999.))
+    def test_incomplete_stream(self, tmpdir, fill_value):
         m5_incomplete = str(tmpdir.join('incomplete.m5'))
         with catch_warnings(UserWarning) as w:
             with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
@@ -468,5 +469,6 @@ class TestMark5B(object):
         with mark5b.open(m5_incomplete, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, ref_mjd=57000) as fwr:
             assert not fwr._frame.valid
-            assert np.all(fwr.read() ==
+            assert np.all(fwr.read(fill_value=fill_value) ==
                           fwr._frame.invalid_data_value)
+            assert fwr._frame.invalid_data_value == fill_value

@@ -601,7 +601,8 @@ class TestVDIF(object):
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
-    def test_incomplete_stream(self, tmpdir):
+    @pytest.mark.parametrize('fill_value', (0., -999.))
+    def test_incomplete_stream(self, tmpdir, fill_value):
         vdif_incomplete = str(tmpdir.join('incomplete.vdif'))
         with catch_warnings(UserWarning) as w:
             with vdif.open(SAMPLE_FILE, 'rs') as fr:
@@ -613,8 +614,9 @@ class TestVDIF(object):
         assert 'partial buffer' in str(w[0].message)
         with vdif.open(vdif_incomplete, 'rs') as fwr:
             assert all([not frame.valid for frame in fwr._frameset.frames])
-            assert np.all(fwr.read() ==
+            assert np.all(fwr.read(fill_value=fill_value) ==
                           fwr._frameset.invalid_data_value)
+            assert fwr._frameset.invalid_data_value == fill_value
 
     def test_corrupt_stream(self, tmpdir):
         with vdif.open(SAMPLE_FILE, 'rb') as fh, \
