@@ -245,6 +245,9 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
                 assert dt == dt_expected
                 assert frame_nr == self._frame['frame_nr']
 
+            # Set decoded value for invalid data.
+            self._frame.invalid_data_value = fill_value
+            # Decode data into array.
             data = self._frame.data
             if self.thread_ids:
                 data = data[:, self.thread_ids]
@@ -258,14 +261,12 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
 
         return out
 
-    def _read_frame(self):
+    def _read_frame(self, fill_value=0.):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
         self._frame = self.read_frame(ref_mjd=self.header0.kday,
                                       nchan=self._sample_shape.nchan,
                                       bps=self.bps)
-        # Convert payloads to data array.
-        self._frame_data = self._frame.data
 
 
 class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):

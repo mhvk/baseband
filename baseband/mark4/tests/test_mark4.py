@@ -576,7 +576,8 @@ class TestMark4(object):
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
-    def test_incomplete_stream(self, tmpdir):
+    @pytest.mark.parametrize('fill_value', (0., -999.))
+    def test_incomplete_stream(self, tmpdir, fill_value):
         m4_incomplete = str(tmpdir.join('incomplete.m4'))
         with catch_warnings(UserWarning) as w:
             with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fr:
@@ -590,8 +591,9 @@ class TestMark4(object):
         with mark4.open(m4_incomplete, 'rs', ntrack=64, decade=2010,
                         frames_per_second=400) as fwr:
             assert not fwr._frame.valid
-            assert np.all(fwr.read() ==
+            assert np.all(fwr.read(fill_value=fill_value) ==
                           fwr._frame.invalid_data_value)
+            assert fwr._frame.invalid_data_value == fill_value
 
     def test_corrupt_stream(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb') as fh, \
