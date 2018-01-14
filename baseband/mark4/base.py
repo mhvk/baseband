@@ -333,10 +333,10 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         """
         oldpos = fh.tell()
         header0 = header_template.fromfile(fh, header_template.ntrack,
-                                           decade=header_template.decade)
+                                           ref_time=header_template.time)
         fh.seek(header0.payloadsize, 1)
         header1 = header_template.fromfile(fh, header_template.ntrack,
-                                           decade=header_template.decade)
+                                           ref_time=header_template.time)
         fh.seek(oldpos)
         # Mark 4 specification states frames-lengths range from 1.25 ms
         # to 160 ms.
@@ -347,10 +347,9 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     def _last_header(self):
         """Last header of the file."""
         last_header = super(Mark4StreamReader, self)._last_header
-        # decade correction.
-        header_unit_year = last_header['bcd_unit_year'][0]
-        last_header.decade = Mark4Header.infer_decade(self.header0.time,
-                                                      header_unit_year)
+        # Infer the decade, assuming the end of the file is no more than
+        # 4 years away from the start.
+        last_header.infer_decade(self.header0.time)
         return last_header
 
     def read(self, count=None, fill_value=0., out=None):

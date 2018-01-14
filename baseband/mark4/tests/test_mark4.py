@@ -187,24 +187,19 @@ class TestMark4(object):
         assert header13.ntrack == 53
         assert abs(header13.time - header.time) < 1. * u.ns
 
-    def test_infer_decade(self):
+    @pytest.mark.parametrize(('unit_year', 'ref_time', 'decade'),
+                             [(5, Time('2014:1:12:00:00'), 2010),
+                              (5, Time('2009:362:19:27:33'), 2000),
+                              (3, Time('2009:362:19:27:33'), 2010),
+                              (2, Time('2018:117:6:42:15'), 2020),
+                              (4, Time('2018:117:6:42:15'), 2010)])
+    def test_infer_decade(self, unit_year, ref_time, decade):
         # Check that infer_decade returns proper decade for
         # ref_time.year - 5 < year <= ref_time.year + 5.
-        decade = mark4.header.Mark4Header.infer_decade(
-            Time('2014:1:12:00:00'), 5)
-        assert decade == 2010
-        decade = mark4.header.Mark4Header.infer_decade(
-            Time('2009:362:19:27:33'), 5)
-        assert decade == 2000
-        decade = mark4.header.Mark4Header.infer_decade(
-            Time('2009:362:19:27:33'), 3)
-        assert decade == 2010
-        decade = mark4.header.Mark4Header.infer_decade(
-            Time('2018:117:6:42:15'), 2)
-        assert decade == 2020
-        decade = mark4.header.Mark4Header.infer_decade(
-            Time('2018:117:6:42:15'), 4)
-        assert decade == 2010
+        header = mark4.header.Mark4Header(None, ntrack=16, verify=False)
+        header['bcd_unit_year'] = unit_year
+        header.infer_decade(ref_time)
+        assert header.decade == decade
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
