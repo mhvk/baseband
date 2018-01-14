@@ -19,21 +19,21 @@ class Mark5BFileReader(VLBIFileBase):
     Adds ``read_frame`` and ``find_header`` methods to the VLBI file wrapper.
     """
 
-    def read_frame(self, nchan, kday=None, ref_time=None, bps=2):
+    def read_frame(self, nchan, bps=2, kday=None, ref_time=None):
         """Read a single frame (header plus payload).
 
         Parameters
         ----------
         nchan : int
             Number of channels encoded in the payload.
+        bps : int
+            Bits per sample (default=2).
         kday : int, or None, optional
             Explicit thousands of MJD of the observation time.  Can instead
             pass an approximate `ref_time`.
         ref_time : `~astropy.time.Time`, or None, optional
             Reference time within 500 days of the observation time, used to
             infer the full MJD.  Used only if `kday` is ``None``.
-        bps : int
-            Bits per sample (default=2).
 
         Returns
         -------
@@ -41,8 +41,8 @@ class Mark5BFileReader(VLBIFileBase):
             With ``header`` and ``data`` properties that return the
             Mark5BHeader and data encoded in the frame, respectively.
         """
-        return Mark5BFrame.fromfile(self.fh_raw, nchan, kday=kday,
-                                    ref_time=ref_time, bps=bps)
+        return Mark5BFrame.fromfile(self.fh_raw, nchan, bps=bps,
+                                    kday=kday, ref_time=ref_time)
 
     def find_header(self, template_header=None, framesize=None, kday=None,
                     maximum=None, forward=True):
@@ -210,8 +210,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
-        self._frame = self.read_frame(ref_time=ref_time, kday=kday,
-                                      nchan=nchan, bps=bps)
+        self._frame = self.read_frame(nchan=nchan, bps=bps,
+                                      ref_time=ref_time, kday=kday)
         self._frame_data = None
         header = self._frame.header
         sample_shape = (Mark5BPayload._sample_shape_maker(len(thread_ids)) if
@@ -234,9 +234,9 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     def _last_header(self):
         """Last header of the file."""
         last_header = super(Mark5BStreamReader, self)._last_header
-        # kday correction.
-        last_header.kday = Mark5BHeader.infer_kday(self.header0.time,
-                                                   last_header.jday)
+        # Infer kday, assuming the end of the file is no more than
+        # 500 days away from the start.
+        last_header.infer_kday(self.header0.time)
         return last_header
 
     def read(self, count=None, fill_value=0., out=None):
@@ -309,9 +309,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     def _read_frame(self, fill_value=0.):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
-        self._frame = self.read_frame(ref_time=self.header0.time,
-                                      nchan=self._sample_shape.nchan,
-                                      bps=self.bps)
+        self._frame = self.read_frame(nchan=self._sample_shape.nchan,
+                                      bps=self.bps, ref_time=self.header0.time)
 
 
 class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):

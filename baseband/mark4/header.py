@@ -164,7 +164,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
             assert self.decade % 10 == 0, "decade must be end in zero"
 
     def infer_decade(self, ref_time):
-        """Uses a reference time to determine a header's ``decade``.
+        """Uses a reference time to set a header's ``decade``.
 
         Parameters
         ----------

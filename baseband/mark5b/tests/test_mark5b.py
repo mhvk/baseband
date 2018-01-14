@@ -115,27 +115,20 @@ class TestMark5B(object):
             header8.kday = 56000
             assert header8 == header
 
-    def test_infer_kday(self):
+    @pytest.mark.parametrize(('jday', 'ref_time', 'kday'),
+                             [(882, Time(57500, format='mjd'), 57000),
+                              (120, Time(57500, format='mjd'), 57000),
+                              (882, Time(57113, format='mjd'), 56000),
+                              (120, Time(57762, format='mjd'), 58000),
+                              (263, Time(57762, format='mjd'), 57000),
+                              (261, Time(57762, format='mjd'), 58000)])
+    def test_infer_kday(self, jday, ref_time, kday):
         # Check that infer_kday returns proper kday for
         # ref_time - 500 <= MJD < ref_time + 500
-        kday = mark5b.header.Mark5BHeader.infer_kday(
-            Time(57500, format='mjd'), 882)
-        assert kday == 57000
-        kday = mark5b.header.Mark5BHeader.infer_kday(
-            Time(57500, format='mjd'), 120)
-        assert kday == 57000
-        kday = mark5b.header.Mark5BHeader.infer_kday(
-            Time(57113, format='mjd'), 882)
-        assert kday == 56000
-        kday = mark5b.header.Mark5BHeader.infer_kday(
-            Time(57762, format='mjd'), 120)
-        assert kday == 58000
-        kday = mark5b.header.Mark5BHeader.infer_kday(
-            Time(57762, format='mjd'), 262)
-        assert kday == 57000
-        kday = mark5b.header.Mark5BHeader.infer_kday(
-            Time(57762, format='mjd'), 261)
-        assert kday == 58000
+        header = mark5b.header.Mark5BHeader(None, verify=False)
+        header.jday = jday
+        header.infer_kday(ref_time)
+        assert header.kday == kday
 
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
