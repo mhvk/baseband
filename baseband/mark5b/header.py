@@ -82,7 +82,7 @@ class Mark5BHeader(VLBIHeaderBase):
         if kday is not None:
             self.kday = kday
         elif ref_time is not None:
-            self.kday = self.infer_kday(ref_time, self.jday)
+            self.infer_kday(ref_time)
         if verify:
             self.verify()
 
@@ -93,8 +93,7 @@ class Mark5BHeader(VLBIHeaderBase):
                 self._header_parser.defaults['sync_pattern'])
         assert self.kday is None or (33000 < self.kday < 400000)
         if self.kday is not None:
-            assert self.kday % 1000 == 0, ("kday must be explicit "
-                                           "thousands of MJD.")
+            assert self.kday % 1000 == 0, "kday must be thousands of MJD."
 
     def copy(self, **kwargs):
         return super(Mark5BHeader, self).copy(kday=self.kday, **kwargs)
@@ -135,25 +134,15 @@ class Mark5BHeader(VLBIHeaderBase):
             if verify:
                 self.verify()
 
-    @staticmethod
-    def infer_kday(ref_time, header_jday):
-        """Uses a reference time to determine a header's ``kday``.
+    def infer_kday(self, ref_time):
+        """Uses a reference time to set a header's ``kday``.
 
         Parameters
         ----------
         ref_time : `~astropy.time.Time`
             Reference time within 500 days of the observation time.
-        header_jday : int
-            Correct jday from the header.
-
-        Returns
-        -------
-        kday : int
-            Explicit thousands of MJD of the observation time.
         """
-        ref_kday, ref_jday = divmod(ref_time.mjd, 1000)
-        return 1000 * int(ref_kday + np.round((ref_jday -
-                                               header_jday) / 1000.))
+        self.kday = np.round(ref_time.mjd - self.jday, decimals=-3).astype(int)
 
     @property
     def payloadsize(self):

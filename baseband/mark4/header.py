@@ -141,13 +141,15 @@ class Mark4TrackHeader(VLBIHeaderBase):
 
     decade = None
 
-    def __init__(self, words, decade=None, verify=True):
+    def __init__(self, words, decade=None, ref_time=None, verify=True):
         if words is None:
             self.words = [0, 0, 0, 0, 0]
         else:
             self.words = words
         if decade is not None:
             self.decade = decade
+        elif ref_time is not None:
+            self.infer_decade(ref_time)
         if verify:
             self.verify()
 
@@ -159,8 +161,18 @@ class Mark4TrackHeader(VLBIHeaderBase):
         assert np.all((self['bcd_fraction'] & 0xf) % 5 != 4)
         if self.decade is not None:
             assert (1950 < self.decade < 3000)
-            assert self.decade % 10 == 0, ("decade must be explicit "
-                                           "decades.")
+            assert self.decade % 10 == 0, "decade must end in zero"
+
+    def infer_decade(self, ref_time):
+        """Uses a reference time to set a header's ``decade``.
+
+        Parameters
+        ----------
+        ref_time : `~astropy.time.Time`
+            Reference time within 5 years of the observation time.
+        """
+        self.decade = np.round(ref_time.decimalyear - self['bcd_unit_year'],
+                               decimals=-1).astype(int)
 
     @property
     def track_id(self):
@@ -293,16 +305,9 @@ class Mark4Header(Mark4TrackHeader):
     def __init__(self, words, ntrack=None, decade=None, ref_time=None,
                  verify=True):
         if words is None:
-            self.words = np.zeros((5, ntrack), dtype=np.uint32)
-        else:
-            self.words = words
-        if decade is not None:
-            self.decade = decade
-        elif ref_time is not None:
-            self.decade = self.infer_decade(ref_time,
-                                            self['bcd_unit_year'][0])
-        if verify:
-            self.verify()
+            words = np.zeros((5, ntrack), dtype=np.uint32)
+        super(Mark4Header, self).__init__(words, decade=decade,
+                                          ref_time=ref_time, verify=verify)
 
     def verify(self):
         super(Mark4Header, self).verify()
@@ -311,20 +316,11 @@ class Mark4Header(Mark4TrackHeader):
                                                  self['lsb_output']))) ==
                 self.nchan)
 
-    @staticmethod
-    def infer_decade(ref_time, header_unit_year):
-        """Uses a reference time to determine a header's ``decade``.
-
-        Parameters
-        ----------
-        ref_time : `~astropy.time.Time`
-            Reference time within 4 years of the observation time.
-        header_unit_year : int
-            Unit digit of the year the observations, from the header.
-        """
-        ref_decade, ref_year = divmod(ref_time.datetime.year, 10)
-        return 10 * int(ref_decade + np.round((ref_year -
-                                               header_unit_year) / 10.))
+    def infer_decade(self, ref_time):
+        super(Mark4Header, self).infer_decade(ref_time)
+        if getattr(self.decade, 'size', 1) > 1:
+            assert np.all(self.decade == self.decade[0])
+            self.decade = self.decade[0]
 
     @classmethod
     def _stream_dtype(cls, ntrack):
@@ -420,11 +416,11 @@ class Mark4Header(Mark4TrackHeader):
         ntrack : int
             Number of Mark 4 bitstreams.
         decade : int, or None, optional
-            Decade in which the observations were taken.  Can instead pass an
-            approximate `ref_time`.
+            Decade in which the observations were taken.  Not needed if
+            ``time`` is given.  Can instead pass an approximate `ref_time`.
         ref_time : `~astropy.time.Time`, or None, optional
-            Reference time within 4 years of the observation time.  Used only
-            if `decade` is ``None``.
+            Reference time within 4 years of the observation time.  Not needed
+            if ``time`` is given, and used only if `decade` is ``None``.
         **kwargs :
             Values used to initialize header keys or methods.
 
@@ -452,8 +448,8 @@ class Mark4Header(Mark4TrackHeader):
         if not any(key in kwargs for key in ('lsb_output', 'converter_id',
                                              'converter')):
             kwargs.setdefault('nsb', 1)
-        return super(Mark4Header, cls).fromvalues(ntrack, decade=decade,
-                                                  ref_time=ref_time, **kwargs)
+        return super(Mark4Header, cls).fromvalues(ntrack, decade, ref_time,
+                                                  **kwargs)
 
     def update(self, crc=None, verify=True, **kwargs):
         """Update the header by setting keywords or properties.

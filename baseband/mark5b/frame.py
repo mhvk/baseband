@@ -69,7 +69,7 @@ class Mark5BFrame(VLBIFrameBase):
         super(Mark5BFrame, self).__init__(header, payload, valid, verify)
 
     @classmethod
-    def fromfile(cls, fh, nchan, kday=None, ref_time=None, bps=2, valid=None,
+    def fromfile(cls, fh, nchan, bps=3, kday=None, ref_time=None, valid=None,
                  verify=True):
         """Read a frame from a filehandle.
 
@@ -79,14 +79,14 @@ class Mark5BFrame(VLBIFrameBase):
             To read the header and payload from.
         nchan : int
             Number of channels encoded in the payload.
+        bps : int
+            Number of bits per sample used in payload encoding (default: 2).
         kday : int, or None, optional
             Explicit thousands of MJD of the observation time.  Can instead
             pass an approximate `ref_time`.
         ref_time : `~astropy.time.Time`, or None, optional
             Reference time within 500 days of the observation time, used to
             infer the full MJD.  Used only if `kday` is ``None``.
-        bps : int
-            Number of bits per sample used in payload encoding (default: 2).
         verify : bool
             Whether to do basic checks of frame integrity (default: `True`).
         """
