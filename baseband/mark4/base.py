@@ -519,8 +519,9 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
 open = make_opener('Mark4', globals(), doc="""
 --- For reading a stream : (see `~baseband.mark4.base.Mark4StreamReader`)
 
-ntrack : int
-    Number of tracks used to store the data.
+ntrack : int, optional
+    Number of tracks used to store the data. Will be inferred from file
+    if not given.
 decade : int, or None, optional
     Decade of the observation start time (eg. ``2010`` for 2018), needed to
     remove ambiguity in the Mark 4 time stamp.  Can instead pass an approximate
