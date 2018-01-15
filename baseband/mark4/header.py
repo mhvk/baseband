@@ -161,7 +161,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
         assert np.all((self['bcd_fraction'] & 0xf) % 5 != 4)
         if self.decade is not None:
             assert (1950 < self.decade < 3000)
-            assert self.decade % 10 == 0, "decade must be end in zero"
+            assert self.decade % 10 == 0, "decade must end in zero"
 
     def infer_decade(self, ref_time):
         """Uses a reference time to set a header's ``decade``.

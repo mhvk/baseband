@@ -124,7 +124,8 @@ class TestMark5B(object):
                               (261, Time(57762, format='mjd'), 58000)])
     def test_infer_kday(self, jday, ref_time, kday):
         # Check that infer_kday returns proper kday for
-        # ref_time - 500 <= MJD < ref_time + 500
+        # ref_time - 500 < MJD < ref_time + 500, and uses bankers' rounding
+        # at the boundaries.
         header = mark5b.header.Mark5BHeader(None, verify=False)
         header.jday = jday
         header.infer_kday(ref_time)

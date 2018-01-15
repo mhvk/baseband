@@ -190,12 +190,13 @@ class TestMark4(object):
     @pytest.mark.parametrize(('unit_year', 'ref_time', 'decade'),
                              [(5, Time('2014:1:12:00:00'), 2010),
                               (5, Time('2009:362:19:27:33'), 2000),
-                              (3, Time('2009:362:19:27:33'), 2010),
-                              (2, Time('2018:117:6:42:15'), 2020),
+                              (4, Time('2009:001:19:27:33'), 2010),
+                              (3, Time('2018:117:6:42:15'), 2020),
                               (4, Time('2018:117:6:42:15'), 2010)])
     def test_infer_decade(self, unit_year, ref_time, decade):
         # Check that infer_decade returns proper decade for
-        # ref_time.year - 5 < year <= ref_time.year + 5.
+        # ref_time.year - 5 < year < ref_time.year + 5, and uses bankers'
+        # rounding at the boundaries.
         header = mark4.header.Mark4Header(None, ntrack=16, verify=False)
         header['bcd_unit_year'] = unit_year
         header.infer_decade(ref_time)

@@ -41,7 +41,7 @@ the data themselves::
 Opening in stream mode automatically seeks for the first frame, and wraps the
 low-level routines such that reading and writing is in units of samples.  It
 also provides access to header information.  In lieu of ``decade``, one may
-also provide a reference time within 5 years of the observation start time::
+also provide a reference time within 4 years of the observation start time::
 
     >>> from astropy.time import Time
     >>> fh = mark4.open(SAMPLE_MARK4, 'rs', ntrack=64,
