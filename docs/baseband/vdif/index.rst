@@ -91,10 +91,6 @@ information::
 To set up a file for writing needs quite a bit of header information. Not
 coincidentally, what is given by the reader above suffices::
 
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', thread_ids=[2, 3])
-    >>> d = fh.read(20000)
-
-::
 
     >>> from astropy.time import Time
     >>> import astropy.units as u
@@ -102,6 +98,8 @@ coincidentally, what is given by the reader above suffices::
     ...                nthread=2, samples_per_frame=20000, nchan=1,
     ...                frames_per_second=1600, complex_data=False, bps=2, edv=3,
     ...                station=65532, time=Time('2014-06-16T05:56:07.000000000'))
+    >>> with vdif.open(SAMPLE_VDIF, 'rs', thread_ids=[2, 3]) as fh:
+    ...    d = fh.read(20000)  # Get some data to write
     >>> fw.write(d)
     >>> fw.close()
     >>> fh = vdif.open('try.vdif', 'rs')
@@ -158,7 +156,7 @@ the class EDV.  If they do not, the following line
 returns an AssertionError.  If this occurs because the VDIF EDV is not yet
 supported by Baseband, support can be added by implementing a custom header
 class.  If the EDV is supported, but the header deviates from the format
-found in the `VLBI.org EDV registry <http://www.vlbi.org/vdif/>`_, the 
+found in the `VLBI.org EDV registry <http://www.vlbi.org/vdif/>`_, the
 best solution is to create a custom header class, then override the
 subclass selector in :class:`~baseband.vdif.header.VDIFHeader`.  Tutorials
 for doing either can be found :ref:`here <new_edv>`.
