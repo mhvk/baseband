@@ -14,6 +14,7 @@ modify Baseband's source code.
 The tutorials below assumes the following modules have been imported::
 
     >>> import numpy as np
+    >>> import astropy.units as u
     >>> from baseband import vdif, vlbi_base as vlbi
 
 .. _new_edv_vdif_headers:
@@ -430,7 +431,7 @@ class, and define a replacement::
 
 We can then use the stream reader without further modification::
 
-    >>> fh2 = vdif.open(SAMPLE_DRAO_CORRUPT, 'rs', frames_per_second=390625)
+    >>> fh2 = vdif.open(SAMPLE_DRAO_CORRUPT, 'rs', sample_rate=625**3*u.Hz)
     >>> fh2.header0['eud2'] == header0['eud2']
     True
     >>> np.array_equal(fh2.read(1), payload0[0])

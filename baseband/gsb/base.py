@@ -111,8 +111,7 @@ class GSBStreamBase(VLBIStreamBase):
     def __init__(self, fh_ts, fh_raw, header0, thread_ids=None,
                  nchan=None, bps=None, complex_data=None,
                  samples_per_frame=None, payloadsize=None,
-                 frames_per_second=None, sample_rate=None,
-                 squeeze=True):
+                 sample_rate=None, squeeze=True):
         self.fh_ts = fh_ts
         rawdump = header0.mode == 'rawdump'
         complex_data = (complex_data if complex_data is not None else
@@ -142,12 +141,25 @@ class GSBStreamBase(VLBIStreamBase):
             sample_shape = GSBPayload._sample_shape_maker_nthread(len(fh_raw),
                                                                   nchan)
 
+        if sample_rate is None:
+            try:
+                header1 = self.fh_ts.read_timestamp()
+                assert (fh_ts.tell() ==
+                        header0.seek_offset(2))
+                sample_rate = samples_per_frame * (
+                    1. / (header1.time - header0.time)).to(u.Hz)
+            except Exception as exc:
+                exc.args += ("The sample rate could not be auto-detected. "
+                             "This may be because the timestamp file only "
+                             "has one entry, or because it is corrupted. "
+                             "Try passing in an explicit `sample_rate`.",)
+                raise
+
         super(GSBStreamBase, self).__init__(
             fh_raw, header0=header0, sample_shape=sample_shape, bps=bps,
             complex_data=complex_data, thread_ids=thread_ids,
             samples_per_frame=samples_per_frame,
-            frames_per_second=frames_per_second, sample_rate=sample_rate,
-            squeeze=squeeze)
+            sample_rate=sample_rate, squeeze=squeeze)
         self._payloadsize = payloadsize
 
     def close(self):
@@ -167,7 +179,7 @@ class GSBStreamBase(VLBIStreamBase):
             data_name = self.fh_raw.name
         return ("<{s.__class__.__name__} header={s.fh_ts.name}"
                 " offset= {s.offset}\n    data={dn}\n"
-                "    frames_per_second={s.frames_per_second:.3f},"
+                "    sample_rate={s._sample_rate:.3e} Hz,"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
                 "    {t}start_time={s.start_time.isot}>"
@@ -203,17 +215,16 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         rawdump, 8 for phased.
     complex_data : bool, optional
         Default is `None`, which sets `False` for rawdump, `True` for phased.
+    sample_rate : `~astropy.units.Quantity`, optional
+        Number of complete samples per second (ie. the rate at which each
+        channel of each polarization is sampled).  If not given, will be
+        inferred from scanning the header.
     samples_per_frame : int, optional
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.
     payloadsize : int, optional
         Number of bytes per payload, divided by the number of raw files.
         Must be set if ``samples_per_frame`` is `None`.
-    frames_per_second : float, optional
-        Rate at which frames are written.  Can give ``sample_rate`` instead.
-        If neither is given, ``frames_per_second`` is inferred from the header.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each channel in each polarization is sampled.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from decoded
         data.
@@ -225,22 +236,14 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
     def __init__(self, fh_ts, fh_raw, thread_ids=None, nchan=None, bps=None,
                  complex_data=None, samples_per_frame=None, payloadsize=None,
-                 frames_per_second=None, sample_rate=None, squeeze=True):
+                 sample_rate=None, squeeze=True):
         header0 = fh_ts.read_timestamp()
-        if frames_per_second is None and sample_rate is None:
-            header1 = fh_ts.read_timestamp()
-            assert (fh_ts.tell() ==
-                    header0.seek_offset(2))
-            frames_per_second = (1. / (header1.time -
-                                       header0.time).to(u.s)).value
-        fh_ts.seek(0)
         super(GSBStreamReader, self).__init__(
             fh_ts, fh_raw, header0, nchan=nchan, bps=bps,
-            complex_data=complex_data,
-            thread_ids=thread_ids, samples_per_frame=samples_per_frame,
-            payloadsize=payloadsize,
-            frames_per_second=frames_per_second, sample_rate=sample_rate,
-            squeeze=squeeze)
+            complex_data=complex_data, thread_ids=thread_ids,
+            samples_per_frame=samples_per_frame, payloadsize=payloadsize,
+            sample_rate=sample_rate, squeeze=squeeze)
+        self.fh_ts.seek(0)
         self._frame_nr = None
 
     @lazyproperty
@@ -320,7 +323,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 # Read relevant frame (possibly reusing data array from
                 # previous frame set).
                 self._read_frame(fill_value)
-                assert np.isclose(self._frame_nr, self.frames_per_second *
+                framerate = self._sample_rate / self.samples_per_frame
+                assert np.isclose(self._frame_nr, framerate *
                                   (self._frame.header.time -
                                    self.start_time).to(u.s).value)
 
@@ -377,17 +381,15 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         rawdump, 8 for phased.
     complex_data : bool, optional
         Default is `None`, which sets `False` for rawdump, `True` for phased.
+    sample_rate : `~astropy.units.Quantity`
+        Number of complete samples per second (ie. the rate at which each
+        channel of each polarization is sampled).
     samples_per_frame : int, optional
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.
     payloadsize : int, optional
         Number of bytes per payload, divided by the number of raw files.
         Must be set if ``samples_per_frame`` is `None`.
-    frames_per_second : float, optional
-        Rate at which frames are written.  Can give ``sample_rate`` instead.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each channel in each polarization is sampled.  Can give
-        ``frames_per_second`` instead.
     squeeze : bool, optional
         If `True` (default), ``write`` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
@@ -415,10 +417,9 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         Redundant modulo-8 shared memory block number; not used by Baseband.
     """
 
-    def __init__(self, fh_ts, fh_raw, header=None, nchan=None, bps=None,
-                 complex_data=None, samples_per_frame=None, payloadsize=None,
-                 frames_per_second=None, sample_rate=None, squeeze=True,
-                 **kwargs):
+    def __init__(self, fh_ts, fh_raw, sample_rate, header=None, nchan=None,
+                 bps=None, complex_data=None, samples_per_frame=None,
+                 payloadsize=None, squeeze=True, **kwargs):
         if header is None:
             mode = kwargs.pop('header_mode',
                               'rawdump' if hasattr(fh_raw, 'read') else
@@ -427,8 +428,8 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         super(GSBStreamWriter, self).__init__(
             fh_ts, fh_raw, header, nchan=nchan, bps=bps,
             complex_data=complex_data, samples_per_frame=samples_per_frame,
-            payloadsize=payloadsize, frames_per_second=frames_per_second,
-            sample_rate=sample_rate, squeeze=squeeze)
+            payloadsize=payloadsize, sample_rate=sample_rate,
+            squeeze=squeeze)
         self._data = np.zeros((self.samples_per_frame,) + self._sample_shape,
                               (np.complex64 if self.complex_data
                                else np.float32))
@@ -532,15 +533,13 @@ def open(name, mode='rs', **kwargs):
         complex data sample).  Default: 4 for rawdump, 8 for phased.
     complex_data : bool, optional
         Default: `False` for rawdump, `True` for phased.
+    sample_rate : `~astropy.units.Quantity`, optional when reading
+        Number of complete samples per second (ie. the rate at which each
+        channel of each polarization is sampled).  When reading, if not given,
+        will be inferred from scanning the header.
     samples_per_frame : int
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.
-    frames_per_second : float, optional
-        Rate at which frames are written.  Can give ``sample_rate`` instead;
-        one of the two is required for writing.  If neither is given when
-        reading, ``frames_per_second`` is inferred from the header.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each channel in each polarization is sampled.
     payloadsize : int
         Number of bytes per payload, divided by the number of raw files.  Must
         be set if ``samples_per_frame`` is `None`.

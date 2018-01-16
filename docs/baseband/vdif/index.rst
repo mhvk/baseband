@@ -47,10 +47,12 @@ Usage Notes
 This section covers VDIF-specific features of Baseband.  Tutorials for general
 usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
 The examples below use the small sample file ``baseband/data/sample.vdif``,
-and assume the `numpy` and `baseband.vdif` modules have been imported::
+and assume the `numpy`, `astropy.units`, and `baseband.vdif` modules have been
+imported::
 
     >>> import numpy as np
     >>> from baseband import vdif
+    >>> import astropy.units as u
     >>> from baseband.data import SAMPLE_VDIF
 
 Simple reading and writing of VDIF files can be done entirely using
@@ -77,7 +79,7 @@ information::
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> fh
     <VDIFStreamReader name=... offset=0
-        frames_per_second=1600, samples_per_frame=20000,
+        sample_rate=32000000.0 Hz, samples_per_frame=20000,
         sample_shape=SampleShape(nthread=8),
         complex_data=False, bps=2, edv=3, station=65532,
         start_time=2014-06-16T05:56:07.000000000>
@@ -93,10 +95,9 @@ coincidentally, what is given by the reader above suffices::
 
 
     >>> from astropy.time import Time
-    >>> import astropy.units as u
     >>> fw = vdif.open('try.vdif', 'ws',
     ...                nthread=2, samples_per_frame=20000, nchan=1,
-    ...                frames_per_second=1600, complex_data=False, bps=2, edv=3,
+    ...                sample_rate=32*u.MHz, complex_data=False, bps=2, edv=3,
     ...                station=65532, time=Time('2014-06-16T05:56:07.000000000'))
     >>> with vdif.open(SAMPLE_VDIF, 'rs', thread_ids=[2, 3]) as fh:
     ...    d = fh.read(20000)  # Get some data to write
@@ -161,17 +162,17 @@ best solution is to create a custom header class, then override the
 subclass selector in :class:`~baseband.vdif.header.VDIFHeader`.  Tutorials
 for doing either can be found :ref:`here <new_edv>`.
 
-EOFError encountered in ``_get_frame_rate`` when reading
---------------------------------------------------------
+EOFError encountered in ``_get_sample_rate`` when reading
+---------------------------------------------------------
 
 When the number of frames per second is not input by the user and cannot be
-deduced from header information (if EDV = 1, 3 or 4, the frame rate can be
-derived from the sampling rate found in the header), Baseband tries to
-determine the frame rate using the private method ``_get_frame_rate`` in
-:class:`~baseband.vdif.base.VDIFStreamReader`.  This function raises
-`EOFError` if the file contains less than one second of data, or is corrupt.
-In either case the file can be opened still by explicitly passing in the frame
-rate to :func:`~baseband.vdif.open` via the `frames_per_second` argument.
+deduced from header information (if EDV = 1 or, the sample rate is found in
+the header), Baseband tries to determine the sample rate using the private
+method ``_get_sample_rate`` in :class:`~baseband.vdif.base.VDIFStreamReader`. 
+This function raises `EOFError` if the file contains less than one second of
+data, or is corrupt.  In either case the file can be opened still by explicitly
+passing in the sample rate to :func:`~baseband.vdif.open` via the `sample_rate`
+argument.
 
 .. _vdif_api:
 

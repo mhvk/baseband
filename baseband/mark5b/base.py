@@ -1,5 +1,5 @@
 import numpy as np
-from astropy import units as u
+import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamReaderBase,
@@ -192,11 +192,10 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         to infer the full MJD.  Only used if `kday` is ``None``.
     thread_ids: list of int, optional
         Specific channels to read.  By default, all channels are read.
-    frames_per_second : int, optional
-        Needed to calculate timestamps. If not given, will be inferred from
-        ``sample_rate``, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each thread is sampled (bandwidth * 2; frequency units).
+        Number of complete samples per second (ie. the rate at which each
+        channel is sampled).  If not given, will be inferred from scanning
+        one second of the file.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
@@ -205,8 +204,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     _frame_class = Mark5BFrame
 
     def __init__(self, fh_raw, nchan, bps=2, kday=None, ref_time=None,
-                 thread_ids=None, frames_per_second=None, sample_rate=None,
-                 squeeze=True):
+                 thread_ids=None, sample_rate=None, squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
@@ -220,15 +218,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             fh_raw, header0=header, sample_shape=sample_shape, bps=bps,
             complex_data=False, thread_ids=thread_ids,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
-            frames_per_second=frames_per_second, sample_rate=sample_rate,
-            squeeze=squeeze)
-
-    @property
-    def size(self):
-        n_frames = int(round(
-            (self._last_header.time - self.header0.time).to(u.s).value *
-            self.frames_per_second)) + 1
-        return n_frames * self.samples_per_frame
+            sample_rate=sample_rate, squeeze=squeeze)
 
     @lazyproperty
     def _last_header(self):
@@ -320,11 +310,9 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
     ----------
     raw : `~baseband.mark5b.base.Mark5BFileWriter` instance.
         Which will write filled sets of frames to storage.
-    frames_per_second : int, optional
-        Needed to calculate timestamps. If not given, inferred from
-        ``sample_rate``.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each thread is sampled (bandwidth * 2; frequency units).
+    sample_rate : `~astropy.units.Quantity`
+        Number of complete samples per second (ie. the rate at which each
+        channel is sampled), needed to calculate header timestamps.
     nchan : int, optional
         Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
         Default is 1.
@@ -348,8 +336,8 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
 
     _frame_class = Mark5BFrame
 
-    def __init__(self, raw, frames_per_second=None, sample_rate=None,
-                 nchan=1, bps=2, header=None, squeeze=True, **kwargs):
+    def __init__(self, raw, sample_rate, nchan=1, bps=2, header=None,
+                 squeeze=True, **kwargs):
         if header is None:
             header = Mark5BHeader.fromvalues(**kwargs)
         sample_shape = Mark5BPayload._sample_shape_maker(nchan)
@@ -357,8 +345,7 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
             raw, header0=header, sample_shape=sample_shape, bps=bps,
             complex_data=False, thread_ids=None,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
-            frames_per_second=frames_per_second, sample_rate=sample_rate,
-            squeeze=squeeze)
+            sample_rate=sample_rate, squeeze=squeeze)
 
         self._data = np.zeros((self.samples_per_frame,
                                self._sample_shape.nchan), np.float32)
@@ -429,22 +416,19 @@ ref_time : `~astropy.time.Time`, or None, optional
     the full MJD.  Only used if `kday` is ``None``.
 thread_ids: list of int, optional
     Specific threads to read.  By default, all threads are read.
-frames_per_second : int, optional
-    Needed to calculate timestamps. If not given, will be inferred from
-    ``sample_rate``, or by scanning the file.
 sample_rate : `~astropy.units.Quantity`, optional
-    Rate at which each thread is sampled (bandwidth * 2; frequency units).
+    Number of complete samples per second (ie. the rate at which each channel
+    is sampled).  If not given, will be inferred from scanning one second of
+    the file.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
 
 --- For writing a stream : (see `~baseband.mark5b.base.Mark5BStreamWriter`)
 
-frames_per_second : int, optional
-    Needed to calculate timestamps. If not given, inferred from
-    ``sample_rate``.
-sample_rate : `~astropy.units.Quantity`, optional
-    Rate at which each thread is sampled (bandwidth * 2; frequency units).
+sample_rate : `~astropy.units.Quantity`
+    Number of complete samples per second (ie. the rate at which each
+    channel is sampled), needed to calculate header timestamps.
 nchan : int, optional
     Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
     Default is 1.

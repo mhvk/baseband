@@ -238,14 +238,14 @@ class VDIFStreamBase(VLBIStreamBase):
     """VDIF file wrapper, allowing access as a stream of data."""
 
     _frame_class = VDIFFrame
-
     _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
 
-    def __init__(self, fh_raw, header0, thread_ids, frames_per_second=None,
-                 sample_rate=None, squeeze=True):
-        if frames_per_second is None and sample_rate is None:
+    def __init__(self, fh_raw, header0, thread_ids, sample_rate=None,
+                 squeeze=True):
+        samples_per_frame = header0.samples_per_frame
+        if sample_rate is None:
             try:
-                frames_per_second = int(header0.framerate.to(u.Hz).value)
+                sample_rate = samples_per_frame * header0.framerate.to(u.Hz)
             except AttributeError:
                 pass  # super below will scan file to get framerate.
 
@@ -255,8 +255,7 @@ class VDIFStreamBase(VLBIStreamBase):
             fh_raw=fh_raw, header0=header0, sample_shape=sample_shape,
             bps=header0.bps, complex_data=header0['complex_data'],
             thread_ids=thread_ids,
-            samples_per_frame=header0.samples_per_frame,
-            frames_per_second=frames_per_second,
+            samples_per_frame=samples_per_frame,
             sample_rate=sample_rate, squeeze=squeeze)
 
     def _get_time(self, header):
@@ -264,11 +263,12 @@ class VDIFStreamBase(VLBIStreamBase):
 
         This passes on frame rate, since not all VDIF headers can calculate it.
         """
-        return header.get_time(framerate=self.frames_per_second * u.Hz)
+        return header.get_time(
+            framerate=self.sample_rate / self.samples_per_frame)
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
-                "    frames_per_second={s.frames_per_second},"
+                "    sample_rate={s._sample_rate} Hz,"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape},\n"
                 "    complex_data={s.complex_data},"
@@ -290,18 +290,17 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         File handle of the raw VDIF stream
     thread_ids: list of int, optional
         Specific threads to read.  By default, all threads are read.
-    frames_per_second : int
-        Needed to calculate timestamps. If not given, will be inferred from
-        ``sample_rate``, EDV bandwidth, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each channel in each thread is sampled.
+        Number of complete samples per second (ie. the rate at which each
+        channel in each thread is sampled).  If not given, will be inferred
+        from the header or by scanning one second of the file.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
     """
 
-    def __init__(self, fh_raw, thread_ids=None, frames_per_second=None,
-                 sample_rate=None, squeeze=True):
+    def __init__(self, fh_raw, thread_ids=None, sample_rate=None,
+                 squeeze=True):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
@@ -317,8 +316,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
         self._framesetsize = fh_raw.tell()
         super(VDIFStreamReader, self).__init__(fh_raw, header, thread_ids,
-                                               frames_per_second, sample_rate,
-                                               squeeze)
+                                               sample_rate, squeeze)
 
     @lazyproperty
     def _last_header(self):
@@ -425,11 +423,11 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     nthread : int
         Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
         Default is 1.
-    frames_per_second : int, optional
-        Needed to calculate timestamps. Can also give ``sample_rate``.
-        Only needed if the EDV does not have bandwidth information.
     sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each channel in each thread is sampled.
+        Number of complete samples per second (ie. the rate at which each
+        channel in each thread is sampled).  For EDV 1 and 3, can
+        alternatively use either the ``framerate`` or ``bandwidth`` header
+        keywords.
     header : :class:`~baseband.vdif.VDIFHeader`, optional
         Header for the first frame, holding time information, etc.
     squeeze : bool, optional
@@ -444,41 +442,46 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     time : `~astropy.time.Time`
         As an alternative, one can pass on ``ref_epoch`` and ``seconds``.
     nchan : int, optional
-        Number of FFT channels within stream (default 1).
+        Number of channels within stream (default 1).
         Note: that different # of channels per thread is not supported.
     complex_data : bool
-        Whether data is complex
+        Whether data is complex.
     bps : int
         Bits per sample (or real, imaginary component).
     samples_per_frame : int
-        Number of complete samples in a given frame.  As an alternative, use
-        ``frame_length``, the number  of long words for header plus payload.
-        For some edv, this number is fixed (e.g., ``frame_length=629`` for
-        edv=3, which corresponds to 20000 real 2-bit samples per frame).
+        Number of complete samples per frame.  As an alternative, use
+        ``frame_length``, the number of long words for header plus payload.
+        For some EDV, this number is fixed (e.g., ``frame_length=629`` for
+        ``edv=3``, which corresponds to 20000 real 2-bit samples per frame).
     station : 2 characters
         Or unsigned 2-byte integer.
     edv : {`False`, 0, 1, 2, 3, 4, 0xab}
         Extended Data Version.
-    bandwidth : `~astropy.units.Quantity`
-        In frequency units.  Sufficient for `edv` 1, 3, or 4 to determine the
-        frames per second.
+    framerate : `~astropy.units.Quantity`, optional
+        In frequency units.  Available for EDV 1 and 3.
+    bandwidth : `~astropy.units.Quantity`, optional
+        In frequency units.  Available for EDV 1 and 3, and sufficient
+        to determine the frame rate.
     """
-    def __init__(self, raw, nthread=1, frames_per_second=None,
-                 sample_rate=None, header=None, squeeze=True, **kwargs):
+    def __init__(self, raw, nthread=1, sample_rate=None, header=None,
+                 squeeze=True, **kwargs):
         if header is None:
             header = VDIFHeader.fromvalues(**kwargs)
         # No frame sets yet exist, so generate a sample shape from values.
         super(VDIFStreamWriter, self).__init__(
-            raw, header, range(nthread), frames_per_second=frames_per_second,
-            sample_rate=sample_rate, squeeze=squeeze)
+            raw, header, range(nthread), sample_rate=sample_rate,
+            squeeze=squeeze)
         # Set framerate and thus bandwidth in the header, if not set already.
         try:
             header_framerate = self.header0.framerate
         except AttributeError:
             pass
         else:
+            framerate = self.sample_rate / self.samples_per_frame
             if header_framerate == 0:
-                header.framerate = self.frames_per_second * u.Hz
+                header.framerate = framerate
+            else:
+                assert np.all(header.framerate == framerate)
         self._data = np.zeros(
             (self._sample_shape.nthread, self.samples_per_frame,
                 self._sample_shape.nchan),
@@ -534,11 +537,10 @@ open = make_opener('VDIF', globals(), doc="""
 
 thread_ids : list of int, optional
     Specific threads to read.  By default, all threads are read.
-frames_per_second : int
-    Needed to calculate timestamps. If not given, will be inferred from
-    ``sample_rate``, EDV bandwidth, or by scanning the file.
 sample_rate : `~astropy.units.Quantity`, optional
-    Rate at which each channel in each thread is sampled.
+    Number of complete samples per second (ie. the rate at which each channel
+    in each thread is sampled).  If not given, will be inferred from the header
+    or by scanning one second of the file.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
@@ -547,11 +549,9 @@ squeeze : bool, optional
 
 nthread : int
     Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
-frames_per_second : int, optional
-    Needed to calculate timestamps. Can also give ``sample_rate``.
-    Only needed if the EDV does not have bandwidth information.
 sample_rate : `~astropy.units.Quantity`, optional
-    Rate at which each channel in each thread is sampled.
+    Number of complete samples per second (ie. the rate at which each
+    channel in each thread is sampled).
 squeeze : bool, optional
     If `True` (default), ``write`` accepts squeezed arrays as input,
     and adds channel and thread dimensions if they have length unity.

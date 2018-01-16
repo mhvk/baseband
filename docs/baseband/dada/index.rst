@@ -15,9 +15,10 @@ Usage
 This section covers DADA-specific features of Baseband.  Tutorials for general
 usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
 The examples below use the small sample file ``baseband/data/sample.dada``,
-and assume the `baseband.dada` module has been imported::
+and assume the `astropy.units` and `baseband.dada` modules have been imported::
 
     >>> from baseband import dada
+    >>> import astropy.units as u
     >>> from baseband.data import SAMPLE_DADA
 
 Single files can be opened with :func:`~baseband.dada.open` in binary mode. 
@@ -49,7 +50,7 @@ writing is in units of samples, and provides access to header information.
     >>> fh = dada.open(SAMPLE_DADA, 'rs')
     >>> fh
     <DADAStreamReader name=... offset=0
-        frames_per_second=1000.0, samples_per_frame=16000,
+        sample_rate=16000000.0 Hz, samples_per_frame=16000,
         sample_shape=SampleShape(npol=2), bps=8,
         thread_ids=[0, 1], start_time=2013-07-02T01:39:20.000>
     >>> d = fh.read(10000)
@@ -67,7 +68,6 @@ even smaller size of the payload, to show how one can define multiple files.
 ::
 
     >>> from astropy.time import Time
-    >>> import astropy.units as u
     >>> fw = dada.open('{utc_start}.{obs_offset:016d}.000000.dada', 'ws',
     ...                npol=2, samples_per_frame=5000, nchan=1, bps=8,
     ...                bandwidth=16*u.MHz, complex_data=True,

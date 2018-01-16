@@ -4,7 +4,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import pytest
 import numpy as np
-from astropy import units as u
+import astropy.units as u
 from astropy.time import Time
 from .. import vdif
 from .. import mark4
@@ -123,7 +123,7 @@ class TestVDIF0VDIF1(object):
             kwargs = dict(h0)
             kwargs['edv'] = 1
             fl = str(tmpdir.join('test1.vdif'))
-            with vdif.open(fl, 'ws', frames_per_second=10000, **kwargs) as f1w:
+            with vdif.open(fl, 'ws', sample_rate=1.28*u.MHz, **kwargs) as f1w:
                 h1w = f1w.header0
                 assert list(h1w.words[:4]) == list(h0.words[:4])
                 assert h1w.framerate == 10. * u.kHz

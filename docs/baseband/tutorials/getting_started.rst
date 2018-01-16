@@ -43,7 +43,7 @@ sample DADA file, for example::
 In general, file I/O and data manipulation use the same syntax across all
 file formats.  When using ``open`` for Mark 4 and Mark 5B files, however, two
 keywords - ``ntrack``, and ``decade`` - may need to be set manually.  For these
-and VDIF, ``frames_per_second`` may also need to be passed if it can't be read
+and VDIF, ``sample_rate`` may also need to be passed if it can't be read
 or inferred from the file.  Notes on such features and quirks of individual
 formats can be found in the docstrings of their ``open`` functions, and
 within the :ref:`Specific file format <specific_file_formats_toc>`
@@ -108,7 +108,7 @@ We can access information about the file by printing ``fh``::
 
     >>> fh
     <VDIFStreamReader name=... offset=24
-        frames_per_second=1600, samples_per_frame=20000,
+        sample_rate=32000000.0 Hz, samples_per_frame=20000,
         sample_shape=SampleShape(nthread=8),
         complex_data=False, bps=2, edv=3, station=65532,
         start_time=2014-06-16T05:56:07.000000000>
@@ -298,7 +298,7 @@ be necessary for compatibility with `DSPSR
     >>> fr = vdif.open(SAMPLE_VDIF, 'rs')
     >>> fw = vdif.open('test_vdif.vdif', 'ws',
     ...                nthread=1, nchan=fr.sample_shape.nthread,
-    ...                frames_per_second=fr.frames_per_second,
+    ...                sample_rate=fr.sample_rate,
     ...                samples_per_frame=fr.samples_per_frame // 8,
     ...                complex_data=fr.complex_data, bps=fr.bps,
     ...                edv=fr.header0.edv, station=fr.header0.station,
@@ -366,20 +366,18 @@ values into `vdif.open <baseband.vdif.open>` to create one.
     >>> from baseband.data import SAMPLE_MARK4
     >>> fr = mark4.open(SAMPLE_MARK4, 'rs', ntrack=64, decade=2010)
     >>> spf = 640       # fanout * 160 = 640 invalid samples per Mark 4 frame
-    >>> fps = fr.frames_per_second * fr.samples_per_frame / spf
     >>> fw = vdif.open('m4convert.vdif', 'ws', edv=1, nthread=1,
     ...                samples_per_frame=spf, nchan=fr.sample_shape.nchan,
-    ...                frames_per_second=fps, complex_data=fr.complex_data, 
+    ...                sample_rate=fr.sample_rate, complex_data=fr.complex_data,
     ...                bps=fr.bps, time=fr.start_time)
 
 We choose ``edv = 1`` since it's the simplest VDIF EDV whose header includes a
-frame rate. The concept of threads does not exist in Mark 4, so the file
+sampling rate. The concept of threads does not exist in Mark 4, so the file
 effectively has ``nthread = 1``.  As discussed in the :ref:`Mark 4
 documentation <mark4>`, the data at the start of each frame is effectively
 overwritten by the header and are represented by invalid samples in the stream
 reader.  We set ``samples_per_frame`` to ``640`` so that each section of
-invalid data is captured in a single frame.  The framerate is then set to 50
-kHz for consistency.
+invalid data is captured in a single frame.
 
 We now write the data to file, manually flagging each invalid data frame::
 

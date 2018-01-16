@@ -15,9 +15,11 @@ Usage
 This section covers Mark 4-specific features of Baseband.  Tutorials for general
 usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
 The examples below use the small sample file ``baseband/data/sample.m4``,
-and assumes `numpy` and `baseband.mark4` modules have been imported::
+and assumes the `numpy`, `astropy.units`, and `baseband.mark4` modules have
+been imported::
 
     >>> import numpy as np
+    >>> import astropy.units as u
     >>> from baseband import mark4
     >>> from baseband.data import SAMPLE_MARK4
 
@@ -48,7 +50,7 @@ also provide a reference time within 4 years of the observation start time::
     ...                 ref_time=Time('2013:100:23:00:00'))
     >>> fh
     <Mark4StreamReader name=... offset=0
-        frames_per_second=400, samples_per_frame=80000,
+        sample_rate=32000000.0 Hz, samples_per_frame=80000,
         sample_shape=SampleShape(nchan=8), bps=2,
         start_time=2014-06-16T07:38:12.47500>
     >>> d = fh.read(6400)
@@ -66,12 +68,12 @@ invalid data (zeros, by default)::
     >>> np.array_equal(d[:640], np.zeros((640,) + d.shape[1:]))
     True
 
-When writing to file, we need to pass in the frame rate in addition to 
+When writing to file, we need to pass in the sample rate in addition to 
 ``ntrack`` and ``decade`` so that times for individual samples can be
 calculated.
 
     >>> fw = mark4.open('sample_mark4_segment.m4', 'ws', header=frame.header,
-    ...                 ntrack=64, decade=2010, frames_per_second=400)
+    ...                 ntrack=64, decade=2010, sample_rate=32*u.MHz)
     >>> fw.write(frame.data)
     >>> fw.close()
 

@@ -496,13 +496,15 @@ class TestVDIF(object):
             assert repr(fh).startswith('<VDIFStreamReader')
             assert fh.tell() == 0
             assert header == fh.header0
+            assert np.all(fh.sample_rate == 32 * u.MHz)
+            assert fh._sample_rate == 32000000.0
             assert fh.start_time == fh.header0.time
             assert abs(fh.time - fh.start_time) < 1. * u.ns
             assert fh.time == fh.tell(unit='time')
             record = fh.read(12)
             assert fh.tell() == 12
             t12 = fh.time
-            s12 = 12 / fh.samples_per_frame / fh.frames_per_second * u.s
+            s12 = (12 / fh.sample_rate).to(u.s)
             assert abs(t12 - fh.start_time - s12) < 1. * u.ns
             fh.seek(10, 1)
             fh.tell() == 22
@@ -522,10 +524,10 @@ class TestVDIF(object):
             with pytest.raises(ValueError):
                 fh.seek(0, 'last')
             assert fh.size == 40000
-            assert abs(fh.stop_time - fh._last_header.time - u.s /
-                       fh.frames_per_second) < 1. * u.ns
-            assert abs(fh.stop_time - fh.start_time - u.s * fh.size /
-                       fh.samples_per_frame / fh.frames_per_second) < 1. * u.ns
+            assert abs(fh.stop_time - fh._last_header.time - (
+                fh.samples_per_frame / fh.sample_rate).to(u.s)) < 1. * u.ns
+            assert abs(fh.stop_time - fh.start_time -
+                       (fh.size / fh.sample_rate).to(u.s)) < 1. * u.ns
 
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==
@@ -561,14 +563,15 @@ class TestVDIF(object):
             complex_data=False, frame_nr=0, thread_id=0, samples_per_frame=16,
             station='me')
         with vdif.open(vdif_file, 'ws', header=header,
-                       nthread=2, frames_per_second=20) as fw:
+                       nthread=2, sample_rate=320*u.Hz) as fw:
+            assert np.all(fw.sample_rate == 320 * u.Hz)
             for i in range(30):
                 fw.write(data)
 
         with vdif.open(vdif_file, 'rs') as fh:
             assert fh.header0.station == 'me'
-            assert fh.frames_per_second == 20
             assert fh.samples_per_frame == 16
+            assert np.all(fh.sample_rate == 320 * u.Hz)
             assert not fh.complex_data
             assert fh.header0.bps == 2
             assert fh._sample_shape.nchan == 2
@@ -599,6 +602,37 @@ class TestVDIF(object):
         with vdif.open(test_file, 'rs') as fh:
             assert np.all(fh.read() == record)
 
+        # Test writing a file using header keywords (in particular
+        # ``bandwidth`` and ``framerate`` to set the sample rate).
+        with vdif.open(test_file, 'ws', nthread=8, nchan=1, complex_data=False,
+                       time=header.time, bps=2, edv=3,
+                       framerate=1600*u.Hz) as fw:
+            fw.write(record)
+        with vdif.open(test_file, 'rs') as fh:
+            assert fh.header0.time == header.time
+            assert fh.header0.edv == header.edv
+            assert fh.header0.framerate == header.framerate
+            assert fh.header0.bandwidth == header.bandwidth
+            assert fh.header0.samples_per_frame == header.samples_per_frame
+            assert fh.sample_shape == (8,)
+            assert np.all(fh.sample_rate == 32 * u.MHz)
+            assert np.all(fh.read() == record)
+        # Test writing a file using header keywords (in particular
+        # ``bandwidth`` and ``framerate`` to set the sample rate).
+        with vdif.open(test_file, 'ws', nthread=8, nchan=1, complex_data=False,
+                       time=header.time, bps=2, station=2, edv=3,
+                       bandwidth=16*u.MHz) as fw:
+            fw.write(record)
+        with vdif.open(test_file, 'rs') as fh:
+            assert fh.header0.time == header.time
+            assert fh.header0.edv == header.edv
+            assert fh.header0.framerate == header.framerate
+            assert fh.header0.bandwidth == header.bandwidth
+            assert fh.header0.samples_per_frame == header.samples_per_frame
+            assert fh.sample_shape == (8,)
+            assert np.all(fh.sample_rate == 32 * u.MHz)
+            assert np.all(fh.read() == record)
+
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
     @pytest.mark.parametrize('fill_value', (0., -999.))
@@ -608,7 +642,7 @@ class TestVDIF(object):
             with vdif.open(SAMPLE_FILE, 'rs') as fr:
                 record = fr.read(10)
                 with vdif.open(vdif_incomplete, 'ws', header=fr.header0,
-                               nthread=8, frames_per_second=1600) as fw:
+                               nthread=8, sample_rate=32*u.MHz) as fw:
                     fw.write(record)
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
@@ -648,7 +682,7 @@ def test_mwa_vdif():
     """Test phased VDIF format (uses EDV=0)"""
     with vdif.open(SAMPLE_MWA, 'rs', sample_rate=1.28*u.MHz) as fh:
         assert fh.samples_per_frame == 128
-        assert fh.frames_per_second == 10000
+        assert np.all(fh.sample_rate == 1.28 * u.MHz)
         assert fh.time == Time('2015-10-03T20:49:45.000')
         assert fh.header0.edv == 0
 
@@ -674,7 +708,7 @@ def test_arochime_vdif():
                header0.get_time(framerate=390625*u.Hz) - 1. * u.s) < 1.*u.ns
 
     # Now test the actual data stream.
-    with vdif.open(SAMPLE_AROCHIME, 'rs', frames_per_second=390625) as fh:
+    with vdif.open(SAMPLE_AROCHIME, 'rs', sample_rate=390625*u.Hz) as fh:
         assert fh.samples_per_frame == 1
         t0 = fh.time
         assert abs(t0 - Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
@@ -686,8 +720,7 @@ def test_arochime_vdif():
         assert d.dtype.kind == 'c'
         t1 = fh.time
         assert abs(t1 - fh.stop_time) < 1. * u.ns
-        assert abs(t1 - t0 - u.s * (fh.size / fh.samples_per_frame /
-                                    fh.frames_per_second)) < 1. * u.ns
+        assert abs(t1 - t0 - (fh.size / fh.sample_rate).to(u.s)) < 1. * u.ns
 
     # For this file, we cannot find a frame rate, so opening it without
     # should fail.

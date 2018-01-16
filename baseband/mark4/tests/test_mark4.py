@@ -3,7 +3,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import pytest
 import numpy as np
-from astropy import units as u
+import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import catch_warnings
 from ... import mark4
@@ -505,6 +505,8 @@ class TestMark4(object):
             assert fh.fh_raw.tell() == 0xa88 + fh.header0.framesize
             assert fh.samples_per_frame == 80000
             assert fh.size == 2 * fh.samples_per_frame
+            assert np.all(fh.sample_rate == 32 * u.MHz)
+            assert fh._sample_rate == 32000000.0
             record = fh.read(642)
             assert fh.tell() == 642
             # regression test against #4, of incorrect frame offsets.
@@ -545,7 +547,8 @@ class TestMark4(object):
         # returns same header and payload info.
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fh:
             assert header == fh.header0
-            assert fh.frames_per_second * fh.samples_per_frame == 32000000
+            assert fh.samples_per_frame == 80000
+            assert np.all(fh.sample_rate == 32 * u.MHz)
             record3 = fh.read(642)
 
         assert np.all(record3 == record)
@@ -553,7 +556,7 @@ class TestMark4(object):
         # Test if automatic ntrack and frame rate detectors work together.
         with mark4.open(SAMPLE_FILE, 'rs', decade=2010) as fh:
             assert header == fh.header0
-            assert fh.frames_per_second * fh.samples_per_frame == 32000000
+            assert np.all(fh.sample_rate == 32 * u.MHz)
             fh.seek(80000 + 639)
             record4 = fh.read(2)
 
@@ -569,6 +572,7 @@ class TestMark4(object):
         rewritten_file = str(tmpdir.join('rewritten.m4'))
         with mark4.open(rewritten_file, 'ws', sample_rate=32*u.MHz,
                         time=start_time, ntrack=64, bps=2, fanout=4) as fw:
+            assert np.all(fw.sample_rate == 32 * u.MHz)
             # write in bits and pieces and with some invalid data as well.
             fw.write(record[:11])
             fw.write(record[11:80000])
@@ -579,6 +583,7 @@ class TestMark4(object):
                         sample_rate=32*u.MHz, thread_ids=[3, 4]) as fh:
             assert fh.time == start_time
             assert fh.time == fh.tell(unit='time')
+            assert np.all(fh.sample_rate == 32 * u.MHz)
             record5 = fh.read(160000)
             assert fh.time == stop_time
             assert np.all(record5[:80000] == record[:80000, 3:5])
@@ -661,7 +666,7 @@ class TestMark4(object):
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
         with mark4.open(m4_incomplete, 'rs', ntrack=64, decade=2010,
-                        frames_per_second=400) as fwr:
+                        sample_rate=32*u.MHz) as fwr:
             assert not fwr._frame.valid
             assert np.all(fwr.read(fill_value=fill_value) ==
                           fwr._frame.invalid_data_value)
@@ -730,9 +735,10 @@ class Test32TrackFanout4():
 
     def test_file_streamer(self, tmpdir):
         with mark4.open(SAMPLE_32TRACK, 'rs', ntrack=32, decade=2010,
-                        frames_per_second=400) as fh:
+                        sample_rate=32*u.MHz) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 80000
+            assert np.all(fh.sample_rate == 32 * u.MHz)
             start_time = fh.start_time
             assert start_time.yday == '2015:011:01:23:10.48500'
             record = fh.read(160000)
@@ -748,14 +754,14 @@ class Test32TrackFanout4():
              [1, 3, 1, 3]]))
 
         fl = str(tmpdir.join('test.m4'))
-        with mark4.open(fl, 'ws', header=header0, frames_per_second=400) as fw:
+        with mark4.open(fl, 'ws', header=header0, sample_rate=32*u.MHz) as fw:
             fw.write(record)
             number_of_bytes = fw.fh_raw.tell()
             assert number_of_bytes == fh_raw_tell1 - 9656
 
         # Note: this test would not work if we wrote only a single record.
         with mark4.open(fl, 'rs', ntrack=32, decade=2010,
-                        frames_per_second=400) as fh:
+                        sample_rate=32*u.MHz) as fh:
             assert fh.start_time == start_time
             record2 = fh.read(1000)
             assert np.all(record2 == record[:1000])
@@ -791,9 +797,10 @@ class Test32TrackFanout2():
 
     def test_file_streamer(self, tmpdir):
         with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rs', ntrack=32, decade=2010,
-                        frames_per_second=400) as fh:
+                        sample_rate=16*u.MHz) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 40000
+            assert np.all(fh.sample_rate == 16 * u.MHz)
             start_time = fh.start_time
             assert start_time.yday == '2017:063:04:42:26.02500'
             record = fh.read(80000)
@@ -809,14 +816,14 @@ class Test32TrackFanout2():
              [-1, -3, -1, 1, -1, 1, -1, 1]]))
 
         fl = str(tmpdir.join('test.m4'))
-        with mark4.open(fl, 'ws', header=header0, frames_per_second=400) as fw:
+        with mark4.open(fl, 'ws', header=header0, sample_rate=16*u.MHz) as fw:
             fw.write(record)
             number_of_bytes = fw.fh_raw.tell()
             assert number_of_bytes == fh_raw_tell1 - 17436
 
         # Note: this test would not work if we wrote only a single record.
         with mark4.open(fl, 'rs', ntrack=32, decade=2010,
-                        frames_per_second=400) as fh:
+                        sample_rate=16*u.MHz) as fh:
             assert fh.start_time == start_time
             record2 = fh.read(1000)
             assert np.all(record2 == record[:1000])
@@ -851,9 +858,10 @@ class Test16TrackFanout4():
 
     def test_file_streamer(self, tmpdir):
         with mark4.open(SAMPLE_16TRACK, 'rs', ntrack=16, decade=2010,
-                        frames_per_second=400) as fh:
+                        sample_rate=32*u.MHz) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 80000
+            assert np.all(fh.sample_rate == 32 * u.MHz)
             start_time = fh.start_time
             assert start_time.yday == '2013:307:06:00:00.77000'
             record = fh.read(160000)
@@ -873,7 +881,7 @@ class Test16TrackFanout4():
         assert np.all(record[640:668].astype(int) == m5access_data.T)
 
         fl = str(tmpdir.join('test.m4'))
-        with mark4.open(fl, 'ws', header=header0, frames_per_second=400) as fw:
+        with mark4.open(fl, 'ws', header=header0, sample_rate=32*u.MHz) as fw:
             fw.fh_raw.write(preheader_junk)
             fw.write(record)
             number_of_bytes = fw.fh_raw.tell()
@@ -881,7 +889,7 @@ class Test16TrackFanout4():
 
         # Note: this test would not work if we wrote only a single record.
         with mark4.open(fl, 'rs', ntrack=16, decade=2010,
-                        frames_per_second=400) as fh:
+                        sample_rate=32*u.MHz) as fh:
             assert fh.start_time == start_time
             record2 = fh.read()
             assert np.all(record2 == record)
