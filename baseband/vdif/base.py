@@ -245,9 +245,9 @@ class VDIFStreamBase(VLBIStreamBase):
         samples_per_frame = header0.samples_per_frame
         if sample_rate is None:
             try:
-                sample_rate = samples_per_frame * header0.framerate.to(u.Hz)
+                sample_rate = header0.sample_rate
             except AttributeError:
-                pass  # super below will scan file to get framerate.
+                pass  # super below will scan file to get sample rate.
 
         sample_shape = self._sample_shape_maker(len(thread_ids), header0.nchan)
 
@@ -263,12 +263,11 @@ class VDIFStreamBase(VLBIStreamBase):
 
         This passes on frame rate, since not all VDIF headers can calculate it.
         """
-        return header.get_time(
-            framerate=self.sample_rate / self.samples_per_frame)
+        return header.get_time(sample_rate=self.sample_rate)
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
-                "    sample_rate={s._sample_rate} Hz,"
+                "    sample_rate={s.sample_rate:.6g},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape},\n"
                 "    complex_data={s.complex_data},"
@@ -426,8 +425,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second (ie. the rate at which each
         channel in each thread is sampled).  For EDV 1 and 3, can
-        alternatively use either the ``framerate`` or ``bandwidth`` header
-        keywords.
+        alternatively set `sample_rate` within the header passed to `header`.
     header : :class:`~baseband.vdif.VDIFHeader`, optional
         Header for the first frame, holding time information, etc.
     squeeze : bool, optional
@@ -457,13 +455,8 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
         Or unsigned 2-byte integer.
     edv : {`False`, 0, 1, 2, 3, 4, 0xab}
         Extended Data Version.
-    framerate : `~astropy.units.Quantity`, optional
-        In frequency units.  Available for EDV 1 and 3.
-    bandwidth : `~astropy.units.Quantity`, optional
-        In frequency units.  Available for EDV 1 and 3, and sufficient
-        to determine the frame rate.
     """
-    def __init__(self, raw, nthread=1, sample_rate=None, header=None,
+    def __init__(self, raw, nthread=1, header=None, sample_rate=None,
                  squeeze=True, **kwargs):
         if header is None:
             header = VDIFHeader.fromvalues(**kwargs)
@@ -471,17 +464,15 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
         super(VDIFStreamWriter, self).__init__(
             raw, header, range(nthread), sample_rate=sample_rate,
             squeeze=squeeze)
-        # Set framerate and thus bandwidth in the header, if not set already.
+        # Set sample rate in the header, if it's possible, and not set already.
         try:
-            header_framerate = self.header0.framerate
+            header_sample_rate = self.header0.sample_rate
         except AttributeError:
             pass
         else:
-            framerate = self.sample_rate / self.samples_per_frame
-            if header_framerate == 0:
-                header.framerate = framerate
-            else:
-                assert np.all(header.framerate == framerate)
+            if header_sample_rate == 0:
+                self.header0.sample_rate = self.sample_rate
+            assert self.header0.sample_rate == self.sample_rate
         self._data = np.zeros(
             (self._sample_shape.nthread, self.samples_per_frame,
                 self._sample_shape.nchan),

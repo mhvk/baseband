@@ -141,20 +141,6 @@ class GSBStreamBase(VLBIStreamBase):
             sample_shape = GSBPayload._sample_shape_maker_nthread(len(fh_raw),
                                                                   nchan)
 
-        if sample_rate is None:
-            try:
-                header1 = self.fh_ts.read_timestamp()
-                assert (fh_ts.tell() ==
-                        header0.seek_offset(2))
-                sample_rate = samples_per_frame * (
-                    1. / (header1.time - header0.time)).to(u.Hz)
-            except Exception as exc:
-                exc.args += ("The sample rate could not be auto-detected. "
-                             "This may be because the timestamp file only "
-                             "has one entry, or because it is corrupted. "
-                             "Try passing in an explicit `sample_rate`.",)
-                raise
-
         super(GSBStreamBase, self).__init__(
             fh_raw, header0=header0, sample_shape=sample_shape, bps=bps,
             complex_data=complex_data, thread_ids=thread_ids,
@@ -179,7 +165,7 @@ class GSBStreamBase(VLBIStreamBase):
             data_name = self.fh_raw.name
         return ("<{s.__class__.__name__} header={s.fh_ts.name}"
                 " offset= {s.offset}\n    data={dn}\n"
-                "    sample_rate={s._sample_rate:.3e} Hz,"
+                "    sample_rate={s.sample_rate:.6g},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
                 "    {t}start_time={s.start_time.isot}>"
@@ -204,6 +190,9 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         streams per polarization.  E.g., ((polL1, polL2), (polR1, polR2)) for
         two streams per polarization.  A single tuple is interpreted as
         streams of a single polarization.
+    sample_rate : `~astropy.units.Quantity`
+        Number of complete samples per second (ie. the rate at which each
+        channel of each polarization is sampled).
     thread_ids : list, optional
         Individual polarizations to read.  **Currently NOT supported!**
     nchan : int, optional
@@ -215,10 +204,6 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         rawdump, 8 for phased.
     complex_data : bool, optional
         Default is `None`, which sets `False` for rawdump, `True` for phased.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Number of complete samples per second (ie. the rate at which each
-        channel of each polarization is sampled).  If not given, will be
-        inferred from scanning the header.
     samples_per_frame : int, optional
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.
@@ -234,9 +219,9 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     # be solved with FileWriter/FileReader classes that handle timestamps and
     # multiple blocks, combining these into a frame?
 
-    def __init__(self, fh_ts, fh_raw, thread_ids=None, nchan=None, bps=None,
-                 complex_data=None, samples_per_frame=None, payloadsize=None,
-                 sample_rate=None, squeeze=True):
+    def __init__(self, fh_ts, fh_raw, sample_rate, thread_ids=None, nchan=None,
+                 bps=None, complex_data=None, samples_per_frame=None,
+                 payloadsize=None, squeeze=True):
         header0 = fh_ts.read_timestamp()
         super(GSBStreamReader, self).__init__(
             fh_ts, fh_raw, header0, nchan=nchan, bps=bps,
@@ -323,10 +308,10 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 # Read relevant frame (possibly reusing data array from
                 # previous frame set).
                 self._read_frame(fill_value)
-                framerate = self._sample_rate / self.samples_per_frame
-                assert np.isclose(self._frame_nr, framerate *
-                                  (self._frame.header.time -
-                                   self.start_time).to(u.s).value)
+                framerate = self.sample_rate / self.samples_per_frame
+                assert np.isclose(self._frame_nr,
+                                  ((self._frame.header.time -
+                                    self.start_time) * framerate).decompose())
 
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
@@ -370,6 +355,9 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         streams per polarization.  E.g., ((polL1, polL2), (polR1, polR2)) for
         two streams per polarization.  A single tuple is interpreted as
         streams of a single polarization.
+    sample_rate : `~astropy.units.Quantity`
+        Number of complete samples per second (ie. the rate at which each
+        channel of each polarization is sampled).
     header : `~baseband.gsb.GSBHeader`, optional
         Header for the first frame, holding time information, etc.
     nchan : int, optional
@@ -381,9 +369,6 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         rawdump, 8 for phased.
     complex_data : bool, optional
         Default is `None`, which sets `False` for rawdump, `True` for phased.
-    sample_rate : `~astropy.units.Quantity`
-        Number of complete samples per second (ie. the rate at which each
-        channel of each polarization is sampled).
     samples_per_frame : int, optional
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.
@@ -526,6 +511,9 @@ def open(name, mode='rs', **kwargs):
         number of streams per polarization.  E.g.,
         ((polL1, polL2), (polR1, polR2)) for two streams per polarization.  A
         single tuple is interpreted as streams of a single polarization.
+    sample_rate : `~astropy.units.Quantity`
+        Number of complete samples per second (ie. the rate at which each
+        channel of each polarization is sampled).
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.
     bps : int, optional
@@ -533,10 +521,6 @@ def open(name, mode='rs', **kwargs):
         complex data sample).  Default: 4 for rawdump, 8 for phased.
     complex_data : bool, optional
         Default: `False` for rawdump, `True` for phased.
-    sample_rate : `~astropy.units.Quantity`, optional when reading
-        Number of complete samples per second (ie. the rate at which each
-        channel of each polarization is sampled).  When reading, if not given,
-        will be inferred from scanning the header.
     samples_per_frame : int
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.

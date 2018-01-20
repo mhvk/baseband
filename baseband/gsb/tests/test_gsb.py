@@ -432,8 +432,9 @@ class TestGSB(object):
     def test_raw_stream(self, tmpdir):
         sample_rate = self.framerate * 2**13 * u.Hz
         # Open here with payloadsize given, below with samples_per_frame.
-        with gsb.open(SAMPLE_RAWDUMP_HEADER, mode='rs', raw=SAMPLE_RAWDUMP,
-                      payloadsize=2**12, squeeze=False) as fh_r:
+        with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP,
+                      sample_rate=sample_rate, payloadsize=2**12,
+                      squeeze=False) as fh_r:
             with open(SAMPLE_RAWDUMP_HEADER, 'rt') as ft, \
                     open(SAMPLE_RAWDUMP, 'rb') as fraw:
                 frame1 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
@@ -443,10 +444,7 @@ class TestGSB(object):
             assert fh_r.size == 10 * fh_r.samples_per_frame
             # Sample rates aren't exactly equal because GSB timestamps only
             # store 9 digits of the fractional second.
-            assert np.all(np.isclose(fh_r.sample_rate, sample_rate,
-                                     rtol=1e-9, atol=0.*u.Hz))
-            assert np.isclose(fh_r._sample_rate, sample_rate.value,
-                              rtol=1e-9, atol=0.)
+            assert fh_r.sample_rate == sample_rate
             assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
             # Seek last offset.
             with open(SAMPLE_RAWDUMP_HEADER, 'rt') as ft, \
@@ -481,28 +479,27 @@ class TestGSB(object):
             # For testing proper file closing below.
             header0 = fh_r.header0
 
-        with gsb.open(SAMPLE_RAWDUMP_HEADER, mode='rs', raw=SAMPLE_RAWDUMP,
+        with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP,
+                      sample_rate=sample_rate,
                       samples_per_frame=2**13) as fh_r, \
                 open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
                 open(str(tmpdir.join('test.dat')), 'w+b') as sp:
             fh_w = gsb.open(sh, 'ws', raw=sp, samples_per_frame=2**13,
                             sample_rate=fh_r.sample_rate, header=fh_r.header0)
-            assert np.all(np.isclose(fh_w.sample_rate, sample_rate,
-                                     rtol=1e-9, atol=0.*u.Hz))
+            assert fh_w.sample_rate == sample_rate
             fh_w.write(fh_r.read())
             fh_w.flush()
             sh.seek(0)
             sp.seek(0)
             fh_r.seek(0)
-            with gsb.open(sh, mode='rs', raw=sp, samples_per_frame=2**13,
+            with gsb.open(sh, 'rs', raw=sp, samples_per_frame=2**13,
                           sample_rate=fh_r.sample_rate) as fh_n:
                 assert fh_n.header0 == fh_r.header0
                 assert fh_n._last_header == fh_r._last_header
                 assert fh_n.size == fh_r.size
                 assert fh_n.sample_shape == fh_r.sample_shape
                 assert fh_n.start_time == fh_r.start_time
-                assert np.all(np.isclose(fh_n.sample_rate, sample_rate,
-                                         rtol=1e-9, atol=0.*u.Hz))
+                assert fh_n.sample_rate == sample_rate
                 assert np.all(fh_n.read() == fh_r.read())
                 assert abs(fh_n.stop_time - fh_n.time) < 1.*u.ns
                 assert abs(fh_n.stop_time - fh_r.stop_time) < 1.*u.ns
@@ -529,8 +526,9 @@ class TestGSB(object):
         with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
                 open(filename_incompletehead, 'wt') as fw:
             fw.write(fh.read()[:-4])
-        with gsb.open(filename_incompletehead, mode='rs', raw=SAMPLE_RAWDUMP,
-                      payloadsize=2**12, squeeze=False) as fh_r:
+        with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_RAWDUMP,
+                      sample_rate=sample_rate, payloadsize=2**12,
+                      squeeze=False) as fh_r:
             with catch_warnings(UserWarning) as w:
                 fh_r._last_header
             assert len(w) == 1
@@ -539,9 +537,9 @@ class TestGSB(object):
         with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
                 open(filename_incompletehead, 'wt') as fw:
             fw.write(fh.read()[:45])
-        with gsb.open(filename_incompletehead, mode='rs', raw=SAMPLE_RAWDUMP,
-                      payloadsize=2**12, squeeze=False,
-                      sample_rate=(self.framerate * 2**13 * u.Hz)) as fh_r:
+        with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_RAWDUMP,
+                      sample_rate=sample_rate, payloadsize=2**12,
+                      squeeze=False) as fh_r:
             with catch_warnings(UserWarning) as w:
                 fh_r._last_header
             assert len(w) == 1
@@ -552,8 +550,9 @@ class TestGSB(object):
     def test_phased_stream(self, tmpdir):
         sample_rate = self.framerate * 2**3 * u.Hz
         # Open here with payloadsize given, below with samples_per_frame.
-        with gsb.open(SAMPLE_PHASED_HEADER, mode='rs', raw=SAMPLE_PHASED,
-                      payloadsize=2**12, squeeze=False) as fh_r:
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
+                      sample_rate=sample_rate, payloadsize=2**12,
+                      squeeze=False) as fh_r:
             fraw = [[open(thread, 'rb') for thread in pol]
                     for pol in SAMPLE_PHASED]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
@@ -565,10 +564,7 @@ class TestGSB(object):
             assert fh_r.size == 10 * fh_r.samples_per_frame
             # Sample rates aren't exactly equal because GSB timestamps only
             # store 9 digits of the fractional second.
-            assert np.all(np.isclose(fh_r.sample_rate, sample_rate,
-                                     rtol=1e-9, atol=0.*u.Hz))
-            assert np.isclose(fh_r._sample_rate, sample_rate.value,
-                              rtol=1e-9, atol=0.)
+            assert fh_r.sample_rate == sample_rate
             assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
             # Seek last offset.
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
@@ -604,8 +600,9 @@ class TestGSB(object):
             self.close_phased_rawfiles(fraw)
 
         # Try only right polarization.
-        with gsb.open(SAMPLE_PHASED_HEADER, mode='rs', raw=SAMPLE_PHASED[1],
-                      payloadsize=2**12, squeeze=False) as fh_r:
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED[1],
+                      sample_rate=sample_rate, payloadsize=2**12,
+                      squeeze=False) as fh_r:
             fraw = [[open(thread, 'rb') for thread in SAMPLE_PHASED[1]]]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
                 frame1 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
@@ -617,7 +614,8 @@ class TestGSB(object):
             self.close_phased_rawfiles(fraw)
 
         # Try writing to file by passing header keywords into open.
-        with gsb.open(SAMPLE_PHASED_HEADER, mode='rs', raw=SAMPLE_PHASED,
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
+                      sample_rate=sample_rate,
                       samples_per_frame=2**3) as fh_r, \
                 open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
                 open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
@@ -626,17 +624,15 @@ class TestGSB(object):
                 open(str(tmpdir.join('test3.dat')), 'w+b') as sp3:
             fraw = ((sp0, sp1), (sp2, sp3))
             fh_w = gsb.open(sh, 'ws', raw=fraw, samples_per_frame=2**3,
-                            sample_rate=(self.framerate * 2**3 * u.Hz),
-                            **fh_r.header0)
-            assert np.all(np.isclose(fh_w.sample_rate, sample_rate,
-                                     rtol=1e-9, atol=0.*u.Hz))
+                            sample_rate=fh_r.sample_rate, **fh_r.header0)
+            assert fh_w.sample_rate == sample_rate
             fh_w.write(fh_r.read())
             fh_w.flush()
             sh.seek(0)
             self.seek_phased_rawfiles(fraw, 0)
             fh_r.seek(0)
-            with gsb.open(sh, mode='rs', raw=fraw, samples_per_frame=2**3,
-                          sample_rate=(self.framerate * 2**3 * u.Hz)) as fh_n:
+            with gsb.open(sh, 'rs', raw=fraw, samples_per_frame=2**3,
+                          sample_rate=sample_rate) as fh_n:
                 assert fh_n.header0 == fh_r.header0
                 # PC time will not be the same.
                 for key in ('gps', 'seq_nr', 'mem_block'):
@@ -644,8 +640,7 @@ class TestGSB(object):
                 assert fh_n.size == fh_r.size
                 assert fh_n.sample_shape == fh_r.sample_shape
                 assert fh_n.start_time == fh_r.start_time
-                assert np.all(np.isclose(fh_n.sample_rate, sample_rate,
-                                         rtol=1e-9, atol=0.*u.Hz))
+                assert fh_n.sample_rate == sample_rate
                 assert np.all(fh_n.read() == fh_r.read())
                 assert abs(fh_n.stop_time - fh_n.time) < 1.*u.ns
                 assert abs(fh_n.stop_time - fh_r.stop_time) < 1.*u.ns
@@ -663,8 +658,9 @@ class TestGSB(object):
         with open(SAMPLE_PHASED_HEADER, 'rt') as fh, \
                 open(filename_incompletehead, 'wt') as fw:
             fw.write(fh.read()[:-7])
-        with gsb.open(filename_incompletehead, mode='rs', raw=SAMPLE_PHASED,
-                      payloadsize=2**12, squeeze=False) as fh_r:
+        with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_PHASED,
+                      sample_rate=sample_rate, payloadsize=2**12,
+                      squeeze=False) as fh_r:
             with catch_warnings(UserWarning) as w:
                 fh_r._last_header
             assert len(w) == 1
@@ -673,9 +669,9 @@ class TestGSB(object):
         with open(SAMPLE_PHASED_HEADER, 'rt') as fh, \
                 open(filename_incompletehead, 'wt') as fw:
             fw.write(fh.read()[:97])
-        with gsb.open(filename_incompletehead, mode='rs', raw=SAMPLE_PHASED,
-                      payloadsize=2**12, squeeze=False,
-                      sample_rate=(self.framerate * 2**3 * u.Hz)) as fh_r:
+        with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_PHASED,
+                      sample_rate=sample_rate, payloadsize=2**12,
+                      squeeze=False) as fh_r:
             with catch_warnings(UserWarning) as w:
                 fh_r._last_header
             assert len(w) == 1

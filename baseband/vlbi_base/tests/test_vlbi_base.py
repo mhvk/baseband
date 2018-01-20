@@ -430,8 +430,11 @@ class TestVLBIBase(object):
         smp_shp_cls = namedtuple('SampleShape',
                                  'n1, n2, n3, n4, n5, n6, n7, n8')
         sample_shape = smp_shp_cls(1, 17, 3, 2, 1, 5, 1, 1)
-        sb = VLBIStreamBase(None, None, sample_shape, 1, False,
-                            None, 1000, 10000*u.Hz, squeeze=False)
+        sb = VLBIStreamBase(fh_raw=None, header0=None,
+                            sample_shape=sample_shape, bps=1,
+                            complex_data=False, thread_ids=None,
+                            samples_per_frame=1000,
+                            sample_rate=10000*u.Hz, squeeze=False)
         assert sb.sample_shape == sample_shape
         sb.squeeze = True
         assert sb.sample_shape == (17, 3, 2, 5)

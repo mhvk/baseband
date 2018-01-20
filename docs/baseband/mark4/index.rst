@@ -50,7 +50,7 @@ also provide a reference time within 4 years of the observation start time::
     ...                 ref_time=Time('2013:100:23:00:00'))
     >>> fh
     <Mark4StreamReader name=... offset=0
-        sample_rate=32000000.0 Hz, samples_per_frame=80000,
+        sample_rate=3.2e+07 Hz, samples_per_frame=80000,
         sample_shape=SampleShape(nchan=8), bps=2,
         start_time=2014-06-16T07:38:12.47500>
     >>> d = fh.read(6400)

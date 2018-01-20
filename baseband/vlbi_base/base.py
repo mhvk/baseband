@@ -6,10 +6,8 @@ import astropy.units as u
 from astropy.utils import lazyproperty, deprecated
 
 
-__all__ = ['u_sample', 'VLBIStreamBase', 'VLBIStreamReaderBase',
-           'VLBIStreamWriterBase', 'make_opener']
-
-u_sample = u.def_unit('sample', doc='One sample from a data stream')
+__all__ = ['VLBIStreamBase', 'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
+           'make_opener']
 
 
 class VLBIFileBase(object):
@@ -18,6 +16,7 @@ class VLBIFileBase(object):
     The underlying file is stored in ``fh`` and all attributes that do not
     exist on the class itself are looked up on it.
     """
+
     def __init__(self, fh_raw):
         self.fh_raw = fh_raw
 
@@ -49,11 +48,11 @@ class VLBIStreamBase(VLBIFileBase):
 
     _frame_class = None
     _squeezed_shape = None
+    _samples_per_frame = None
     _sample_rate = None
 
     def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
-                 thread_ids, samples_per_frame, sample_rate=None,
-                 squeeze=True):
+                 thread_ids, samples_per_frame, sample_rate, squeeze=True):
         super(VLBIStreamBase, self).__init__(fh_raw)
         self._header0 = header0
         self._sample_shape = sample_shape
@@ -137,7 +136,7 @@ class VLBIStreamBase(VLBIFileBase):
 
     @property
     def header0(self):
-        """First header of file."""
+        """First header of the file."""
         return self._header0
 
     @property
@@ -160,13 +159,28 @@ class VLBIStreamBase(VLBIFileBase):
         self._thread_ids = ids
 
     @property
+    def samples_per_frame(self):
+        """Number of complete samples per frame."""
+        return self._samples_per_frame
+
+    @samples_per_frame.setter
+    def samples_per_frame(self, samples_per_frame):
+        self._samples_per_frame = samples_per_frame
+
+    @property
     def sample_rate(self):
         """Number of complete samples per second."""
-        return self._sample_rate * u.Hz
+        return self._sample_rate
 
     @sample_rate.setter
     def sample_rate(self, sample_rate):
-        self._sample_rate = sample_rate.to(u.Hz).value
+        # Check if sample_rate is a time rate.
+        try:
+            sample_rate.to(u.Hz)
+        except u.UnitsError as exc:
+            exc.args += ("Sample rate must have units of 1 / time!",)
+            raise
+        self._sample_rate = sample_rate
 
     def tell(self, unit=None):
         """Current offset in file.
@@ -189,19 +203,19 @@ class VLBIStreamBase(VLBIFileBase):
         if unit == 'time':
             return self.start_time + self.tell(unit=u.s)
 
-        return (self.offset * u_sample).to(unit, equivalencies=[(u.s, u.Unit(
-            self._sample_rate * u_sample))])
+        return (self.offset / self.sample_rate).to(unit)
 
     def _frame_info(self):
         offset = (self.offset +
                   self.header0['frame_nr'] * self.samples_per_frame)
-        dt, subsecond_samples = divmod(offset, self._sample_rate)
-        frame_nr, extra = divmod(subsecond_samples, self.samples_per_frame)
+        framerate = self.sample_rate.to_value(u.Hz) / self.samples_per_frame
+        full_frame_nr, extra = divmod(offset, self.samples_per_frame)
+        dt, frame_nr = divmod(full_frame_nr, framerate)
         return int(dt), int(frame_nr), int(extra)
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
-                "    sample_rate={s._sample_rate} Hz,"
+                "    sample_rate={s.sample_rate:.6g},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
                 "    {t}start_time={s.start_time.isot}>"
@@ -217,8 +231,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         if sample_rate is None:
             try:
-                sample_rate = self._get_sample_rate(fh_raw, header0,
-                                                    samples_per_frame)
+                sample_rate = (samples_per_frame *
+                               self._get_frame_rate(fh_raw, header0)) * u.Hz
+
             except Exception as exc:
                 exc.args += ("The sample rate could not be auto-detected. "
                              "This can happen if the file is too short to "
@@ -232,8 +247,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             samples_per_frame, sample_rate, squeeze)
 
     @staticmethod
-    def _get_sample_rate(fh, header_template, samples_per_frame):
-        """Returns the number of complete samples in one second of data.
+    def _get_frame_rate(fh, header_template):
+        """Returns the number of frames per second.
 
         Parameters
         ----------
@@ -241,21 +256,18 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             Binary file handle.
         header_template : header class or instance
             Definition or instance of file format's header class.
-        samples_per_frame : int
-            Number of complete samples per frame.
 
         Returns
         -------
-        sample_rate : `~astropy.units.Quantity`
-            Number of complete samples per second.
+        framerate : int
+            Frames per second.
 
         Notes
         -----
 
         The function cycles through headers, starting from the file pointer's
         current position, to find the next frame whose frame number is zero
-        while keeping track of the largest frame number yet found.  This gives
-        the number of frames per second, which is converted to a sample rate.
+        while keeping track of the largest frame number yet found.
 
         ``_get_frame_rate`` is called when the sample rate is not user-provided
         or deducable from header information.  If less than one second of data
@@ -280,7 +292,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             warnings.warn("Header time changed by more than 1 second?")
 
         fh.seek(oldpos)
-        return (max_frame + 1) * samples_per_frame * u.Hz
+        return max_frame + 1
 
     @lazyproperty
     def _last_header(self):
@@ -303,10 +315,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         See also `start_time` for the start time of the file, and `time` for
         the time of the sample pointer's current offset.
         """
-        # Faster to use self._sample_rate and append units than to convert
-        # 1 / self.sample_rate.
         return (self._get_time(self._last_header) +
-                u.s * (self.samples_per_frame / self._sample_rate))
+                (self.samples_per_frame / self.sample_rate).to(u.s))
 
     @deprecated('0.X', name='time1', alternative='stop_time',
                 obj_type='attribute')
@@ -318,8 +328,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     @property
     def size(self):
         """Number of samples in the file."""
-        return int(round((self.stop_time - self.start_time).to(u.s).value *
-                         self._sample_rate))
+        return int(np.round(((self.stop_time - self.start_time) *
+                             self.sample_rate).decompose()))
 
     def seek(self, offset, whence=0):
         """Change stream position.
@@ -349,9 +359,10 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             else:
                 whence = 0
 
-            offset = offset.to(u_sample, equivalencies=[(u.s, u.Unit(
-                self._sample_rate * u_sample))])
-            offset = int(round(offset.value))
+            # offset = offset.to(u_sample, equivalencies=[(u.s, u.Unit(
+            #     self._sample_rate * u_sample))])
+            # offset = int(round(offset.value))
+            offset = int(np.round((offset * self.sample_rate).decompose()))
 
         if whence == 0 or whence == 'start':
             self.offset = offset
@@ -360,7 +371,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         elif whence == 2 or whence == 'end':
             self.offset = self.size + offset
         else:
-            raise ValueError("invalid 'whence'; should be 0 or 'start', 1 or"
+            raise ValueError("Invalid 'whence'; should be 0 or 'start', 1 or"
                              "'current', or 2 or 'end'.")
 
         return self.offset

@@ -505,8 +505,7 @@ class TestMark4(object):
             assert fh.fh_raw.tell() == 0xa88 + fh.header0.framesize
             assert fh.samples_per_frame == 80000
             assert fh.size == 2 * fh.samples_per_frame
-            assert np.all(fh.sample_rate == 32 * u.MHz)
-            assert fh._sample_rate == 32000000.0
+            assert fh.sample_rate == 32 * u.MHz
             record = fh.read(642)
             assert fh.tell() == 642
             # regression test against #4, of incorrect frame offsets.
@@ -548,7 +547,7 @@ class TestMark4(object):
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fh:
             assert header == fh.header0
             assert fh.samples_per_frame == 80000
-            assert np.all(fh.sample_rate == 32 * u.MHz)
+            assert fh.sample_rate == 32 * u.MHz
             record3 = fh.read(642)
 
         assert np.all(record3 == record)
@@ -556,7 +555,7 @@ class TestMark4(object):
         # Test if automatic ntrack and frame rate detectors work together.
         with mark4.open(SAMPLE_FILE, 'rs', decade=2010) as fh:
             assert header == fh.header0
-            assert np.all(fh.sample_rate == 32 * u.MHz)
+            assert fh.sample_rate == 32 * u.MHz
             fh.seek(80000 + 639)
             record4 = fh.read(2)
 
@@ -572,7 +571,7 @@ class TestMark4(object):
         rewritten_file = str(tmpdir.join('rewritten.m4'))
         with mark4.open(rewritten_file, 'ws', sample_rate=32*u.MHz,
                         time=start_time, ntrack=64, bps=2, fanout=4) as fw:
-            assert np.all(fw.sample_rate == 32 * u.MHz)
+            assert fw.sample_rate == 32 * u.MHz
             # write in bits and pieces and with some invalid data as well.
             fw.write(record[:11])
             fw.write(record[11:80000])
@@ -583,7 +582,7 @@ class TestMark4(object):
                         sample_rate=32*u.MHz, thread_ids=[3, 4]) as fh:
             assert fh.time == start_time
             assert fh.time == fh.tell(unit='time')
-            assert np.all(fh.sample_rate == 32 * u.MHz)
+            assert fh.sample_rate == 32 * u.MHz
             record5 = fh.read(160000)
             assert fh.time == stop_time
             assert np.all(record5[:80000] == record[:80000, 3:5])
@@ -738,7 +737,7 @@ class Test32TrackFanout4():
                         sample_rate=32*u.MHz) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 80000
-            assert np.all(fh.sample_rate == 32 * u.MHz)
+            assert fh.sample_rate == 32 * u.MHz
             start_time = fh.start_time
             assert start_time.yday == '2015:011:01:23:10.48500'
             record = fh.read(160000)
@@ -800,7 +799,7 @@ class Test32TrackFanout2():
                         sample_rate=16*u.MHz) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 40000
-            assert np.all(fh.sample_rate == 16 * u.MHz)
+            assert fh.sample_rate == 16 * u.MHz
             start_time = fh.start_time
             assert start_time.yday == '2017:063:04:42:26.02500'
             record = fh.read(80000)
@@ -861,7 +860,7 @@ class Test16TrackFanout4():
                         sample_rate=32*u.MHz) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 80000
-            assert np.all(fh.sample_rate == 32 * u.MHz)
+            assert fh.sample_rate == 32 * u.MHz
             start_time = fh.start_time
             assert start_time.yday == '2013:307:06:00:00.77000'
             record = fh.read(160000)

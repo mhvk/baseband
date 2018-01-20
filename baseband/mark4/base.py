@@ -306,8 +306,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             sample_rate=sample_rate, squeeze=squeeze)
 
     @staticmethod
-    def _get_sample_rate(fh, header_template, samples_per_frame):
-        """Returns the number of complete samples in one second of data.
+    def _get_frame_rate(fh, header_template):
+        """Returns the number of frames per second in a Mark 4 file.
 
         Parameters
         ----------
@@ -315,18 +315,16 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             Binary file handle.
         header_template : header class or instance
             Definition or instance of file format's header class.
-        samples_per_frame : int
-            Number of complete samples per frame.
 
         Returns
         -------
-        sample_rate : `~astropy.units.Quantity`
-            Number of complete samples per second.
+        framerate : int
+            Frames per second.
 
         Notes
         -----
 
-        Unlike `VLBIStreamReaderBase._get_sample_rate`, this function reads
+        Unlike `VLBIStreamReaderBase._get_frame_rate`, this function reads
         only two consecutive frames, extracting their timestamps to determine
         how much time has elapsed.  It will return an EOFError if there is
         only one frame.
@@ -341,7 +339,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         # Mark 4 specification states frames-lengths range from 1.25 ms
         # to 160 ms.
         tdelta = header1.ms[0] - header0.ms[0]
-        return int(np.round(1000. / tdelta)) * samples_per_frame * u.Hz
+        return int(np.round(1000. / tdelta))
 
     @lazyproperty
     def _last_header(self):

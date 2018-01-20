@@ -265,8 +265,7 @@ class TestDADA(object):
             assert fh.header0 == self.header
             assert fh.size == 16000
             assert fh.start_time == start_time
-            assert np.all(fh.sample_rate == 16 * u.MHz)
-            assert fh._sample_rate == 16000000.0
+            assert fh.sample_rate == 16 * u.MHz
             record1 = fh.read(12)
             assert fh.tell() == 12
             fh.seek(10000)
@@ -304,7 +303,7 @@ class TestDADA(object):
         filename = str(tmpdir.join('a.dada'))
         with dada.open(filename, 'ws', header=self.header,
                        squeeze=False) as fw:
-            assert np.all(fw.sample_rate == 16 * u.MHz)
+            assert fw.sample_rate == 16 * u.MHz
             fw.write(self.payload.data)
             assert fw.start_time == start_time
             assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
@@ -316,7 +315,7 @@ class TestDADA(object):
             assert (np.abs(fh.time - (start_time + 16000 / (16. * u.MHz))) <
                     1. * u.ns)
             assert fh.stop_time == fh.time
-            assert np.all(fh.sample_rate == 16 * u.MHz)
+            assert fh.sample_rate == 16 * u.MHz
         assert np.all(data == self.payload.data.squeeze())
         # Try single polarisation, and check initialisation by header keywords.
         h = self.header

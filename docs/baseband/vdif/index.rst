@@ -79,7 +79,7 @@ information::
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> fh
     <VDIFStreamReader name=... offset=0
-        sample_rate=32000000.0 Hz, samples_per_frame=20000,
+        sample_rate=3.2e+07 Hz, samples_per_frame=20000,
         sample_shape=SampleShape(nthread=8),
         complex_data=False, bps=2, edv=3, station=65532,
         start_time=2014-06-16T05:56:07.000000000>
@@ -162,17 +162,17 @@ best solution is to create a custom header class, then override the
 subclass selector in :class:`~baseband.vdif.header.VDIFHeader`.  Tutorials
 for doing either can be found :ref:`here <new_edv>`.
 
-EOFError encountered in ``_get_sample_rate`` when reading
+EOFError encountered in ``_get_frame_rate`` when reading
 ---------------------------------------------------------
 
-When the number of frames per second is not input by the user and cannot be
-deduced from header information (if EDV = 1 or, the sample rate is found in
-the header), Baseband tries to determine the sample rate using the private
-method ``_get_sample_rate`` in :class:`~baseband.vdif.base.VDIFStreamReader`. 
-This function raises `EOFError` if the file contains less than one second of
-data, or is corrupt.  In either case the file can be opened still by explicitly
-passing in the sample rate to :func:`~baseband.vdif.open` via the `sample_rate`
-argument.
+When the sample rate is not input by the user and cannot be deduced from header
+information (if EDV = 1 or, the sample rate is found in the header), Baseband
+tries to determine the frame rate using the private method ``_get_frame_rate``
+in :class:`~baseband.vdif.base.VDIFStreamReader` (and then multiply by the
+samples per frame to obtain the sample rate).  This function raises `EOFError`
+if the file contains less than one second of data, or is corrupt.  In either
+case the file can be opened still by explicitly passing in the sample rate to
+:func:`~baseband.vdif.open` via the `sample_rate` argument.
 
 .. _vdif_api:
 

@@ -108,7 +108,7 @@ We can access information about the file by printing ``fh``::
 
     >>> fh
     <VDIFStreamReader name=... offset=24
-        sample_rate=32000000.0 Hz, samples_per_frame=20000,
+        sample_rate=3.2e+07 Hz, samples_per_frame=20000,
         sample_shape=SampleShape(nthread=8),
         complex_data=False, bps=2, edv=3, station=65532,
         start_time=2014-06-16T05:56:07.000000000>

@@ -431,7 +431,7 @@ class, and define a replacement::
 
 We can then use the stream reader without further modification::
 
-    >>> fh2 = vdif.open(SAMPLE_DRAO_CORRUPT, 'rs', sample_rate=625**3*u.Hz)
+    >>> fh2 = vdif.open(SAMPLE_DRAO_CORRUPT, 'rs', sample_rate=5**12*u.Hz)
     >>> fh2.header0['eud2'] == header0['eud2']
     True
     >>> np.array_equal(fh2.read(1), payload0[0])
