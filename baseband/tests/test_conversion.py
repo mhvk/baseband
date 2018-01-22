@@ -311,9 +311,8 @@ class TestDADAToVDIF1(object):
     """
 
     def get_vdif_header(self, header):
-        sample_rate = header.bandwidth * (1 if header.complex_data else 2)
         return vdif.VDIFHeader.fromvalues(
-            edv=1, time=header.time, sample_rate=sample_rate,
+            edv=1, time=header.time, sample_rate=header.sample_rate,
             bps=header.bps, nchan=header['NCHAN'],
             complex_data=header.complex_data,
             payloadsize=header.payloadsize // 2,
@@ -388,8 +387,7 @@ class TestDADAToVDIF1(object):
         dada_file = str(tmpdir.join('reconverted.dada'))
         dv_data = self.get_dada_data(dv)
         assert np.allclose(dv_data, dada_data)
-        bandwidth = vh.sample_rate / (1 if vh.complex_data else 2)
-        with dada.open(dada_file, 'ws', bandwidth=bandwidth,
+        with dada.open(dada_file, 'ws', sample_rate=vh.sample_rate,
                        time=vh.time, npol=vnthread, bps=vh.bps,
                        payloadsize=vh.payloadsize*2, nchan=vh.nchan,
                        telescope=vh.station,

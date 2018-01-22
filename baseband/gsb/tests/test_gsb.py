@@ -22,7 +22,9 @@ class TestGSB(object):
 
     def setup(self):
         # For all sample files, each frame spans 0.25165824 sec.
-        self.framerate = (1e8 / 3) / 2**23
+        self.framerate = (1e8 / 3) / 2**23 * u.Hz
+        # Payload size for all sample files is 2**12 bytes.
+        self.payloadsize = 2**12
 
     def test_rawdump_header(self):
         with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh:
@@ -430,7 +432,8 @@ class TestGSB(object):
             gsb.open(SAMPLE_RAWDUMP, 'rb', bps=2)
 
     def test_raw_stream(self, tmpdir):
-        sample_rate = self.framerate * 2**13 * u.Hz
+        bps = 4
+        sample_rate = self.framerate * self.payloadsize * (8 // bps)
         # Open here with payloadsize given, below with samples_per_frame.
         with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP,
                       sample_rate=sample_rate, payloadsize=2**12,
@@ -442,8 +445,6 @@ class TestGSB(object):
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
             assert fh_r.size == 10 * fh_r.samples_per_frame
-            # Sample rates aren't exactly equal because GSB timestamps only
-            # store 9 digits of the fractional second.
             assert fh_r.sample_rate == sample_rate
             assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
             # Seek last offset.
@@ -548,7 +549,9 @@ class TestGSB(object):
             assert fh_r._last_header == fh_r.header0
 
     def test_phased_stream(self, tmpdir):
-        sample_rate = self.framerate * 2**3 * u.Hz
+        bps = 8
+        nchan = 512
+        sample_rate = self.framerate * self.payloadsize * (8 // bps) / nchan
         # Open here with payloadsize given, below with samples_per_frame.
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
                       sample_rate=sample_rate, payloadsize=2**12,
@@ -557,13 +560,11 @@ class TestGSB(object):
                     for pol in SAMPLE_PHASED]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
                 frame1 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
-                                               bps=8, nchan=512,
+                                               nchan=nchan, bps=bps,
                                                complex_data=True)
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
             assert fh_r.size == 10 * fh_r.samples_per_frame
-            # Sample rates aren't exactly equal because GSB timestamps only
-            # store 9 digits of the fractional second.
             assert fh_r.sample_rate == sample_rate
             assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
             # Seek last offset.
@@ -571,7 +572,7 @@ class TestGSB(object):
                 ft.seek(frame1.header.seek_offset(9))
                 self.seek_phased_rawfiles(fraw, 9 * fh_r._payloadsize)
                 frame10 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
-                                                nchan=512, bps=8,
+                                                nchan=nchan, bps=bps,
                                                 complex_data=True)
             assert fh_r._last_header == frame10.header
             fh_r.seek(-8, 2)
@@ -606,7 +607,7 @@ class TestGSB(object):
             fraw = [[open(thread, 'rb') for thread in SAMPLE_PHASED[1]]]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
                 frame1 = gsb.GSBFrame.fromfile(ft, fraw, payloadsize=2**12,
-                                               bps=8, nchan=512,
+                                               nchan=nchan, bps=bps,
                                                complex_data=True)
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header

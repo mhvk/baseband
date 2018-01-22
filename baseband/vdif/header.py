@@ -374,8 +374,9 @@ class VDIFHeader(VLBIHeaderBase):
                 except AttributeError:
                     raise ValueError("Cannot calculate sample rate for this "
                                      "header. Pass it in explicitly.")
-            framerate = sample_rate / self.samples_per_frame
-            offset = (frame_nr / framerate).to(u.s).value
+            offset = (frame_nr * self.samples_per_frame /
+                      sample_rate).to_value(u.s)
+
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
@@ -513,9 +514,8 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
     def sample_rate(self):
         """Number of complete samples per second."""
         return u.Quantity(self['sampling_rate'] *
-                          (1000000 if self['sampling_unit'] else 1000) *
-                          (1 if self['complex_data'] else 2) /
-                          self.nchan, u.Hz)
+                          (1 if self['complex_data'] else 2) / self.nchan,
+                          u.MHz if self['sampling_unit'] else u.kHz)
 
     @sample_rate.setter
     def sample_rate(self, sample_rate):
@@ -669,8 +669,8 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                     raise ValueError("Calculating the time for a non-zero "
                                      "frame number requires a sample rate. "
                                      "Pass it in explicitly.")
-                framerate = sample_rate / self.samples_per_frame
-                offset = (frame_nr / framerate).to(u.s).value
+                offset = (frame_nr * self.samples_per_frame /
+                          sample_rate).to_value(u.s)
 
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))

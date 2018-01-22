@@ -54,8 +54,9 @@ class DADAHeader(OrderedDict):
     """
 
     _properties = ('payloadsize', 'framesize', 'bps', 'complex_data',
-                   'sample_shape', 'bandwidth', 'sideband', 'tsamp',
-                   'samples_per_frame', 'offset', 'start_time', 'time')
+                   'sample_shape', 'sample_rate', 'bandwidth', 'sideband',
+                   'tsamp', 'samples_per_frame', 'offset', 'start_time',
+                   'time')
     """Properties accessible/usable in initialisation for all headers."""
 
     _defaults = [('HEADER', 'DADA'),
@@ -334,6 +335,18 @@ class DADAHeader(OrderedDict):
     @sample_shape.setter
     def sample_shape(self, sample_shape):
         self['NPOL'], self['NCHAN'] = sample_shape
+
+    @property
+    def sample_rate(self):
+        """Number of complete samples per second."""
+        return (1. / self['TSAMP']) * u.MHz
+
+    @sample_rate.setter
+    def sample_rate(self, sample_rate):
+        sample_rate = sample_rate.to_value(u.MHz)
+        self['TSAMP'] = 1. / sample_rate
+        bw = sample_rate * self['NCHAN'] / (1 if self.complex_data else 2)
+        self['BW'] = (-1 if self.get('BW', bw) < 0 else 1) * bw
 
     @property
     def bandwidth(self):

@@ -443,8 +443,11 @@ class TestVLBIBase(object):
         smp_shp_cls_s = namedtuple('SampleShape',
                                    'n1')
         sample_shape_short = smp_shp_cls_s(1)
-        sbs = VLBIStreamBase(None, None, sample_shape_short, 1, False,
-                             None, 1000, 10000*u.Hz, squeeze=False)
+        sbs = VLBIStreamBase(fh_raw=None, header0=None,
+                             sample_shape=sample_shape_short, bps=1,
+                             complex_data=False, thread_ids=None,
+                             samples_per_frame=1000, sample_rate=10000*u.Hz,
+                             squeeze=False)
         assert sbs.sample_shape == sample_shape_short
         sbs.squeeze = True
         assert sbs.sample_shape == ()

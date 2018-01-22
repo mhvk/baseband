@@ -504,7 +504,7 @@ class TestVDIF(object):
             record = fh.read(12)
             assert fh.tell() == 12
             t12 = fh.time
-            s12 = (12 / fh.sample_rate).to(u.s)
+            s12 = 12 / fh.sample_rate
             assert abs(t12 - fh.start_time - s12) < 1. * u.ns
             fh.seek(10, 1)
             fh.tell() == 22
@@ -525,9 +525,9 @@ class TestVDIF(object):
                 fh.seek(0, 'last')
             assert fh.size == 40000
             assert abs(fh.stop_time - fh._last_header.time - (
-                fh.samples_per_frame / fh.sample_rate).to(u.s)) < 1. * u.ns
+                fh.samples_per_frame / fh.sample_rate)) < 1. * u.ns
             assert abs(fh.stop_time - fh.start_time -
-                       (fh.size / fh.sample_rate).to(u.s)) < 1. * u.ns
+                       (fh.size / fh.sample_rate)) < 1. * u.ns
 
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==
@@ -658,7 +658,7 @@ def test_mwa_vdif():
 
 def test_arochime_vdif():
     """Test ARO CHIME format (uses EDV=0)"""
-    sample_rate = 5**8*u.Hz   # 390625 frames/second * 1 samples/frame.
+    sample_rate = 800*u.MHz / 1024. / 2.   # File has 1 sample/frame.
     with open(SAMPLE_AROCHIME, 'rb') as fh:
         header0 = vdif.VDIFHeader.fromfile(fh)
     assert header0.edv == 0
@@ -690,7 +690,7 @@ def test_arochime_vdif():
         assert d.dtype.kind == 'c'
         t1 = fh.time
         assert abs(t1 - fh.stop_time) < 1. * u.ns
-        assert abs(t1 - t0 - (fh.size / fh.sample_rate).to(u.s)) < 1. * u.ns
+        assert abs(t1 - t0 - fh.size / fh.sample_rate) < 1. * u.ns
 
     # For this file, we cannot find a frame rate, so opening it without
     # should fail.

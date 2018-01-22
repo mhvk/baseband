@@ -318,8 +318,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
 
         Returns
         -------
-        framerate : int
-            Frames per second.
+        framerate : `~astropy.units.Quantity`
+            Frames per second, in Hz.
 
         Notes
         -----
@@ -339,7 +339,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         # Mark 4 specification states frames-lengths range from 1.25 ms
         # to 160 ms.
         tdelta = header1.ms[0] - header0.ms[0]
-        return int(np.round(1000. / tdelta))
+        return np.round(1000. / tdelta) * u.Hz
 
     @lazyproperty
     def _last_header(self):

@@ -48,8 +48,7 @@ class VLBIStreamBase(VLBIFileBase):
 
     _frame_class = None
     _squeezed_shape = None
-    _samples_per_frame = None
-    _sample_rate = None
+    #_samples_per_frame = None
 
     def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
                  thread_ids, samples_per_frame, sample_rate, squeeze=True):
@@ -165,7 +164,10 @@ class VLBIStreamBase(VLBIFileBase):
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
-        self._samples_per_frame = samples_per_frame
+        try:
+            self._samples_per_frame = samples_per_frame.__index__()
+        except Exception:
+            raise TypeError("samples per frame must have an integer value.")
 
     @property
     def sample_rate(self):
@@ -178,7 +180,7 @@ class VLBIStreamBase(VLBIFileBase):
         try:
             sample_rate.to(u.Hz)
         except u.UnitsError as exc:
-            exc.args += ("Sample rate must have units of 1 / time!",)
+            exc.args += ("sample rate must have units of 1 / time.",)
             raise
         self._sample_rate = sample_rate
 
@@ -208,14 +210,15 @@ class VLBIStreamBase(VLBIFileBase):
     def _frame_info(self):
         offset = (self.offset +
                   self.header0['frame_nr'] * self.samples_per_frame)
-        framerate = self.sample_rate.to_value(u.Hz) / self.samples_per_frame
+        framerate = int(np.round((
+            self.sample_rate / self.samples_per_frame).to_value(u.Hz)))
         full_frame_nr, extra = divmod(offset, self.samples_per_frame)
         dt, frame_nr = divmod(full_frame_nr, framerate)
-        return int(dt), int(frame_nr), int(extra)
+        return dt, frame_nr, extra
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
-                "    sample_rate={s.sample_rate:.6g},"
+                "    sample_rate={s.sample_rate},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
                 "    {t}start_time={s.start_time.isot}>"
@@ -232,10 +235,10 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         if sample_rate is None:
             try:
                 sample_rate = (samples_per_frame *
-                               self._get_frame_rate(fh_raw, header0)) * u.Hz
+                               self._get_frame_rate(fh_raw, header0)).to(u.MHz)
 
             except Exception as exc:
-                exc.args += ("The sample rate could not be auto-detected. "
+                exc.args += ("the sample rate could not be auto-detected. "
                              "This can happen if the file is too short to "
                              "determine the sample rate, or because it is "
                              "corrupted.  Try passing in an explicit "
@@ -259,8 +262,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         Returns
         -------
-        framerate : int
-            Frames per second.
+        framerate : `~astropy.units.Quantity`
+            Frames per second, in Hz.
 
         Notes
         -----
@@ -289,10 +292,10 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             header = header_template.fromfile(fh)
 
         if header.seconds != sec0 + 1:  # pragma: no cover
-            warnings.warn("Header time changed by more than 1 second?")
+            warnings.warn("header time changed by more than 1 second?")
 
         fh.seek(oldpos)
-        return max_frame + 1
+        return (max_frame + 1) * u.Hz
 
     @lazyproperty
     def _last_header(self):
@@ -304,7 +307,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                                        forward=False)
         self.fh_raw.seek(raw_offset)
         if last_header is None:
-            raise ValueError("Corrupt VLBI frame? No frame in last {0} bytes."
+            raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
                              .format(10 * self.header0.framesize))
         return last_header
 
@@ -328,8 +331,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     @property
     def size(self):
         """Number of samples in the file."""
-        return int(np.round(((self.stop_time - self.start_time) *
-                             self.sample_rate).decompose()))
+        return int(((self.stop_time - self.start_time) *
+                    self.sample_rate).to(u.one).round())
 
     def seek(self, offset, whence=0):
         """Change stream position.
@@ -359,10 +362,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             else:
                 whence = 0
 
-            # offset = offset.to(u_sample, equivalencies=[(u.s, u.Unit(
-            #     self._sample_rate * u_sample))])
-            # offset = int(round(offset.value))
-            offset = int(np.round((offset * self.sample_rate).decompose()))
+            offset = int((offset * self.sample_rate).to(u.one).round())
 
         if whence == 0 or whence == 'start':
             self.offset = offset
@@ -371,7 +371,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         elif whence == 2 or whence == 'end':
             self.offset = self.size + offset
         else:
-            raise ValueError("Invalid 'whence'; should be 0 or 'start', 1 or"
+            raise ValueError("invalid 'whence'; should be 0 or 'start', 1 or"
                              "'current', or 2 or 'end'.")
 
         return self.offset
@@ -381,7 +381,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
     def close(self):
         extra = self.offset % self.samples_per_frame
         if extra != 0:
-            warnings.warn("Closing with partial buffer remaining.  "
+            warnings.warn("closing with partial buffer remaining.  "
                           "Writing padded frame, marked as invalid.")
             self.write(np.zeros((self.samples_per_frame - extra,) +
                                 self.sample_shape), invalid_data=True)
@@ -450,7 +450,7 @@ def make_opener(fmt, classes, doc='', append_doc=True):
             if not got_fh:
                 name = io.open(name, 'rb')
         else:
-            raise ValueError("Only support opening {0} file for reading "
+            raise ValueError("only support opening {0} file for reading "
                              "or writing (mode='r' or 'w')."
                              .format(fmt))
         try:

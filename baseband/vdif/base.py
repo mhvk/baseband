@@ -267,7 +267,7 @@ class VDIFStreamBase(VLBIStreamBase):
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
-                "    sample_rate={s.sample_rate:.6g},"
+                "    sample_rate={s.sample_rate},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape},\n"
                 "    complex_data={s.complex_data},"
@@ -456,7 +456,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     edv : {`False`, 0, 1, 2, 3, 4, 0xab}
         Extended Data Version.
     """
-    def __init__(self, raw, nthread=1, header=None, sample_rate=None,
+    def __init__(self, raw, nthread=1, sample_rate=None, header=None,
                  squeeze=True, **kwargs):
         if header is None:
             header = VDIFHeader.fromvalues(**kwargs)
