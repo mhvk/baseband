@@ -349,17 +349,6 @@ class DADAHeader(OrderedDict):
         self['BW'] = (-1 if self.get('BW', bw) < 0 else 1) * bw
 
     @property
-    def bandwidth(self):
-        """Bandwidth covered by the data."""
-        return abs(self['BW']) * u.MHz
-
-    @bandwidth.setter
-    def bandwidth(self, bw):
-        bw = bw.to(u.MHz).value
-        self['BW'] = (-1 if self.get('BW', bw) < 0 else 1) * bw
-        self['TSAMP'] = self['NCHAN'] / (1 if self.complex_data else 2) / bw
-
-    @property
     def sideband(self):
         """True if upper sideband."""
         return self['BW'] > 0

@@ -48,7 +48,6 @@ class VLBIStreamBase(VLBIFileBase):
 
     _frame_class = None
     _squeezed_shape = None
-    #_samples_per_frame = None
 
     def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
                  thread_ids, samples_per_frame, sample_rate, squeeze=True):

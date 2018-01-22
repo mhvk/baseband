@@ -13,7 +13,7 @@ Usage
 =====
 
 This section covers Mark 4-specific features of Baseband.  Tutorials for general
-usage can be found under the :ref:`Using Baseband <using_baseband_tsaoc>` section.
+usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
 The examples below use the small sample file ``baseband/data/sample.m4``,
 and assumes the `numpy`, `astropy.units`, and `baseband.mark4` modules have
 been imported::
