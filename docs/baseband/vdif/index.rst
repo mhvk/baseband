@@ -99,7 +99,7 @@ coincidentally, what is given by the reader above suffices::
     ...                nthread=2, samples_per_frame=20000, nchan=1,
     ...                sample_rate=32*u.MHz, complex_data=False, bps=2, edv=3,
     ...                station=65532, time=Time('2014-06-16T05:56:07.000000000'))
-    >>> with vdif.open(SAMPLE_VDIF, 'rs', thread_ids=[2, 3]) as fh:
+    >>> with vdif.open(SAMPLE_VDIF, 'rs', subset=[1, 3]) as fh:
     ...    d = fh.read(20000)  # Get some data to write
     >>> fw.write(d)
     >>> fw.close()
@@ -128,6 +128,10 @@ For small files, one could just do::
     ...     fw.write(fr.read())
 
 This copies everything to memory, though, and some header information is lost.
+
+.. note:: In the sample VDIF file, frames with even thread IDs have header
+   timestamps that are offset from the odd-ID ones.  This is a known error in
+   the sample file.
 
 .. _vdif_troubleshooting:
 

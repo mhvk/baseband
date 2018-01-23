@@ -579,12 +579,13 @@ class TestMark4(object):
             assert fw.tell(unit='time') == stop_time
 
         with mark4.open(rewritten_file, 'rs', ntrack=64, decade=2010,
-                        sample_rate=32*u.MHz, thread_ids=[3, 4]) as fh:
+                        sample_rate=32*u.MHz, subset=[3, 4]) as fh:
             assert fh.time == start_time
             assert fh.time == fh.tell(unit='time')
             assert fh.sample_rate == 32 * u.MHz
             record5 = fh.read(160000)
             assert fh.time == stop_time
+            assert fh.sample_shape == (2,)
             assert np.all(record5[:80000] == record[:80000, 3:5])
             assert np.all(record5[80000:] == 0.)
 
@@ -616,7 +617,7 @@ class TestMark4(object):
             assert np.all(out == record[:12, 0])
 
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
-                        thread_ids=[0], squeeze=False) as fh:
+                        subset=0, squeeze=False) as fh:
             assert fh.sample_shape == (1,)
             assert fh.sample_shape.nchan == 1
             assert fh.read(1).shape == (1, 1)

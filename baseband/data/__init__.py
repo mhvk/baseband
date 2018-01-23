@@ -47,6 +47,10 @@ SAMPLE_VDIF = _full_path('sample.vdif')
 """VDIF sample. 8 threads, bps=2.
 
 Created from a EVN/VLBA PSR B1957+20 observation.
+
+Frames with even thread IDs have header timestamps that are offset from the
+odd-ID ones.  Timestamps from only odd-ID frames are used in the test suite and
+documentation.
 """
 
 SAMPLE_MWA_VDIF = _full_path('sample_mwa.vdif')

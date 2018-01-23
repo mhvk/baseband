@@ -366,8 +366,11 @@ class TestVDIF(object):
 
         with vdif.open(SAMPLE_FILE, 'rb') as fh:
             frameset2 = fh.read_frameset(thread_ids=[2, 3])
+            fh.fh_raw.seek(0)
+            frameset3 = fh.read_frameset(thread_ids=[3, 4, 1])
         assert frameset2.shape == (2, 20000, 1)
         assert np.all(frameset2.data == frameset.data[2:4])
+        assert np.all(frameset3.data == frameset.data[[3, 4, 1]])
 
         frameset3 = vdif.VDIFFrameSet(frameset.frames, frameset.header0)
         assert frameset3 == frameset
@@ -393,7 +396,7 @@ class TestVDIF(object):
             fh.seek(-10064, 2)
             with pytest.raises(EOFError):
                 fh.read_frameset(thread_ids=list(range(8)))
-            # Give non-existent thread_id
+            # Give non-existent thread_id.
             fh.seek(0)
             with pytest.raises(IOError):
                 fh.read_frameset(thread_ids=[1, 9])
@@ -601,6 +604,48 @@ class TestVDIF(object):
 
         with vdif.open(test_file, 'rs') as fh:
             assert np.all(fh.read() == record)
+
+    def test_subset(self, tmpdir):
+        # Test subsetting on a 8 thread, 4 channel dataset to file.
+
+        # Make the file.
+        test_file = str(tmpdir.join('test.vdif'))
+        with vdif.open(SAMPLE_FILE, 'rs') as fh:
+            data = fh.read()
+            data = np.array([data, abs(data),
+                             -data, -abs(data)]).transpose(1, 2, 0)
+            fw = vdif.open(test_file, 'ws',
+                           nthread=8, nchan=4, sample_rate=fh.sample_rate,
+                           samples_per_frame=fh.samples_per_frame // 4,
+                           complex_data=fh.complex_data, bps=fh.bps,
+                           edv=fh.header0.edv, station=fh.header0.station,
+                           time=fh.start_time)
+            fw.write(data)
+            fw.close()
+
+        # Sanity check by re-reading the file.
+        with vdif.open(test_file, 'rs') as fhn:
+            assert np.all(fhn.read() == data)
+            assert fhn.sample_shape == (8, 4)
+
+        # Single thread and channel selection.
+        with vdif.open(test_file, 'rs', subset=(6, 2)) as fhn:
+            assert fhn.sample_shape == ()
+            assert np.all(fhn.read() == data[:, 6, 2])
+
+        # Single thread, multi-channel selection.
+        with vdif.open(test_file, 'rs', subset=(3, [1, 2])) as fhn:
+            assert fhn.sample_shape == (2,)
+            assert np.all(fhn.read() == data[:, 3, 1:3])
+
+        # Multi-thread, multi-channel selection
+        subset_md = (np.array([5, 3])[:, np.newaxis], np.array([0, 2]))
+        with vdif.open(test_file, 'rs', subset=subset_md) as fhn:
+            assert fhn.sample_shape == (2, 2)
+            thread_ids = [frame.header.thread_id for frame in
+                          fhn._frameset.frames]
+            assert thread_ids == [5, 3]
+            assert np.all(fhn.read() == data[(slice(None),) + subset_md])
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.

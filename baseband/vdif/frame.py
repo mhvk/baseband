@@ -212,10 +212,11 @@ class VDIFFrameSet(object):
             The thread ids that should be read.  If `None`, continue reading
             threads as long as the frame number does not increase.
         sort : bool
-            Whether to sort the frames by thread_id.  Default: True.
+            Whether to sort the frames by `thread_ids`.  If `thread_ids` is
+            ``None``, sorts frames by their header thread_id.  Default: True.
             Note that this does not influence the header used to look up
-            attributes (it is always the header of the first frame read).
-            It does, however, influence the order in which decoded data is
+            attributes (it is always the header of the first frame read).  It
+            does, however, influence the order in which decoded data is
             returned.
         edv : int or None
             The expected extended data version for the VDIF Header.  If not
@@ -253,14 +254,15 @@ class VDIFFrameSet(object):
         else:  # Move back to before header that had incorrect frame_nr.
             fh.seek(-header.size, 1)
 
-        if thread_ids is None:
-            thread_ids = range(min(len(frames), 1))
-
-        if len(frames) < len(thread_ids):
+        if thread_ids and len(frames) < len(thread_ids):
             raise IOError("Could not find all requested frames.")
 
         if sort:
             frames.sort(key=lambda frame: frame['thread_id'])
+            # If user gives thread_ids out of order, sort by user ordering.
+            if thread_ids:
+                frames.sort(key=lambda frame:
+                            thread_ids.index(frame['thread_id']))
 
         return cls(frames, header0)
 

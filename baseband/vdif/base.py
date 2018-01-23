@@ -240,7 +240,7 @@ class VDIFStreamBase(VLBIStreamBase):
     _frame_class = VDIFFrame
     _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
 
-    def __init__(self, fh_raw, header0, thread_ids, sample_rate=None,
+    def __init__(self, fh_raw, header0, subset, nthread, sample_rate=None,
                  squeeze=True):
         samples_per_frame = header0.samples_per_frame
         if sample_rate is None:
@@ -249,13 +249,11 @@ class VDIFStreamBase(VLBIStreamBase):
             except AttributeError:
                 pass  # super below will scan file to get sample rate.
 
-        sample_shape = self._sample_shape_maker(len(thread_ids), header0.nchan)
-
         super(VDIFStreamBase, self).__init__(
-            fh_raw=fh_raw, header0=header0, sample_shape=sample_shape,
+            fh_raw=fh_raw, header0=header0,
+            unsliced_shape=(nthread, header0.nchan),
             bps=header0.bps, complex_data=header0['complex_data'],
-            thread_ids=thread_ids,
-            samples_per_frame=samples_per_frame,
+            subset=subset, samples_per_frame=samples_per_frame,
             sample_rate=sample_rate, squeeze=squeeze)
 
     def _get_time(self, header):
@@ -273,8 +271,10 @@ class VDIFStreamBase(VLBIStreamBase):
                 "    sample_shape={s.sample_shape},\n"
                 "    complex_data={s.complex_data},"
                 " bps={h.bps}, edv={h.edv}, station={h.station},\n"
-                "    start_time={s.start_time}>"
-                .format(s=self, h=self.header0))
+                "    {t}start_time={s.start_time}>"
+                .format(s=self, h=self.header0,
+                        t=('subset={0}, '.format(self.subset)
+                           if self.subset else '')))
 
 
 class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
@@ -288,8 +288,11 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
     ----------
     fh_raw : `~baseband.vdif.base.VDIFFileReader` instance
         File handle of the raw VDIF stream
-    thread_ids: list of int, optional
-        Specific threads to read.  By default, all threads are read.
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode.  If a single
+        indexing object is passed, it selects threads.  If a tuple of
+        objects is passed, the first selects threads and the second selects
+        channels.  By default, all components are read.
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second (ie. the rate at which each
         channel in each thread is sampled).  If not given, will be inferred
@@ -299,7 +302,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         decoded data.
     """
 
-    def __init__(self, fh_raw, thread_ids=None, sample_rate=None,
+    def __init__(self, fh_raw, subset=None, sample_rate=None,
                  squeeze=True):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
@@ -308,15 +311,28 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         # Now also read the first frameset, since we need to know how many
         # threads there are, and what the frameset size is. For this purpose,
         # pre-attach the file handle (it will just get reset anyway).
-        # TODO: make this a bit less ugly. Can we not just super first?
+        # TODO: make this a bit less ugly?  Maybe don't read frameset twice?
         fh_raw.seek(0)
         self.fh_raw = fh_raw
-        self._frameset = self.read_frameset(thread_ids)
-        if thread_ids is None:
-            thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
+        self._frameset = self.read_frameset()
         self._framesetsize = fh_raw.tell()
-        super(VDIFStreamReader, self).__init__(fh_raw, header, thread_ids,
+        super(VDIFStreamReader, self).__init__(fh_raw, header, subset,
+                                               len(self._frameset.frames),
                                                sample_rate, squeeze)
+        # If subsetting, decode first frameset again.
+        if self._thread_ids:
+            self.fh_raw.seek(0)
+            self._frameset = self.read_frameset(self._thread_ids)
+            self._header0 = self._frameset.frames[0].header
+
+    def _get_subset_and_sample_shape(self, subset):
+        # Extension of _get_subset_and_sample_shape to set self._thread_ids
+        super(VDIFStreamReader, self)._get_subset_and_sample_shape(subset)
+        if self.subset is not None:
+            self._thread_ids = list(np.arange(self._unsliced_shape[0],
+                                              dtype='int')[self.subset[0]])
+        else:
+            self._thread_ids = None
 
     @lazyproperty
     def _last_header(self):
@@ -328,7 +344,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         # Find first header with same thread_id going backward.
         found = False
         # Set maximum as twice number of frames in frameset.
-        maximum = 2 * self._sample_shape.nthread * self.header0.framesize
+        maximum = 2 * self._unsliced_shape[0] * self.header0.framesize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
             last_header = self.find_header(
@@ -345,15 +361,15 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         return last_header
 
     def read(self, count=None, fill_value=0., out=None):
-        """Read count samples.
+        """Read a number of complete (or subset) samples.
 
         The range retrieved can span multiple frames.
 
         Parameters
         ----------
-        count : int
-            Number of samples to read.  If omitted or negative, the whole
-            file is read.  Ignored if ``out`` is given.
+        count : int, optional
+            Number of complete/subset samples to read.  If omitted or negative,
+            the whole file is read.  Ignored if ``out`` is given.
         fill_value : float or complex
             Value to use for invalid or missing data.
         out : `None` or array
@@ -365,8 +381,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         -------
         out : array of float or complex
             The first dimension is sample-time, and the other two, given by
-            ``sample_shape``, are (vlbi-thread, channel).  Any dimension of
-            length unity is removed if ``self.squeeze=True``.
+            ``sample_shape``, are (thread, channel).  Any dimension of length
+            unity is removed if ``self.squeeze=True``.
         """
         if out is None:
             if count is None or count < 0:
@@ -398,6 +414,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             self._frameset.invalid_data_value = fill_value
             # Decode data into array.
             data = self._frameset.data.transpose(1, 0, 2)
+            # Subset data (channel only; threads subset when reading frameset).
+            if self.subset and len(self.subset) > 1:
+                data = data[(Ellipsis,) + (self.subset[1],)]
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
@@ -411,7 +430,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
     def _read_frame_set(self):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._framesetsize)
-        self._frameset = self.read_frameset(self.thread_ids,
+        self._frameset = self.read_frameset(self._thread_ids,
                                             edv=self.header0.edv)
 
 
@@ -465,7 +484,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
             header = VDIFHeader.fromvalues(**kwargs)
         # No frame sets yet exist, so generate a sample shape from values.
         super(VDIFStreamWriter, self).__init__(
-            raw, header, range(nthread), sample_rate=sample_rate,
+            raw, header, None, nthread, sample_rate=sample_rate,
             squeeze=squeeze)
         # Set sample rate in the header, if it's possible, and not set already.
         try:
@@ -531,8 +550,11 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
 open = make_opener('VDIF', globals(), doc="""
 --- For reading : (see :class:`VDIFStreamReader`)
 
-thread_ids : list of int, optional
-    Specific threads to read.  By default, all threads are read.
+subset : indexing object or tuple of objects, optional
+    Specific components of the complete sample to decode.  If a single indexing
+    object is passed, it selects threads.  If a tuple of objects is passed, the
+    first selects threads and the second selects channels.  By default, all
+    components are read.
 sample_rate : `~astropy.units.Quantity`, optional
     Number of complete samples per second (ie. the rate at which each channel
     in each thread is sampled).  If not given, will be inferred from the header

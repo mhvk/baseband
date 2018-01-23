@@ -425,34 +425,121 @@ class TestVLBIBase(object):
             assert fh.closed
             assert fh.fh_raw.closed
 
-    def test_streambase_squeeze(self):
-        # Tests stream base's sample shape concatenation routines.
-        smp_shp_cls = namedtuple('SampleShape',
-                                 'n1, n2, n3, n4, n5, n6, n7, n8')
-        sample_shape = smp_shp_cls(1, 17, 3, 2, 1, 5, 1, 1)
+    def make_streambase_with_shape(self, smp_shp_mkr, unsliced_shape, subset):
+
+        class StreamBaseWithShape(VLBIStreamBase):
+            _sample_shape_maker = smp_shp_mkr
+
+        return StreamBaseWithShape(fh_raw=None, header0=None,
+                                   bps=1, complex_data=False, subset=subset,
+                                   unsliced_shape=unsliced_shape,
+                                   samples_per_frame=1000,
+                                   sample_rate=10000*u.Hz, squeeze=False)
+
+    def test_sample_shape_and_squeeze(self):
+        # Tests stream base's sample and squeezing routines.
+
+        smp_shp_mkr = namedtuple('SampleShape',
+                                 'n0, n1, n2, n3, n4, n5, n6, n7')
+        unsliced_shape = (1, 17, 3, 2, 1, 5, 1, 1)
+
+        # Try tuple only.
         sb = VLBIStreamBase(fh_raw=None, header0=None,
-                            sample_shape=sample_shape, bps=1,
-                            complex_data=False, thread_ids=None,
+                            bps=1, complex_data=False, subset=None,
+                            unsliced_shape=unsliced_shape,
                             samples_per_frame=1000,
                             sample_rate=10000*u.Hz, squeeze=False)
-        assert sb.sample_shape == sample_shape
+        assert sb.sample_shape == unsliced_shape
         sb.squeeze = True
         assert sb.sample_shape == (17, 3, 2, 5)
-        data = np.empty((100, 17, 3, 2, 5), dtype='float32')
-        assert sb._unsqueeze(data).shape[1:] == sample_shape
-        smp_shp_cls_s = namedtuple('SampleShape',
-                                   'n1')
-        sample_shape_short = smp_shp_cls_s(1)
-        sbs = VLBIStreamBase(fh_raw=None, header0=None,
-                             sample_shape=sample_shape_short, bps=1,
-                             complex_data=False, thread_ids=None,
-                             samples_per_frame=1000, sample_rate=10000*u.Hz,
-                             squeeze=False)
-        assert sbs.sample_shape == sample_shape_short
+
+        # Try with equivalent sample shape.
+        sb = self.make_streambase_with_shape(smp_shp_mkr, unsliced_shape, None)
+        assert sb.sample_shape == unsliced_shape
+        sb.squeeze = True
+        assert sb.sample_shape == (17, 3, 2, 5)
+        assert sb.sample_shape._fields == ('n1', 'n2', 'n3', 'n5')
+
+        data = np.empty((100,) + sb.sample_shape, dtype='float32')
+        assert sb._unsqueeze(data).shape[1:] == unsliced_shape
+
+        # Check that single-axis sample shape squeezes to ().
+        smp_shp_mkr_s = namedtuple('SampleShape',
+                                   'n0')
+        unsliced_shape_short = (1,)
+        sbs = self.make_streambase_with_shape(smp_shp_mkr_s,
+                                              unsliced_shape_short, None)
+        assert sbs.sample_shape == unsliced_shape_short
         sbs.squeeze = True
         assert sbs.sample_shape == ()
         data = np.empty(100, dtype='float32')
-        assert sbs._unsqueeze(data).shape[1:] == sample_shape_short
+        assert sbs._unsqueeze(data).shape[1:] == unsliced_shape_short
+
+    @pytest.mark.parametrize(('subset', 'sliced_shape',
+                              'squeezed_shape', 'squeezed_n'),
+                             [(0, (1, 21, 33, 1, 2),
+                               (21, 33, 2), ('n1', 'n2', 'n4')),
+                              ((0, 13), (1, 1, 33, 1, 2),
+                               (33, 2), ('n2', 'n4')),
+                              ((0, np.array([2, 8, 9])[:, np.newaxis], [1, 7]),
+                               (1, 3, 2, 1, 2), (3, 2, 2), ('n1', 'n2', 'n4')),
+                              ((Ellipsis, 0, 1), (1, 21, 33, 1, 1),
+                               (21, 33), ('n1', 'n2')),
+                              ((0, slice(1, None, 4), slice(None),
+                                Ellipsis, [1]), (1, 5, 33, 1, 1),
+                               (5, 33), ('n1', 'n2')),
+                              ((0, slice(None, 1, -4)), (1, 5, 33, 1, 2),
+                               (5, 33, 2), ('n1', 'n2', 'n4'))])
+    def test_subset(self, subset, sliced_shape, squeezed_shape, squeezed_n):
+        # Tests subsetting and squeezing subset samples.
+
+        smp_shp_mkr = namedtuple('SampleShape',
+                                 'n0, n1, n2, n3, n4')
+        unsliced_shape = (1, 21, 33, 1, 2)
+        data = np.empty((100,) + unsliced_shape, dtype='float32')
+        sb = self.make_streambase_with_shape(smp_shp_mkr, unsliced_shape,
+                                             subset)
+
+        assert sb.sample_shape == sliced_shape
+        subset_data = data[(slice(0, 12),) + sb.subset]
+        assert subset_data.shape == (12,) + sb.sample_shape
+
+        # Check that squeezing subset data work is self-consistent.
+        sb.squeeze = True
+        assert sb.sample_shape == squeezed_shape
+        assert sb.sample_shape._fields == squeezed_n
+        assert subset_data.squeeze().shape[1:] == sb.sample_shape
+
+    def test_subset_specialindexing(self):
+        # Tests that passing single integers correctly returns slices, but
+        # advanced indexing that reduces dimensionality returns TypeErrors.
+
+        smp_shp_mkr = namedtuple('SampleShape',
+                                 'n0, n1, n2, n3, n4')
+        unsliced_shape = (1, 21, 33, 4, 1)
+        sb = self.make_streambase_with_shape(smp_shp_mkr, unsliced_shape, None)
+
+        sb._get_subset_and_sample_shape(0)
+        assert sb.subset == (slice(0, 1),)
+
+        sb._get_subset_and_sample_shape((0, 13))
+        assert sb.subset == (slice(0, 1), slice(13, 14))
+
+        # Advanced indexing reduces dimensions, so sample_shape can't be set.
+        with pytest.raises(TypeError):
+            sb._get_subset_and_sample_shape(
+                ([0], np.array([2, 8, 16])[:, np.newaxis], [1, 7]))
+
+        # Can't subset with a string.
+        with pytest.raises(TypeError) as excinfo:
+            sb._get_subset_and_sample_shape(
+                (0, 'nonsense', [1, 7]))
+        assert "subset cannot be used" in str(excinfo.value)
+
+        # 3 is out of bounds of 1st dimension.
+        with pytest.raises(AssertionError) as excinfo:
+            sb._get_subset_and_sample_shape((3, [2, 8]))
+        assert "subset is out of bounds" in str(excinfo.value)
 
 
 def test_crc():

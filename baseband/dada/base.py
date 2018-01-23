@@ -182,23 +182,22 @@ class DADAStreamBase(VLBIStreamBase):
     header0 : `~baseband.dada.DADAHeader`
         Header for the first frame, which is used to infer frame size,
         encoding, etc.
-    thread_ids : list of int, optional
-        Specific threads to use.  By default, as many as there are
-        polarizations ('header0["NPOL"]').
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode.  By default, all
+        components are read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         ``sample_shape``.
     """
 
-    def __init__(self, fh_raw, header0, thread_ids=None, squeeze=True):
-        if thread_ids is None:
-            thread_ids = list(range(header0['NPOL']))
-        sample_shape = DADAPayload._sample_shape_maker(len(thread_ids),
-                                                       header0.nchan)
+    _sample_shape_maker = DADAPayload._sample_shape_maker
+
+    def __init__(self, fh_raw, header0, subset=None, squeeze=True):
+
         super(DADAStreamBase, self).__init__(
-            fh_raw=fh_raw, header0=header0, sample_shape=sample_shape,
-            bps=header0.bps, complex_data=header0.complex_data,
-            thread_ids=thread_ids,
+            fh_raw=fh_raw, header0=header0, bps=header0.bps,
+            complex_data=header0.complex_data, subset=subset,
+            unsliced_shape=(header0.npol, header0.nchan),
             samples_per_frame=header0.samples_per_frame,
             sample_rate=header0.sample_rate, squeeze=squeeze)
 
@@ -217,16 +216,18 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     ----------
     fh_raw : filehandle
         File handle of the (first) raw DADA stream.
-    thread_ids : list of int, optional
-        Specific threads to read.  By default, all threads are read.
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode.  If a single
+        indexing object is passed, it selects polarizations.  If a tuple of
+        objects is passed, the first selects polarizations and the second
+        selects channels.  By default, all components are read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
     """
-    def __init__(self, fh_raw, thread_ids=None, squeeze=True):
+    def __init__(self, fh_raw, subset=None, squeeze=True):
         header = DADAHeader.fromfile(fh_raw)
-        super(DADAStreamReader, self).__init__(fh_raw, header, thread_ids,
-                                               squeeze)
+        super(DADAStreamReader, self).__init__(fh_raw, header, subset, squeeze)
         self._get_frame(0)
 
     @lazyproperty
@@ -237,13 +238,13 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         return last_frame.header
 
     def read(self, count=None, out=None):
-        """Read count samples.
+        """Read a number of complete (or subset) samples.
 
         Parameters
         ----------
         count : int, optional
-            Number of samples to read.  If omitted or negative, the whole
-            file is read.  Ignored if ``out`` is given.
+            Number of complete/subset samples to read.  If omitted or negative,
+            the whole file is read.  Ignored if ``out`` is given.
         out : `None` or array
             Array to store the data in. If given, ``count`` will be inferred
             from the first dimension.  The other dimensions should equal
@@ -253,8 +254,8 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         -------
         out : array of float or complex
             The first dimension is sample-time, and the other two, given by
-            ``sample_shape``, are (thread (polarization), channel).  Any
-            dimension of length unity is removed if ``self.squeeze=True``.
+            ``sample_shape``, are (polarization, channel).  Any dimension of
+            length unity is removed if ``self.squeeze=True``.
         """
         if out is None:
             if count is None or count < 0:
@@ -282,8 +283,8 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
             data_slice = slice(sample_offset, sample_offset + nsample)
-            if self.thread_ids:
-                data_slice = (data_slice, self.thread_ids)
+            if self.subset:
+                data_slice = (data_slice,) + self.subset
 
             result[sample:sample + nsample] = self._frame[data_slice]
             self.offset += nsample
@@ -372,10 +373,11 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
 opener = make_opener('DADA', globals(), doc="""
 --- For reading : (see :class:`~baseband.dada.base.DADAStreamReader`)
 
-thread_ids : list of int, optional
-    Specific threads to read.  By default, all threads are read.
-    (For DADA, the number threads equals ``header['NPOL']``, i.e.,
-    the number of polarizations.)
+subset : indexing object or tuple of objects, optional
+    Specific components of the complete sample to decode.  If a single indexing
+    object is passed, it selects polarizations.  If a tuple of objects is
+    passed, the first selects polarizations and the second selects channels.
+    By default, all components are read.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
@@ -425,7 +427,7 @@ Filehandle
 
 # Need to wrap the opener to be able to deal with file lists or templates.
 # TODO: move this up to the opener??
-def open(name, mode='rs', thread_ids=None, header=None, **kwargs):
+def open(name, mode='rs', subset=None, header=None, **kwargs):
     is_template = isinstance(name, six.string_types) and ('{' in name and
                                                           '}' in name)
     is_sequence = isinstance(name, (tuple, list))
@@ -465,8 +467,8 @@ def open(name, mode='rs', thread_ids=None, header=None, **kwargs):
 
         if header and 'w' in mode:
             kwargs['header'] = header
-        if thread_ids and 'r' in mode:
-            kwargs['thread_ids'] = thread_ids
+        if subset is not None and 'r' in mode:
+            kwargs['subset'] = subset
 
     return opener(name, mode, **kwargs)
 

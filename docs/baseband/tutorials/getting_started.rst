@@ -83,7 +83,7 @@ decoded data array.  Reading files with multiple threads and channels will
 produce 3-dimensional arrays.
 
 If you want to know the shape of a single complete sample - the set of samples
-from all available threads and channels for a given point in time - it is
+from all available threads, channels, etc., for a given point in time - it is
 accessible through::
 
     >>> fh.sample_shape
@@ -256,25 +256,66 @@ VDIF file's headers are of class::
 
 and so its attributes can be found `here <baseband.vdif.header.VDIFHeader3>`.
 
-Opening Specific Threads/Channels From Files
---------------------------------------------
+Opening Specific Components of the Data
+---------------------------------------
 
-By default, ``fh.read()`` returns all threads and channels available.  If we
-were only interested in decoding specific threads, we can select them using the
-``thread_ids`` keyword::
+By default, ``fh.read()`` returns complete samples, i.e. with all
+available threads, polarizations or channels. If we were only interested in
+decoding specific components of the complete sample, we can select them by
+passing indexing objects the ``subset`` keyword in open.  For example, if we
+only wanted thread 3 of the sample VDIF file::
 
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', thread_ids=[2, 3])
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=3, squeeze=False)
     >>> fh.sample_shape
-    SampleShape(nthread=2)
+    SampleShape(nthread=1, nchan=1)
     >>> d = fh.read(20000)
     >>> d.shape
-    (20000, 2)
+    (20000, 1, 1)
+    >>> fh.subset    # File reader transforms single integers to slices.
+    (slice(3, 4, None),)
     >>> fh.close()
 
-For VDIF, ``thread_ids`` selects the specified **threads** (each of which may
-have multiple channels), while for others this selects the specified
-**channels**.
+Data with multi-dimensional samples can be subset by passing a `tuple` of
+indexing objects with the same dimensional ordering as the sample shape prior
+to squeezing (in the case of VDIF this is threads, then channels).  For
+example, if we wished to select threads 1 and 3, and channel 0::
 
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=([1, 3], 0), squeeze=False)
+    >>> fh.sample_shape
+    SampleShape(nthread=2, nchan=1)
+    >>> fh.close()
+
+If a `tuple` is not used when subsetting multi-dimensional data, ``subset``
+will only act upon the the first dimension::
+
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=[1, 3], squeeze=False)
+    >>> fh.sample_shape
+    SampleShape(nthread=2, nchan=1)
+    >>> fh.close()
+
+Here, we have also selected 1 and 3, and channel 0.  No enclosing `tuple` is
+required for data with single-dimensional samples.
+
+If ``squeeze=True``, dimensions of length unity are removed from the decoded
+data after subsetting::
+
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=([1, 3], 0))
+    >>> fh.sample_shape
+    SampleShape(nthread=2)
+    >>> fh.close()
+
+``subset`` accepts any object `that can be used to for basic indexing
+<https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.indexing.html>`_ of a
+`numpy.ndarray`, with the exceptions of ``None``.  Advanced indexing (as done
+above with ``subset=([1, 3], 0)``) is also possible, but any indexing that
+leads to a reduction in the number of dimensions will result in errors.  We can
+use broadcasting to select specific threads from more than one sample shape
+dimension; see the Numpy documentation on `integer array indexing.
+<https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html#integer-array-indexing>`_
+
+.. note:: In the sample VDIF file, frames with even thread IDs have header
+   timestamps that are offset from the odd-ID ones.  This is a known error in
+   the sample file, and why we only subset odd-ID frames in the examples above.
 
 .. _getting_started_writing:
 

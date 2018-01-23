@@ -48,18 +48,19 @@ class VLBIStreamBase(VLBIFileBase):
 
     _frame_class = None
     _squeezed_shape = None
+    _sample_shape_maker = None
 
-    def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
-                 thread_ids, samples_per_frame, sample_rate, squeeze=True):
+    def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
+                 subset, samples_per_frame, sample_rate, squeeze=True):
         super(VLBIStreamBase, self).__init__(fh_raw)
         self._header0 = header0
-        self._sample_shape = sample_shape
+        self._unsliced_shape = unsliced_shape
         self._bps = bps
         self._complex_data = complex_data
-        self.thread_ids = thread_ids
         self.samples_per_frame = samples_per_frame
         self.sample_rate = sample_rate
         self.offset = 0
+        self._get_subset_and_sample_shape(subset)
         self.squeeze = squeeze
 
     @property
@@ -73,6 +74,57 @@ class VLBIStreamBase(VLBIFileBase):
     @squeeze.setter
     def squeeze(self, squeeze):
         self._squeeze = bool(squeeze)
+
+    def _unsqueeze(self, data):
+        new_shape = list(data.shape)
+        for i, dim in enumerate(self._sample_shape):
+            if dim == 1:
+                new_shape.insert(i + 1, 1)
+        return data.reshape(new_shape)
+
+    def _get_subset_and_sample_shape(self, subset):
+        if subset is not None:
+            # Check if enclosing structure is a tuple.
+            if not isinstance(subset, tuple):
+                subset = (subset,)
+            assert len(subset) <= len(self._unsliced_shape), (
+                "attempting to subset more dimensions than data has.")
+            # Replace lone ints with slices.
+            subset_wrapints = ()
+            for item in subset:
+                try:
+                    i = item.__index__()
+                except Exception:
+                    subset_wrapints += (item,)
+                else:
+                    subset_wrapints += (slice(i, (None if i == -1
+                                                  else i + 1)),)
+            subset = subset_wrapints
+            # Extract sample_shape by creating a dummy sample and indexing it
+            # with subset.
+            dummy_sample = np.empty(self._unsliced_shape)
+            try:
+                dummy_subsample = dummy_sample[subset]
+            except Exception:
+                raise TypeError("subset cannot be used to index array.")
+            sample_shape = dummy_subsample.shape
+            assert 0 not in sample_shape, ("subset is out of bounds of "
+                                           "the sample shape.")
+        else:
+            sample_shape = self._unsliced_shape
+        self._subset = subset
+        if self._sample_shape_maker is not None:
+            self._sample_shape = self._sample_shape_maker(*sample_shape)
+        else:
+            self._sample_shape = sample_shape
+
+    @property
+    def subset(self):
+        """Specific elements (threads/channels) of the sample to read.
+
+        The order of dimensions is the same as for `sample_shape`.
+        """
+        return self._subset
 
     @property
     def sample_shape(self):
@@ -93,13 +145,6 @@ class VLBIStreamBase(VLBIFileBase):
             return self._squeezed_shape
         else:
             return self._sample_shape
-
-    def _unsqueeze(self, data):
-        new_shape = list(data.shape)
-        for i, dim in enumerate(self._sample_shape):
-            if dim == 1:
-                new_shape.insert(i + 1, 1)
-        return data.reshape(new_shape)
 
     def _get_time(self, header):
         """Get time from a header."""
@@ -146,15 +191,6 @@ class VLBIStreamBase(VLBIFileBase):
     def complex_data(self):
         """Whether the decoded data is complex."""
         return self._complex_data
-
-    @property
-    def thread_ids(self):
-        """Specific threads/channels to read."""
-        return self._thread_ids
-
-    @thread_ids.setter
-    def thread_ids(self, ids):
-        self._thread_ids = ids
 
     @property
     def samples_per_frame(self):
@@ -221,14 +257,14 @@ class VLBIStreamBase(VLBIFileBase):
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
                 "    {t}start_time={s.start_time.isot}>"
-                .format(s=self, t=('thread_ids={0}, '.format(self.thread_ids)
-                                   if self.thread_ids else '')))
+                .format(s=self, t=('subset={0}, '.format(self.subset)
+                                   if self.subset else '')))
 
 
 class VLBIStreamReaderBase(VLBIStreamBase):
 
-    def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
-                 thread_ids, samples_per_frame, sample_rate=None,
+    def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
+                 subset, samples_per_frame, sample_rate=None,
                  squeeze=True):
 
         if sample_rate is None:
@@ -245,7 +281,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 raise
 
         super(VLBIStreamReaderBase, self).__init__(
-            fh_raw, header0, sample_shape, bps, complex_data, thread_ids,
+            fh_raw, header0, unsliced_shape, bps, complex_data, subset,
             samples_per_frame, sample_rate, squeeze)
 
     @staticmethod

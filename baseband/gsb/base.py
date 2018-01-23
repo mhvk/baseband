@@ -108,7 +108,9 @@ class GSBFileWriter(VLBIFileBase):
 class GSBStreamBase(VLBIStreamBase):
     """GSB file wrapper, allowing access as a stream of data."""
 
-    def __init__(self, fh_ts, fh_raw, header0, thread_ids=None,
+    _sample_shape_maker = GSBPayload._sample_shape_maker
+
+    def __init__(self, fh_ts, fh_raw, header0, subset=None,
                  nchan=None, bps=None, complex_data=None,
                  samples_per_frame=None, payloadsize=None,
                  sample_rate=None, squeeze=True):
@@ -118,8 +120,7 @@ class GSBStreamBase(VLBIStreamBase):
                         (False if rawdump else True))
         bps = bps if bps is not None else (4 if rawdump else 8)
         nchan = nchan if nchan is not None else (1 if rawdump else 512)
-        thread_ids = (thread_ids if thread_ids is not None else
-                      list(range(1 if rawdump else len(fh_raw))))
+
         if payloadsize is None:
             payloadsize = (samples_per_frame * nchan *
                            (2 if complex_data else 1) * bps // 8 //
@@ -129,21 +130,11 @@ class GSBStreamBase(VLBIStreamBase):
                                  (1 if rawdump else len(fh_raw[0])) //
                                  (nchan * (2 if complex_data else 1)))
 
-        # Temporary assertion that specific thread reading isn't supported.
-        if not rawdump:
-            assert len(thread_ids) == len(fh_raw), (
-                "Baseband.gsb currently does not support "
-                "reading specific threads.")
-        # sample_shape uses len(fh_raw) instead of len(thread_ids)!
-        if rawdump:
-            sample_shape = GSBPayload._sample_shape_maker_1thread(nchan)
-        else:
-            sample_shape = GSBPayload._sample_shape_maker_nthread(len(fh_raw),
-                                                                  nchan)
+        unsliced_shape = (nchan,) if rawdump else (len(fh_raw), nchan)
 
         super(GSBStreamBase, self).__init__(
-            fh_raw, header0=header0, sample_shape=sample_shape, bps=bps,
-            complex_data=complex_data, thread_ids=thread_ids,
+            fh_raw, header0=header0, unsliced_shape=unsliced_shape, bps=bps,
+            complex_data=complex_data, subset=subset,
             samples_per_frame=samples_per_frame,
             sample_rate=sample_rate, squeeze=squeeze)
         self._payloadsize = payloadsize
@@ -170,8 +161,8 @@ class GSBStreamBase(VLBIStreamBase):
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
                 "    {t}start_time={s.start_time.isot}>"
                 .format(s=self, dn=data_name, t=(
-                    'thread_ids={0}, '.format(self.thread_ids) if
-                    self.thread_ids else '')))
+                    'subset={0}, '.format(self.subset) if
+                    self.subset else '')))
 
 
 class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
@@ -208,8 +199,11 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     payloadsize : int, optional
         Number of bytes per payload, divided by the number of raw files.
         Must be set if ``samples_per_frame`` is `None`.
-    thread_ids : list, optional
-        Individual polarizations to read.  **Currently NOT supported!**
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode.  If a single
+        indexing object is passed, it selects (available) polarizations.  If a
+        tuple of objects is passed, the first selects (available) polarizations
+        and the second selects channels.  By default, all components are read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from decoded
         data.
@@ -221,11 +215,11 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
     def __init__(self, fh_ts, fh_raw, sample_rate, nchan=None,
                  bps=None, complex_data=None, samples_per_frame=None,
-                 payloadsize=None, thread_ids=None, squeeze=True):
+                 payloadsize=None, subset=None, squeeze=True):
         header0 = fh_ts.read_timestamp()
         super(GSBStreamReader, self).__init__(
             fh_ts, fh_raw, header0, nchan=nchan, bps=bps,
-            complex_data=complex_data, thread_ids=thread_ids,
+            complex_data=complex_data, subset=subset,
             samples_per_frame=samples_per_frame, payloadsize=payloadsize,
             sample_rate=sample_rate, squeeze=squeeze)
         self.fh_ts.seek(0)
@@ -265,15 +259,15 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         return last_header
 
     def read(self, count=None, fill_value=0., out=None):
-        """Read count samples.
+        """Read a number of complete (or subset) samples.
 
         The range retrieved can span multiple frames.
 
         Parameters
         ----------
-        count : int
-            Number of samples to read.  If omitted or negative, the whole
-            file is read.
+        count : int, optional
+            Number of complete/subset samples to read.  If omitted or negative,
+            the whole file is read.  Ignored if ``out`` is given.
         fill_value : float or complex
             Value to use for invalid or missing data.
         out : `None` or array
@@ -285,7 +279,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         -------
         out : array of float or complex
             The first dimension is sample-time, and the other two, given by
-            ``sample_shape``, are (thread (polarization), channel).  Any
+            ``sample_shape``, are (polarization, channel).  Any
             dimension of length unity is removed if ``self.squeeze=True``.
         """
         if out is None:
@@ -318,8 +312,10 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            result[sample:sample + nsample] = self._frame[
-                sample_offset:sample_offset + nsample]
+            data_slice = slice(sample_offset, sample_offset + nsample)
+            if self.subset:
+                data_slice = (data_slice,) + self.subset
+            result[sample:sample + nsample] = self._frame[data_slice]
             self.offset += nsample
             count -= nsample
 
@@ -336,7 +332,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                     fh.seek(frame_nr * self._payloadsize)
         self._frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
                                         payloadsize=self._payloadsize,
-                                        nchan=self._sample_shape.nchan,
+                                        nchan=self._unsliced_shape[-1],
                                         bps=self.bps,
                                         complex_data=self.complex_data)
         self._frame_nr = frame_nr
@@ -413,7 +409,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
                               'phased')
             header = GSBHeader.fromvalues(mode=mode, **kwargs)
         super(GSBStreamWriter, self).__init__(
-            fh_ts, fh_raw, header, nchan=nchan, bps=bps,
+            fh_ts, fh_raw, header, nchan=nchan, bps=bps, subset=None,
             complex_data=complex_data, samples_per_frame=samples_per_frame,
             payloadsize=payloadsize, sample_rate=sample_rate,
             squeeze=squeeze)
@@ -529,6 +525,11 @@ def open(name, mode='rs', **kwargs):
     payloadsize : int
         Number of bytes per payload, divided by the number of raw files.  Must
         be set if ``samples_per_frame`` is `None`.
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode.  If a single
+        indexing object is passed, it selects (available) polarizations.  If a
+        tuple of objects is passed, the first selects (available) polarizations
+        and the second selects channels.  By default, all components are read.
     squeeze : bool, optional
         If `True` (default) and reading, remove any dimensions of length unity
         from decoded data.  If `True` and writing, accept squeezed

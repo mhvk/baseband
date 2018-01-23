@@ -317,6 +317,7 @@ class TestDADA(object):
             assert fh.stop_time == fh.time
             assert fh.sample_rate == 16 * u.MHz
         assert np.all(data == self.payload.data.squeeze())
+
         # Try single polarisation, and check initialisation by header keywords.
         h = self.header
         with dada.open(filename, 'ws', time=h.time, bps=h.bps,
@@ -328,15 +329,40 @@ class TestDADA(object):
                     1. * u.ns)
 
         with dada.open(filename, 'rs') as fh:
-            data = fh.read()
+            data_onepol = fh.read()
             assert np.abs(fh.start_time - start_time) < 1.*u.ns
-            assert np.abs(fh.stop_time - (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
-        assert np.all(data == self.payload.data[:, 0, 0])
+            assert np.abs(fh.stop_time - (start_time + 16000 /
+                                          (16.*u.MHz))) < 1.*u.ns
+        assert np.all(data_onepol == self.payload.data[:, 0, 0])
 
         # Try reading a single polarization.
-        with dada.open(SAMPLE_FILE, 'rs', thread_ids=[0]) as fh:
+        with dada.open(SAMPLE_FILE, 'rs', subset=0) as fh:
+            assert fh.sample_shape == ()
+            assert fh.subset == (slice(0, 1),)
             record3 = fh.read(12)
             assert np.all(record3 == record1[:12, 0])
+
+        # Create an npol=2, nchan=2 file and subset it.
+        data2d = np.array([data, -data]).transpose(1, 2, 0)
+        with dada.open(filename, 'ws', time=h.time, bps=h.bps,
+                       complex_data=h.complex_data, sample_rate=h.sample_rate,
+                       payloadsize=32000, nthread=2, nchan=2) as fw:
+            fw.write(data2d)
+            assert np.abs(fw.start_time - start_time) < 1.*u.ns
+            assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
+                    1. * u.ns)
+
+        # First check if write was successful.
+        with dada.open(filename, 'rs') as fh:
+            assert fh.sample_shape == (2, 2)
+            data_all = fh.read()
+            assert np.all(data_all == data2d)
+
+        # Then read right polarization, but read channels in reverse order
+        with dada.open(filename, 'rs', subset=(1, [1, 0])) as fh:
+            assert fh.sample_shape == (2,)
+            data_sub = fh.read()
+            assert np.all(data_sub[:, 1] == data2d[:, 1, 0])
 
         # Test that squeeze attribute works on read (including in-place read)
         # and write, but can be turned off if needed.

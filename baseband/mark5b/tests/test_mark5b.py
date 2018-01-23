@@ -404,8 +404,10 @@ class TestMark5B(object):
 
         # Read only some selected threads.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
-                         thread_ids=[4, 5], sample_rate=32*u.MHz,
+                         subset=[4, 5], sample_rate=32*u.MHz,
                          ref_time=Time(57000, format='mjd')) as fh:
+            assert fh.sample_shape == (2,)
+            assert fh.subset == ([4, 5],)
             record4 = fh.read(12)
         assert np.all(record4 == record[:, 4:6])
         # Read all data and check that it can be written out.
@@ -492,7 +494,8 @@ class TestMark5B(object):
 
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, kday=56000,
-                         thread_ids=[0], squeeze=False) as fh:
+                         subset=0, squeeze=False) as fh:
+            assert fh.subset == (slice(0, 1),)
             assert fh.sample_shape == (1,)
             assert fh.sample_shape.nchan == 1
             assert fh.read(1).shape == (1, 1)

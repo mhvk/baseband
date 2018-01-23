@@ -613,8 +613,9 @@ class TestGSB(object):
 
         # Try only right polarization.
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED[1],
-                      sample_rate=sample_rate, squeeze=False,
-                      payloadsize=self.payloadsize) as fh_r:
+                      sample_rate=sample_rate, payloadsize=self.payloadsize,
+                      squeeze=False) as fh_r:
+
             fraw = [[open(thread, 'rb') for thread in SAMPLE_PHASED[1]]]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
                 frame1 = gsb.GSBFrame.fromfile(
@@ -624,6 +625,21 @@ class TestGSB(object):
             assert fh_r.header0 == frame1.header
             assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
             self.close_phased_rawfiles(fraw)
+
+        # Test subsetting.
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
+                      sample_rate=sample_rate, subset=(1, 3),
+                      payloadsize=self.payloadsize) as fh_r:
+            assert fh_r.sample_shape == ()
+            assert np.all(fh_r.read() == data1[:, 1, 3])
+
+        subset_md = (np.array([1, 0])[:, np.newaxis], [1, 33, 121, 245])
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
+                      sample_rate=sample_rate,
+                      subset=subset_md,
+                      payloadsize=self.payloadsize) as fh_r:
+            assert fh_r.sample_shape == (2, 4)
+            assert np.all(fh_r.read() == data1[(slice(None),) + subset_md])
 
         # Try writing to file by passing header keywords into open.
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
