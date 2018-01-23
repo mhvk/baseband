@@ -514,22 +514,20 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
     def sample_rate(self):
         """Number of complete samples per second."""
         return u.Quantity(self['sampling_rate'] *
-                          (1 if self['complex_data'] else 2) / self.nchan,
+                          (1 if self['complex_data'] else 2),
                           u.MHz if self['sampling_unit'] else u.kHz)
 
     @sample_rate.setter
     def sample_rate(self, sample_rate):
-        sample_rate = sample_rate.to(u.Hz)
-        assert sample_rate.value % 1 == 0
-        bandwidth = (sample_rate * self.nchan /
-                     (1 if self['complex_data'] else 2))
+        assert sample_rate.to_value(u.Hz) % 1 == 0
+        bandwidth = sample_rate / (1 if self['complex_data'] else 2)
         self['sampling_unit'] = not (bandwidth.unit == u.kHz or
-                                     bandwidth.to(u.MHz).value % 1 != 0)
+                                     bandwidth.to_value(u.MHz) % 1 != 0)
         if self['sampling_unit']:
-            self['sampling_rate'] = int(bandwidth.to(u.MHz).value)
+            self['sampling_rate'] = int(bandwidth.to_value(u.MHz))
         else:
             assert bandwidth.to(u.kHz).value % 1 == 0
-            self['sampling_rate'] = int(bandwidth.to(u.kHz).value)
+            self['sampling_rate'] = int(bandwidth.to_value(u.kHz))
 
 
 class VDIFHeader1(VDIFSampleRateHeader):
