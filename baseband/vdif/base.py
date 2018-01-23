@@ -259,9 +259,10 @@ class VDIFStreamBase(VLBIStreamBase):
             sample_rate=sample_rate, squeeze=squeeze)
 
     def _get_time(self, header):
-        """Calculate time for given header.
+        """Get time from a header.
 
-        This passes on frame rate, since not all VDIF headers can calculate it.
+        This passes on sample rate, since not all VDIF headers can calculate
+        it.
         """
         return header.get_time(sample_rate=self.sample_rate)
 

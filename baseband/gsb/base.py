@@ -358,6 +358,8 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
     sample_rate : `~astropy.units.Quantity`
         Number of complete samples per second (ie. the rate at which each
         channel of each polarization is sampled).
+    header : `~baseband.gsb.GSBHeader`, optional
+        Header for the first frame, holding time information, etc.
     nchan : int, optional
         Number of channels. Default is `None`, which sets it to 1 for rawdump,
         512 for phased.
@@ -373,8 +375,6 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
     payloadsize : int, optional
         Number of bytes per payload, divided by the number of raw files.
         Must be set if ``samples_per_frame`` is `None`.
-    header : `~baseband.gsb.GSBHeader`, optional
-        Header for the first frame, holding time information, etc.
     squeeze : bool, optional
         If `True` (default), ``write`` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
@@ -402,9 +402,9 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         Redundant modulo-8 shared memory block number; not used by Baseband.
     """
 
-    def __init__(self, fh_ts, fh_raw, sample_rate, nchan=None, bps=None,
-                 complex_data=None, samples_per_frame=None, payloadsize=None,
-                 header=None, squeeze=True, **kwargs):
+    def __init__(self, fh_ts, fh_raw, sample_rate, header=None, nchan=None,
+                 bps=None, complex_data=None, samples_per_frame=None,
+                 payloadsize=None, squeeze=True, **kwargs):
         if header is None:
             mode = kwargs.pop('header_mode',
                               'rawdump' if hasattr(fh_raw, 'read') else

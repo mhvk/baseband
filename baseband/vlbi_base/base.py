@@ -209,8 +209,8 @@ class VLBIStreamBase(VLBIFileBase):
     def _frame_info(self):
         offset = (self.offset +
                   self.header0['frame_nr'] * self.samples_per_frame)
-        framerate = int(np.round((
-            self.sample_rate / self.samples_per_frame).to_value(u.Hz)))
+        framerate = int(np.round(
+            (self.sample_rate / self.samples_per_frame).to_value(u.Hz)))
         full_frame_nr, extra = divmod(offset, self.samples_per_frame)
         dt, frame_nr = divmod(full_frame_nr, framerate)
         return dt, frame_nr, extra

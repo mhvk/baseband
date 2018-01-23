@@ -338,13 +338,16 @@ class DADAHeader(OrderedDict):
 
     @property
     def sample_rate(self):
-        """Number of complete samples per second."""
+        """Number of complete samples per second.
+
+        Can be set with a negative quantity to set `sideband`.
+        """
         return (1. / self['TSAMP']) * u.MHz
 
     @sample_rate.setter
     def sample_rate(self, sample_rate):
         sample_rate = sample_rate.to_value(u.MHz)
-        self['TSAMP'] = 1. / sample_rate
+        self['TSAMP'] = 1. / abs(sample_rate)
         bw = sample_rate * self['NCHAN'] / (1 if self.complex_data else 2)
         self['BW'] = (-1 if self.get('BW', bw) < 0 else 1) * bw
 
