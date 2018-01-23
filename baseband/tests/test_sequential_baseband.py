@@ -3,6 +3,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import os
 import numpy as np
+import astropy.units as u
 from astropy.time import Time
 from .. import vdif
 from ..helpers import sequentialfile
@@ -24,7 +25,7 @@ def test_sequentialfile_vdif_stream(tmpdir):
         station='me')
     with sequentialfile.open(vdif_sequencer, 'wb',
                              file_size=4*header.framesize) as sfh, vdif.open(
-            sfh, 'ws', header=header, nthread=2, frames_per_second=16) as fw:
+            sfh, 'ws', header=header, nthread=2, sample_rate=256*u.Hz) as fw:
         fw.write(data)
     # check that this wrote 8 frames
     files = [vdif_sequencer[i] for i in range(8)]
@@ -33,7 +34,7 @@ def test_sequentialfile_vdif_stream(tmpdir):
     assert not os.path.isfile(vdif_sequencer[8])
 
     with sequentialfile.open(vdif_sequencer, 'rb') as sfh, vdif.open(
-            sfh, 'rs', frames_per_second=16) as fr:
+            sfh, 'rs', sample_rate=256*u.Hz) as fr:
         record1 = fr.read(21)
         assert np.all(record1 == data[:21])
         fr.seek(7*16)
@@ -42,6 +43,6 @@ def test_sequentialfile_vdif_stream(tmpdir):
         assert fr.tell() == 7*16+61
     # Might as well check file list too.
     with sequentialfile.open(files, 'rb') as sfh, vdif.open(
-            sfh, 'rs', frames_per_second=16) as fr:
+            sfh, 'rs', sample_rate=256*u.Hz) as fr:
         record1 = fr.read()
         assert np.all(record1 == data)

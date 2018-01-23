@@ -11,7 +11,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
-from astropy import units as u
+import astropy.units as u
 from astropy.time import Time
 
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, four_word_struct

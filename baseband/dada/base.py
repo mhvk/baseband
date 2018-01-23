@@ -4,6 +4,7 @@ import os
 import re
 
 import numpy as np
+import astropy.units as u
 from astropy.extern import six
 from astropy.utils import lazyproperty
 
@@ -190,8 +191,6 @@ class DADAStreamBase(VLBIStreamBase):
     """
 
     def __init__(self, fh_raw, header0, thread_ids=None, squeeze=True):
-        frames_per_second = (1. / (header0['TSAMP'] * 1e-6) /
-                             header0.samples_per_frame)
         if thread_ids is None:
             thread_ids = list(range(header0['NPOL']))
         sample_shape = DADAPayload._sample_shape_maker(len(thread_ids),
@@ -201,7 +200,7 @@ class DADAStreamBase(VLBIStreamBase):
             bps=header0.bps, complex_data=header0.complex_data,
             thread_ids=thread_ids,
             samples_per_frame=header0.samples_per_frame,
-            frames_per_second=frames_per_second, squeeze=squeeze)
+            sample_rate=header0.sample_rate, squeeze=squeeze)
 
     def _frame_info(self):
         """Convert offset to file number and offset into that file."""

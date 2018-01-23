@@ -3,7 +3,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import pytest
 import numpy as np
-from astropy import units as u
+import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import catch_warnings
 from ... import mark5b
@@ -345,7 +345,7 @@ class TestMark5B(object):
             assert header == fh.header0
             assert fh.fh_raw.tell() == header.framesize
             assert fh.samples_per_frame == 5000
-            assert fh.frames_per_second == 6400
+            assert fh.sample_rate == 32 * u.MHz
             last_header = fh._last_header
             assert fh.size == 20000
             record = fh.read(12)
@@ -418,6 +418,7 @@ class TestMark5B(object):
         m5_test = str(tmpdir.join('test.m5b'))
         with mark5b.open(m5_test, 'ws', time=start_time, nchan=8,
                          bps=2, sample_rate=32*u.MHz) as fw:
+            assert fw.sample_rate == 32 * u.MHz
             # Write in pieces to ensure squeezed data can be handled,
             # And add in an invalid frame for good measure.
             fw.write(record[:11])
@@ -429,6 +430,7 @@ class TestMark5B(object):
         with mark5b.open(m5_test, 'rs', nchan=8, bps=2, sample_rate=32*u.MHz,
                          ref_time=Time(57000, format='mjd')) as fh:
             assert fh.time == start_time
+            assert fh.sample_rate == 32 * u.MHz
             record2 = fh.read(20000)
             assert fh.time == stop_time
             assert np.all(record2[:5000] == record[:5000])

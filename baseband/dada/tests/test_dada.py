@@ -88,7 +88,7 @@ class TestDADA(object):
             start_time=header.start_time,
             offset=header.time-header.start_time,
             bps=header.bps, complex_data=header.complex_data,
-            bandwidth=header.bandwidth, sideband=header.sideband,
+            sample_rate=header.sample_rate, sideband=header.sideband,
             samples_per_frame=header.samples_per_frame,
             sample_shape=header.sample_shape,
             source=header['SOURCE'], ra=header['RA'], dec=header['DEC'],
@@ -101,7 +101,7 @@ class TestDADA(object):
         header5 = dada.DADAHeader.fromvalues(
             offset=header.offset, time=header.time,
             bps=header.bps, complex_data=header.complex_data,
-            bandwidth=header.bandwidth, sideband=header.sideband,
+            sample_rate=header.sample_rate, sideband=header.sideband,
             samples_per_frame=header.samples_per_frame,
             sample_shape=header.sample_shape,
             source=header['SOURCE'], ra=header['RA'], dec=header['DEC'],
@@ -265,6 +265,7 @@ class TestDADA(object):
             assert fh.header0 == self.header
             assert fh.size == 16000
             assert fh.start_time == start_time
+            assert fh.sample_rate == 16 * u.MHz
             record1 = fh.read(12)
             assert fh.tell() == 12
             fh.seek(10000)
@@ -302,6 +303,7 @@ class TestDADA(object):
         filename = str(tmpdir.join('a.dada'))
         with dada.open(filename, 'ws', header=self.header,
                        squeeze=False) as fw:
+            assert fw.sample_rate == 16 * u.MHz
             fw.write(self.payload.data)
             assert fw.start_time == start_time
             assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
@@ -313,11 +315,12 @@ class TestDADA(object):
             assert (np.abs(fh.time - (start_time + 16000 / (16. * u.MHz))) <
                     1. * u.ns)
             assert fh.stop_time == fh.time
+            assert fh.sample_rate == 16 * u.MHz
         assert np.all(data == self.payload.data.squeeze())
         # Try single polarisation, and check initialisation by header keywords.
         h = self.header
         with dada.open(filename, 'ws', time=h.time, bps=h.bps,
-                       complex_data=h.complex_data, bandwidth=h.bandwidth,
+                       complex_data=h.complex_data, sample_rate=h.sample_rate,
                        payloadsize=32000, nthread=1, nchan=1) as fw:
             fw.write(self.payload.data[:, 0, 0])
             assert np.abs(fw.start_time - start_time) < 1.*u.ns

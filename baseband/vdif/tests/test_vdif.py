@@ -54,7 +54,7 @@ class TestVDIF(object):
         assert header.payloadsize == 5000
         assert header.framesize == 5032
         assert header['thread_id'] == 1
-        assert header.framerate.value == 1600
+        assert header.sample_rate == 32*u.MHz
         assert header.samples_per_frame == 20000
         assert header.nchan == 1
         assert header.bps == 2
@@ -81,7 +81,7 @@ class TestVDIF(object):
         header4 = vdif.VDIFHeader.fromvalues(
             edv=header.edv, time=header.time,
             samples_per_frame=header.samples_per_frame,
-            station=header.station, bandwidth=header.bandwidth,
+            station=header.station, sample_rate=header.sample_rate,
             bps=header.bps, complex_data=header['complex_data'],
             thread_id=header['thread_id'],
             loif_tuning=header['loif_tuning'], dbe_unit=header['dbe_unit'],
@@ -101,14 +101,15 @@ class TestVDIF(object):
             header['thread_id'] = 0
         # Also test time setting
         header5.time = header.time + 1.*u.s
+        framerate = header.sample_rate / header.samples_per_frame
         assert abs(header5.time - header.time - 1.*u.s) < 1.*u.ns
         assert header5['frame_nr'] == header['frame_nr']
-        header5.time = header.time + 1.*u.s + 1.1/header.framerate
+        header5.time = header.time + 1.*u.s + 1.1/framerate
         assert abs(header5.time - header.time - 1.*u.s -
-                   1./header.framerate) < 1.*u.ns
+                   1./framerate) < 1.*u.ns
         assert header5['frame_nr'] == header['frame_nr'] + 1
         # Check rounding in corner case.
-        header5.time = header.time + 1.*u.s - 0.01/header.framerate
+        header5.time = header.time + 1.*u.s - 0.01/framerate
         assert abs(header5.time - header.time - 1.*u.s) < 1.*u.ns
         assert header5['frame_nr'] == header['frame_nr']
         # Check requesting non-existent EDV returns VDIFBaseHeader instance
@@ -147,7 +148,7 @@ class TestVDIF(object):
         headerX_dummy = vdif.VDIFHeader.fromvalues(
             edv=0x58, time=header.time,
             samples_per_frame=header.samples_per_frame,
-            station=header.station, bandwidth=header.bandwidth,
+            station=header.station, sample_rate=header.sample_rate,
             bps=header.bps, complex_data=header['complex_data'],
             thread_id=header['thread_id'], nonsense_0=2000000000,
             nonsense_1=100, nonsense_2=10000000)
@@ -175,7 +176,7 @@ class TestVDIF(object):
         assert headerX.payloadsize == header.payloadsize
         assert headerX.framesize == header.framesize
         assert headerX['thread_id'] == header['thread_id']
-        assert headerX.framerate.value == header.framerate.value
+        assert headerX.sample_rate == header.sample_rate
         assert headerX.samples_per_frame == header.samples_per_frame
         assert headerX.nchan == header.nchan
         assert headerX.bps == header.bps
@@ -496,13 +497,14 @@ class TestVDIF(object):
             assert repr(fh).startswith('<VDIFStreamReader')
             assert fh.tell() == 0
             assert header == fh.header0
+            assert fh.sample_rate == 32*u.MHz
             assert fh.start_time == fh.header0.time
             assert abs(fh.time - fh.start_time) < 1. * u.ns
             assert fh.time == fh.tell(unit='time')
             record = fh.read(12)
             assert fh.tell() == 12
             t12 = fh.time
-            s12 = 12 / fh.samples_per_frame / fh.frames_per_second * u.s
+            s12 = 12 / fh.sample_rate
             assert abs(t12 - fh.start_time - s12) < 1. * u.ns
             fh.seek(10, 1)
             fh.tell() == 22
@@ -522,10 +524,10 @@ class TestVDIF(object):
             with pytest.raises(ValueError):
                 fh.seek(0, 'last')
             assert fh.size == 40000
-            assert abs(fh.stop_time - fh._last_header.time - u.s /
-                       fh.frames_per_second) < 1. * u.ns
-            assert abs(fh.stop_time - fh.start_time - u.s * fh.size /
-                       fh.samples_per_frame / fh.frames_per_second) < 1. * u.ns
+            assert abs(fh.stop_time - fh._last_header.time - (
+                fh.samples_per_frame / fh.sample_rate)) < 1. * u.ns
+            assert abs(fh.stop_time - fh.start_time -
+                       (fh.size / fh.sample_rate)) < 1. * u.ns
 
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==
@@ -561,14 +563,15 @@ class TestVDIF(object):
             complex_data=False, frame_nr=0, thread_id=0, samples_per_frame=16,
             station='me')
         with vdif.open(vdif_file, 'ws', header=header,
-                       nthread=2, frames_per_second=20) as fw:
+                       nthread=2, sample_rate=320*u.Hz) as fw:
+            assert fw.sample_rate == 320*u.Hz
             for i in range(30):
                 fw.write(data)
 
         with vdif.open(vdif_file, 'rs') as fh:
             assert fh.header0.station == 'me'
-            assert fh.frames_per_second == 20
             assert fh.samples_per_frame == 16
+            assert fh.sample_rate == 320*u.Hz
             assert not fh.complex_data
             assert fh.header0.bps == 2
             assert fh._sample_shape.nchan == 2
@@ -608,7 +611,7 @@ class TestVDIF(object):
             with vdif.open(SAMPLE_FILE, 'rs') as fr:
                 record = fr.read(10)
                 with vdif.open(vdif_incomplete, 'ws', header=fr.header0,
-                               nthread=8, frames_per_second=1600) as fw:
+                               nthread=8, sample_rate=32*u.MHz) as fw:
                     fw.write(record)
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
@@ -648,13 +651,14 @@ def test_mwa_vdif():
     """Test phased VDIF format (uses EDV=0)"""
     with vdif.open(SAMPLE_MWA, 'rs', sample_rate=1.28*u.MHz) as fh:
         assert fh.samples_per_frame == 128
-        assert fh.frames_per_second == 10000
+        assert fh.sample_rate == 1.28*u.MHz
         assert fh.time == Time('2015-10-03T20:49:45.000')
         assert fh.header0.edv == 0
 
 
 def test_arochime_vdif():
     """Test ARO CHIME format (uses EDV=0)"""
+    sample_rate = 800*u.MHz / 1024. / 2.   # File has 1 sample/frame.
     with open(SAMPLE_AROCHIME, 'rb') as fh:
         header0 = vdif.VDIFHeader.fromfile(fh)
     assert header0.edv == 0
@@ -662,19 +666,19 @@ def test_arochime_vdif():
     assert header0['frame_nr'] == 308109
     with pytest.raises(ValueError):
         header0.time
-    assert abs(header0.get_time(framerate=390625*u.Hz) -
+    assert abs(header0.get_time(sample_rate=sample_rate) -
                Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
     # also check writing Time.
     header1 = header0.copy()
     with pytest.raises(ValueError):
         header1.time = Time('2016-04-22T08:45:31.788759040')
     header1.set_time(Time('2016-04-22T08:45:32.788759040'),
-                     framerate=0.390625*u.MHz)
-    assert abs(header1.get_time(framerate=390625*u.Hz) -
-               header0.get_time(framerate=390625*u.Hz) - 1. * u.s) < 1.*u.ns
+                     sample_rate=sample_rate)
+    assert abs(header1.get_time(sample_rate=sample_rate) -
+               header0.get_time(sample_rate=sample_rate) - 1. * u.s) < 1.*u.ns
 
     # Now test the actual data stream.
-    with vdif.open(SAMPLE_AROCHIME, 'rs', frames_per_second=390625) as fh:
+    with vdif.open(SAMPLE_AROCHIME, 'rs', sample_rate=sample_rate) as fh:
         assert fh.samples_per_frame == 1
         t0 = fh.time
         assert abs(t0 - Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
@@ -686,8 +690,7 @@ def test_arochime_vdif():
         assert d.dtype.kind == 'c'
         t1 = fh.time
         assert abs(t1 - fh.stop_time) < 1. * u.ns
-        assert abs(t1 - t0 - u.s * (fh.size / fh.samples_per_frame /
-                                    fh.frames_per_second)) < 1. * u.ns
+        assert abs(t1 - t0 - fh.size / fh.sample_rate) < 1. * u.ns
 
     # For this file, we cannot find a frame rate, so opening it without
     # should fail.

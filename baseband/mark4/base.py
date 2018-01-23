@@ -1,6 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE.rst
 import numpy as np
 from astropy.utils import lazyproperty
+import astropy.units as u
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase)
@@ -264,11 +265,10 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         Used only if `decade` is ``None``.
     thread_ids: list of int, optional
         Specific threads/channels to read.  By default, all are read.
-    frames_per_second : int, optional
-        Needed to calculate timestamps. If not given, will be inferred from
-        ``sample_rate``, or by scanning the file.
     sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each thread is sampled (bandwidth * 2; frequency units).
+        Number of complete samples per second (ie. the rate at which each
+        channel is sampled).  If not given, will be inferred from scanning two
+        frames of the file.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
@@ -277,8 +277,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     _frame_class = Mark4Frame
 
     def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None,
-                 thread_ids=None, frames_per_second=None, sample_rate=None,
-                 squeeze=True):
+                 thread_ids=None, sample_rate=None, squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
@@ -304,12 +303,11 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             fh_raw, header0=header, sample_shape=sample_shape,
             bps=header.bps, complex_data=False, thread_ids=thread_ids,
             samples_per_frame=header.samples_per_frame,
-            frames_per_second=frames_per_second, sample_rate=sample_rate,
-            squeeze=squeeze)
+            sample_rate=sample_rate, squeeze=squeeze)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
-        """Returns the number of frames in one second of data.
+        """Returns the number of frames per second in a Mark 4 file.
 
         Parameters
         ----------
@@ -320,16 +318,16 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
 
         Returns
         -------
-        fps : int
-            Frames per second.
+        framerate : `~astropy.units.Quantity`
+            Frames per second, in Hz.
 
         Notes
         -----
 
-        Unlike VLBIStreamReaderBase._get_frame_rate, this function reads
+        Unlike `VLBIStreamReaderBase._get_frame_rate`, this function reads
         only two consecutive frames, extracting their timestamps to determine
         how much time has elapsed.  It will return an EOFError if there is
-        only one frame.  It cannot seek past decade increments.
+        only one frame.
         """
         oldpos = fh.tell()
         header0 = header_template.fromfile(fh, header_template.ntrack,
@@ -341,7 +339,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         # Mark 4 specification states frames-lengths range from 1.25 ms
         # to 160 ms.
         tdelta = header1.ms[0] - header0.ms[0]
-        return int(np.round(1000. / tdelta))
+        return np.round(1000. / tdelta) * u.Hz
 
     @lazyproperty
     def _last_header(self):
@@ -426,11 +424,9 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
     ----------
     raw : `~baseband.mark4.Mark4FileWriter`
         Which will write filled sets of frames to storage.
-    frames_per_second : int, optional
-        Needed to calculate timestamps. If not given, inferred from
-        ``sample_rate``.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Rate at which each thread is sampled (bandwidth * 2; frequency units).
+    sample_rate : `~astropy.units.Quantity`
+        Number of complete samples per second (ie. the rate at which each
+        channel is sampled), needed to calculate header timestamps.
     header : `~baseband.mark4.Mark4Header`
         Header for the first frame, holding start time information, etc.
     squeeze : bool, optional
@@ -455,8 +451,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
 
     _frame_class = Mark4Frame
 
-    def __init__(self, raw, frames_per_second=None, sample_rate=None,
-                 header=None, squeeze=True, **kwargs):
+    def __init__(self, raw, sample_rate, header=None, squeeze=True, **kwargs):
         if header is None:
             header = Mark4Header.fromvalues(**kwargs)
         sample_shape = Mark4Payload._sample_shape_maker(header.nchan)
@@ -465,8 +460,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
             thread_ids=range(header.nchan), bps=header.bps, complex_data=False,
             samples_per_frame=(header.framesize * 8 // header.bps //
                                header.nchan),
-            frames_per_second=frames_per_second, sample_rate=sample_rate,
-            squeeze=squeeze)
+            sample_rate=sample_rate, squeeze=squeeze)
 
         self._data = np.zeros((self.samples_per_frame,
                                self._sample_shape.nchan), np.float32)
@@ -530,22 +524,19 @@ ref_time : `~astropy.time.Time`, or None, optional
     only if `decade` is ``None``.
 thread_ids: list of int, optional
     Specific threads/channels to read.  By default, all are read.
-frames_per_second : int, optional
-    Needed to calculate timestamps. If not given, will be inferred from
-    ``sample_rate``, or by scanning the file.
 sample_rate : `~astropy.units.Quantity`, optional
-    Rate at which each thread is sampled (bandwidth * 2; frequency units).
+    Number of complete samples per second (ie. the rate at which each channel
+    is sampled).  If not given, will be inferred from scanning two frames of
+    the file.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
 
 --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
 
-frames_per_second : int, optional
-    Needed to calculate timestamps. If not given, inferred from
-    ``sample_rate``.
-sample_rate : `~astropy.units.Quantity`, optional
-    Rate at which each thread is sampled (bandwidth * 2; frequency units).
+sample_rate : `~astropy.units.Quantity`
+    Number of complete samples per second (ie. the rate at which each channel
+    is sampled), needed to calculate header timestamps.
 header : `~baseband.mark4.Mark4Header`
     Header for the first frame, holding time information, etc.
 squeeze : bool, optional
