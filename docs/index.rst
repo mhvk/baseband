@@ -83,3 +83,5 @@ Project details
    :maxdepth: 1
 
    authors_for_sphinx
+   changelog
+   license
