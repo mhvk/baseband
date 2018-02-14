@@ -121,6 +121,10 @@ class GSBStreamBase(VLBIStreamBase):
         bps = bps if bps is not None else (4 if rawdump else 8)
         nchan = nchan if nchan is not None else (1 if rawdump else 512)
 
+        # By default, GSB frames span 4 MB for rawdump and 8 MB for phased.
+        if payloadsize is None and samples_per_frame is None:
+            payloadsize = 2**22 if rawdump else 2**23 // len(fh_raw[0])
+
         if payloadsize is None:
             payloadsize = (samples_per_frame * nchan *
                            (2 if complex_data else 1) * bps // 8 //
@@ -129,6 +133,10 @@ class GSBStreamBase(VLBIStreamBase):
             samples_per_frame = (payloadsize * 8 // bps *
                                  (1 if rawdump else len(fh_raw[0])) //
                                  (nchan * (2 if complex_data else 1)))
+
+        # By default, GSB rawdump and phased frames span exactly 251.658240 ms.
+        if sample_rate is None:
+            sample_rate = (samples_per_frame * (100. / 3. / 2.**23)) * u.MHz
 
         unsliced_shape = (nchan,) if rawdump else (len(fh_raw), nchan)
 
@@ -181,9 +189,10 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         streams per polarization.  E.g., ((polL1, polL2), (polR1, polR2)) for
         two streams per polarization.  A single tuple is interpreted as
         streams of a single polarization.
-    sample_rate : `~astropy.units.Quantity`
+    sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second (ie. the rate at which each
-        channel of each polarization is sampled).
+        channel of each polarization is sampled).  If not given, will be
+        inferred assuming the framerate is exactly 251.658240 ms.
     nchan : int, optional
         Number of channels. Default is `None`, which sets it to 1 for rawdump,
         512 for phased.
@@ -198,7 +207,9 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         instead.
     payloadsize : int, optional
         Number of bytes per payload, divided by the number of raw files.
-        Must be set if ``samples_per_frame`` is `None`.
+        If both ``samples_per_frame`` and ``payloadsize`` are ``None``,
+        ``payloadsize`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
+        divided by the number of streams per polarization for phased.
     subset : indexing object or tuple of objects, optional
         Specific components of the complete sample to decode.  If a single
         indexing object is passed, it selects (available) polarizations.  If a
@@ -213,7 +224,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     # be solved with FileWriter/FileReader classes that handle timestamps and
     # multiple blocks, combining these into a frame?
 
-    def __init__(self, fh_ts, fh_raw, sample_rate, nchan=None,
+    def __init__(self, fh_ts, fh_raw, sample_rate=None, nchan=None,
                  bps=None, complex_data=None, samples_per_frame=None,
                  payloadsize=None, subset=None, squeeze=True):
         header0 = fh_ts.read_timestamp()
@@ -353,9 +364,10 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         streams per polarization.  E.g., ((polL1, polL2), (polR1, polR2)) for
         two streams per polarization.  A single tuple is interpreted as
         streams of a single polarization.
-    sample_rate : `~astropy.units.Quantity`
+    sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second (ie. the rate at which each
-        channel of each polarization is sampled).
+        channel of each polarization is sampled).  If not given, will be
+        inferred assuming the framerate is exactly 251.658240 ms.
     header : `~baseband.gsb.GSBHeader`, optional
         Header for the first frame, holding time information, etc.
     nchan : int, optional
@@ -372,7 +384,9 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         instead.
     payloadsize : int, optional
         Number of bytes per payload, divided by the number of raw files.
-        Must be set if ``samples_per_frame`` is `None`.
+        If both ``samples_per_frame`` and ``payloadsize`` are ``None``,
+        ``payloadsize`` is set to 2**22 (4 MB) for rawdump and 2**23 (8 MB)
+        divided by the number of streams per polarization for phased.
     squeeze : bool, optional
         If `True` (default), ``write`` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
@@ -400,9 +414,10 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         Redundant modulo-8 shared memory block number; not used by Baseband.
     """
 
-    def __init__(self, fh_ts, fh_raw, sample_rate, header=None, nchan=None,
-                 bps=None, complex_data=None, samples_per_frame=None,
-                 payloadsize=None, squeeze=True, **kwargs):
+    def __init__(self, fh_ts, fh_raw, sample_rate=None, header=None,
+                 nchan=None, bps=None, complex_data=None,
+                 samples_per_frame=None, payloadsize=None, squeeze=True,
+                 **kwargs):
         if header is None:
             mode = kwargs.pop('header_mode',
                               'rawdump' if hasattr(fh_raw, 'read') else
@@ -511,7 +526,8 @@ def open(name, mode='rs', **kwargs):
         single tuple is interpreted as streams of a single polarization.
     sample_rate : `~astropy.units.Quantity`
         Number of complete samples per second (ie. the rate at which each
-        channel of each polarization is sampled).
+        channel of each polarization is sampled).  If not given, will be
+        inferred assuming the framerate is exactly 251.658240 ms.
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.
     bps : int, optional
@@ -522,9 +538,11 @@ def open(name, mode='rs', **kwargs):
     samples_per_frame : int
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.
-    payloadsize : int
-        Number of bytes per payload, divided by the number of raw files.  Must
-        be set if ``samples_per_frame`` is `None`.
+    payloadsize : int, optional
+        Number of bytes per payload, divided by the number of raw files.
+        If both ``samples_per_frame`` and ``payloadsize`` are ``None``,
+        ``payloadsize`` is set to 2**22 (4 MB) for rawdump and 2**23 (8 MB)
+        divided by the number of streams per polarization for phased.
     subset : indexing object or tuple of objects, optional
         Specific components of the complete sample to decode.  If a single
         indexing object is passed, it selects (available) polarizations.  If a
