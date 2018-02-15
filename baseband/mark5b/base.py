@@ -257,12 +257,15 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            result = np.empty(self._sample_shape + (count,),
-                              dtype=self._frame.dtype).T
-            out = result.squeeze() if self.squeeze else result
+            out = np.empty((count,) + self.sample_shape,
+                           dtype=self._frame.dtype)
         else:
+            assert out.shape[1:] == self.sample_shape, (
+                "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
-            result = self._unsqueeze(out) if self.squeeze else out
+
+        # Create a properly-shaped view of the output if needed.
+        result = self._unsqueeze(out) if self.squeeze else out
 
         offset0 = self.offset
         while count > 0:
@@ -363,13 +366,11 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
         invalid_data : bool, optional
             Whether the current data is valid.  Defaults to `False`.
         """
+        assert data.shape[1:] == self.sample_shape, (
+            "'data' should have trailing shape {}".format(self.sample_shape))
+
         if self.squeeze:
             data = self._unsqueeze(data)
-
-        if data.ndim != 2 or data.shape[1] != self._sample_shape.nchan:
-            raise ValueError('cannot write an array with shape {0} to a '
-                             'stream with {1} threads'
-                             .format(data.shape, self._sample_shape.nchan))
 
         count = data.shape[0]
         sample = 0

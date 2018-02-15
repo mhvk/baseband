@@ -260,14 +260,16 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            result = np.empty((count,) + self._sample_shape,
-                              dtype=self._frame.dtype)
+            out = np.empty((count,) + self.sample_shape,
+                           dtype=self._frame.dtype)
             # Generate view of the result data set that will be returned.
-            out = result.squeeze() if self.squeeze else result
         else:
+            assert out.shape[1:] == self.sample_shape, (
+                "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
-            # Create a properly-shaped view of the output if needed.
-            result = self._unsqueeze(out) if self.squeeze else out
+
+        # Create a properly-shaped view of the output if needed.
+        result = self._unsqueeze(out) if self.squeeze else out
 
         offset0 = self.offset
         while count > 0:
@@ -332,11 +334,10 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
             for consistency with other stream writers.  It does not seem
             possible to store this information in DADA files.
         """
+        assert data.shape[1:] == self.sample_shape, (
+            "'data' should have trailing shape {}".format(self.sample_shape))
         if self.squeeze:
             data = self._unsqueeze(data)
-
-        assert data.shape[1] == self._sample_shape.npol
-        assert data.shape[2] == self._sample_shape.nchan
 
         count = data.shape[0]
         sample = 0

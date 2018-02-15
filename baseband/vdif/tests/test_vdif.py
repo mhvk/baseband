@@ -538,7 +538,7 @@ class TestVDIF(object):
         with vdif.open(SAMPLE_FILE, 'rs') as fh:
             assert fh.sample_shape == (8,)
             assert fh.sample_shape.nthread == 8
-            assert fh.read(1).shape == (8,)
+            assert fh.read(1).shape == (1, 8)
             fh.seek(0)
             out = np.zeros((12, 8))
             fh.read(out=out)
@@ -574,8 +574,8 @@ class TestVDIF(object):
             assert fh.sample_rate == 320*u.Hz
             assert not fh.complex_data
             assert fh.header0.bps == 2
-            assert fh._sample_shape.nchan == 2
-            assert fh._sample_shape.nthread == 2
+            assert fh.sample_shape.nchan == 2
+            assert fh.sample_shape.nthread == 2
             assert fh.start_time == Time('2010-01-01')
             assert fh.stop_time == fh.start_time + 1.5 * u.s
             fh.seek(16)

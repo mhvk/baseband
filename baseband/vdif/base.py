@@ -372,13 +372,15 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             if count is None or count < 0:
                 count = self.size - self.offset
 
-            result = np.empty((self._sample_shape.nthread, count,
-                               self._sample_shape.nchan),
-                              dtype=self._frameset.dtype).transpose(1, 0, 2)
-            out = result.squeeze() if self.squeeze else result
+            out = np.empty((count,) + self.sample_shape,
+                           dtype=self._frameset.dtype)
         else:
+            assert out.shape[1:] == self.sample_shape, (
+                "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
-            result = self._unsqueeze(out) if self.squeeze else out
+
+        # Create a properly-shaped view of the output if needed.
+        result = self._unsqueeze(out) if self.squeeze else out
 
         offset0 = self.offset
         while count > 0:
@@ -491,11 +493,13 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
         invalid_data : bool, optional
             Whether the current data is valid.  Defaults to `False`.
         """
+        assert data.shape[1:] == self.sample_shape, (
+            "'data' should have trailing shape {}".format(self.sample_shape))
+        assert data.dtype.kind == self._data.dtype.kind, (
+            "'data' should be {}".format('complex' if self.data.dtype == 'c'
+                                         else 'float'))
         if self.squeeze:
             data = self._unsqueeze(data)
-
-        assert data.shape[1] == self._sample_shape.nthread
-        assert data.shape[2] == self._sample_shape.nchan
 
         count = data.shape[0]
         sample = 0
