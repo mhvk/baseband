@@ -343,7 +343,8 @@ class TestDADA(object):
         with dada.open(SAMPLE_FILE, 'rs') as fh:
             assert fh.sample_shape == (2,)
             assert fh.sample_shape.npol == 2
-            assert fh.read(1).shape == (2,)
+            assert fh.read(1).shape == (1, 2)
+            assert fh.read(10).shape == (10, 2)
             fh.seek(0)
             out = np.zeros((12, 2), dtype=np.complex64)
             fh.read(out=out)
@@ -354,6 +355,7 @@ class TestDADA(object):
             assert fh.sample_shape.npol == 2
             assert fh.sample_shape.nchan == 1
             assert fh.read(1).shape == (1, 2, 1)
+            assert fh.read(10).shape == (10, 2, 1)
             fh.seek(0)
             out = np.zeros((12, 2, 1), dtype=np.complex64)
             fh.read(out=out)

@@ -605,15 +605,15 @@ class TestMark4(object):
 
         # Test that squeeze attribute works on read (including in-place read)
         # and write, but can be turned off if needed.
-        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fh:
-            assert fh.sample_shape == (8,)
-            assert fh.sample_shape.nchan == 8
-            assert fh.read(1).shape == (8,)
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64,
+                        thread_ids=[0], decade=2010) as fh:
+            assert fh.sample_shape == ()
+            assert fh.read(1).shape == (1,)
             fh.seek(0)
-            out = np.zeros((12, 8))
+            out = np.zeros(12)
             fh.read(out=out)
             assert fh.tell() == 12
-            assert np.all(out == record[:12])
+            assert np.all(out == record[:12, 0])
 
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         thread_ids=[0], squeeze=False) as fh:

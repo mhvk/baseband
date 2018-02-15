@@ -481,15 +481,14 @@ class TestMark5B(object):
         # Test that squeeze attribute works on read (including in-place read)
         # and write, but can be turned off if needed.
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
-                         sample_rate=32*u.MHz, kday=56000) as fh:
-            assert fh.sample_shape == (8,)
-            assert fh.sample_shape.nchan == 8
-            assert fh.read(1).shape == (8,)
+                         thread_ids=[0], sample_rate=32*u.MHz, kday=56000) as fh:
+            assert fh.sample_shape == ()
+            assert fh.read(1).shape == (1,)
             fh.seek(0)
-            out = np.zeros((12, 8))
+            out = np.zeros(12)
             fh.read(out=out)
             assert fh.tell() == 12
-            assert np.all(out == record[:12])
+            assert np.all(out == record[:12, 0])
 
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, kday=56000,

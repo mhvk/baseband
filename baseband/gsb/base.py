@@ -293,12 +293,14 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 count = self.size - self.offset
 
             dtype = np.complex64 if self.complex_data else np.float32
-            result = np.empty((count,) + self._sample_shape, dtype)
-            out = result.squeeze() if self.squeeze else result
-
+            out = np.empty((count,) + self.sample_shape, dtype)
         else:
+            assert out.shape[1:] == self.sample_shape, (
+                "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
-            result = self._unsqueeze(out) if self.squeeze else out
+
+        # Create a properly-shaped view of the output if needed.
+        result = self._unsqueeze(out) if self.squeeze else out
 
         offset0 = self.offset
         while count > 0:
@@ -430,13 +432,13 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
             ``sample_shape``. This should be properly scaled to make best use
             of the dynamic range delivered by the encoding.
         """
+        assert data.shape[1:] == self.sample_shape, (
+            "'data' should have trailing shape {}".format(self.sample_shape))
+        assert data.dtype.kind == self._data.dtype.kind, (
+            "'data' should be {}".format('complex' if self.data.dtype == 'c'
+                                         else 'float'))
         if self.squeeze:
             data = self._unsqueeze(data)
-
-        if self.header0.mode == 'phased':
-            assert data.shape[1] == self._sample_shape.nthread
-        assert data.shape[-1] == self._sample_shape.nchan
-        assert data.dtype.kind == self._data.dtype.kind
 
         count = data.shape[0]
         sample = 0
