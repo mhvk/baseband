@@ -293,9 +293,6 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
 
-        # Create a properly-shaped view of the output if needed.
-        result = self._unsqueeze(out) if self.squeeze else out
-
         offset0 = self.offset
         while count > 0:
             frame_nr, sample_offset = divmod(self.offset,
@@ -315,7 +312,9 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             data_slice = slice(sample_offset, sample_offset + nsample)
             if self.subset:
                 data_slice = (data_slice,) + self.subset
-            result[sample:sample + nsample] = self._frame[data_slice]
+            out[sample:sample + nsample] = (
+                self._frame[data_slice].squeeze() if self.squeeze else
+                self._frame[data_slice])
             self.offset += nsample
             count -= nsample
 
@@ -332,7 +331,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                     fh.seek(frame_nr * self._payloadsize)
         self._frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
                                         payloadsize=self._payloadsize,
-                                        nchan=self._unsliced_shape[-1],
+                                        nchan=self._unsliced_shape.nchan,
                                         bps=self.bps,
                                         complex_data=self.complex_data)
         self._frame_nr = frame_nr
@@ -413,7 +412,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
             complex_data=complex_data, samples_per_frame=samples_per_frame,
             payloadsize=payloadsize, sample_rate=sample_rate,
             squeeze=squeeze)
-        self._data = np.zeros((self.samples_per_frame,) + self._sample_shape,
+        self._data = np.zeros((self.samples_per_frame,) + self._unsliced_shape,
                               (np.complex64 if self.complex_data
                                else np.float32))
         self._valid = True

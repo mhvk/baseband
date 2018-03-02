@@ -536,25 +536,25 @@ class TestVDIF(object):
         assert np.all(record.astype(int)[:, 0] ==
                       np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
 
-        # Test that squeeze attribute works on read (including in-place read)
-        # but can be turned off if needed.
+        # Test that squeeze attribute works on read (including in-place read).
         with vdif.open(SAMPLE_FILE, 'rs') as fh:
             assert fh.sample_shape == (8,)
             assert fh.sample_shape.nthread == 8
             assert fh.read(1).shape == (1, 8)
             fh.seek(0)
-            out = np.zeros((12, 8))
-            fh.read(out=out)
+            out_squeeze = np.zeros((12, 8))
+            fh.read(out=out_squeeze)
             assert fh.tell() == 12
-            assert np.all(out.squeeze() == record)
-            fh.squeeze = False
+            assert np.all(out_squeeze == record)
+
+        with vdif.open(SAMPLE_FILE, 'rs', squeeze=False) as fh:
             assert fh.sample_shape == (8, 1)
             assert fh.read(1).shape == (1, 8, 1)
             fh.seek(0)
-            out = np.zeros((12, 8, 1))
-            fh.read(out=out)
+            out_nosqueeze = np.zeros((12, 8, 1))
+            fh.read(out=out_nosqueeze)
             assert fh.tell() == 12
-            assert np.all(out.squeeze() == record)
+            assert np.all(out_nosqueeze.squeeze() == out_squeeze)
 
     def test_stream_writer(self, tmpdir):
         vdif_file = str(tmpdir.join('simple.vdif'))
@@ -585,25 +585,29 @@ class TestVDIF(object):
             record = fh.read(16)
         assert np.all(record == data)
 
-        # Test that squeeze attribute works on write but can be turned off if
-        # needed.
+        # Test that squeeze attribute works on write.
         with vdif.open(SAMPLE_FILE, 'rs') as fh:
             record = fh.read()
             header = fh.header0
 
-        test_file = str(tmpdir.join('test.vdif'))
-        with vdif.open(test_file, 'ws', nthread=8, header=header) as fw:
-            assert fw.sample_shape == (8,)
-            assert fw.sample_shape.nthread == 8
-            fw.write(record[:20000])
-            fw.squeeze = False
-            assert fw.sample_shape == (8, 1)
-            assert fw.sample_shape.nthread == 8
-            assert fw.sample_shape.nchan == 1
-            fw.write(record[20000:, :, np.newaxis])
+        test_file_squeeze = str(tmpdir.join('test_squeeze.vdif'))
+        with vdif.open(test_file_squeeze, 'ws', nthread=8,
+                       header=header) as fws:
+            assert fws.sample_shape == (8,)
+            assert fws.sample_shape.nthread == 8
+            fws.write(record)
+        test_file_nosqueeze = str(tmpdir.join('test_nosqueeze.vdif'))
+        with vdif.open(test_file_nosqueeze, 'ws', nthread=8, header=header,
+                       squeeze=False) as fwns:
+            assert fwns.sample_shape == (8, 1)
+            assert fwns.sample_shape.nthread == 8
+            assert fwns.sample_shape.nchan == 1
+            fwns.write(record[..., np.newaxis])
 
-        with vdif.open(test_file, 'rs') as fh:
-            assert np.all(fh.read() == record)
+        with vdif.open(test_file_squeeze, 'rs') as fhs, \
+                vdif.open(test_file_nosqueeze, 'rs') as fhns:
+            assert np.all(fhs.read() == record)
+            assert np.all(fhns.read() == record)
 
     def test_subset(self, tmpdir):
         # Test subsetting on a 8 thread, 4 channel dataset to file.
@@ -614,14 +618,13 @@ class TestVDIF(object):
             data = fh.read()
             data = np.array([data, abs(data),
                              -data, -abs(data)]).transpose(1, 2, 0)
-            fw = vdif.open(test_file, 'ws',
+            with vdif.open(test_file, 'ws',
                            nthread=8, nchan=4, sample_rate=fh.sample_rate,
                            samples_per_frame=fh.samples_per_frame // 4,
                            complex_data=fh.complex_data, bps=fh.bps,
                            edv=fh.header0.edv, station=fh.header0.station,
-                           time=fh.start_time)
-            fw.write(data)
-            fw.close()
+                           time=fh.start_time) as fw:
+                fw.write(data)
 
         # Sanity check by re-reading the file.
         with vdif.open(test_file, 'rs') as fhn:

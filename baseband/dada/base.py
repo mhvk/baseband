@@ -269,9 +269,6 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
                 "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
 
-        # Create a properly-shaped view of the output if needed.
-        result = self._unsqueeze(out) if self.squeeze else out
-
         offset0 = self.offset
         while count > 0:
             frame_nr, sample_offset = self._frame_info()
@@ -285,8 +282,9 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
             data_slice = slice(sample_offset, sample_offset + nsample)
             if self.subset:
                 data_slice = (data_slice,) + self.subset
-
-            result[sample:sample + nsample] = self._frame[data_slice]
+            out[sample:sample + nsample] = (
+                self._frame[data_slice].squeeze() if self.squeeze else
+                self._frame[data_slice])
             self.offset += nsample
             count -= nsample
 

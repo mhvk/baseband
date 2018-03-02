@@ -477,10 +477,12 @@ class TestGSB(object):
             out1 = np.empty_like(data1)
             fh_r.read(out=out1)
             assert np.all(out1 == data1)
-            fh_r.seek(0)
-            fh_r.squeeze = True
+
+        # Try with squeezing on.
+        with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP,
+                      sample_rate=sample_rate, payloadsize=self.payloadsize,
+                      squeeze=True) as fh_r:
             out2 = np.empty((fh_r.size,) + fh_r.sample_shape)
-            fh_r.seek(0)
             fh_r.read(out=out2)
             assert np.all(out2 == out1.squeeze())
             # To compare with directly psasing samples_per_frame below.
@@ -502,24 +504,38 @@ class TestGSB(object):
             sh.seek(0)
             sp.seek(0)
             fh_r.seek(0)
-            with gsb.open(sh, 'rs', raw=sp, sample_rate=fh_r.sample_rate,
-                          samples_per_frame=(
-                              self.payloadsize * (8 // bps))) as fh_n:
-                assert fh_n.header0 == fh_r.header0
-                assert fh_n._last_header == fh_r._last_header
-                assert fh_n.size == fh_r.size
-                assert fh_n.sample_shape == fh_r.sample_shape
-                assert fh_n.start_time == fh_r.start_time
-                assert fh_n.sample_rate == sample_rate
-                assert np.all(fh_n.read() == fh_r.read())
-                assert abs(fh_n.stop_time - fh_n.time) < 1.*u.ns
-                assert abs(fh_n.stop_time - fh_r.stop_time) < 1.*u.ns
+            fh_n = gsb.open(sh, 'rs', raw=sp, sample_rate=fh_r.sample_rate,
+                            samples_per_frame=(self.payloadsize * (8 // bps)))
+            assert fh_n.header0 == fh_r.header0
+            assert fh_n._last_header == fh_r._last_header
+            assert fh_n.size == fh_r.size
+            assert fh_n.sample_shape == fh_r.sample_shape
+            assert fh_n.start_time == fh_r.start_time
+            assert fh_n.sample_rate == sample_rate
+            assert np.all(fh_n.read() == fh_r.read())
+            assert abs(fh_n.stop_time - fh_n.time) < 1.*u.ns
+            assert abs(fh_n.stop_time - fh_r.stop_time) < 1.*u.ns
             # Check that passing samples_per_frame is identical to passing
             # payloadsize.
             fh_r.seek(0)
             assert fh_r.samples_per_frame == spf_from_payloadsize
             assert np.all(fh_r.read() == data1.squeeze())
-            fh_w.close()
+            # Try writing a file with squeeze off.
+            sh.seek(0)
+            sp.seek(0)
+            fh_r.seek(0)
+            fh_wns = gsb.open(sh, 'ws', raw=sp, sample_rate=fh_r.sample_rate,
+                              samples_per_frame=(self.payloadsize *
+                                                 (8 // bps)),
+                              header=fh_r.header0, squeeze=False)
+            fh_wns.write(fh_r.read()[:, np.newaxis])
+            sh.seek(0)
+            sp.seek(0)
+            fh_r.seek(0)
+            fh_nns = gsb.open(sh, 'rs', raw=sp, sample_rate=fh_r.sample_rate,
+                              samples_per_frame=(self.payloadsize *
+                                                 (8 // bps)))
+            assert np.all(fh_nns.read() == fh_r.read())
 
         # Test that opening that raises an exception correctly handles
         # file closing. (Note that the timestamp file always gets closed).
@@ -600,11 +616,13 @@ class TestGSB(object):
             out1 = np.empty_like(data1)
             fh_r.read(out=out1)
             assert np.all(out1 == data1)
-            fh_r.seek(0)
-            fh_r.squeeze = True
+
+        # Try again with squeezing.
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
+                      sample_rate=sample_rate, payloadsize=self.payloadsize,
+                      squeeze=True) as fh_r:
             out2 = np.empty((fh_r.size,) + fh_r.sample_shape,
                             dtype=np.complex64)
-            fh_r.seek(0)
             fh_r.read(out=out2)
             assert np.all(out2 == out1.squeeze())
             # To compare with directly psasing samples_per_frame below.

@@ -315,24 +315,24 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         fh_raw.seek(0)
         self.fh_raw = fh_raw
         self._frameset = self.read_frameset()
+        thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
         self._framesetsize = fh_raw.tell()
         super(VDIFStreamReader, self).__init__(fh_raw, header, subset,
                                                len(self._frameset.frames),
                                                sample_rate, squeeze)
-        # If subsetting, decode first frameset again.
-        if self._thread_ids:
+        # Set _thread_ids.  If subsetting, decode first frameset again.
+        if self.subset:
+            thread_ids = np.array(thread_ids)[self.subset[0]]
+            # In cases where self.subset[0] is a lone int, must create list.
+            try:
+                self._thread_ids = [thread_ids.__index__()]
+            except Exception:
+                self._thread_ids = list(thread_ids)
             self.fh_raw.seek(0)
             self._frameset = self.read_frameset(self._thread_ids)
             self._header0 = self._frameset.frames[0].header
-
-    def _get_subset_and_sample_shape(self, subset):
-        # Extension of _get_subset_and_sample_shape to set self._thread_ids
-        super(VDIFStreamReader, self)._get_subset_and_sample_shape(subset)
-        if self.subset is not None:
-            self._thread_ids = list(np.arange(self._unsliced_shape[0],
-                                              dtype='int')[self.subset[0]])
         else:
-            self._thread_ids = None
+            self._thread_ids = thread_ids
 
     @lazyproperty
     def _last_header(self):
@@ -344,7 +344,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         # Find first header with same thread_id going backward.
         found = False
         # Set maximum as twice number of frames in frameset.
-        maximum = 2 * self._unsliced_shape[0] * self.header0.framesize
+        maximum = 2 * self._framesetsize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
             last_header = self.find_header(
@@ -395,9 +395,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
                 "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
 
-        # Create a properly-shaped view of the output if needed.
-        result = self._unsqueeze(out) if self.squeeze else out
-
         offset0 = self.offset
         while count > 0:
             dt, frame_nr, sample_offset = self._frame_info()
@@ -417,11 +414,14 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             # Subset data (channel only; threads subset when reading frameset).
             if self.subset and len(self.subset) > 1:
                 data = data[(Ellipsis,) + (self.subset[1],)]
+            # Squeeze it if necessary.
+            if self.squeeze:
+                data = data.squeeze()
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            result[sample:sample + nsample] = data[sample_offset:
-                                                   sample_offset + nsample]
+            out[sample:sample + nsample] = data[sample_offset:
+                                                sample_offset + nsample]
             self.offset += nsample
             count -= nsample
 
@@ -496,8 +496,8 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
                 self.header0.sample_rate = self.sample_rate
             assert self.header0.sample_rate == self.sample_rate
         self._data = np.zeros(
-            (self._sample_shape.nthread, self.samples_per_frame,
-                self._sample_shape.nchan),
+            (self._unsliced_shape.nthread, self.samples_per_frame,
+                self._unsliced_shape.nchan),
             np.complex64 if self.complex_data else np.float32)
 
     def write(self, data, invalid_data=False):

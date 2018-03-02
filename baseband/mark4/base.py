@@ -301,7 +301,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         header = self._frame.header
         super(Mark4StreamReader, self).__init__(
             fh_raw, header0=header, sample_rate=sample_rate,
-            unsliced_shape=tuple(self._frame.payload.sample_shape),
+            unsliced_shape=self._frame.payload.sample_shape,
             bps=header.bps, complex_data=False, subset=subset,
             samples_per_frame=header.samples_per_frame,
             squeeze=squeeze)
@@ -386,9 +386,6 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
                 "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
 
-        # Create a properly-shaped view of the output if needed.
-        result = self._unsqueeze(out) if self.squeeze else out
-
         offset0 = self.offset
         while count > 0:
             frame_nr, sample_offset = divmod(self.offset,
@@ -402,11 +399,14 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             data = self._frame.data
             if self.subset:
                 data = data[(slice(None),) + self.subset]
+            # Squeeze it if necessary.
+            if self.squeeze:
+                data = data.squeeze()
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            result[sample:sample + nsample] = data[sample_offset:
-                                                   sample_offset + nsample]
+            out[sample:sample + nsample] = data[sample_offset:
+                                                sample_offset + nsample]
             self.offset += nsample
             count -= nsample
 
@@ -467,7 +467,7 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
             sample_rate=sample_rate, squeeze=squeeze)
 
         self._data = np.zeros((self.samples_per_frame,
-                               self._sample_shape.nchan), np.float32)
+                               self._unsliced_shape.nchan), np.float32)
 
     def write(self, data, invalid_data=False):
         """Write data, buffering by frames as needed.

@@ -264,9 +264,6 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
                 "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
 
-        # Create a properly-shaped view of the output if needed.
-        result = self._unsqueeze(out) if self.squeeze else out
-
         offset0 = self.offset
         while count > 0:
             dt, frame_nr, sample_offset = self._frame_info()
@@ -289,11 +286,14 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             data = self._frame.data
             if self.subset:
                 data = data[(slice(None),) + self.subset]
+            # Squeeze it if necessary.
+            if self.squeeze:
+                data = data.squeeze()
             # Copy relevant data from frame into output.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            result[sample:sample + nsample] = data[sample_offset:
-                                                   sample_offset + nsample]
+            out[sample:sample + nsample] = data[sample_offset:
+                                                sample_offset + nsample]
             self.offset += nsample
             count -= nsample
 
@@ -302,7 +302,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     def _read_frame(self, fill_value=0.):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
-        self._frame = self.read_frame(nchan=self._sample_shape.nchan,
+        self._frame = self.read_frame(nchan=self._unsliced_shape.nchan,
                                       bps=self.bps, ref_time=self.header0.time)
 
 
@@ -351,7 +351,7 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
             sample_rate=sample_rate, squeeze=squeeze)
 
         self._data = np.zeros((self.samples_per_frame,
-                               self._sample_shape.nchan), np.float32)
+                               self._unsliced_shape.nchan), np.float32)
         self._valid = True
 
     def write(self, data, invalid_data=False):

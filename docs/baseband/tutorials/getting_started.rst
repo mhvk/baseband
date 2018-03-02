@@ -67,7 +67,7 @@ would use the `~baseband.vdif.base.VDIFStreamReader.read` method::
     <... 'numpy.ndarray'>
     >>> d.shape
     (12, 8)
-    >>> d[:, 0].astype(int)  # First thread.
+    >>> d[:, 0].astype(int)    # First thread.
     array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
 As discussed in detail in the :ref:`VDIF section <vdif>`, VDIF files are
@@ -90,32 +90,30 @@ accessible through::
     SampleShape(nthread=8)
 
 By default, dimensions of length unity are removed from the sample shape.  To
-retain them, set the ``fh.squeeze`` attribute to `False`:
+retain them, we can pass ``squeeze=False`` to `~baseband.vdif.open`:
 
-    >>> fh.squeeze = False
-    >>> fh.sample_shape              # Sample shape now keeps channel dimension.
+    >>> fhns = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False)
+    >>> fhns.sample_shape    # Sample shape now keeps channel dimension.
     SampleShape(nthread=8, nchan=1)
-    >>> d2 = fh.read(12)
-    >>> d2.shape                     # Decoded data has channel dimension.
+    >>> d2 = fhns.read(12)
+    >>> d2.shape             # Decoded data has channel dimension.
     (12, 8, 1)
-    >>> fh.squeeze = True            # Set back to `True` for rest of section.
+    >>> fhns.close()
 
-The ``squeeze`` attribute defaults to `False` for all stream readers and
-writers, but this behaviour can be overridden by passing ``squeeze=False`` to
-``open``
+``squeeze`` cannot be changed for an already-open file reader.
 
 We can access information about the file by printing ``fh``::
 
     >>> fh
-    <VDIFStreamReader name=... offset=24
+    <VDIFStreamReader name=... offset=12
         sample_rate=32.0 MHz, samples_per_frame=20000,
         sample_shape=SampleShape(nthread=8),
         complex_data=False, bps=2, edv=3, station=65532,
         start_time=2014-06-16T05:56:07.000000000>
 
 The ``offset`` gives the current location of the sample file pointer - it's at
-``24`` since we have just read in 24 (complete) samples.  If we called
-``fh.read(12)`` again we would get the next 12 samples.  If we instead called 
+``12`` since we have read in 12 (complete) samples.  If we called ``fh.read
+(12)`` again we would get the next 12 samples.  If we instead called 
 ``fh.read()``, it would read from the pointer's *current* position to the end
 of the file.  If we wanted all the data in one array, we would move the file
 pointer back to the start of file, using ``fh.seek``, before reading::
@@ -271,9 +269,14 @@ only wanted thread 3 of the sample VDIF file::
     >>> d = fh.read(20000)
     >>> d.shape
     (20000, 1, 1)
-    >>> fh.subset    # File reader transforms single integers to slices.
+    >>> fh.subset
     (slice(3, 4, None),)
     >>> fh.close()
+
+Since ``squeeze=False``, ``subset`` is converted from ``3`` to ``slice(3, 4,
+None)`` to retain dimensions of length unity.  This behaviour is turned off
+when ``squeeze=True`` (see below).  Like ``squeeze``, ``subset`` cannot be
+changed for an already-open file reader.
 
 Data with multi-dimensional samples can be subset by passing a `tuple` of
 indexing objects with the same dimensional ordering as the sample shape prior
@@ -308,7 +311,7 @@ data after subsetting::
 <https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.indexing.html>`_ of a
 `numpy.ndarray`, with the exceptions of ``None``.  Advanced indexing (as done
 above with ``subset=([1, 3], 0)``) is also possible, but any indexing that
-leads to a reduction in the number of dimensions will result in errors.  We can
+leads to a change in the number of dimensions will result in errors.  We can
 use broadcasting to select specific threads from more than one sample shape
 dimension; see the Numpy documentation on `integer array indexing.
 <https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html#integer-array-indexing>`_

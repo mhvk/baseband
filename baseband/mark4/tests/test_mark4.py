@@ -604,10 +604,9 @@ class TestMark4(object):
                 conv_bytes = s.read()
                 assert conv_bytes == orig_bytes
 
-        # Test that squeeze attribute works on read (including in-place read)
-        # and write, but can be turned off if needed.
+        # Test that squeeze attribute works on read (including in-place read).
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64,
-                        thread_ids=[0], decade=2010) as fh:
+                        subset=0, decade=2010) as fh:
             assert fh.sample_shape == ()
             assert fh.read(1).shape == (1,)
             fh.seek(0)
@@ -626,12 +625,6 @@ class TestMark4(object):
             fh.read(out=out)
             assert fh.tell() == 12
             assert np.all(out.squeeze() == record[:12, 0])
-
-        with mark4.open(str(tmpdir.join('test.m4')), 'ws',
-                        sample_rate=32*u.MHz, time=start_time,
-                        ntrack=64, bps=1, fanout=4) as fw:
-            assert fw.sample_shape == (16,)
-            assert fw.sample_shape.nchan == 16
 
         # Test writing across decades.
         start_time = Time('2019:365:23:59:59.9975', precision=9)

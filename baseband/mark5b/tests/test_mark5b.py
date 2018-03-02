@@ -480,10 +480,9 @@ class TestMark5B(object):
             assert (abs(fh.time - Time('2017-09-04T00:00:01', precision=9)) <
                     1. * u.ns)
 
-        # Test that squeeze attribute works on read (including in-place read)
-        # and write, but can be turned off if needed.
+        # Test that squeeze attribute works on read (including in-place read).
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
-                         thread_ids=[0], sample_rate=32*u.MHz, kday=56000) as fh:
+                         subset=0, sample_rate=32*u.MHz, kday=56000) as fh:
             assert fh.sample_shape == ()
             assert fh.read(1).shape == (1,)
             fh.seek(0)
@@ -505,20 +504,29 @@ class TestMark5B(object):
             assert fh.tell() == 12
             assert np.all(out.squeeze() == record[:12, 0])
 
-        with mark5b.open(m5_test, 'ws', time=start_time, nchan=1, bps=2,
-                         sample_rate=32*u.MHz) as fw:
-            assert fw.sample_shape == ()
-            fw.write(record[:10000, 0])
-            fw.squeeze = False
-            assert fw.sample_shape == (1,)
-            assert fw.sample_shape.nchan == 1
-            fw.write(record[10000:, 0:1])   # 0:1 to keep record 2-dimensional.
+        # Test that squeeze attribute works on write.
+        m5_test_squeeze = str(tmpdir.join('test_squeeze.m5b'))
+        with mark5b.open(m5_test_squeeze, 'ws', time=start_time, nchan=1,
+                         bps=2, sample_rate=32*u.MHz) as fws:
+            assert fws.sample_shape == ()
+            fws.write(record[:, 0])
             # Write some dummy data to fill up the rest of the frame.
-            fw.write(np.zeros((20000, 1), dtype='float32'))
+            fws.write(np.zeros(20000, dtype='float32'))
+        m5_test_nosqueeze = str(tmpdir.join('test_nosqueeze.m5b'))
+        with mark5b.open(m5_test_nosqueeze, 'ws', time=start_time, nchan=1,
+                         bps=2, sample_rate=32*u.MHz, squeeze=False) as fwns:
+            assert fwns.sample_shape == (1,)
+            assert fwns.sample_shape.nchan == 1
+            fwns.write(record[:, 0:1])    # 0:1 to keep record 2-dimensional.
+            # Write some dummy data to fill up the rest of the frame.
+            fwns.write(np.zeros((20000, 1), dtype='float32'))
 
-        with mark5b.open(m5_test, 'rs', nchan=1, bps=2,
-                         sample_rate=32*u.MHz, kday=56000) as fh:
-            assert np.all(fh.read(20000) == record[:, 0])
+        with mark5b.open(m5_test_squeeze, 'rs', nchan=1, bps=2,
+                         sample_rate=32*u.MHz, kday=56000) as fhs, \
+                mark5b.open(m5_test_nosqueeze, 'rs', nchan=1, bps=2,
+                            sample_rate=32*u.MHz, kday=56000) as fhns:
+            assert np.all(fhs.read(20000) == record[:, 0])
+            assert np.all(fhns.read(20000) == record[:, 0])
 
     def test_stream_invalid(self):
         with pytest.raises(ValueError):

@@ -338,7 +338,7 @@ class TestDADA(object):
         # Try reading a single polarization.
         with dada.open(SAMPLE_FILE, 'rs', subset=0) as fh:
             assert fh.sample_shape == ()
-            assert fh.subset == (slice(0, 1),)
+            assert fh.subset == (0,)
             record3 = fh.read(12)
             assert np.all(record3 == record1[:12, 0])
 
@@ -364,19 +364,9 @@ class TestDADA(object):
             data_sub = fh.read()
             assert np.all(data_sub[:, 1] == data2d[:, 1, 0])
 
-        # Test that squeeze attribute works on read (including in-place read)
-        # and write, but can be turned off if needed.
-        with dada.open(SAMPLE_FILE, 'rs') as fh:
-            assert fh.sample_shape == (2,)
-            assert fh.sample_shape.npol == 2
-            assert fh.read(1).shape == (1, 2)
-            assert fh.read(10).shape == (10, 2)
-            fh.seek(0)
-            out = np.zeros((12, 2), dtype=np.complex64)
-            fh.read(out=out)
-            assert fh.tell() == 12
-            assert np.all(out == record1)
-            fh.squeeze = False
+        # Test that squeeze attribute works on read (including in-place read;
+        # we implicitly tested squeeze=True above).
+        with dada.open(SAMPLE_FILE, 'rs', squeeze=False) as fh:
             assert fh.sample_shape == (2, 1)
             assert fh.sample_shape.npol == 2
             assert fh.sample_shape.nchan == 1
@@ -388,18 +378,24 @@ class TestDADA(object):
             assert fh.tell() == 12
             assert np.all(out.squeeze() == record1)
 
-        with dada.open(filename, 'ws', header=self.header) as fw:
+        # Test that squeeze attribute works on write.
+        dada_test_squeeze = str(tmpdir.join('test_squeeze.dada'))
+        with dada.open(dada_test_squeeze, 'ws', header=self.header) as fw:
             assert fw.sample_shape == (2,)
             assert fw.sample_shape.npol == 2
-            fw.write(self.payload[:8000].squeeze())
-            fw.squeeze = False
+            fw.write(self.payload.data.squeeze())
+        dada_test_nosqueeze = str(tmpdir.join('test_nosqueeze.dada'))
+        with dada.open(dada_test_nosqueeze, 'ws', header=self.header,
+                       squeeze=False) as fw:
             assert fw.sample_shape == (2, 1)
             assert fw.sample_shape.npol == 2
             assert fw.sample_shape.nchan == 1
-            fw.write(self.payload[8000:16000])
+            fw.write(self.payload.data)
 
-        with dada.open(filename, 'rs', squeeze=False) as fh:
-            assert np.all(fh.read() == self.payload)
+        with dada.open(dada_test_squeeze, 'rs', squeeze=False) as fhs, \
+                dada.open(dada_test_nosqueeze, 'rs', squeeze=False) as fhns:
+            assert np.all(fhs.read() == self.payload)
+            assert np.all(fhns.read() == self.payload)
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # valid but invalid samples are appropriately marked.
