@@ -48,58 +48,113 @@ class VLBIStreamBase(VLBIFileBase):
 
     _frame_class = None
     _squeezed_shape = None
+    _sample_shape_maker = None
 
-    def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
-                 thread_ids, samples_per_frame, sample_rate, squeeze=True):
+    def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
+                 subset, samples_per_frame, sample_rate, squeeze=True):
         super(VLBIStreamBase, self).__init__(fh_raw)
         self._header0 = header0
-        self._sample_shape = sample_shape
         self._bps = bps
         self._complex_data = complex_data
-        self.thread_ids = thread_ids
         self.samples_per_frame = samples_per_frame
         self.sample_rate = sample_rate
         self.offset = 0
-        self.squeeze = squeeze
+
+        if self._sample_shape_maker is not None:
+            self._unsliced_shape = self._sample_shape_maker(*unsliced_shape)
+        else:
+            self._unsliced_shape = unsliced_shape
+
+        self._squeeze = bool(squeeze)
+
+        if subset is None:
+            subset_wrapints = (slice(None),)
+        else:
+            # Check if enclosing structure is a tuple.
+            if not isinstance(subset, tuple):
+                subset = (subset,)
+            subset_wrapints = self._wrap_subset(subset)
+            # If we don't squeeze, use subset_wrapints to keep numpy from
+            # concatenating dimensions subset to length unity.
+            if not self.squeeze:
+                subset = subset_wrapints
+        self._subset = subset
+        self._sample_shape = self._get_sample_shape(subset_wrapints)
 
     @property
     def squeeze(self):
-        """Whether data arrays have arrays with length unity removed.
+        """Whether data arrays have dimensions with length unity removed.
 
-        If `True`, such dimensions are removed in reading, and added back in
-        writing."""
+        If `True`, data read out has such dimensions removed, and data
+        passed in for writing has them inserted.
+        """
         return self._squeeze
 
-    @squeeze.setter
-    def squeeze(self, squeeze):
-        self._squeeze = bool(squeeze)
+    def _wrap_subset(self, subset):
+        """Creates subset where lone integers are replaced with slices."""
+        subset_wrapints = []
+        for item in subset:
+            try:
+                i = item.__index__()
+            except (AttributeError, TypeError):
+                subset_wrapints.append(item)
+            else:
+                subset_wrapints.append(slice(i, (None if i == -1 else i + 1)))
+        return tuple(subset_wrapints)
 
     @property
-    def sample_shape(self):
-        """Shape of a data sample (possibly squeezed)."""
-        if self.squeeze:
-            if not self._squeezed_shape:
-                field_names = getattr(self._sample_shape, '_fields', None)
-                sqz_dims = [dim for dim in self._sample_shape if dim > 1]
-                if field_names is None:
-                    self._squeezed_shape = tuple(sqz_dims)
-                else:
-                    sqz_names = [field for field, dim in
-                                 zip(field_names, self._sample_shape) if
-                                 dim > 1]
-                    sqz_shp_cls = namedtuple('SampleShape',
-                                             ','.join(sqz_names))
-                    self._squeezed_shape = sqz_shp_cls(*sqz_dims)
-            return self._squeezed_shape
-        else:
-            return self._sample_shape
+    def subset(self):
+        """Specific elements (threads/channels) of the sample to read.
 
-    def _unsqueeze(self, data):
-        new_shape = list(data.shape)
-        for i, dim in enumerate(self._sample_shape):
-            if dim == 1:
-                new_shape.insert(i + 1, 1)
-        return data.reshape(new_shape)
+        The order of dimensions is the same as for `sample_shape`.  Set by the
+        class initializer.
+        """
+        return self._subset
+
+    def _get_sample_shape(self, subset_wrapints):
+        # Extract sample_shape by creating a dummy sample and indexing it
+        # with subset_wrapints.
+        dummy_sample = np.empty(self._unsliced_shape)
+        try:
+            dummy_subsample = dummy_sample[subset_wrapints]
+        except IndexError as exc:
+            exc.args += ("subset cannot be used to set sample shape.",)
+            raise exc
+        sample_shape = dummy_subsample.shape
+        # Check no slice is out of bounds.
+        assert 0 not in sample_shape, ("subset is out of bounds of "
+                                       "the sample shape.")
+
+        # If _sample_shape_maker is defined, use it to generate a named tuple.
+        if self._sample_shape_maker is not None:
+            try:
+                sample_shape = self._sample_shape_maker(*sample_shape)
+            except TypeError:
+                raise ValueError("sample shape and shape maker's dimensions "
+                                 "do not match.  This may be because subset "
+                                 "uses advanced indexing that changes the "
+                                 "number of dimensions.")
+
+        # If self.squeeze = True, remove any remaining unity dimensions.
+        if self.squeeze:
+            field_names = getattr(sample_shape, '_fields', None)
+            sqz_dims = [dim for dim in sample_shape if dim > 1]
+            if field_names is None:
+                return tuple(sqz_dims)
+            else:
+                sqz_names = [field for field, dim in
+                             zip(field_names, sample_shape) if
+                             dim > 1]
+                sqz_shp_cls = namedtuple('SampleShape',
+                                         ','.join(sqz_names))
+                return sqz_shp_cls(*sqz_dims)
+
+        return sample_shape
+
+    @lazyproperty
+    def sample_shape(self):
+        """Shape of a complete sample (possibly subset or squeezed)."""
+        return self._sample_shape
 
     def _get_time(self, header):
         """Get time from a header."""
@@ -146,15 +201,6 @@ class VLBIStreamBase(VLBIFileBase):
     def complex_data(self):
         """Whether the decoded data is complex."""
         return self._complex_data
-
-    @property
-    def thread_ids(self):
-        """Specific threads/channels to read."""
-        return self._thread_ids
-
-    @thread_ids.setter
-    def thread_ids(self, ids):
-        self._thread_ids = ids
 
     @property
     def samples_per_frame(self):
@@ -220,15 +266,15 @@ class VLBIStreamBase(VLBIFileBase):
                 "    sample_rate={s.sample_rate},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
-                "    {t}start_time={s.start_time.isot}>"
-                .format(s=self, t=('thread_ids={0}, '.format(self.thread_ids)
-                                   if self.thread_ids else '')))
+                "    {sub}start_time={s.start_time.isot}>"
+                .format(s=self, sub=('subset={0}, '.format(self.subset)
+                                     if self.subset else '')))
 
 
 class VLBIStreamReaderBase(VLBIStreamBase):
 
-    def __init__(self, fh_raw, header0, sample_shape, bps, complex_data,
-                 thread_ids, samples_per_frame, sample_rate=None,
+    def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
+                 subset, samples_per_frame, sample_rate=None,
                  squeeze=True):
 
         if sample_rate is None:
@@ -245,7 +291,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 raise
 
         super(VLBIStreamReaderBase, self).__init__(
-            fh_raw, header0, sample_shape, bps, complex_data, thread_ids,
+            fh_raw, header0, unsliced_shape, bps, complex_data, subset,
             samples_per_frame, sample_rate, squeeze)
 
     @staticmethod
@@ -377,6 +423,14 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
 
 class VLBIStreamWriterBase(VLBIStreamBase):
+
+    def _unsqueeze(self, data):
+        new_shape = list(data.shape)
+        for i, dim in enumerate(self._unsliced_shape):
+            if dim == 1:
+                new_shape.insert(i + 1, 1)
+        return data.reshape(new_shape)
+
     def close(self):
         extra = self.offset % self.samples_per_frame
         if extra != 0:

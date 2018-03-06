@@ -12,7 +12,7 @@ from ..utils import bcd_encode, bcd_decode, CRC
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
 from ..frame import VLBIFrameBase
-from ..base import VLBIFileBase, VLBIStreamBase
+from ..base import VLBIFileBase, VLBIStreamBase, VLBIStreamWriterBase
 
 
 def encode_1bit(values):
@@ -425,34 +425,142 @@ class TestVLBIBase(object):
             assert fh.closed
             assert fh.fh_raw.closed
 
-    def test_streambase_squeeze(self):
-        # Tests stream base's sample shape concatenation routines.
-        smp_shp_cls = namedtuple('SampleShape',
-                                 'n1, n2, n3, n4, n5, n6, n7, n8')
-        sample_shape = smp_shp_cls(1, 17, 3, 2, 1, 5, 1, 1)
+    def make_writer_with_shape(self, sample_shape_maker, unsliced_shape,
+                               subset, squeeze):
+        # StreamWriterBase is used instead of StreamBase so we can also test
+        # _unsqueeze.
+
+        class StreamWriterWithShape(VLBIStreamWriterBase):
+            _sample_shape_maker = sample_shape_maker
+
+        return StreamWriterWithShape(fh_raw=None, header0=None,
+                                     bps=1, complex_data=False, subset=subset,
+                                     unsliced_shape=unsliced_shape,
+                                     samples_per_frame=1000,
+                                     sample_rate=10000*u.Hz, squeeze=squeeze)
+
+    def test_sample_shape_and_squeeze(self):
+        # Tests stream base's sample and squeezing routines.
+
+        sample_shape_maker = namedtuple('SampleShape',
+                                        'n0, n1, n2, n3, n4, n5, n6, n7')
+        unsliced_shape = (1, 17, 3, 2, 1, 5, 1, 1)
+
+        # Try tuple only.
         sb = VLBIStreamBase(fh_raw=None, header0=None,
-                            sample_shape=sample_shape, bps=1,
-                            complex_data=False, thread_ids=None,
+                            bps=1, complex_data=False, subset=None,
+                            unsliced_shape=unsliced_shape,
                             samples_per_frame=1000,
-                            sample_rate=10000*u.Hz, squeeze=False)
-        assert sb.sample_shape == sample_shape
-        sb.squeeze = True
+                            sample_rate=10000*u.Hz, squeeze=True)
         assert sb.sample_shape == (17, 3, 2, 5)
-        data = np.empty((100, 17, 3, 2, 5), dtype='float32')
-        assert sb._unsqueeze(data).shape[1:] == sample_shape
-        smp_shp_cls_s = namedtuple('SampleShape',
-                                   'n1')
-        sample_shape_short = smp_shp_cls_s(1)
-        sbs = VLBIStreamBase(fh_raw=None, header0=None,
-                             sample_shape=sample_shape_short, bps=1,
-                             complex_data=False, thread_ids=None,
-                             samples_per_frame=1000, sample_rate=10000*u.Hz,
-                             squeeze=False)
-        assert sbs.sample_shape == sample_shape_short
-        sbs.squeeze = True
+
+        # Try with equivalent sample shape.
+        sb = self.make_writer_with_shape(sample_shape_maker, unsliced_shape,
+                                         subset=None, squeeze=False)
+        assert sb.sample_shape == unsliced_shape
+
+        # Use VLBIStreamWriterBase so we can access _unsqueeze.
+        sb = self.make_writer_with_shape(sample_shape_maker, unsliced_shape,
+                                         subset=None, squeeze=True)
+        assert sb.sample_shape == (17, 3, 2, 5)
+        assert sb.sample_shape._fields == ('n1', 'n2', 'n3', 'n5')
+
+        data = np.empty((100,) + sb.sample_shape, dtype='float32')
+        assert sb._unsqueeze(data).shape == (100,) + unsliced_shape
+
+        # Check that single-axis sample shape squeezes to ().
+        sample_shape_maker_s = namedtuple('SampleShape',
+                                          'n0')
+        unsliced_shape_short = (1,)
+        sbs = self.make_writer_with_shape(sample_shape_maker_s,
+                                          unsliced_shape_short,
+                                          subset=None, squeeze=False)
+        assert sbs.sample_shape == unsliced_shape_short
+        sbs = self.make_writer_with_shape(sample_shape_maker_s,
+                                          unsliced_shape_short,
+                                          subset=None, squeeze=True)
         assert sbs.sample_shape == ()
         data = np.empty(100, dtype='float32')
-        assert sbs._unsqueeze(data).shape[1:] == sample_shape_short
+        assert sbs._unsqueeze(data).shape == (100,) + unsliced_shape_short
+
+    @pytest.mark.parametrize(('subset', 'sliced_shape',
+                              'squeezed_shape', 'squeezed_n'),
+                             [(0, (1, 21, 33, 1, 2),
+                               (21, 33, 2), ('n1', 'n2', 'n4')),
+                              ((0, 13), (1, 1, 33, 1, 2),
+                               (33, 2), ('n2', 'n4')),
+                              ((0, np.array([2, 8, 9])[:, np.newaxis], [1, 7]),
+                               (1, 3, 2, 1, 2), (3, 2, 2), ('n1', 'n2', 'n4')),
+                              ((Ellipsis, 0, 1), (1, 21, 33, 1, 1),
+                               (21, 33), ('n1', 'n2')),
+                              ((0, slice(1, None, 4), slice(None),
+                                Ellipsis, [1]), (1, 5, 33, 1, 1),
+                               (5, 33), ('n1', 'n2')),
+                              ((0, slice(None, 1, -4)), (1, 5, 33, 1, 2),
+                               (5, 33, 2), ('n1', 'n2', 'n4'))])
+    def test_subset(self, subset, sliced_shape, squeezed_shape, squeezed_n):
+        # Tests subsetting and squeezing subset samples.
+
+        sample_shape_maker = namedtuple('SampleShape',
+                                        'n0, n1, n2, n3, n4')
+        unsliced_shape = (1, 21, 33, 1, 2)
+        data = np.empty((100,) + unsliced_shape, dtype='float32')
+        sb = self.make_writer_with_shape(sample_shape_maker, unsliced_shape,
+                                         subset=subset, squeeze=False)
+
+        assert sb.sample_shape == sliced_shape
+        subset_data = data[(slice(0, 12),) + sb.subset]
+        assert subset_data.shape == (12,) + sb.sample_shape
+
+        # Check that squeezing subset data is self-consistent and consistent
+        # with squeezing the data from above.
+        sbs = self.make_writer_with_shape(sample_shape_maker, unsliced_shape,
+                                          subset=subset, squeeze=True)
+        assert sbs.sample_shape == squeezed_shape
+        assert sbs.sample_shape._fields == squeezed_n
+        sbs_data = data[(slice(0, 12),) + sbs.subset]
+        assert sbs_data.squeeze().shape == (12,) + sbs.sample_shape
+        assert sbs_data.squeeze().shape == subset_data.squeeze().shape
+
+    def test_subset_specialindexing(self):
+        # Tests that single integer subsets are converted to slices if
+        # squeeze is False, but any advanced indexing that reduces
+        # dimensionality returns IndexErrors.
+
+        sample_shape_maker = namedtuple('SampleShape',
+                                        'n0, n1, n2, n3, n4')
+        unsliced_shape = (1, 21, 33, 4, 1)
+
+        # When squeeze = False, passing ints returns slices.
+        sb = self.make_writer_with_shape(sample_shape_maker, unsliced_shape,
+                                         subset=(0, -1), squeeze=False)
+        assert sb.subset == (slice(0, 1), slice(-1, None))
+
+        # When squeeze = True, passing ints returns ints.
+        sb = self.make_writer_with_shape(sample_shape_maker, unsliced_shape,
+                                         subset=(0, -1), squeeze=True)
+        assert sb.subset == (0, -1)
+
+        # Advanced indexing changes dimensions, so sample_shape can't be set.
+        with pytest.raises(ValueError) as excinfo:
+            sb = self.make_writer_with_shape(
+                sample_shape_maker, unsliced_shape, squeeze=True,
+                subset=([0], np.array([2, 8, 16])[:, np.newaxis], [1, 7]))
+        assert "subset uses advanced indexing" in str(excinfo.value)
+
+        # Can't subset with a string.
+        with pytest.raises(IndexError) as excinfo:
+            sb = self.make_writer_with_shape(
+                sample_shape_maker, unsliced_shape,
+                subset=(0, 'nonsense', [1, 7]), squeeze=True)
+        assert "subset cannot be used" in str(excinfo.value)
+
+        # 3 is out of bounds of 1st dimension.
+        with pytest.raises(AssertionError) as excinfo:
+            sb = self.make_writer_with_shape(
+                sample_shape_maker, unsliced_shape, subset=(3, [2, 8]),
+                squeeze=True)
+        assert "subset is out of bounds" in str(excinfo.value)
 
 
 def test_crc():

@@ -263,8 +263,9 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     ref_time : `~astropy.time.Time`, or None, optional
         Reference time within 4 years of the start time of the observations.
         Used only if `decade` is ``None``.
-    thread_ids: list of int, optional
-        Specific threads/channels to read.  By default, all are read.
+    subset : indexing object, optional
+        Specific components (ie. channels) of the complete sample to decode.
+        By default, all channels are read.
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second (ie. the rate at which each
         channel is sampled).  If not given, will be inferred from scanning two
@@ -275,9 +276,10 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     """
 
     _frame_class = Mark4Frame
+    _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None,
-                 thread_ids=None, sample_rate=None, squeeze=True):
+                 subset=None, sample_rate=None, squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
@@ -297,13 +299,12 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         self._frame_data = None
         self._frame_nr = None
         header = self._frame.header
-        sample_shape = (Mark4Payload._sample_shape_maker(len(thread_ids)) if
-                        thread_ids else self._frame.payload.sample_shape)
         super(Mark4StreamReader, self).__init__(
-            fh_raw, header0=header, sample_shape=sample_shape,
-            bps=header.bps, complex_data=False, thread_ids=thread_ids,
+            fh_raw, header0=header, sample_rate=sample_rate,
+            unsliced_shape=self._frame.payload.sample_shape,
+            bps=header.bps, complex_data=False, subset=subset,
             samples_per_frame=header.samples_per_frame,
-            sample_rate=sample_rate, squeeze=squeeze)
+            squeeze=squeeze)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
@@ -385,9 +386,6 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
                 "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
 
-        # Create a properly-shaped view of the output if needed.
-        result = self._unsqueeze(out) if self.squeeze else out
-
         offset0 = self.offset
         while count > 0:
             frame_nr, sample_offset = divmod(self.offset,
@@ -397,15 +395,16 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
 
             # Set decoded value for invalid data.
             self._frame.invalid_data_value = fill_value
-            # Decode data into array.
-            data = self._frame.data
-            if self.thread_ids:
-                data = data[:, self.thread_ids]
-            # Copy relevant data from frame into output.
+            # Determine appropriate slice to decode.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            result[sample:sample + nsample] = data[sample_offset:
-                                                   sample_offset + nsample]
+            data_slice = slice(sample_offset, sample_offset + nsample)
+            if self.subset:
+                data_slice = (data_slice,) + self.subset
+            # Copy relevant data from frame into output.
+            out[sample:sample + nsample] = (
+                self._frame.data[data_slice].squeeze() if self.squeeze else
+                self._frame.data[data_slice])
             self.offset += nsample
             count -= nsample
 
@@ -453,20 +452,20 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
     """
 
     _frame_class = Mark4Frame
+    _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, raw, sample_rate, header=None, squeeze=True, **kwargs):
         if header is None:
             header = Mark4Header.fromvalues(**kwargs)
-        sample_shape = Mark4Payload._sample_shape_maker(header.nchan)
         super(Mark4StreamWriter, self).__init__(
-            fh_raw=raw, header0=header, sample_shape=sample_shape,
-            thread_ids=range(header.nchan), bps=header.bps, complex_data=False,
+            fh_raw=raw, header0=header, unsliced_shape=(header.nchan,),
+            subset=None, bps=header.bps, complex_data=False,
             samples_per_frame=(header.framesize * 8 // header.bps //
                                header.nchan),
             sample_rate=sample_rate, squeeze=squeeze)
 
         self._data = np.zeros((self.samples_per_frame,
-                               self._sample_shape.nchan), np.float32)
+                               self._unsliced_shape.nchan), np.float32)
 
     def write(self, data, invalid_data=False):
         """Write data, buffering by frames as needed.
@@ -526,8 +525,9 @@ decade : int, or None, optional
 ref_time : `~astropy.time.Time`, or None, optional
     Reference time within 4 years of the start time of the observations.  Used
     only if `decade` is ``None``.
-thread_ids: list of int, optional
-    Specific threads/channels to read.  By default, all are read.
+subset : slice or other indexing object, optional
+    Specific components (ie. channels) of the complete sample to decode.  By
+    default, all channels are read.
 sample_rate : `~astropy.units.Quantity`, optional
     Number of complete samples per second (ie. the rate at which each channel
     is sampled).  If not given, will be inferred from scanning two frames of

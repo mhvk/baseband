@@ -190,8 +190,9 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     ref_time : `~astropy.time.Time`, or None, optional
         Reference time within 500 days of the observation start time, used
         to infer the full MJD.  Only used if `kday` is ``None``.
-    thread_ids: list of int, optional
-        Specific channels to read.  By default, all channels are read.
+    subset : indexing object, optional
+        Specific components (ie. channels) of the complete sample to decode.
+        By default, all channels are read.
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second (ie. the rate at which each
         channel is sampled).  If not given, will be inferred from scanning
@@ -202,9 +203,10 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     """
 
     _frame_class = Mark5BFrame
+    _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, fh_raw, nchan, bps=2, kday=None, ref_time=None,
-                 thread_ids=None, sample_rate=None, squeeze=True):
+                 subset=None, sample_rate=None, squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
@@ -212,11 +214,9 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
                                       ref_time=ref_time, kday=kday)
         self._frame_data = None
         header = self._frame.header
-        sample_shape = (Mark5BPayload._sample_shape_maker(len(thread_ids)) if
-                        thread_ids else self._frame.payload.sample_shape)
         super(Mark5BStreamReader, self).__init__(
-            fh_raw, header0=header, sample_shape=sample_shape, bps=bps,
-            complex_data=False, thread_ids=thread_ids,
+            fh_raw, header0=header, bps=bps, complex_data=False, subset=subset,
+            unsliced_shape=self._frame.payload.sample_shape,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
             sample_rate=sample_rate, squeeze=squeeze)
 
@@ -230,15 +230,15 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         return last_header
 
     def read(self, count=None, fill_value=0., out=None):
-        """Read count samples.
+        """Read a number of complete (or subset) samples.
 
         The range retrieved can span multiple frames.
 
         Parameters
         ----------
         count : int
-            Number of samples to read.  If omitted or negative, the whole
-            file is read.  Ignored if ``out`` is given.
+            Number of complete/subset samples to read.  If omitted or negative,
+            the whole file is read.  Ignored if ``out`` is given.
         fill_value : float or complex
             Value to use for invalid or missing data.
         out : `None` or array
@@ -264,9 +264,6 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
                 "'out' should have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
 
-        # Create a properly-shaped view of the output if needed.
-        result = self._unsqueeze(out) if self.squeeze else out
-
         offset0 = self.offset
         while count > 0:
             dt, frame_nr, sample_offset = self._frame_info()
@@ -285,15 +282,16 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
 
             # Set decoded value for invalid data.
             self._frame.invalid_data_value = fill_value
-            # Decode data into array.
-            data = self._frame.data
-            if self.thread_ids:
-                data = data[:, self.thread_ids]
-            # Copy relevant data from frame into output.
+            # Determine appropriate slice to decode.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            result[sample:sample + nsample] = data[sample_offset:
-                                                   sample_offset + nsample]
+            data_slice = slice(sample_offset, sample_offset + nsample)
+            if self.subset:
+                data_slice = (data_slice,) + self.subset
+            # Copy relevant data from frame into output.
+            out[sample:sample + nsample] = (
+                self._frame[data_slice].squeeze() if self.squeeze else
+                self._frame[data_slice])
             self.offset += nsample
             count -= nsample
 
@@ -302,7 +300,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     def _read_frame(self, fill_value=0.):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
-        self._frame = self.read_frame(nchan=self._sample_shape.nchan,
+        self._frame = self.read_frame(nchan=self._unsliced_shape.nchan,
                                       bps=self.bps, ref_time=self.header0.time)
 
 
@@ -338,20 +336,20 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
     """
 
     _frame_class = Mark5BFrame
+    _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, raw, sample_rate, nchan=1, bps=2, header=None,
                  squeeze=True, **kwargs):
         if header is None:
             header = Mark5BHeader.fromvalues(**kwargs)
-        sample_shape = Mark5BPayload._sample_shape_maker(nchan)
         super(Mark5BStreamWriter, self).__init__(
-            raw, header0=header, sample_shape=sample_shape, bps=bps,
-            complex_data=False, thread_ids=None,
+            raw, header0=header, unsliced_shape=(nchan,), bps=bps,
+            complex_data=False, subset=None,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
             sample_rate=sample_rate, squeeze=squeeze)
 
         self._data = np.zeros((self.samples_per_frame,
-                               self._sample_shape.nchan), np.float32)
+                               self._unsliced_shape.nchan), np.float32)
         self._valid = True
 
     def write(self, data, invalid_data=False):
@@ -415,8 +413,9 @@ kday : int, or None, optional
 ref_time : `~astropy.time.Time`, or None, optional
     Reference time within 500 days of the observation start time, used to infer
     the full MJD.  Only used if `kday` is ``None``.
-thread_ids: list of int, optional
-    Specific threads to read.  By default, all threads are read.
+subset : slice or other indexing object, optional
+    Specific components (ie. channels) of the complete sample to decode.  By
+    default, all channels are read.
 sample_rate : `~astropy.units.Quantity`, optional
     Number of complete samples per second (ie. the rate at which each channel
     is sampled).  If not given, will be inferred from scanning one second of
