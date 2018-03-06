@@ -258,11 +258,12 @@ class VDIFFrameSet(object):
             raise IOError("Could not find all requested frames.")
 
         if sort:
-            frames.sort(key=lambda frame: frame['thread_id'])
-            # If user gives thread_ids out of order, sort by user ordering.
+            # Sort by thread id, by user order if needed.
             if thread_ids:
                 frames.sort(key=lambda frame:
                             thread_ids.index(frame['thread_id']))
+            else:
+                frames.sort(key=lambda frame: frame['thread_id'])
 
         return cls(frames, header0)
 

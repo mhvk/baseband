@@ -159,8 +159,8 @@ class GSBStreamBase(VLBIStreamBase):
                 "    sample_rate={s.sample_rate:.5g},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
-                "    {t}start_time={s.start_time.isot}>"
-                .format(s=self, dn=data_name, t=(
+                "    {sub}start_time={s.start_time.isot}>"
+                .format(s=self, dn=data_name, sub=(
                     'subset={0}, '.format(self.subset) if
                     self.subset else '')))
 
@@ -306,12 +306,13 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                                   ((self._frame.header.time -
                                     self.start_time) * framerate).to(u.one))
 
-            # Copy relevant data from frame into output.
+            # Determine appropriate slice to decode.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
             data_slice = slice(sample_offset, sample_offset + nsample)
             if self.subset:
                 data_slice = (data_slice,) + self.subset
+            # Copy relevant data from frame into output.
             out[sample:sample + nsample] = (
                 self._frame[data_slice].squeeze() if self.squeeze else
                 self._frame[data_slice])

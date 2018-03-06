@@ -54,7 +54,7 @@ For the rest of this section, let's go back to using VDIF files.
 Decoding Data and the Sample File Pointer
 -----------------------------------------
 
-We gave `~baseband.vdif.open` the `'rs'` flag, which opens the file in 
+We gave `~baseband.vdif.open` the `'rs'` flag, which opens the file in
 "stream reader" mode.  The function returns an instance of
 `~baseband.vdif.base.VDIFStreamReader`, a wrapper around `io.BufferedReader`
 that adds methods to decode files as data frames and seek to and read data
@@ -100,8 +100,6 @@ retain them, we can pass ``squeeze=False`` to `~baseband.vdif.open`:
     (12, 8, 1)
     >>> fhns.close()
 
-``squeeze`` cannot be changed for an already-open file reader.
-
 We can access information about the file by printing ``fh``::
 
     >>> fh
@@ -113,7 +111,7 @@ We can access information about the file by printing ``fh``::
 
 The ``offset`` gives the current location of the sample file pointer - it's at
 ``12`` since we have read in 12 (complete) samples.  If we called ``fh.read
-(12)`` again we would get the next 12 samples.  If we instead called 
+(12)`` again we would get the next 12 samples.  If we instead called
 ``fh.read()``, it would read from the pointer's *current* position to the end
 of the file.  If we wanted all the data in one array, we would move the file
 pointer back to the start of file, using ``fh.seek``, before reading::
@@ -169,7 +167,7 @@ Passing the string ``'time'`` reports the pointer's location in absolute time::
     <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.001250000>
 
 We can also pass an absolute `astropy.time.Time`, or a positive or negative time
-difference `~astropy.time.TimeDelta` or `astropy.units.Quantity` to ``seek``. 
+difference `~astropy.time.TimeDelta` or `astropy.units.Quantity` to ``seek``.
 If the offset is a `~astropy.time.Time` object, the second argument to seek is
 ignored.
 
@@ -241,7 +239,7 @@ The full list of keywords is available by printing out ``header0``::
                  personality: 131>
 
 A number of derived properties, such as the time (as a `~astropy.time.Time`
-object), are also available through the header object.  
+object), are also available through the header object.
 
     >>> header0.time
     <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.000000000>
@@ -254,13 +252,13 @@ VDIF file's headers are of class::
 
 and so its attributes can be found `here <baseband.vdif.header.VDIFHeader3>`.
 
-Opening Specific Components of the Data
+Reading Specific Components of the Data
 ---------------------------------------
 
 By default, ``fh.read()`` returns complete samples, i.e. with all
 available threads, polarizations or channels. If we were only interested in
 decoding specific components of the complete sample, we can select them by
-passing indexing objects the ``subset`` keyword in open.  For example, if we
+passing indexing objects to the ``subset`` keyword in open.  For example, if we
 only wanted thread 3 of the sample VDIF file::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=3, squeeze=False)
@@ -275,8 +273,7 @@ only wanted thread 3 of the sample VDIF file::
 
 Since ``squeeze=False``, ``subset`` is converted from ``3`` to ``slice(3, 4,
 None)`` to retain dimensions of length unity.  This behaviour is turned off
-when ``squeeze=True`` (see below).  Like ``squeeze``, ``subset`` cannot be
-changed for an already-open file reader.
+when ``squeeze=True`` (see below).
 
 Data with multi-dimensional samples can be subset by passing a `tuple` of
 indexing objects with the same dimensional ordering as the sample shape prior
@@ -296,8 +293,7 @@ will only act upon the the first dimension::
     SampleShape(nthread=2, nchan=1)
     >>> fh.close()
 
-Here, we have also selected 1 and 3, and channel 0.  No enclosing `tuple` is
-required for data with single-dimensional samples.
+No enclosing `tuple` is required for data with single-dimensional samples.
 
 If ``squeeze=True``, dimensions of length unity are removed from the decoded
 data after subsetting::
@@ -307,14 +303,12 @@ data after subsetting::
     SampleShape(nthread=2)
     >>> fh.close()
 
-``subset`` accepts any object `that can be used to for basic indexing
-<https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.indexing.html>`_ of a
-`numpy.ndarray`, with the exceptions of ``None``.  Advanced indexing (as done
-above with ``subset=([1, 3], 0)``) is also possible, but any indexing that
-leads to a change in the number of dimensions will result in errors.  We can
-use broadcasting to select specific threads from more than one sample shape
-dimension; see the Numpy documentation on `integer array indexing.
-<https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html#integer-array-indexing>`_
+Generally, ``subset`` accepts any object that can be used to `index
+<https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.indexing.html>`_ a
+`numpy.ndarray`, including advanced indexing (as done above, with
+``subset=([1, 3], 0)``).  If possible, slices should be used instead
+of list of integers, since indexing with them returns a view rather
+than a copy and thus avoid unnecessary processing and memory allocation.
 
 .. note:: In the sample VDIF file, frames with even thread IDs have header
    timestamps that are offset from the odd-ID ones.  This is a known error in
@@ -404,7 +398,7 @@ offers wider compatibility, or better fits the structure of the data.  As an
 example, we convert the sample Mark 4 data to VDIF.
 
 Since we don't have a VDIF header handy, we pass the relevant Mark 4 header
-values into `vdif.open <baseband.vdif.open>` to create one. 
+values into `vdif.open <baseband.vdif.open>` to create one.
 
     >>> import baseband.mark4 as mark4
     >>> from baseband.data import SAMPLE_MARK4
@@ -445,6 +439,6 @@ For file format conversion in general, we have to consider how to properly
 scale our data to make the best use of the dynamic range of the new encoded
 format. For VLBI formats like VDIF, Mark 4 and Mark 5B, samples of the same
 size have the same scale, which is why we did not have to rescale our data when
-writing 2-bits-per-sample Mark 4 data to a 2-bits-per-sample VDIF file. 
+writing 2-bits-per-sample Mark 4 data to a 2-bits-per-sample VDIF file.
 Rescaling is necessary, though, to convert DADA or GSB to VDIF.  For examples
 of rescaling, see the ``baseband/tests/test_conversion.py`` file.

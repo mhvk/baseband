@@ -395,18 +395,16 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
 
             # Set decoded value for invalid data.
             self._frame.invalid_data_value = fill_value
-            # Decode data into array.
-            data = self._frame.data
-            if self.subset:
-                data = data[(slice(None),) + self.subset]
-            # Squeeze it if necessary.
-            if self.squeeze:
-                data = data.squeeze()
-            # Copy relevant data from frame into output.
+            # Determine appropriate slice to decode.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            out[sample:sample + nsample] = data[sample_offset:
-                                                sample_offset + nsample]
+            data_slice = slice(sample_offset, sample_offset + nsample)
+            if self.subset:
+                data_slice = (data_slice,) + self.subset
+            # Copy relevant data from frame into output.
+            out[sample:sample + nsample] = (
+                self._frame.data[data_slice].squeeze() if self.squeeze else
+                self._frame.data[data_slice])
             self.offset += nsample
             count -= nsample
 

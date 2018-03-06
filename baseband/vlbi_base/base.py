@@ -59,47 +59,48 @@ class VLBIStreamBase(VLBIFileBase):
         self.samples_per_frame = samples_per_frame
         self.sample_rate = sample_rate
         self.offset = 0
+
         if self._sample_shape_maker is not None:
             self._unsliced_shape = self._sample_shape_maker(*unsliced_shape)
         else:
             self._unsliced_shape = unsliced_shape
+
         self._squeeze = bool(squeeze)
+
         if subset is None:
-            self._subset = None
             subset_wrapints = (slice(None),)
         else:
-            self._subset, subset_wrapints = self._get_subset(subset)
+            # Check if enclosing structure is a tuple.
+            if not isinstance(subset, tuple):
+                subset = (subset,)
+            subset_wrapints = self._wrap_subset(subset)
+            # If we don't squeeze, use subset_wrapints to keep numpy from
+            # concatenating dimensions subset to length unity.
+            if not self.squeeze:
+                subset = subset_wrapints
+        self._subset = subset
         self._sample_shape = self._get_sample_shape(subset_wrapints)
 
     @property
     def squeeze(self):
-        """Whether data arrays have arrays with length unity removed.
+        """Whether data arrays have dimensions with length unity removed.
 
-        If `True`, such dimensions are removed in reading, and added back in
-        writing.  Set by the class initializer."""
+        If `True`, data read out has such dimensions removed, and data
+        passed in for writing has them inserted.
+        """
         return self._squeeze
 
-    def _get_subset(self, subset):
-        # Check if enclosing structure is a tuple.
-        if not isinstance(subset, tuple):
-            subset = (subset,)
-
-        # Calculate subset_wrapints, where lone ints are replaced with slices.
-        subset_wrapints = ()
+    def _wrap_subset(self, subset):
+        """Creates subset where lone integers are replaced with slices."""
+        subset_wrapints = []
         for item in subset:
             try:
                 i = item.__index__()
-            except Exception:
-                subset_wrapints += (item,)
+            except (AttributeError, TypeError):
+                subset_wrapints.append(item)
             else:
-                subset_wrapints += (slice(i, (None if i == -1
-                                              else i + 1)),)
-
-        # If we don't squeeze, use subset_wrapints to keep numpy from
-        # concatenating dimensions subset to length unity.
-        if not self.squeeze:
-            subset = subset_wrapints
-        return subset, subset_wrapints
+                subset_wrapints.append(slice(i, (None if i == -1 else i + 1)))
+        return tuple(subset_wrapints)
 
     @property
     def subset(self):
@@ -111,16 +112,14 @@ class VLBIStreamBase(VLBIFileBase):
         return self._subset
 
     def _get_sample_shape(self, subset_wrapints):
-        # Sanity check that we subset fewer dimensions than data has.
-        assert len(subset_wrapints) <= len(self._unsliced_shape), (
-            "attempting to subset more dimensions than data has.")
         # Extract sample_shape by creating a dummy sample and indexing it
         # with subset_wrapints.
         dummy_sample = np.empty(self._unsliced_shape)
         try:
             dummy_subsample = dummy_sample[subset_wrapints]
-        except Exception:
-            raise TypeError("subset cannot be used to set sample shape.")
+        except IndexError as exc:
+            exc.args += ("subset cannot be used to set sample shape.",)
+            raise exc
         sample_shape = dummy_subsample.shape
         # Check no slice is out of bounds.
         assert 0 not in sample_shape, ("subset is out of bounds of "
@@ -267,9 +266,9 @@ class VLBIStreamBase(VLBIFileBase):
                 "    sample_rate={s.sample_rate},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape}, bps={s.bps},\n"
-                "    {t}start_time={s.start_time.isot}>"
-                .format(s=self, t=('subset={0}, '.format(self.subset)
-                                   if self.subset else '')))
+                "    {sub}start_time={s.start_time.isot}>"
+                .format(s=self, sub=('subset={0}, '.format(self.subset)
+                                     if self.subset else '')))
 
 
 class VLBIStreamReaderBase(VLBIStreamBase):
