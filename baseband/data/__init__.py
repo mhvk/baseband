@@ -46,11 +46,15 @@ Created from a EVN/WSRT PSR B1957+20 observation.
 SAMPLE_VDIF = _full_path('sample.vdif')
 """VDIF sample. 8 threads, bps=2.
 
-Created from a EVN/VLBA PSR B1957+20 observation.
+Created from a EVN/VLBA PSR B1957+20 observation.  Timestamps of frames with
+even thread IDs have been corrected to be consistent with odd-ID frames.
+"""
 
-Frames with even thread IDs have header timestamps that are offset from the
-odd-ID ones.  Timestamps from only odd-ID frames are used in the test suite and
-documentation.
+SAMPLE_VLBI_VDIF = _full_path('sample_vlbi.vdif')
+"""VDIF sample. 8 threads, bps=2.
+
+Created from a EVN/VLBA PSR B1957+20 observation.  Uncorrected version of
+SAMPLE_VDIF.
 """
 
 SAMPLE_MWA_VDIF = _full_path('sample_mwa.vdif')

@@ -310,10 +310,6 @@ Generally, ``subset`` accepts any object that can be used to `index
 of list of integers, since indexing with them returns a view rather
 than a copy and thus avoid unnecessary processing and memory allocation.
 
-.. note:: In the sample VDIF file, frames with even thread IDs have header
-   timestamps that are offset from the odd-ID ones.  This is a known error in
-   the sample file, and why we only subset odd-ID frames in the examples above.
-
 .. _getting_started_writing:
 
 Writing to Files and Format Conversion
