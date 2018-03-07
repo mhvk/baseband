@@ -129,10 +129,6 @@ For small files, one could just do::
 
 This copies everything to memory, though, and some header information is lost.
 
-.. note:: In the sample VDIF file, frames with even thread IDs have header
-   timestamps that are offset from the odd-ID ones.  This is a known error in
-   the sample file.
-
 .. _vdif_troubleshooting:
 
 Troubleshooting

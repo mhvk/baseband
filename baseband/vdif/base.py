@@ -302,17 +302,16 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         decoded data.
     """
 
-    def __init__(self, fh_raw, subset=None, sample_rate=None,
-                 squeeze=True):
+    def __init__(self, fh_raw, subset=None, sample_rate=None, squeeze=True):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
         header = VDIFHeader.fromfile(fh_raw)
+        # TODO: make this a bit less ugly?  Maybe don't read frameset twice?
+        fh_raw.seek(0)
         # Now also read the first frameset, since we need to know how many
         # threads there are, and what the frameset size is. For this purpose,
         # pre-attach the file handle (it will just get reset anyway).
-        # TODO: make this a bit less ugly?  Maybe don't read frameset twice?
-        fh_raw.seek(0)
         self.fh_raw = fh_raw
         self._frameset = self.read_frameset()
         thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
@@ -328,7 +327,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             self._thread_ids = np.atleast_1d(thread_ids).tolist()
             self.fh_raw.seek(0)
             self._frameset = self.read_frameset(self._thread_ids)
-            self._header0 = self._frameset.frames[0].header
         else:
             self._thread_ids = thread_ids
 

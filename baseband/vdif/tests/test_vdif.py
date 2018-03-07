@@ -9,9 +9,9 @@ import astropy.units as u
 from astropy.tests.helper import catch_warnings
 
 from ... import vdif, vlbi_base
-from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_MWA_VDIF as SAMPLE_MWA,
+from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_VLBI_VDIF as
+                     SAMPLE_VLBI, SAMPLE_MWA_VDIF as SAMPLE_MWA,
                      SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME)
-
 
 # Comparisn with m5access routines (check code on 2015-MAY-30) on vlba.m5a,
 # which contains the first 16 frames from evn/Fd/GP052D_FD_No0006.m5a.
@@ -693,6 +693,21 @@ class TestVDIF(object):
         with pytest.raises(ValueError):
             # missing w or r
             vdif.open('ts.dat', 's')
+
+
+def test_vlbi_vdif():
+    """Tests SAMPLE_VLBI, which is SAMPLE_VDIF with uncorrected timestamps."""
+    with vdif.open(SAMPLE_VLBI, 'rs') as fh, \
+            vdif.open(SAMPLE_FILE, 'rs') as fhc:
+        assert fh.sample_rate == 32*u.MHz
+        assert fh.start_time == fh.header0.time
+        assert fh.start_time == fhc.start_time
+        assert fh.size == 40000
+        assert abs(fh.stop_time - fh._last_header.time - (
+            fh.samples_per_frame / fh.sample_rate)) < 1. * u.ns
+        assert abs(fh.stop_time - fh.start_time -
+                   (fh.size / fh.sample_rate)) < 1. * u.ns
+        assert np.all(fh.read() == fhc.read())
 
 
 def test_mwa_vdif():
