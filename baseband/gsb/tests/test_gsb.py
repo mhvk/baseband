@@ -572,6 +572,13 @@ class TestGSB(object):
             assert fh_r.size == fh_r.samples_per_frame
             assert fh_r._last_header == fh_r.header0
 
+        # Test not passing a sample rate and samples per frame to reader
+        # (can't test reading, since the sample file is tiny).
+        with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP) as fh_r:
+            assert fh_r.sample_rate == (100. / 3.) * u.MHz
+            assert fh_r.samples_per_frame == 2**23
+            assert fh_r._payloadsize == 2**22
+
     def test_phased_stream(self, tmpdir):
         bps = 8
         nchan = 512
@@ -723,6 +730,14 @@ class TestGSB(object):
             assert 'second-to-last entry' in str(w[0].message)
             assert fh_r.size == fh_r.samples_per_frame
             assert fh_r._last_header == fh_r.header0
+
+        # Test not passing a sample rate and samples per frame to reader
+        # (can't test reading, since the sample file is tiny).
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED) as fh_r:
+            assert fh_r.sample_rate == (fh_r.samples_per_frame *
+                                        (100. / 3. / 2.**23) * u.MHz)
+            assert fh_r.samples_per_frame == 2**13  # 2**23 / 1024
+            assert fh_r._payloadsize == 2**22
 
     def test_stream_invalid(self, tmpdir):
         with pytest.raises(ValueError):
