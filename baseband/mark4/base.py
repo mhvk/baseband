@@ -348,7 +348,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         last_header = super(Mark4StreamReader, self)._last_header
         # Infer the decade, assuming the end of the file is no more than
         # 4 years away from the start.
-        last_header.infer_decade(self.header0.time)
+        last_header.infer_decade(self.start_time)
         return last_header
 
     def read(self, count=None, fill_value=0., out=None):
@@ -414,7 +414,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         frame_nr = self.offset // self.samples_per_frame
         self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
         self._frame = self.read_frame(ntrack=self.header0.ntrack,
-                                      ref_time=self.header0.time)
+                                      ref_time=self.start_time)
         # Convert payloads to data array.
         self._frame_nr = frame_nr
 

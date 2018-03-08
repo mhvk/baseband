@@ -469,7 +469,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
                         mem_block=((self.header0['mem_block'] + frame_nr) % 8))
                 else:
                     self._header = self.header0.__class__.fromvalues(
-                        time=self.header0.time + time_offset)
+                        time=self.start_time + time_offset)
 
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample_end = sample_offset + nsample

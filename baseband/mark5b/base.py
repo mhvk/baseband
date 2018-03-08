@@ -226,7 +226,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         last_header = super(Mark5BStreamReader, self)._last_header
         # Infer kday, assuming the end of the file is no more than
         # 500 days away from the start.
-        last_header.infer_kday(self.header0.time)
+        last_header.infer_kday(self.start_time)
         return last_header
 
     def read(self, count=None, fill_value=0., out=None):
@@ -301,7 +301,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
         self._frame = self.read_frame(nchan=self._unsliced_shape.nchan,
-                                      bps=self.bps, ref_time=self.header0.time)
+                                      bps=self.bps, ref_time=self.start_time)
 
 
 class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
