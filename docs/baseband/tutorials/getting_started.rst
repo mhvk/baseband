@@ -1,11 +1,14 @@
 .. _getting_started:
 
+.. include:: ../tutorials/glossary_substitutions.rst
+
 ***************
 Getting Started
 ***************
 
-This tutorial covers the basic features of Baseband.  It assumes that Numpy and
-the Astropy units module have been imported::
+This tutorial covers the basic features of Baseband.  It assumes that 
+`NumPy <http://www.numpy.org/>`_ and the `Astropy`_ units module have been
+imported::
 
     >>> import numpy as np
     >>> import astropy.units as u
@@ -54,12 +57,12 @@ For the rest of this section, let's go back to using VDIF files.
 Decoding Data and the Sample File Pointer
 -----------------------------------------
 
-We gave `~baseband.vdif.open` the `'rs'` flag, which opens the file in
+We gave `~baseband.vdif.open` the ``'rs'`` flag, which opens the file in
 "stream reader" mode.  The function returns an instance of
 `~baseband.vdif.base.VDIFStreamReader`, a wrapper around `io.BufferedReader`
-that adds methods to decode files as data frames and seek to and read data
-samples.  To decode the first 12 data samples into an `~numpy.ndarray`, we
-would use the `~baseband.vdif.base.VDIFStreamReader.read` method::
+that adds methods to decode files as |data frames| and seek to and read data
+|samples|.  To decode the first 12 samples into a `~numpy.ndarray`, we would
+use the `~baseband.vdif.base.VDIFStreamReader.read` method::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> d = fh.read(12)
@@ -71,26 +74,27 @@ would use the `~baseband.vdif.base.VDIFStreamReader.read` method::
     array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
 As discussed in detail in the :ref:`VDIF section <vdif>`, VDIF files are
-sequences of "frames", each of which is comprised of a header (which holds
-information like the time at which the data was taken) and a block of
-data.  Multiple concurrent time streams can be stored within a single frame;
-each of these is called a "channel".  Moreover, groups of channels can be
-stored over multiple frames, each of which is called a "thread".  Our sample
-file is an "8-thread, single-channel file" (8 concurrent time streams with 1
-stream per frame), and in the example above, ``fh.read`` decoded the first 12
-samples from all 8 threads, mapping thread number to the second axis of the
-decoded data array.  Reading files with multiple threads and channels will
-produce 3-dimensional arrays.
+sequences of data frames, each of which is comprised of a :term:`header` (which
+holds information like the time at which the data was taken) and a
+:term:`payload`, or block of data.  Multiple concurrent time streams can be
+stored within a single frame; each of these is called a ":term:`channel`". 
+Moreover, groups of channels can be stored over multiple frames, each of which
+is called a ":term:`thread`".  Our sample file is an "8-thread, single-channel
+file" (8 concurrent time streams with 1 stream per frame), and in the example
+above, ``fh.read`` decoded the first 12 samples from all 8 threads, mapping
+thread number to the second axis of the decoded data array.  Reading files with
+multiple threads and channels will produce 3-dimensional arrays.
 
-If you want to know the shape of a single complete sample - the set of samples
-from all available threads, channels, etc., for a given point in time - it is
+If you want to know the shape of a :term:`complete sample` - the set of samples
+from all available threads and channels for one point in time - it is
 accessible through::
 
     >>> fh.sample_shape
     SampleShape(nthread=8)
 
-By default, dimensions of length unity are removed from the sample shape.  To
-retain them, we can pass ``squeeze=False`` to `~baseband.vdif.open`:
+By default, dimensions of length unity are |squeezed|, or removed from the
+sample shape.  To retain them, we can pass ``squeeze=False`` to
+`~baseband.vdif.open`:
 
     >>> fhns = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False)
     >>> fhns.sample_shape    # Sample shape now keeps channel dimension.
@@ -257,9 +261,9 @@ Reading Specific Components of the Data
 
 By default, ``fh.read()`` returns complete samples, i.e. with all
 available threads, polarizations or channels. If we were only interested in
-decoding specific components of the complete sample, we can select them by
-passing indexing objects to the ``subset`` keyword in open.  For example, if we
-only wanted thread 3 of the sample VDIF file::
+decoding a :term:`subset` of the complete sample, we can select specific
+components by passing indexing objects to the ``subset`` keyword in open.  For
+example, if we only wanted thread 3 of the sample VDIF file::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=3, squeeze=False)
     >>> fh.sample_shape

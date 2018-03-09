@@ -4,46 +4,50 @@
 DADA
 ****
 
-Distributed Acquisition and Data Analysis (DADA) format data files contain an
-ASCII header of typically 4096 bytes followed by a payload.
+Distributed Acquisition and Data Analysis (DADA) format data files contain a
+single :term:`data frame` consisting of an ASCII :term:`header` of typically
+4096 bytes followed by a :term:`payload`.
 
 .. _dada_usage:
 
 Usage
 =====
 
-This section covers DADA-specific features of Baseband.  Tutorials for general
-usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
-The examples below use the small sample file ``baseband/data/sample.dada``,
-and assume the `astropy.units` and `baseband.dada` modules have been imported::
+This section covers reading and writing DADA files with Baseband; general usage
+is covered in the :ref:`Using Baseband <using_baseband_toc>` section.  The
+examples below use the sample file ``baseband/data/sample.dada``, and the
+the `astropy.units` and `baseband.dada` modules::
 
     >>> from baseband import dada
     >>> import astropy.units as u
     >>> from baseband.data import SAMPLE_DADA
 
-Single files can be opened with :func:`~baseband.dada.open` in binary mode. 
-Dada files consist of just a single header and payload, and can be read into a
-single :class:`~baseband.dada.DADAFrame`.
+Single files can be opened with `~baseband.dada.open` in binary mode. 
+DADA files typically consist of just a single header and payload, and can be
+read into a single `~baseband.dada.DADAFrame`.
 
 ::
 
-    >>> fh = dada.open(SAMPLE_DADA, 'rb')
-    >>> frame = fh.read_frame()
+    >>> fb = dada.open(SAMPLE_DADA, 'rb')
+    >>> frame = fb.read_frame()
     >>> frame.shape
     (16000, 2, 1)
     >>> frame[:3].squeeze()
     array([[ -38.-38.j,  -38.-38.j],
            [ -38.-38.j,  -40. +0.j],
            [-105.+60.j,   85.-15.j]], dtype=complex64)
-    >>> fh.close()
+    >>> fb.close()
 
-Since the files can be quite large, the payload is mapped, so that if one
-accesses part of the data, only the corresponding parts of the encoded payload
-are loaded into memory (since the sample file is encoded using 8 bits, the
-above example thus loads 12 bytes into memory).
+Since the files can be quite large, the payload is mapped (with
+`numpy.memmap`), so that if one accesses part of the data, only the
+corresponding parts of the encoded payload are loaded into memory (since the
+sample file is encoded using 8 bits, the above example thus loads 12 bytes into
+memory).
 
 Opening in stream mode wraps the low-level routines such that reading and
-writing is in units of samples, and provides access to header information.
+writing is in units of samples, and provides access to header information.  For
+a full list of parameters that can be passed to `~baseband.dada.open` in
+stream mode, see its API entry.
 
 ::
 
@@ -83,6 +87,10 @@ even smaller size of the payload, to show how one can define multiple files.
     >>> (d == d2).all()
     True
     >>> fr.close()
+
+For a full list of parameters, including header keywords, that can be passed to
+`~baseband.dada.open` in stream writing mode, see the
+`~baseband.dada.base.DADAStreamWriter` API entry.
 
 .. _dada_api:
 

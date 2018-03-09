@@ -192,7 +192,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second (ie. the rate at which each
         channel of each polarization is sampled).  If not given, will be
-        inferred assuming the framerate is exactly 251.658240 ms.
+        inferred assuming the framerate is exactly 0.25165824 s.
     nchan : int, optional
         Number of channels. Default is `None`, which sets it to 1 for rawdump,
         512 for phased.
@@ -367,7 +367,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second (ie. the rate at which each
         channel of each polarization is sampled).  If not given, will be
-        inferred assuming the framerate is exactly 251.658240 ms.
+        inferred assuming the framerate is exactly 0.25165824 s.
     header : `~baseband.gsb.GSBHeader`, optional
         Header for the first frame, holding time information, etc.
     nchan : int, optional

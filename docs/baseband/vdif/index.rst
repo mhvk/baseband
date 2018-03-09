@@ -1,5 +1,7 @@
 .. _vdif:
 
+.. include:: ../tutorials/glossary_substitutions.rst
+
 ****
 VDIF
 ****
@@ -11,44 +13,38 @@ specifications are found in VDIF's `specification document
 
 .. _vdif_file_structure:
 
-VDIF File Structure
-===================
+File Structure
+==============
 
-A VDIF file or data transmission is composed of a sequence of **data frames**,
-each of which is comprised of a self-identifying data frame
-header followed by a sequence, or **payload**, of data covering a single time
-segment of observations from one or more frequency sub-bands.  The header
-is a pre-defined 32-bytes long, while the payload is task-specific and can
-range from 32 bytes to ~134 megabytes.  Both are little-endian and grouped
-into 32-bit **words**.  The first four words of a VDIF header hold the same
-information in all VDIF files, but the last four words hold optional
-user-defined data.  The layout of these four words is specified by the file's
-**extended-data version**, or EDV.  More detailed information on the header
-can be found in the :ref:`tutorial for supporting a new VDIF EDV <new_edv>`.
+A VDIF file is composed of |data frames|.  Each has a :term:`header` of eight
+32-bit words (32 bytes; the exception is the "legacy VDIF" format, which is
+four words, or 16 bytes, long), and a :term:`payload` that ranges from 32 bytes
+to ~134 megabytes.  Both are little-endian.  The first four words of a VDIF
+header hold the same information in all VDIF files, but the last four words
+hold optional user-defined data.  The layout of these four words is specified
+by the file's **extended-data version**, or EDV.  More detailed information on
+the header can be found in the :ref:`tutorial for supporting a new VDIF EDV
+<new_edv>`.
 
-A data frame may carry one or multiple frequency sub-bands or Fourier
-channels, and we refer to either of these as **channels** for short.  A sequence
-of data frames all carrying the same (set of) channels is called a **data
-thread**, denoted by its thread ID.  A data set consisting of multiple
-concurrent threads is transmitted or stored as a serial sequence of frames
-called a **data stream**.  The collection of frames that cover all threads for a
-single time segment - equivalently, all thread IDs for the same header time and
-frame number - is a **dataframe set** (or just "frame set").
+A data frame may carry one or multiple |channels|, and a :term:`stream` of data
+frames all carrying the same (set of) channels is known as a :term:`thread` and
+denoted by its thread ID.  The collection of frames representing the same time
+segment (and all possible thread IDs) is called a  :term:`data frameset` (or
+just "frameset").
 
-Strict time ordering of frames in the stream, while considered part of VDIF
-best practices, is not mandated, and cannot be guaranteed during data
-transmission over the internet.
+Strict time and thread ID ordering of frames in the stream, while considered
+part of VDIF best practices, is not mandated, and cannot be guaranteed during
+data transmission over the internet.
 
 .. _vdif_usage:
 
 Usage Notes
 ===========
 
-This section covers VDIF-specific features of Baseband.  Tutorials for general
+This section covers reading and writing VDIF files with Baseband; general
 usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
-The examples below use the small sample file ``baseband/data/sample.vdif``,
-and assume the `numpy`, `astropy.units`, and `baseband.vdif` modules have been
-imported::
+The examples below use the small sample file ``baseband/data/sample.vdif``, and
+the `numpy`, `astropy.units`, and `baseband.vdif` modules::
 
     >>> import numpy as np
     >>> from baseband import vdif
@@ -56,10 +52,10 @@ imported::
     >>> from baseband.data import SAMPLE_VDIF
 
 Simple reading and writing of VDIF files can be done entirely using
-:func:`~baseband.vdif.open`. Opening in binary mode provides a normal file
-reader, but extended with methods to read a :class:`~baseband.vdif.VDIFFrameSet`
+`~baseband.vdif.open`. Opening in binary mode provides a normal file
+reader, but extended with methods to read a `~baseband.vdif.VDIFFrameSet`
 data container for storing a frame set as well as
-:class:`~baseband.vdif.VDIFFrame` one for storing a single frame::
+`~baseband.vdif.VDIFFrame` one for storing a single frame::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rb')
     >>> fs = fh.read_frameset()
@@ -70,11 +66,14 @@ data container for storing a frame set as well as
     (20000, 1)
     >>> fh.close()
 
-As with other formats, ``fr.data`` is a read-only property of the frame.
+(As with other formats, ``fr.data`` is a read-only property of the frame.)
 
 Opening in stream mode wraps the low-level routines such that reading
 and writing is in units of samples.  It also provides access to header
-information::
+information.  For a full list of parameters that can be passed to
+`~baseband.vdif.open` in stream mode, see its API entry.
+
+::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> fh
@@ -127,7 +126,10 @@ For small files, one could just do::
     ...                   nthread=fr.sample_shape.nthread) as fw:
     ...     fw.write(fr.read())
 
-This copies everything to memory, though, and some header information is lost.
+This copies everything to memory, though, and some header information is lost. 
+For a full list of parameters, including header keywords, that can be passed to
+`~baseband.vdif.open` in stream writing mode, see the
+`~baseband.vdif.base.Mark4StreamWriter` API entry.
 
 .. _vdif_troubleshooting:
 
@@ -135,10 +137,10 @@ Troubleshooting
 ===============
 
 In situations where the VDIF files being handled are corrupted or modified
-in an unusual way, using :func:`~baseband.vdif.open` will likely lead
-either to an exception being raised or to unexpected behavior.  In such
-cases, it may still be possible to read in the data.  Below, we provide a
-few solutions and workarounds to do so.
+in an unusual way, using `~baseband.vdif.open` will likely lead to an
+exception being raised or to unexpected behavior.  In such cases, it may still
+be possible to read in the data.  Below, we provide a few solutions and
+workarounds to do so.
 
 .. note::
     This list is certainly incomplete.   If you have an issue (solved
@@ -148,7 +150,7 @@ few solutions and workarounds to do so.
 AssertionError when checking EDV in header ``verify`` function
 --------------------------------------------------------------
 
-All VDIF header classes (other than :class:`~baseband.vdif.header.VDIFLegacyHeader`)
+All VDIF header classes (other than `~baseband.vdif.header.VDIFLegacyHeader`)
 check, using their ``verify`` function, that the EDV read from file matches
 the class EDV.  If they do not, the following line
 
@@ -159,7 +161,7 @@ supported by Baseband, support can be added by implementing a custom header
 class.  If the EDV is supported, but the header deviates from the format
 found in the `VLBI.org EDV registry <http://www.vlbi.org/vdif/>`_, the
 best solution is to create a custom header class, then override the
-subclass selector in :class:`~baseband.vdif.header.VDIFHeader`.  Tutorials
+subclass selector in `~baseband.vdif.header.VDIFHeader`.  Tutorials
 for doing either can be found :ref:`here <new_edv>`.
 
 EOFError encountered in ``_get_frame_rate`` when reading
@@ -168,11 +170,11 @@ EOFError encountered in ``_get_frame_rate`` when reading
 When the sample rate is not input by the user and cannot be deduced from header
 information (if EDV = 1 or, the sample rate is found in the header), Baseband
 tries to determine the frame rate using the private method ``_get_frame_rate``
-in :class:`~baseband.vdif.base.VDIFStreamReader` (and then multiply by the
+in `~baseband.vdif.base.VDIFStreamReader` (and then multiply by the
 samples per frame to obtain the sample rate).  This function raises `EOFError`
 if the file contains less than one second of data, or is corrupt.  In either
 case the file can be opened still by explicitly passing in the sample rate to
-:func:`~baseband.vdif.open` via the `sample_rate` argument.
+`~baseband.vdif.open` via the ``sample_rate`` keyword.
 
 .. _vdif_api:
 

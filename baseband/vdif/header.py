@@ -281,7 +281,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     @property
     def bps(self):
-        """Bits per sample (adding bits for imaginary and real for complex)."""
+        """Bits per elementary sample."""
         return self['bits_per_sample'] + 1
 
     @bps.setter
@@ -291,7 +291,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     @property
     def nchan(self):
-        """Number of channels in frame."""
+        """Number of channels in the frame."""
         return 2**self['lg2_nchan']
 
     @nchan.setter
@@ -302,7 +302,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     @property
     def samples_per_frame(self):
-        """Number of complete samples encoded in the frame."""
+        """Number of complete samples in the frame."""
         # Values are not split over word boundaries.
         values_per_word = 32 // self.bps // (2 if self['complex_data'] else 1)
         # samples are not split over payload boundaries.
