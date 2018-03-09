@@ -10,6 +10,7 @@ For the VDIF specification, see http://www.vlbi.org/vdif
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+from collections import OrderedDict
 import numpy as np
 
 from ..vlbi_base.frame import VLBIFrameBase
@@ -233,14 +234,15 @@ class VDIFFrameSet(object):
         """
         header0 = VDIFHeader.fromfile(fh, edv, verify)
         edv = header0.edv
+        frame_nr = header0['frame_nr']
 
-        frames = []
+        frames = OrderedDict()
         header = header0
-        while header['frame_nr'] == header0['frame_nr']:
-            if thread_ids is None or header['thread_id'] in thread_ids:
-                frames.append(
-                    VDIFFrame(header, VDIFPayload.fromfile(fh, header=header),
-                              verify=verify))
+        while header['frame_nr'] == frame_nr:
+            thread_id = header['thread_id']
+            if thread_ids is None or thread_id in thread_ids:
+                payload = VDIFPayload.fromfile(fh, header=header)
+                frames[thread_id] = VDIFFrame(header, payload, verify=verify)
             else:
                 fh.seek(header.payloadsize, 1)
 
@@ -257,13 +259,13 @@ class VDIFFrameSet(object):
         if thread_ids and len(frames) < len(thread_ids):
             raise IOError("could not find all requested frames.")
 
+        # Turn dict of frames into a possibly sorted list.
         if sort:
-            # Sort by thread id, by user order if needed.
-            if thread_ids:
-                frames.sort(key=lambda frame:
-                            thread_ids.index(frame['thread_id']))
-            else:
-                frames.sort(key=lambda frame: frame['thread_id'])
+            if thread_ids is None:
+                thread_ids = sorted(frames.keys())
+            frames = [frames[thread_id] for thread_id in thread_ids]
+        else:
+            frames = list(frames.values())
 
         return cls(frames, header0)
 
