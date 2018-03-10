@@ -30,7 +30,7 @@ class TestGSB(object):
         with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh:
             header = gsb.GSBHeader.fromfile(fh, verify=True)
         assert header.mode == 'rawdump'
-        assert header['pc'] == '2015 04 27 18 45 00 0.000000240'
+        assert header['gps'] == '2015 04 27 18 45 00 0.000000240'
         # Includes UTC offset.
         assert abs(header.time -
                    Time('2015-04-27T13:15:00.000000240')) < 1.*u.ns
