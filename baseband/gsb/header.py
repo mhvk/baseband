@@ -193,7 +193,7 @@ class GSBHeader(VLBIHeaderBase):
             if cls._mode is not None:
                 mode = cls._mode
             else:
-                if set(kwargs.keys()) & {'gps', 'gps_time',
+                if set(kwargs.keys()) & {'pc', 'pc_time',
                                          'seq_nr', 'mem_block'}:
                     mode = 'phased'
                 else:
@@ -207,7 +207,7 @@ class GSBHeader(VLBIHeaderBase):
             if cls._mode is not None:
                 mode = cls._mode
             else:
-                if set(kwargs.keys()) & {'gps', 'seq_nr', 'mem_block'}:
+                if set(kwargs.keys()) & {'pc', 'seq_nr', 'mem_block'}:
                     mode = 'phased'
                 else:
                     mode = 'rawdump'
@@ -249,11 +249,42 @@ class GSBRawdumpHeader(GSBHeader):
 
     _mode = 'rawdump'
     _number_of_words = 7
-    _pc_time_precision = 9
-    _properties = ('pc_time', 'time')
+    _gps_time_precision = 9
+    _properties = ('gps_time', 'time')
 
     _header_parser = HeaderParser(
-        (('pc', (0, 7, ' '.join, str_split)),),
+        (('gps', (0, 7, ' '.join, str_split)),),
+        make_parser=make_parser,
+        make_setter=make_setter,
+        get_default=get_default)
+
+    @property
+    def gps_time(self):
+        return Time(self['gps'], format='gsb',
+                    precision=self._gps_time_precision) - self.utc_offset
+
+    @gps_time.setter
+    def gps_time(self, time):
+        t = time + self.utc_offset
+        t.precision = self._gps_time_precision
+        self['gps'] = t.gsb
+
+    time = gps_time
+
+
+class GSBPhasedHeader(GSBRawdumpHeader):
+    """GSB phased header."""
+
+    _mode = 'phased'
+    _number_of_words = GSBRawdumpHeader._number_of_words + 7 + 2
+    _pc_time_precision = 6
+    _properties = ('time', 'pc_time') + GSBRawdumpHeader._properties
+
+    _header_parser = HeaderParser(
+        (('pc', (0, 7, ' '.join, str_split)),
+         ('gps', (7, 7, ' '.join, str_split)),
+         ('seq_nr', (14, 1, int, str, 1)),
+         ('mem_block', (15, 1, int, str, 1))),
         make_parser=make_parser,
         make_setter=make_setter,
         get_default=get_default)
@@ -268,35 +299,6 @@ class GSBRawdumpHeader(GSBHeader):
         t = time + self.utc_offset
         t.precision = self._pc_time_precision
         self['pc'] = t.gsb
-
-    time = pc_time
-
-
-class GSBPhasedHeader(GSBRawdumpHeader):
-    """GSB phased header."""
-
-    _mode = 'phased'
-    _number_of_words = GSBRawdumpHeader._number_of_words + 7 + 2
-    _pc_time_precision = 6
-    _properties = ('time', 'gps_time') + GSBRawdumpHeader._properties
-
-    _header_parser = GSBRawdumpHeader._header_parser + HeaderParser(
-        (('gps', (7, 7, ' '.join, str_split)),
-         ('seq_nr', (14, 1, int, str, 1)),
-         ('mem_block', (15, 1, int, str, 1))),
-        make_parser=make_parser,
-        make_setter=make_setter,
-        get_default=get_default)
-
-    @property
-    def gps_time(self):
-        return Time(self['gps'], format='gsb', precision=9) - self.utc_offset
-
-    @gps_time.setter
-    def gps_time(self, time):
-        t = time + self.utc_offset
-        t.precision = 9
-        self['gps'] = t.gsb
 
     @property
     def time(self):
