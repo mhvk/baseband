@@ -542,7 +542,7 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def bps(self):
-        """Number of bits per sample (either 1 or 2).
+        """Bits per elementary sample (either 1 or 2).
 
         If set, combined with ``fanout`` and ``ntrack`` to updates
         ``magnitude_bit`` for all tracks.

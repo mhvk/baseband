@@ -24,6 +24,7 @@ Using Baseband
    :maxdepth: 1
 
    tutorials/getting_started
+   tutorials/glossary
 
 .. _specific_file_formats_toc:
 

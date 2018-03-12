@@ -312,7 +312,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def bps(self):
-        """Bits per sample (or real/imaginary part)."""
+        """Bits per elementary sample."""
         return self['NBIT']
 
     @bps.setter

@@ -194,7 +194,7 @@ class VLBIStreamBase(VLBIFileBase):
 
     @property
     def bps(self):
-        """Number of bits for each part (real or imaginary) of a sample."""
+        """Bits per elementary sample."""
         return self._bps
 
     @property
