@@ -442,3 +442,16 @@ size have the same scale, which is why we did not have to rescale our data when
 writing 2-bits-per-sample Mark 4 data to a 2-bits-per-sample VDIF file.
 Rescaling is necessary, though, to convert DADA or GSB to VDIF.  For examples
 of rescaling, see the ``baseband/tests/test_conversion.py`` file.
+
+.. _getting_started_multifile:
+
+Reading or Writing to a Sequence of Files
+=========================================
+
+Data from one continuous observation is often spread over a sequence of files. 
+The `~baseband.helpers.sequentialfile` module is available for reading in a
+sequence as if it were one contiguous file.  Simple usage examples can be found
+in the :ref:`Sequential File <sequential_file>` section.  DADA data is so
+often stored in a file sequence that reading a time-ordered list of filenames
+is built into `baseband.dada.open`; for details, see the `its API entry
+<baseband.dada.open>`.

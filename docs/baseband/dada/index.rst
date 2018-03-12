@@ -66,8 +66,10 @@ stream mode, see its API entry.
            [-105.+60.j,   85.-15.j]], dtype=complex64)
     >>> fh.close()
 
-To set up a file for writing as a stream is possible as well.  Here, we use an
-even smaller size of the payload, to show how one can define multiple files.
+To set up a file for writing as a stream is possible as well.  For a full list
+of parameters, including header keywords, that can be passed to
+`~baseband.dada.open` in stream writing mode, see the
+`~baseband.dada.base.DADAStreamWriter` API entry.
 
 ::
 
@@ -88,9 +90,18 @@ even smaller size of the payload, to show how one can define multiple files.
     True
     >>> fr.close()
 
-For a full list of parameters, including header keywords, that can be passed to
-`~baseband.dada.open` in stream writing mode, see the
-`~baseband.dada.base.DADAStreamWriter` API entry.
+Here, we have used an even smaller size of the payload, to show how one can
+define multiple files.  DADA data are typically stored in sequences of files. 
+If, in place of a single filename, one passes a time-ordered list or tuple of
+filenames to `~baseband.dada.open`, it uses |sequentialfile.open| to read or
+write to them as a single contiguous file.  If, as above, one passes a template
+string, `~baseband.dada.open` uses `~baseband.dada.base.DADAFileNameSequencer`
+to create a subscriptable filename generator, which is then passed to
+|sequentialfile.open|.  For further details, and usage examples, see the
+`~baseband.dada.open` and `~baseband.dada.base.DADAFileNameSequencer` API
+entries.
+
+.. |sequentialfile.open| replace:: `sequentialfile.open <baseband.helpers.sequentialfile.open>`
 
 .. _dada_api:
 

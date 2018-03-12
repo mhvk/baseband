@@ -275,9 +275,9 @@ def open(files, mode='rb', file_size=None, opener=None):
     Parameters
     ----------
     files : list, tuple, or other iterable of str, filehandle
-        The contains the names of the underlying files that should be combined.
-        If not a list or tuple, it should allow indexing with positive indices,
-        and raise `IndexError` if these are out of range.
+        Contains the names of the underlying files that should be combined,
+        ordered in time.  If not a list or tuple, it should allow indexing with
+        positive indices, and raise `IndexError` if these are out of range.
     mode : str, optional
         The mode with which the files should be opened (default: 'rb').
     file_size : int, optional
@@ -297,6 +297,9 @@ def open(files, mode='rb', file_size=None, opener=None):
     Methods other than ``read``, ``write``, ``seek``, ``tell``, and ``close``
     are tried on the underlying file.  This implies, e.g., ``readline`` is
     possible, though the line cannot span multiple files.
+
+    The reader assumes the sequence of files is **contiguous in time**, ie.
+    with no gaps in the data.
     """
     if 'r' in mode:
         if file_size is not None:
