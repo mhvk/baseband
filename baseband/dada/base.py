@@ -427,32 +427,25 @@ Filehandle
 # Need to wrap the opener to be able to deal with file lists or templates.
 # TODO: move this up to the opener??
 def open(name, mode='rs', subset=None, header=None, **kwargs):
+    # If sequentialfile object, check that it's opened properly.
+    if isinstance(name, sf.SequentialFileBase):
+        assert (('r' in mode and name.mode == 'rb') or
+                ('w' in mode and name.mode == 'w+b')), (
+                    "open only accepts sequential files opened in 'rb' mode "
+                    "for reading or 'w+b' mode for writing.")
     is_template = isinstance(name, six.string_types) and ('{' in name and
                                                           '}' in name)
     is_sequence = isinstance(name, (tuple, list))
-    is_sequentialfile = isinstance(name, (sf.SequentialFileReader,
-                                          sf.SequentialFileWriter))
 
     if 'b' not in mode:
         if header is None:
             if 'w' in mode:
-                # If sequentialfile object, check that it's opened for writing.
-                if is_sequentialfile:
-                    assert name.mode == 'w+b', (
-                        'open only accepts sequential files opened in '
-                        '\'w+b\' mode for writing.')
                 # For writing a header is required.
                 header = DADAHeader.fromvalues(**kwargs)
                 kwargs = {}
 
-            elif is_sequentialfile:
-                # If sequentialfile object, check that it's opened for reading.
-                assert name.mode == 'rb', ('open only accepts sequential '
-                                           'files opened in \'rb\' mode '
-                                           'for reading.')
-                header = {}
-
-            elif is_template and 'OBS_OFFSET' in name or 'obs_offset' in name:
+            elif is_template and ('OBS_OFFSET' in name or
+                                  'obs_offset' in name):
                 # For reading try reading header from first file if needed.
                 # We make a temporary file sequencer for this, as the real one
                 # will need the header file size.

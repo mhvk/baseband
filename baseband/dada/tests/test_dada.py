@@ -446,7 +446,12 @@ class TestDADA(object):
             assert fr.time == fr.stop_time
         assert np.all(data2 == data)
 
-        # Pass sequentialfile object to reader.
+        # Pass sequentialfile objects to reader.
+        with sf.open(filenames, 'w+b',
+                     file_size=(header.payloadsize + 4096)) as fraw, \
+                dada.open(fraw, 'ws', header=header) as fw:
+            fw.write(data)
+
         with sf.open(filenames, 'rb') as fraw, \
                 dada.open(fraw, 'rs') as fr:
             data3 = fr.read()
