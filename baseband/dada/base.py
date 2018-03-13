@@ -427,6 +427,12 @@ Filehandle
 # Need to wrap the opener to be able to deal with file lists or templates.
 # TODO: move this up to the opener??
 def open(name, mode='rs', subset=None, header=None, **kwargs):
+    # If sequentialfile object, check that it's opened properly.
+    if isinstance(name, sf.SequentialFileBase):
+        assert (('r' in mode and name.mode == 'rb') or
+                ('w' in mode and name.mode == 'w+b')), (
+                    "open only accepts sequential files opened in 'rb' mode "
+                    "for reading or 'w+b' mode for writing.")
     is_template = isinstance(name, six.string_types) and ('{' in name and
                                                           '}' in name)
     is_sequence = isinstance(name, (tuple, list))
@@ -435,14 +441,13 @@ def open(name, mode='rs', subset=None, header=None, **kwargs):
         if header is None:
             if 'w' in mode:
                 # For writing a header is required.
-                if 'nthread' in kwargs:
-                    kwargs.setdefault('npol', kwargs.pop('nthread'))
                 header = DADAHeader.fromvalues(**kwargs)
                 kwargs = {}
 
-            elif is_template and 'OBS_OFFSET' in name or 'obs_offset' in name:
-                # for reading try reading header from first file if needed.
-                # we make a temporary file sequencer for this, as the real one
+            elif is_template and ('OBS_OFFSET' in name or
+                                  'obs_offset' in name):
+                # For reading try reading header from first file if needed.
+                # We make a temporary file sequencer for this, as the real one
                 # will need the header file size.
                 kwargs = {key.upper(): value for key, value in kwargs.items()}
                 for key in ('FILE_NR', 'FRAME_NR', 'OBS_OFFSET', 'FILE_SIZE'):
@@ -475,7 +480,7 @@ def open(name, mode='rs', subset=None, header=None, **kwargs):
 open.__doc__ = opener.__doc__ + """\n
 Notes
 -----
-For streams, one can also pass in a list of files or a template string that
+For streams, one can also pass in a list of files, or a template string that
 can be formatted using 'frame_nr', 'obs_offset', and other header keywords
 (using :class:`~baseband.dada.base.DADAFileNameSequencer`).
 
@@ -489,4 +494,8 @@ first file name, before any header is read, and therefore the only keywords
 available are 'frame_nr', 'file_nr', and 'obs_offset', all of which are
 assumed to be zero for the first file. To avoid this restriction, pass in
 keyword arguments with values appropriate for the first file.
+
+One may also pass in a `~baseband.helpers.sequentialfile` object
+(opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
+cases it is practically identical to passing in a list or template.
 """

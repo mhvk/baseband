@@ -9,6 +9,7 @@ import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import catch_warnings
 from ... import dada
+from ...helpers import sequentialfile as sf
 from ..base import DADAFileNameSequencer
 from ...data import SAMPLE_DADA as SAMPLE_FILE
 
@@ -322,7 +323,7 @@ class TestDADA(object):
         h = self.header
         with dada.open(filename, 'ws', time=h.time, bps=h.bps,
                        complex_data=h.complex_data, sample_rate=h.sample_rate,
-                       payloadsize=32000, nthread=1, nchan=1) as fw:
+                       payloadsize=32000, npol=1, nchan=1) as fw:
             fw.write(self.payload.data[:, 0, 0])
             assert np.abs(fw.start_time - start_time) < 1.*u.ns
             assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
@@ -346,7 +347,7 @@ class TestDADA(object):
         data2d = np.array([data, -data]).transpose(1, 2, 0)
         with dada.open(filename, 'ws', time=h.time, bps=h.bps,
                        complex_data=h.complex_data, sample_rate=h.sample_rate,
-                       payloadsize=32000, nthread=2, nchan=2) as fw:
+                       payloadsize=32000, npol=2, nchan=2) as fw:
             fw.write(data2d)
             assert np.abs(fw.start_time - start_time) < 1.*u.ns
             assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
@@ -444,6 +445,17 @@ class TestDADA(object):
             data2 = fr.read()
             assert fr.time == fr.stop_time
         assert np.all(data2 == data)
+
+        # Pass sequentialfile objects to reader.
+        with sf.open(filenames, 'w+b',
+                     file_size=(header.payloadsize + 4096)) as fraw, \
+                dada.open(fraw, 'ws', header=header) as fw:
+            fw.write(data)
+
+        with sf.open(filenames, 'rb') as fraw, \
+                dada.open(fraw, 'rs') as fr:
+            data3 = fr.read()
+        assert np.all(data3 == data)
 
     def test_template_stream(self, tmpdir):
         start_time = self.header.time
