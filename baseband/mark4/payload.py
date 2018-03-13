@@ -273,7 +273,7 @@ class Mark4Payload(VLBIPayloadBase):
         """
         s = fh.read(header.payloadsize)
         if len(s) < header.payloadsize:
-            raise EOFError("Could not read full payload.")
+            raise EOFError("could not read full payload.")
         return cls(np.frombuffer(s, dtype=header.stream_dtype), header)
 
     @classmethod
@@ -282,7 +282,7 @@ class Mark4Payload(VLBIPayloadBase):
         if data.dtype.kind == 'c':
             raise ValueError("Mark4 format does not support complex data.")
         if header.nchan != data.shape[-1]:
-            raise ValueError("Header is for {0} channels but data has {1}"
+            raise ValueError("header is for {0} channels but data has {1}"
                              .format(header.nchan, data.shape[-1]))
         encoder = cls._encoders[header.nchan, header.bps, header.fanout]
         words = encoder(data)

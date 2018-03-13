@@ -164,7 +164,7 @@ class VDIFPayload(VLBIPayloadBase):
         """
         s = fh.read(header.payloadsize)
         if len(s) < header.payloadsize:
-            raise EOFError("Could not read full payload.")
+            raise EOFError("could not read full payload.")
         return cls(np.frombuffer(s, dtype=cls._dtype_word), header)
 
     @classmethod
@@ -188,10 +188,10 @@ class VDIFPayload(VLBIPayloadBase):
         complex_data = (data.dtype.kind == 'c')
         if header is not None:
             if header.nchan != nchan:
-                raise ValueError("Header is for {0} channels but data has {1}"
+                raise ValueError("header is for {0} channels but data has {1}"
                                  .format(header.nchan, data.shape[-1]))
             if header['complex_data'] != complex_data:
-                raise ValueError("Header is for {0} data but data is {1}"
+                raise ValueError("header is for {0} data but data is {1}"
                                  .format(*(('complex' if c else 'real') for c
                                            in (header['complex_data'],
                                                complex_data))))

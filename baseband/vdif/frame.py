@@ -255,7 +255,7 @@ class VDIFFrameSet(object):
             fh.seek(-header.size, 1)
 
         if thread_ids and len(frames) < len(thread_ids):
-            raise IOError("Could not find all requested frames.")
+            raise IOError("could not find all requested frames.")
 
         if sort:
             # Sort by thread id, by user order if needed.

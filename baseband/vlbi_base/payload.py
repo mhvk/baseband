@@ -58,10 +58,10 @@ class VLBIPayloadBase(object):
                       reduce(operator.mul, sample_shape, 1))
         self._coder = bps
         if self._size is not None and self._size != self.size:
-            raise ValueError("Encoded data should have length {0}"
+            raise ValueError("encoded data should have length {0}"
                              .format(self._size))
         if words.dtype != self._dtype_word:
-            raise ValueError("Encoded data should have dtype {0}"
+            raise ValueError("encoded data should have dtype {0}"
                              .format(self._dtype_word))
 
     @classmethod
@@ -79,11 +79,11 @@ class VLBIPayloadBase(object):
         """
         payloadsize = kwargs.pop('payloadsize', cls._size)
         if payloadsize is None:
-            raise ValueError("Payloadsize should be given as an argument "
+            raise ValueError("payloadsize should be given as an argument "
                              "if no default is defined on the class.")
         s = fh.read(payloadsize)
         if len(s) < payloadsize:
-            raise EOFError("Could not read full payload.")
+            raise EOFError("could not read full payload.")
         return cls(np.frombuffer(s, dtype=cls._dtype_word), *args, **kwargs)
 
     def tofile(self, fh):
@@ -222,7 +222,7 @@ class VLBIPayloadBase(object):
                                    step) if is_slice else o_start
 
             else:
-                raise TypeError("Do not know how to extract data when full "
+                raise TypeError("do not know how to extract data when full "
                                 "samples have {0} bits and words have {1} bits"
                                 .format(bpfs, bpw))
 
