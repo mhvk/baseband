@@ -144,8 +144,7 @@ number of binary files*.)
 Opening in stream mode allows timestamp and binary files to be read in
 concert to create data frames, and also wraps the low-level routines such that
 reading and writing is in units of samples, and provides access to header
-information.  For a full list of parameters that can be passed to
-`~baseband.gsb.open` in stream mode, see its API entry.
+information.
 
 When opening a rawdump file in stream mode, we pass the timestamp file as the
 first argument, and the binary file to the ``raw`` keyword.  As per above, we
@@ -235,10 +234,6 @@ simply uses the same time for both GPS and PC times.  Since the PC time can
 drift from the GPS time by several tens of milliseconds,
 ``test_phased.timestamp`` will not be identical to ``SAMPLE_GSB_PHASED``, even
 though we have written the exact same data to file.
-
-For a full list of parameters, including header keywords, that can be passed to
-`~baseband.gsb.open` in stream writing mode, see the
-`~baseband.gsb.base.GSBStreamWriter` API entry.
 
 .. _gsb_api:
 

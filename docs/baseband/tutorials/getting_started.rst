@@ -48,7 +48,7 @@ file formats.  When using ``open`` for Mark 4 and Mark 5B files, however, two
 keywords - ``ntrack``, and ``decade`` - may need to be set manually.  For these
 and VDIF, ``sample_rate`` may also need to be passed if it can't be read
 or inferred from the file.  Notes on such features and quirks of individual
-formats can be found in the docstrings of their ``open`` functions, and
+formats can be found in the API entries of their ``open`` functions, and
 within the :ref:`Specific file format <specific_file_formats_toc>`
 documentation.
 

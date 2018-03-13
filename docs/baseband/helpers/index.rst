@@ -22,8 +22,7 @@ file formats, there is a master `sequentialfile.open
 for reading or writing.  It returns sequential file objects that have ``read``,
 ``write``, ``seek``, ``tell``, and ``close`` methods that work identically to
 their single file object counterparts.  They additionally have ``memmap``
-methods to read or write to files through `numpy.memmap`.  For a full list of
-parameters that can be passed to |open|, please see its API entry.
+methods to read or write to files through `numpy.memmap`.
 
 As an example of how to use |open|, we write the data from the sample VDIF
 file ``baseband/data/sample.vdif`` into a sequence of two files - as the sample
@@ -80,17 +79,17 @@ We can also open the second file on its own and confirm it contains the second
 frameset of the sample file::
 
     >>> fsf = vdif.open(filenames[1], mode='rs', sample_rate=fh.sample_rate)
-    >>> dps = fh.fh_raw.seek(40256)    # Seek to start of second frameset.
-    >>> frameset = fh.read_frameset()
-    >>> fsf.header0.time == frameset.header0.time
+    >>> fh.seek(fh.size // 2)    # Seek to start of second frameset.
+    20000
+    >>> fsf.header0.time == fh.time
     True
-    >>> np.all(fsf.read() == frameset.data.transpose(1, 0, 2).squeeze())
+    >>> np.all(fsf.read() == fh.read())
     True
     >>> fsf.close()
     >>> fh.close()  # Close sample file.
 
 While `~baseband.helpers.sequentialfile` can be used for any format, since
-file sequences are common for DADA, it is **implicitly used** if a list of
+file sequences are common for DADA, it is implicitly used if a list of
 files or filename template is passed to `dada.open <baseband.dada.open>`. 
 See the DADA :ref:`Usage <dada_usage>` section for details.
 

@@ -89,9 +89,6 @@ we also must provide ``nchan``, ``sample_rate``, and ``ref_time`` or ``kday``::
     array([-3.316505, -1.      ,  1.      ], dtype=float32)
     >>> fh.close()
 
-For a full list of parameters that can be passed to `~baseband.mark5b.open` in
-stream mode, see its API entry.
-
 When writing to file, we again need to pass in ``sample_rate`` and ``nchan``,
 though time can either be passed explicitly or inferred from the header::
 
@@ -105,10 +102,6 @@ though time can either be passed explicitly or inferred from the header::
     >>> np.all(fh.read() == d)
     True
     >>> fh.close()
-
-For a full list of parameters, including header keywords, that can be passed to
-`~baseband.mark5b.open` in stream writing mode, see the
-`~baseband.mark5b.base.Mark4StreamWriter` API entry.
 
 .. _mark5b_api:
 
