@@ -182,9 +182,9 @@ class TestVDIF(object):
         assert headerX.bps == header.bps
         assert not headerX['complex_data']
         assert headerX.mutable is False
-        assert headerX.nonsense_0 == 2000000000
-        assert headerX.nonsense_1 == 100
-        assert headerX.nonsense_2 == 10000000
+        assert headerX['nonsense_0'] == 2000000000
+        assert headerX['nonsense_1'] == 100
+        assert headerX['nonsense_2'] == 10000000
 
     def test_decoding(self, tmpdir):
         """Check that look-up levels are consistent with mark5access."""
@@ -645,7 +645,7 @@ class TestVDIF(object):
         subset_md = (np.array([5, 3])[:, np.newaxis], np.array([0, 2]))
         with vdif.open(test_file, 'rs', subset=subset_md) as fhn:
             assert fhn.sample_shape == (2, 2)
-            thread_ids = [frame.header.thread_id for frame in
+            thread_ids = [frame.header['thread_id'] for frame in
                           fhn._frameset.frames]
             assert thread_ids == [5, 3]
             assert np.all(fhn.read() == data[(slice(None),) + subset_md])

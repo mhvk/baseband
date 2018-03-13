@@ -391,7 +391,7 @@ class TestDADAToVDIF1(object):
                        time=vh.time, npol=vnthread, bps=vh.bps,
                        payloadsize=vh.payloadsize*2, nchan=vh.nchan,
                        telescope=vh.station,
-                       complex_data=vh.complex_data) as fw:
+                       complex_data=vh['complex_data']) as fw:
             new_header = fw.header0
             fw.write(dv_data)
 
