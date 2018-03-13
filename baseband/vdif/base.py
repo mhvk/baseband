@@ -475,6 +475,8 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     def __init__(self, raw, nthread=1, sample_rate=None, header=None,
                  squeeze=True, **kwargs):
         if header is None:
+            if sample_rate is not None:
+                kwargs['sample_rate'] = sample_rate
             header = VDIFHeader.fromvalues(**kwargs)
         # No frame sets yet exist, so generate a sample shape from values.
         super(VDIFStreamWriter, self).__init__(

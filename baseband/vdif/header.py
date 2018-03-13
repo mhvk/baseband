@@ -208,7 +208,15 @@ class VDIFHeader(VLBIHeaderBase):
         # Some defaults that are not done by setting properties.
         kwargs.setdefault('legacy_mode', True if edv is False else False)
         kwargs['edv'] = edv
-        return super(VDIFHeader, cls).fromvalues(edv, **kwargs)
+        time = kwargs.pop('time', None)
+        sample_rate = kwargs.pop('sample_rate', None)
+        frame_nr = kwargs.get('frame_nr', None)
+        self = super(VDIFHeader, cls).fromvalues(edv, **kwargs)
+        if sample_rate is not None and 'sample_rate' in self._properties:
+            self.sample_rate = sample_rate
+        if time is not None:
+            self.set_time(time, sample_rate, frame_nr)
+        return self
 
     @classmethod
     def fromkeys(cls, **kwargs):
@@ -250,9 +258,9 @@ class VDIFHeader(VLBIHeaderBase):
             ``invalid_data``.
         """
         kwargs.update(mark5b_header)
-        return cls.fromvalues(edv=0xab, time=mark5b_header.time,
-                              bps=bps, nchan=nchan, complex_data=False,
-                              **kwargs)
+        return super(VDIFHeader, cls).fromvalues(
+            0xab, time=mark5b_header.time, bps=bps, nchan=nchan,
+            complex_data=False, **kwargs)
 
     # properties common to all VDIF headers.
     @property
