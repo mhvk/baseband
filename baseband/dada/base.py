@@ -24,12 +24,14 @@ class DADAFileNameSequencer:
     """List-like generator of filenames using a template.
 
     The template is formatted, filling in any items in curly brackets with
-    values from the header, as well as possibly a file number, indicated with
-    '{file_nr}'.  The value '{obs_offset}' is treated specially, in being
-    calculated using ``header['OBS_OFFSET'] + file_nr * header['FILE_SIZE']``.
+    values from the header, as well as possibly a file number equal to the
+    indexing value, indicated with '{file_nr}'.  The value '{obs_offset}' is
+    treated specially, in being calculated using ``header['OBS_OFFSET'] +
+    file_nr * header['FILE_SIZE']``, where ``header['FILE_SIZE']`` is the file
+    size in bytes.
 
     The length of the instance will be the number of files that exist that
-    match the template for increasing values of the file fumber.
+    match the template for increasing values of the file number.
 
     Parameters
     ----------
@@ -37,6 +39,7 @@ class DADAFileNameSequencer:
         Template to format to get specific filenames.
     header : dict-like
         Structure holding key'd values that are used to fill in the format.
+        Keys must be in all caps (eg. ``DATE``), as with DADA header keys.
 
     Examples
     --------
@@ -45,6 +48,10 @@ class DADAFileNameSequencer:
     >>> dfs = dada.base.DADAFileNameSequencer('a{file_nr:03d}.dada', {})
     >>> dfs[10]
     'a010.dada'
+    >>> dfs = dada.base.DADAFileNameSequencer(
+    ...     '{date}_{file_nr:03d}.dada', {'DATE': "2018-01-01"})
+    >>> dfs[10]
+    '2018-01-01_010.dada'
     >>> from baseband.data import SAMPLE_DADA
     >>> with open(SAMPLE_DADA, 'rb') as fh:
     ...     header = dada.DADAHeader.fromfile(fh)
@@ -482,7 +489,7 @@ Notes
 -----
 For streams, one can also pass in a list of files, or a template string that
 can be formatted using 'frame_nr', 'obs_offset', and other header keywords
-(using :class:`~baseband.dada.base.DADAFileNameSequencer`).
+(by `~baseband.dada.base.DADAFileNameSequencer`).
 
 For writing, one can mimic what is done at quite a few telescopes by using
 the template '{utc_start}_{obs_offset:016d}.000000.dada'.

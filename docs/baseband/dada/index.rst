@@ -45,11 +45,7 @@ sample file is encoded using 8 bits, the above example thus loads 12 bytes into
 memory).
 
 Opening in stream mode wraps the low-level routines such that reading and
-writing is in units of samples, and provides access to header information.  For
-a full list of parameters that can be passed to `~baseband.dada.open` in
-stream mode, see its API entry.
-
-::
+writing is in units of samples, and provides access to header information::
 
     >>> fh = dada.open(SAMPLE_DADA, 'rs')
     >>> fh
@@ -66,10 +62,7 @@ stream mode, see its API entry.
            [-105.+60.j,   85.-15.j]], dtype=complex64)
     >>> fh.close()
 
-To set up a file for writing as a stream is possible as well.  Here, we use an
-even smaller size of the payload, to show how one can define multiple files.
-
-::
+To set up a file for writing as a stream is possible as well::
 
     >>> from astropy.time import Time
     >>> fw = dada.open('{utc_start}.{obs_offset:016d}.000000.dada', 'ws',
@@ -88,9 +81,16 @@ even smaller size of the payload, to show how one can define multiple files.
     True
     >>> fr.close()
 
-For a full list of parameters, including header keywords, that can be passed to
-`~baseband.dada.open` in stream writing mode, see the
-`~baseband.dada.base.DADAStreamWriter` API entry.
+Here, we have used an even smaller size of the payload, to show how one can
+define multiple files.  DADA data are typically stored in sequences of files. 
+If, in place of a single filename, one passes a time-ordered list or tuple of
+filenames to `~baseband.dada.open`, it uses |sequentialfile.open| to read or
+write to them as a single contiguous file.  If, as above, one passes a template
+string, `~baseband.dada.open` uses `~baseband.dada.base.DADAFileNameSequencer`
+to create a subscriptable filename generator, which is then passed to
+|sequentialfile.open|.  (See API links for further details.)
+
+.. |sequentialfile.open| replace:: `sequentialfile.open <baseband.helpers.sequentialfile.open>`
 
 .. _dada_api:
 

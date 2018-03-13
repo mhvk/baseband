@@ -101,10 +101,7 @@ the number of tracks if not given explicitly), and wraps the
 low-level routines such that reading and writing is in units of samples.  It
 also provides access to header information.  Here we pass a reference
 `~astropy.time.Time` object within 4 years of the observation start time to
-``ref_time``, rather than a ``decade``.  For a full list of parameters that can
-be passed to `~baseband.mark4.open` in stream mode, see its API entry.
-
-::
+``ref_time``, rather than a ``decade``::
 
     >>> fh = mark4.open(SAMPLE_MARK4, 'rs', ref_time=Time('2013:100:23:00:00'))
     >>> fh
@@ -128,12 +125,7 @@ reader includes these overwritten samples as invalid data (zeros, by default)::
     True
 
 When writing to file, we need to pass in the sample rate in addition
-to ``decade``.  The number of tracks can be inferred from the header.
-For a full list of parameters, including header keywords, that can be
-passed to `~baseband.mark4.open` in stream writing mode, see the
-`~baseband.mark4.base.Mark4StreamWriter` API entry.
-
-::
+to ``decade``.  The number of tracks can be inferred from the header::
 
     >>> fw = mark4.open('sample_mark4_segment.m4', 'ws', header=frame.header,
     ...                 decade=2010, sample_rate=32*u.MHz)

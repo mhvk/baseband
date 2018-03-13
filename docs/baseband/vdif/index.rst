@@ -70,10 +70,7 @@ data container for storing a frame set as well as
 
 Opening in stream mode wraps the low-level routines such that reading
 and writing is in units of samples.  It also provides access to header
-information.  For a full list of parameters that can be passed to
-`~baseband.vdif.open` in stream mode, see its API entry.
-
-::
+information::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> fh
@@ -127,9 +124,6 @@ For small files, one could just do::
     ...     fw.write(fr.read())
 
 This copies everything to memory, though, and some header information is lost. 
-For a full list of parameters, including header keywords, that can be passed to
-`~baseband.vdif.open` in stream writing mode, see the
-`~baseband.vdif.base.Mark4StreamWriter` API entry.
 
 .. _vdif_troubleshooting:
 
