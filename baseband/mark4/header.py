@@ -348,7 +348,7 @@ class Mark4Header(Mark4TrackHeader):
         elif ntrack == 16:
             return ta[:, ::2, :] // 2
         else:
-            raise ValueError("Have Mark 4 track assignments only for "
+            raise ValueError("have Mark 4 track assignments only for "
                              "ntrack=32 or 64, not {0}".format(ntrack))
 
     @property
@@ -390,7 +390,7 @@ class Mark4Header(Mark4TrackHeader):
             stream = np.frombuffer(fh.read(size), dtype=dtype)
             assert len(stream) * dtype.itemsize == size
         except (ValueError, AssertionError):
-            raise EOFError("Could not read full Mark 4 Header.")
+            raise EOFError("could not read full Mark 4 Header.")
 
         words = stream2words(stream)
         self = cls(words, decade=decade, ref_time=ref_time, verify=verify)
@@ -685,7 +685,7 @@ class Mark4Header(Mark4TrackHeader):
                 h.set_time(t)
                 decades.add(h.decade)
             if len(decades) > 1:
-                raise ValueError("MarkHeader cannot have tracks that differ "
+                raise ValueError("Mark4Header cannot have tracks that differ "
                                  "in the decade of the time they were taken.")
             self.decade = decades.pop()
 
@@ -701,10 +701,10 @@ class Mark4Header(Mark4TrackHeader):
         try:
             new_words = self.words[:, item]
         except IndexError:
-            raise IndexError("Index {item} is out of bounds.")
+            raise IndexError("index {item} is out of bounds.")
 
         if not(1 <= new_words.ndim <= 2 and new_words.shape[0] == 5):
-            raise ValueError("Cannot extract {0} from {1} instance."
+            raise ValueError("cannot extract {0} from {1} instance."
                              .format(item, type(self)))
 
         if new_words.ndim == 1:

@@ -84,7 +84,7 @@ class SequentialFileBase(object):
         if shape is None:
             count = self.size - self.tell()
             if count % dtype.itemsize:
-                raise ValueError("Size of available data is not a "
+                raise ValueError("size of available data is not a "
                                  "multiple of the data-type size.")
             shape = (count // dtype.itemsize,)
         else:

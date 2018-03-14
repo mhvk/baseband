@@ -237,7 +237,7 @@ class HeaderParser(OrderedDict):
     def update(self, other):
         """Update the parser with the information from another one."""
         if not isinstance(other, HeaderParser):
-            raise TypeError("Can only update using a HeaderParser instance.")
+            raise TypeError("can only update using a HeaderParser instance.")
         super(HeaderParser, self).update(other)
         # Update the parsers rather than recalculate all the functions.
         self._parsers.update(other._parsers)
@@ -337,7 +337,7 @@ class VLBIHeaderBase(object):
             if not mutable:
                 self.words = tuple(self.words)
         else:
-            raise TypeError("Do not know how to set mutability of '.words' "
+            raise TypeError("do not know how to set mutability of '.words' "
                             "of class {0}".format(type(self.words)))
 
     @classmethod
@@ -406,7 +406,7 @@ class VLBIHeaderBase(object):
                 if item:
                     msg_parts.append(msg.format(item))
 
-            raise KeyError("Input list " + " and ".join(msg_parts))
+            raise KeyError("input list " + " and ".join(msg_parts))
 
         self.update(**kwargs)
         return self
@@ -439,7 +439,7 @@ class VLBIHeaderBase(object):
                     setattr(self, key, kwargs.pop(key))
 
             if kwargs:
-                warnings.warn("Some keywords unused in header update: {0}"
+                warnings.warn("some keywords unused in header update: {0}"
                               .format(kwargs))
 
         if verify:
@@ -462,7 +462,7 @@ class VLBIHeaderBase(object):
                            .format(self.__class__.__name__, item))
         except(TypeError, ValueError):
             if not self.mutable:
-                raise TypeError("Header is immutable. Set '.mutable` attribute"
+                raise TypeError("header is immutable. Set '.mutable` attribute"
                                 " or make a copy.")
             else:
                 raise

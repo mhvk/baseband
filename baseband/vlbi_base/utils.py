@@ -9,7 +9,7 @@ def bcd_decode(value):
         return int('{:x}'.format(value))
     except ValueError:  # Might be an array (older python versions)
         if not isinstance(value, np.ndarray):
-            raise ValueError("Invalid BCD encoded value {0}={1}."
+            raise ValueError("invalid BCD encoded value {0}={1}."
                              .format(value, hex(value)))
     except TypeError:  # Might still be an array (newer python versions)
         if not isinstance(value, np.ndarray):
@@ -23,7 +23,7 @@ def bcd_decode(value):
         if np.any(digit > 9):
             if not np.isscalar(digit):
                 value = value[digit > 9][0]
-            raise ValueError("Invalid BCD encoded value {0}={1}."
+            raise ValueError("invalid BCD encoded value {0}={1}."
                              .format(value, hex(value)))
         result += digit * factor
         factor *= 10

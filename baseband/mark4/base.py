@@ -287,13 +287,13 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         if ntrack is None:
             ntrack = self.determine_ntrack()
             assert ntrack is not None, (
-                "Could not automatically determine the number of tracks. "
+                "could not automatically determine the number of tracks. "
                 "Try passing in an explicit ntrack.")
             self.offset0 = self.fh_raw.tell()
         else:
             self.offset0 = self.find_frame(ntrack=ntrack)
             assert self.offset0 is not None, (
-                "Could not find a first frame using ntrack={}. Perhaps "
+                "could not find a first frame using ntrack={}. Perhaps "
                 "try ntrack=None for auto-determination.".format(ntrack))
         self._frame = self.read_frame(ntrack, decade=decade, ref_time=ref_time)
         self._frame_data = None

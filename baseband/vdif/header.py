@@ -372,7 +372,7 @@ class VDIFHeader(VLBIHeaderBase):
                 try:
                     sample_rate = self.sample_rate
                 except AttributeError:
-                    raise ValueError("Cannot calculate sample rate for this "
+                    raise ValueError("cannot calculate sample rate for this "
                                      "header. Pass it in explicitly.")
             offset = (frame_nr * self.samples_per_frame /
                       sample_rate).to_value(u.s)
@@ -417,7 +417,7 @@ class VDIFHeader(VLBIHeaderBase):
                     try:
                         sample_rate = self.sample_rate
                     except AttributeError:
-                        raise ValueError("Cannot calculate sample rate for "
+                        raise ValueError("cannot calculate sample rate for "
                                          "this header. Pass it in explicitly.")
                 framerate = sample_rate / self.samples_per_frame
                 frame_nr = int(round((frac_sec * framerate)
@@ -664,7 +664,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                 offset = 0.
             else:
                 if sample_rate is None:
-                    raise ValueError("Calculating the time for a non-zero "
+                    raise ValueError("calculating the time for a non-zero "
                                      "frame number requires a sample rate. "
                                      "Pass it in explicitly.")
                 offset = (frame_nr * self.samples_per_frame /

@@ -347,7 +347,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
                 template_header=self.header0,
                 maximum=maximum, forward=False)
             if last_header is None or raw_size - self.fh_raw.tell() > maximum:
-                raise ValueError("Corrupt VDIF? No thread_id={0} frame in "
+                raise ValueError("corrupt VDIF? No thread_id={0} frame in "
                                  "last {1} bytes."
                                  .format(self.header0['thread_id'], maximum))
 
