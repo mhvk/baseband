@@ -601,7 +601,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                       HeaderParser((('frame_length', (2, 0, 24, 1254)),)) +
                       HeaderParser(tuple(
                           ((k if k != 'frame_nr' else 'mark5b_frame_nr'),
-                           (v[0]+4,) + v[1:])
+                           (v[0] + 4,) + v[1:])
                           for (k, v) in Mark5BHeader._header_parser.items())))
 
     def verify(self):

@@ -153,7 +153,8 @@ class TestVLBIBase(object):
             self.header['bla']
         with pytest.raises(KeyError):
             self.header['bla'] = 1
-        assert self.header.x0_16_4 == 4
+        with pytest.raises(AttributeError):
+            self.header.x0_16_4
         with pytest.raises(AttributeError):
             self.header.xbla
 

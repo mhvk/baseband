@@ -332,7 +332,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         oldpos = fh.tell()
         header = header_template.fromfile(fh)
         frame_nr0 = header['frame_nr']
-        sec0 = header.seconds
+        sec0 = header['seconds']
         while header['frame_nr'] == frame_nr0:
             fh.seek(header.payloadsize, 1)
             header = header_template.fromfile(fh)
@@ -342,7 +342,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             fh.seek(header.payloadsize, 1)
             header = header_template.fromfile(fh)
 
-        if header.seconds != sec0 + 1:  # pragma: no cover
+        if header['seconds'] != sec0 + 1:  # pragma: no cover
             warnings.warn("header time changed by more than 1 second?")
 
         fh.seek(oldpos)

@@ -467,16 +467,6 @@ class VLBIHeaderBase(object):
             else:
                 raise
 
-    def __getattr__(self, attr):
-        """Get attribute, or, failing that, try to get key from header."""
-        try:
-            return super(VLBIHeaderBase, self).__getattribute__(attr)
-        except AttributeError:
-            if attr in self.keys():
-                return self[attr]
-            else:
-                raise
-
     def keys(self):
         return self._header_parser.keys()
 
