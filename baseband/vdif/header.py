@@ -210,12 +210,11 @@ class VDIFHeader(VLBIHeaderBase):
         kwargs['edv'] = edv
         time = kwargs.pop('time', None)
         sample_rate = kwargs.pop('sample_rate', None)
-        frame_nr = kwargs.get('frame_nr', None)
         self = super(VDIFHeader, cls).fromvalues(edv, **kwargs)
         if sample_rate is not None and 'sample_rate' in self._properties:
             self.sample_rate = sample_rate
         if time is not None:
-            self.set_time(time, sample_rate, frame_nr)
+            self.set_time(time, sample_rate)
         return self
 
     @classmethod
@@ -424,7 +423,8 @@ class VDIFHeader(VLBIHeaderBase):
                 if sample_rate is None:
                     try:
                         sample_rate = self.sample_rate
-                    except AttributeError:
+                        assert sample_rate.value != 0.
+                    except (AttributeError, AssertionError):
                         raise ValueError("cannot calculate sample rate for "
                                          "this header. Pass it in explicitly.")
                 framerate = sample_rate / self.samples_per_frame
