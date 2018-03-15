@@ -50,6 +50,13 @@ class TestVDIFMark5B(object):
             assert (header.samples_per_frame ==
                     10000 * 8 // m5pl.bps // m5pl.sample_shape.nchan)
 
+        # Check that we can handle > 512 Mbps sampling rate.
+        header3 = vdif.VDIFHeader.from_mark5b_header(
+            m5h2, nchan=m5pl.sample_shape.nchan, bps=m5pl.bps,
+            sample_rate=64*u.MHz)
+        assert header3.time == header2.time
+        assert header3['frame_nr'] == header2['frame_nr'] + 1
+
         # A copy might remove any `kday` keywords set, but should still work
         # (Regression test for #34)
         header_copy = header2.copy()
