@@ -208,7 +208,19 @@ class VDIFHeader(VLBIHeaderBase):
         # Some defaults that are not done by setting properties.
         kwargs.setdefault('legacy_mode', True if edv is False else False)
         kwargs['edv'] = edv
-        return super(VDIFHeader, cls).fromvalues(edv, **kwargs)
+        time = kwargs.pop('time', None)
+        sample_rate = kwargs.pop('sample_rate', None)
+        # Pop verify and pass on False so verify happens after time is set.
+        verify = kwargs.pop('verify', True)
+        kwargs['verify'] = False
+        self = super(VDIFHeader, cls).fromvalues(edv, **kwargs)
+        if sample_rate is not None and 'sample_rate' in self._properties:
+            self.sample_rate = sample_rate
+        if time is not None:
+            self.set_time(time, sample_rate=sample_rate)
+        if verify:
+            self.verify()
+        return self
 
     @classmethod
     def fromkeys(cls, **kwargs):
@@ -416,7 +428,8 @@ class VDIFHeader(VLBIHeaderBase):
                 if sample_rate is None:
                     try:
                         sample_rate = self.sample_rate
-                    except AttributeError:
+                        assert sample_rate.value != 0.
+                    except (AttributeError, AssertionError):
                         raise ValueError("cannot calculate sample rate for "
                                          "this header. Pass it in explicitly.")
                 framerate = sample_rate / self.samples_per_frame
@@ -636,7 +649,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         In the code, this is "unrounded" to give the exact time of the start
         of the frame for any total bit rate below 512 Mbps.  For rates above
         this value, it is no longer guaranteed that subsequent frames have
-        unique rates, and one should pass in an explicit frame rate instead.
+        unique rates, and one should pass in an explicit sample rate instead.
 
         Set frame_nr=0 to just get the header time from ref_epoch and seconds.
 
@@ -673,8 +686,12 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
-    def set_time(self, time):
+    def set_time(self, time, sample_rate=None):
         Mark5BHeader.set_time(self, time)
-        super(VDIFMark5BHeader, self).set_time(time, frame_nr=self['frame_nr'])
+        # Without a sample rate, we assume the frame number calculated
+        # by Mark5B header is correct; otherwise we calculate it here.
+        super(VDIFMark5BHeader, self).set_time(
+            time, sample_rate=sample_rate,
+            frame_nr=self['frame_nr'] if sample_rate is None else None)
 
     time = property(get_time, set_time)

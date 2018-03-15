@@ -79,6 +79,20 @@ class TestVDIF(object):
         # possible.  Note that we still have to give a lots of extra, less
         # directly useful parameters to get an *identical* header.
         header4 = vdif.VDIFHeader.fromvalues(
+            edv=header.edv, ref_epoch=header['ref_epoch'],
+            seconds=header['seconds'], frame_nr=header['frame_nr'],
+            samples_per_frame=header.samples_per_frame,
+            bps=header.bps, complex_data=header['complex_data'],
+            thread_id=header['thread_id'], station=header.station,
+            sampling_unit=header['sampling_unit'],
+            sampling_rate=header['sampling_rate'],
+            loif_tuning=header['loif_tuning'], dbe_unit=header['dbe_unit'],
+            if_nr=header['if_nr'], subband=header['subband'],
+            sideband=header['sideband'], major_rev=header['major_rev'],
+            minor_rev=header['minor_rev'], personality=header['personality'],
+            _7_28_4=header['_7_28_4'])
+        # The same header, but created by passing time and sample rate.
+        header4_usetime = vdif.VDIFHeader.fromvalues(
             edv=header.edv, time=header.time,
             samples_per_frame=header.samples_per_frame,
             station=header.station, sample_rate=header.sample_rate,
@@ -91,6 +105,7 @@ class TestVDIF(object):
             _7_28_4=header['_7_28_4'])
         assert header4 == header
         assert header4.mutable is True
+        assert header4 == header4_usetime
         header5 = header.copy()
         assert header5 == header
         assert header5.mutable is True
@@ -116,6 +131,42 @@ class TestVDIF(object):
         header6 = vdif.header.VDIFHeader.fromvalues(edv=100)
         assert isinstance(header6, vdif.header.VDIFBaseHeader)
         assert header6['edv'] == 100
+
+        # Make a new header to test passing time/sample rate.
+        headerT = header.copy()
+        headerT.time = header.time + 1. / framerate
+
+        # Test initializing EDV 0 with properties, but off of 1 second mark so
+        # frame_nr is used.
+        header8 = vdif.VDIFHeader.fromvalues(
+            edv=0, ref_epoch=headerT['ref_epoch'], seconds=headerT['seconds'],
+            frame_nr=headerT['frame_nr'], complex_data=headerT['complex_data'],
+            samples_per_frame=headerT.samples_per_frame, bps=headerT.bps,
+            station=headerT.station, thread_id=headerT['thread_id'])
+        assert header8['ref_epoch'] == headerT['ref_epoch']
+        assert header8['seconds'] == headerT['seconds']
+        assert header8['frame_nr'] == headerT['frame_nr']
+        # The same header, but created by passing time and sample rate.
+        header8_usetime = vdif.VDIFHeader.fromvalues(
+            edv=0, time=headerT.time, sample_rate=headerT.sample_rate,
+            complex_data=headerT['complex_data'], bps=headerT.bps,
+            samples_per_frame=headerT.samples_per_frame,
+            station=headerT.station, thread_id=headerT['thread_id'])
+        assert header8_usetime == header8
+        # Without a sample rate or frame_nr, cannot initialize using time.
+        with pytest.raises(ValueError):
+            vdif.VDIFHeader.fromvalues(
+                edv=0, time=headerT.time, complex_data=headerT['complex_data'],
+                bps=headerT.bps, samples_per_frame=headerT.samples_per_frame,
+                station=headerT.station, thread_id=headerT['thread_id'])
+
+        # Without a sample rate for EDV 1, 3, cannot initialize using time.
+        with pytest.raises(ValueError):
+            vdif.VDIFHeader.fromvalues(
+                edv=1, time=headerT.time, station=headerT.station,
+                samples_per_frame=headerT.samples_per_frame,
+                bps=headerT.bps, complex_data=headerT['complex_data'],
+                thread_id=headerT['thread_id'])
 
     def test_custom_header(self, tmpdir):
         # Custom header with an EDV that already exists
