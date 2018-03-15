@@ -133,7 +133,7 @@ class TestVDIF(object):
         assert header6['edv'] == 100
 
         # Make a new header to test passing time/sample rate.
-        headerT = header5.copy()
+        headerT = header.copy()
         headerT.time = header.time + 1. / framerate
 
         # Test initializing EDV 0 with properties, but off of 1 second mark so

@@ -210,11 +210,13 @@ class VDIFHeader(VLBIHeaderBase):
         kwargs['edv'] = edv
         time = kwargs.pop('time', None)
         sample_rate = kwargs.pop('sample_rate', None)
+        kwargs['verify'] = False
         self = super(VDIFHeader, cls).fromvalues(edv, **kwargs)
         if sample_rate is not None and 'sample_rate' in self._properties:
             self.sample_rate = sample_rate
         if time is not None:
-            self.set_time(time, sample_rate)
+            self.set_time(time, sample_rate=sample_rate)
+        self.verify()
         return self
 
     @classmethod
@@ -257,9 +259,9 @@ class VDIFHeader(VLBIHeaderBase):
             ``invalid_data``.
         """
         kwargs.update(mark5b_header)
-        return super(VDIFHeader, cls).fromvalues(
-            0xab, time=mark5b_header.time, bps=bps, nchan=nchan,
-            complex_data=False, **kwargs)
+        return cls.fromvalues(edv=0xab, time=mark5b_header.time,
+                              bps=bps, nchan=nchan, complex_data=False,
+                              **kwargs)
 
     # properties common to all VDIF headers.
     @property
@@ -681,7 +683,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
-    def set_time(self, time):
+    def set_time(self, time, sample_rate=None):
         Mark5BHeader.set_time(self, time)
         super(VDIFMark5BHeader, self).set_time(time, frame_nr=self['frame_nr'])
 
