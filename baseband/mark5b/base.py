@@ -202,7 +202,6 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         decoded data.
     """
 
-    _frame_class = Mark5BFrame
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, fh_raw, nchan, bps=2, kday=None, ref_time=None,
@@ -335,7 +334,6 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
         well as the frame number.
     """
 
-    _frame_class = Mark5BFrame
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, raw, sample_rate, nchan=1, bps=2, header=None,

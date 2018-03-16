@@ -46,8 +46,6 @@ class VLBIFileBase(object):
 class VLBIStreamBase(VLBIFileBase):
     """VLBI file wrapper, allowing access as a stream of data."""
 
-    _frame_class = None
-    _squeezed_shape = None
     _sample_shape_maker = None
 
     def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,

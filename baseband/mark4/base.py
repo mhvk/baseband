@@ -275,7 +275,6 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         decoded data.
     """
 
-    _frame_class = Mark4Frame
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None,
@@ -451,7 +450,6 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
         Number of tracks over which a given channel is spread out.
     """
 
-    _frame_class = Mark4Frame
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, raw, sample_rate, header=None, squeeze=True, **kwargs):
