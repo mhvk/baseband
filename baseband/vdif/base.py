@@ -380,6 +380,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         if out is None:
             if count is None or count < 0:
                 count = self.size - self.offset
+                if count < 0:
+                    raise EOFError
 
             out = np.empty((count,) + self.sample_shape,
                            dtype=self._frameset.dtype)

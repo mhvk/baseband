@@ -267,10 +267,11 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         if out is None:
             if count is None or count < 0:
                 count = self.size - self.offset
+                if count < 0:
+                    raise EOFError
 
             out = np.empty((count,) + self.sample_shape,
                            dtype=self._frame.dtype)
-            # Generate view of the result data set that will be returned.
         else:
             assert out.shape[1:] == self.sample_shape, (
                 "'out' should have trailing shape {}".format(self.sample_shape))

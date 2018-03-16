@@ -290,6 +290,9 @@ class TestDADA(object):
             assert fhseek_int == fhseek_str
             with pytest.raises(ValueError):
                 fh.seek(0, 'last')
+            fh.seek(1, 'end')
+            with pytest.raises(EOFError):
+                fh.read()
 
         assert record1.shape == (12, 2)
         assert np.all(record1[:3] == np.array(

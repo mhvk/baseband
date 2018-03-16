@@ -142,15 +142,18 @@ files through selective decoding using ``seek`` and ``read``.
 
 .. note::
 
-    Cation should be used when decoding large blocks of data using
-    ``fh.read``.  For typical files, the resulting arrays are far too
-    large to hold in memory.
+    As with file pointers in general, ``fh.seek`` will not return an error if
+    one seeks beyond the end of file.  Attempting to read beyond
+    the end of file, however, will result in an ``EOFError``.
 
 To determine where the pointer is located, we use ``fh.tell()``::
 
     >>> fh.tell()
     40000
     >>> fh.close()
+
+Caution should be used when decoding large blocks of data using ``fh.read``. 
+For typical files, the resulting arrays are far too large to hold in memory.
 
 Seeking and Telling in Time With the Sample Pointer
 ---------------------------------------------------
