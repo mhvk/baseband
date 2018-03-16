@@ -555,6 +555,11 @@ class TestMark5B(object):
         with pytest.raises(ValueError):
             mark5b.open('ts.dat', 's')
 
+    def test_stream_missing_kday(self):
+          with pytest.raises(ValueError):
+            mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2, 
+                        sample_rate = 32*u.MHz)
+
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
     @pytest.mark.parametrize('fill_value', (0., -999.))
