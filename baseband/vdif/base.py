@@ -78,15 +78,13 @@ class VDIFFileReader(VLBIFileBase):
         """
         return VDIFFrame.fromfile(self.fh_raw)
 
-    def read_frameset(self, thread_ids=None, sort=True, edv=None, verify=True):
+    def read_frameset(self, thread_ids=None, edv=None, verify=True):
         """Read a single frame (header plus payload).
 
         Parameters
         ----------
         thread_ids : list, optional
             The thread ids that should be read.  By default, read all threads.
-        sort : bool, optional
-            Whether to sort the frames by thread_id.  Default: True.
         edv : int, optional
             The expected extended data version for the VDIF Header.  If not
             given, use that of the first frame.  (Passing it in slightly
@@ -101,8 +99,8 @@ class VDIFFileReader(VLBIFileBase):
             :class:`~baseband.vdif.VDIFHeaders` and the data encoded in the
             frame set, respectively.
         """
-        return VDIFFrameSet.fromfile(self.fh_raw, thread_ids, sort=sort,
-                                     edv=edv, verify=verify)
+        return VDIFFrameSet.fromfile(self.fh_raw, thread_ids, edv=edv,
+                                     verify=verify)
 
     def find_header(self, template_header=None, framesize=None, edv=None,
                     maximum=None, forward=True):

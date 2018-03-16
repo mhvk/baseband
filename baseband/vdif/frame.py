@@ -200,7 +200,7 @@ class VDIFFrameSet(object):
             self.header0 = header0
 
     @classmethod
-    def fromfile(cls, fh, thread_ids=None, sort=True, edv=None, verify=True):
+    def fromfile(cls, fh, thread_ids=None, edv=None, verify=True):
         """Read a frame set from a file, starting at the current location.
 
         Parameters
@@ -211,13 +211,6 @@ class VDIFFrameSet(object):
         thread_ids : list or None
             The thread ids that should be read.  If `None`, continue reading
             threads as long as the frame number does not increase.
-        sort : bool
-            Whether to sort the frames by `thread_ids`.  If `thread_ids` is
-            ``None``, sorts frames by their header thread_id.  Default: True.
-            Note that this does not influence the header used to look up
-            attributes (it is always the header of the first frame read).  It
-            does, however, influence the order in which decoded data is
-            returned.
         edv : int or None
             The expected extended data version for the VDIF Header.  If not
             given, use that of the first frame.  (Passing it in slightly
@@ -228,19 +221,21 @@ class VDIFFrameSet(object):
         Returns
         -------
         frameset : VDIFFrameSet instance
-            Holds ''frames'' property with a possibly sorted list of frames.
+            Its ``frames`` property holds a list of frames (in order of either
+            their ``thread_id`` or following the input ``thread_ids`` list).
             Use the ''data'' attribute to convert to an array.
         """
         header0 = VDIFHeader.fromfile(fh, edv, verify)
         edv = header0.edv
+        frame_nr = header0['frame_nr']
 
-        frames = []
+        frames = {}
         header = header0
-        while header['frame_nr'] == header0['frame_nr']:
-            if thread_ids is None or header['thread_id'] in thread_ids:
-                frames.append(
-                    VDIFFrame(header, VDIFPayload.fromfile(fh, header=header),
-                              verify=verify))
+        while header['frame_nr'] == frame_nr:
+            thread_id = header['thread_id']
+            if thread_ids is None or thread_id in thread_ids:
+                payload = VDIFPayload.fromfile(fh, header=header)
+                frames[thread_id] = VDIFFrame(header, payload, verify=verify)
             else:
                 fh.seek(header.payloadsize, 1)
 
@@ -257,13 +252,11 @@ class VDIFFrameSet(object):
         if thread_ids and len(frames) < len(thread_ids):
             raise IOError("could not find all requested frames.")
 
-        if sort:
-            # Sort by thread id, by user order if needed.
-            if thread_ids:
-                frames.sort(key=lambda frame:
-                            thread_ids.index(frame['thread_id']))
-            else:
-                frames.sort(key=lambda frame: frame['thread_id'])
+        # Turn dict of frames into a list, following order given by
+        # thread_ids, or just sorting by their own thread_id
+        if thread_ids is None:
+            thread_ids = sorted(frames.keys())
+        frames = [frames[tid] for tid in thread_ids]
 
         return cls(frames, header0)
 
