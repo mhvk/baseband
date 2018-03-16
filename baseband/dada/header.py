@@ -13,7 +13,6 @@ from collections import OrderedDict
 import astropy.units as u
 from astropy.time import Time
 from astropy.extern import six
-from astropy.utils import deprecated
 
 
 __all__ = ['DADAHeader']
@@ -410,13 +409,6 @@ class DADAHeader(OrderedDict):
             mjd_frac += 1.
         self['MJD_START'] = ('{0:05d}'.format(mjd_int) +
                              ('{0:17.15f}'.format(mjd_frac))[1:])
-
-    @deprecated('0.X', name='time0', alternative='start_time',
-                obj_type='attribute')
-    def get_time0(self):
-        return self.start_time
-
-    time0 = property(get_time0, None, None)
 
     @property
     def time(self):
