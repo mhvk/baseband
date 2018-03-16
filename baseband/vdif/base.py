@@ -237,7 +237,6 @@ class VDIFFileWriter(VLBIFileBase):
 class VDIFStreamBase(VLBIStreamBase):
     """VDIF file wrapper, allowing access as a stream of data."""
 
-    _frame_class = VDIFFrame
     _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
 
     def __init__(self, fh_raw, header0, subset, nthread, sample_rate=None,
