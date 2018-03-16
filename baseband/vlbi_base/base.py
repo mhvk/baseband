@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 from collections import namedtuple
 import astropy.units as u
-from astropy.utils import lazyproperty, deprecated
+from astropy.utils import lazyproperty
 
 
 __all__ = ['VLBIStreamBase', 'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
@@ -168,13 +168,6 @@ class VLBIStreamBase(VLBIFileBase):
         and (if available) `stop_time` for the time at the end of the file.
         """
         return self._get_time(self.header0)
-
-    @deprecated('0.X', name='time0', alternative='start_time',
-                obj_type='attribute')
-    def get_time0(self):
-        return self.start_time
-
-    time0 = property(get_time0, None, None)
 
     @property
     def time(self):
@@ -365,13 +358,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """
         return (self._get_time(self._last_header) +
                 (self.samples_per_frame / self.sample_rate).to(u.s))
-
-    @deprecated('0.X', name='time1', alternative='stop_time',
-                obj_type='attribute')
-    def get_time1(self):
-        return self.stop_time
-
-    time1 = property(get_time1, None, None)
 
     @property
     def size(self):
