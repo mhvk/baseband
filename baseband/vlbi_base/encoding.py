@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """Encoders and decoders for generic VLBI data formats."""
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)

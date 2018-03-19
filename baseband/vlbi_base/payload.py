@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Base definitions for VLBI payloads, used for VDIF and Mark 5B.
 
@@ -24,16 +25,16 @@ class VLBIPayloadBase(object):
 
     Parameters
     ----------
-    words : `numpy.ndarray`
+    words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    bps : int
-        Number of bits per sample part (i.e., per channel and per real or
-        imaginary component).  Default: 2.
     sample_shape : tuple
-        Shape of the samples; e.g., (nchan,).  Default: ().
+        Shape of the samples (e.g., (nchan,)).  Default: ().
+    bps : int
+        Bits per elementary sample, i.e., per channel and per real or
+        imaginary component.  Default: 2.
     complex_data : bool
-        Whether data is complex or float.  Default: False.
+        Whether the data is complex.  Default: False.
     """
     # Possible fixed payload size.
     _size = None
@@ -46,7 +47,7 @@ class VLBIPayloadBase(object):
     # Placeholder for sample shape named tuple.
     _sample_shape_maker = None
 
-    def __init__(self, words, bps=2, sample_shape=(), complex_data=False):
+    def __init__(self, words, sample_shape=(), bps=2, complex_data=False):
         self.words = words
         if self._sample_shape_maker is not None:
             self.sample_shape = self._sample_shape_maker(*sample_shape)
@@ -66,14 +67,14 @@ class VLBIPayloadBase(object):
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
-        """Read payload from file handle and decode it into data.
+        """Read payload from filehandle and decode it into data.
 
         Parameters
         ----------
         fh : filehandle
-            Handle to the file from which data is read
+            From which data is read.
         payloadsize : int
-            Number of bytes to read (default: as given in ``cls._size``.
+            Number of bytes to read (default: as given in ``cls._size``).
 
         Any other (keyword) arguments are passed on to the class initialiser.
         """
@@ -87,21 +88,21 @@ class VLBIPayloadBase(object):
         return cls(np.frombuffer(s, dtype=cls._dtype_word), *args, **kwargs)
 
     def tofile(self, fh):
-        """Write VLBI payload to filehandle."""
+        """Write payload to filehandle."""
         return fh.write(self.words.tostring())
 
     @classmethod
     def fromdata(cls, data, bps=2):
-        """Encode data as a VLBI payload.
+        """Encode data as a payload.
 
         Parameters
         ----------
-        data : `numpy.ndarray`
+        data : `~numpy.ndarray`
             Data to be encoded. The last dimension is taken as the number of
             channels.
-        bps : int
-            Number of bits per sample to use (for complex data, for real and
-            imaginary part separately; default: 2).
+        bps : int, optional
+            Bits per elementary sample, i.e., per channel and per real or
+            imaginary component.  Default: 2.
         """
         sample_shape = data.shape[1:]
         complex_data = data.dtype.kind == 'c'
@@ -148,8 +149,8 @@ class VLBIPayloadBase(object):
         Parameters
         ----------
         item : int, slice, or tuple
-            Sample indices.  Int represents a single sample, slice
-            a sample range, and tuple of ints/slices a range for
+            Sample indices.  An int represents a single sample, a slice
+            a sample range, and a tuple of ints/slices a range for
             multi-channel data.
 
         Returns
@@ -165,7 +166,7 @@ class VLBIPayloadBase(object):
         Notes
         -----
         ``item`` is restricted to (tuples of) ints or slices, so one cannot
-        access non-contiguous samples using fancy indexing.  If ``item``
+        access non-contiguous samples using advanced indexing.  If ``item``
         is a slice, a negative increment cannot be used.  The function is
         unable to parse payloads whose words have unused space (eg. VDIF files
         with 20 bits/sample).

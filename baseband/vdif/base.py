@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import division, unicode_literals, print_function
 
 from collections import namedtuple
@@ -86,11 +86,12 @@ class VDIFFileReader(VLBIFileBase):
         Parameters
         ----------
         thread_ids : list, optional
-            The thread ids that should be read.  By default, read all threads.
+            The thread ids that should be read.  If `None` (default), read all
+            threads.
         edv : int, optional
-            The expected extended data version for the VDIF Header.  If not
-            given, use that of the first frame.  (Passing it in slightly
-            improves file integrity checking.)
+            The expected extended data version for the VDIF Header.  If `None`,
+            use that of the first frame.  (Passing it in slightly improves file
+            integrity checking.)
         verify : bool, optional
             Whether to do (light) sanity checks on the header. Default: True.
 
@@ -192,20 +193,21 @@ class VDIFFileWriter(VLBIFileBase):
     Adds ``write_frame`` and ``write_frameset`` methods to the basic VLBI
     binary file wrapper.
     """
+
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
 
         Parameters
         ----------
-        data : array or `~baseband.vdif.VDIFFrame`
+        data : `~numpy.ndarray` or `~baseband.vdif.VDIFFrame`
             If an array, a `header` should be given, which will be used to
             get the information needed to encode the array, and to construct
             the VDIF frame.
-        header : `~baseband.vdif.VDIFHeader`, optional
-            Ignored if `data` is a VDIF Frame.
+        header : `~baseband.vdif.VDIFHeader`
+            Can instead give keyword arguments to construct a header.  Ignored
+            if `data` is a `~baseband.vdif.VDIFFrame` instance.
         **kwargs
-            If no `header` is given, an attempt is made to initialize one
-            using keywords arguments.
+            If `header` is not given, these are used to initialize one.
         """
         if not isinstance(data, VDIFFrame):
             data = VDIFFrame.fromdata(data, header, **kwargs)
@@ -216,18 +218,18 @@ class VDIFFileWriter(VLBIFileBase):
 
         Parameters
         ----------
-        data : array or :class:`~baseband.vdif.VDIFFrameSet`
+        data : `~numpy.ndarray` or :class:`~baseband.vdif.VDIFFrameSet`
             If an array, a header should be given, which will be used to
             get the information needed to encode the array, and to construct
             the VDIF frame set.
-        header : :class:`~baseband.vdif.VDIFHeader`, list of same, optional
-            Ignored if `data` is a :class:`~baseband.vdif.VDIFFrameSet`
-            instance.  If a list, should have a length matching the number of
-            threads in `data`; if a single header, ``thread_ids`` corresponding
+        header : :class:`~baseband.vdif.VDIFHeader`, list of same
+            Can instead give keyword arguments to construct a header.  Ignored
+            if `data` is a :class:`~baseband.vdif.VDIFFrameSet` instance.  If a
+            list, should have a length matching the number of threads in
+            `data`; if a single header, ``thread_ids`` corresponding
             to the number of threads are generated automatically.
         **kwargs
-            If no `header` is given, remaining keywords are used to attempt
-            to initiate a single header.
+            If `header` is not given, these are used to initialize one.
         """
         if not isinstance(data, VDIFFrameSet):
             data = VDIFFrameSet.fromdata(data, header, **kwargs)
@@ -235,20 +237,21 @@ class VDIFFileWriter(VLBIFileBase):
 
 
 class VDIFStreamBase(VLBIStreamBase):
-    """VDIF file wrapper, allowing access as a stream of data."""
+    """Base for VDIF streams."""
 
     _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
 
-    def __init__(self, fh_raw, header0, subset, nthread, sample_rate=None,
-                 fill_value=0., squeeze=True):
+    def __init__(self, fh_raw, header0, sample_rate=None, nthread=1,
+                 subset=(), squeeze=True, fill_value=0.):
         samples_per_frame = header0.samples_per_frame
 
         super(VDIFStreamBase, self).__init__(
-            fh_raw=fh_raw, header0=header0,
-            unsliced_shape=(nthread, header0.nchan),
-            bps=header0.bps, complex_data=header0['complex_data'],
-            subset=subset, samples_per_frame=samples_per_frame,
-            sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
+            fh_raw=fh_raw, header0=header0, sample_rate=sample_rate,
+            samples_per_frame=samples_per_frame,
+            unsliced_shape=(nthread, header0.nchan), bps=header0.bps,
+            complex_data=header0['complex_data'], subset=subset,
+            squeeze=squeeze, fill_value=fill_value)
+
         self._framerate = int(round((self.sample_rate /
                                      self.samples_per_frame).to_value(u.Hz)))
 
@@ -265,8 +268,8 @@ class VDIFStreamBase(VLBIStreamBase):
                 "    sample_rate={s.sample_rate},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape},\n"
-                "    complex_data={s.complex_data},"
-                " bps={h.bps}, edv={h.edv}, station={h.station},\n"
+                "    bps={h.bps}, complex_data={s.complex_data},"
+                " edv={h.edv}, station={h.station},\n"
                 "    {sub}start_time={s.start_time}>"
                 .format(s=self, h=self.header0,
                         sub=('subset={0}, '.format(self.subset)
@@ -276,48 +279,47 @@ class VDIFStreamBase(VLBIStreamBase):
 class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
     """VLBI VDIF format reader.
 
-    This wrapper allows one to access a VDIF file as a continues series of
-    samples.  Invalid data are marked, but possible gaps in the data stream
-    are not yet filled in.
+    Allows access to a VDIF file as a continuous series of samples.
 
     Parameters
     ----------
-    fh_raw : `~baseband.vdif.base.VDIFFileReader` instance
-        File handle of the raw VDIF stream
+    fh_raw : filehandle
+        Filehandle of the raw VDIF stream.
+    sample_rate : `~astropy.units.Quantity`, optional
+        Number of complete samples per second, i.e. the rate at which each
+        channel in each thread is sampled.  If `None` (default), will be
+        inferred from the header or by scanning one second of the file.
     subset : indexing object or tuple of objects, optional
         Specific components of the complete sample to decode.  If a single
         indexing object is passed, it selects threads.  If a tuple of
         objects is passed, the first selects threads and the second selects
-        channels.  By default, all components are read.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Number of complete samples per second (ie. the rate at which each
-        channel in each thread is sampled).  If not given, will be inferred
-        from the header or by scanning one second of the file.
-    fill_value : float or complex
-        Value to use for invalid or missing data. Default: 0.
+        channels.  If the tuple is empty (default) all components are read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
+    fill_value : float or complex, optional
+        Value to use for invalid or missing data. Default: 0.
     """
 
-    def __init__(self, fh_raw, subset=(), sample_rate=None, fill_value=0.,
-                 squeeze=True):
+    def __init__(self, fh_raw, sample_rate=None, subset=(), squeeze=True,
+                 fill_value=0.):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
-        header = VDIFHeader.fromfile(fh_raw)
+        header0 = VDIFHeader.fromfile(fh_raw)
         # TODO: make this a bit less ugly?  Maybe don't read frameset twice?
         fh_raw.seek(0)
         # Now also read the first frameset, since we need to know how many
         # threads there are, and what the frameset size is. For this purpose,
-        # pre-attach the file handle (it will just get reset anyway).
+        # pre-attach the filehandle (it will just get reset anyway).
         self.fh_raw = fh_raw
         frameset = self.read_frameset()
         thread_ids = [fr['thread_id'] for fr in frameset.frames]
         self._framesetsize = fh_raw.tell()
         super(VDIFStreamReader, self).__init__(
-            fh_raw, header, subset, len(frameset.frames),
-            sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
+            fh_raw, header0, sample_rate=sample_rate,
+            nthread=len(frameset.frames), subset=subset,
+            squeeze=squeeze, fill_value=fill_value)
         # Check whether we are reading only some threads.  This is somewhat
         # messy since normally we apply the whole subset to the whole data,
         # but here we need to split it up in the part that selects specific
@@ -362,15 +364,15 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 
         Parameters
         ----------
-        fh : io.BufferedReader
-            Binary file handle.
+        fh : filehandle
+            Filehandle of the raw stream.
         header_template : header class or instance
             Definition or instance of file format's header class.
 
         Returns
         -------
         framerate : `~astropy.units.Quantity`
-            Frames per second, in Hz.
+            Frames per second.
 
         Notes
         -----
@@ -439,58 +441,63 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     """VLBI VDIF format writer.
 
+    Encodes and writes sequences of samples to file.
+
     Parameters
     ----------
-    raw : `~baseband.vdif.base.VDIFFileWriter`
+    raw : filehandle
         Which will write filled sets of frames to storage.
-    nthread : int
-        Number of threads the VLBI data has (e.g., 2 for 2 polarizations).
-        Default is 1.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Number of complete samples per second (ie. the rate at which each
-        channel in each thread is sampled).  For EDV 1 and 3, can
-        alternatively set `sample_rate` within the header passed to `header`.
-    header : :class:`~baseband.vdif.VDIFHeader`, optional
-        Header for the first frame, holding time information, etc.
+    header0 : :class:`~baseband.vdif.VDIFHeader`
+        Header for the first frame, holding time information, etc.  Can instead
+        give keyword arguments to construct a header (see ``**kwargs``).
+    sample_rate : `~astropy.units.Quantity`
+        Number of complete samples per second, i.e. the rate at which each
+        channel in each thread is sampled.  For EDV 1 and 3, can
+        alternatively set `sample_rate` within the header.
+    nthread : int, optional
+        Number of threads (e.g., 2 for 2 polarisations).  Default: 1.
     squeeze : bool, optional
-        If `True` (default), ``write`` accepts squeezed arrays as input,
-        and adds channel and thread dimensions if they have length unity.
+        If `True` (default), ``write`` accepts squeezed arrays as input, and
+        adds any dimensions of length unity.
     **kwargs
-        If no header is given, an attempt is made to construct the header from
-        these.  For a standard header, this would include the following.
+        If no header is given, an attempt is made to construct one from these.
+        For a standard header, this would include the following.
 
     --- Header keywords : (see :meth:`~baseband.vdif.VDIFHeader.fromvalues`)
 
     time : `~astropy.time.Time`
-        As an alternative, one can pass on ``ref_epoch`` and ``seconds``.
+        Start time of the file.  Can instead pass on ``ref_epoch`` and
+        ``seconds``.
     nchan : int, optional
-        Number of channels within stream (default 1).
-        Note: that different # of channels per thread is not supported.
-    complex_data : bool
-        Whether data is complex.
-    bps : int
-        Bits per sample (or real, imaginary component).
+        Number of channels (default: 1).  Note: different numbers of channels
+        per thread is not supported.
+    complex_data : bool, optional
+        Whether data is complex.  Default: `False`.
+    bps : int, optional
+        Bits per elementary sample, i.e. per real or imaginary component for
+        complex data.  Default: 1.
     samples_per_frame : int
-        Number of complete samples per frame.  As an alternative, use
-        ``frame_length``, the number of long words for header plus payload.
+        Number of complete samples per frame.  Can alternatively use
+        ``frame_length``, the number of 8-byte words for header plus payload.
         For some EDV, this number is fixed (e.g., ``frame_length=629`` for
         ``edv=3``, which corresponds to 20000 real 2-bit samples per frame).
-    station : 2 characters
-        Or unsigned 2-byte integer.
+    station : 2 characters, optional
+        Station ID.  Can also be an unsigned 2-byte integer.  Default: 0.
     edv : {`False`, 0, 1, 2, 3, 4, 0xab}
         Extended Data Version.
     """
-    def __init__(self, raw, nthread=1, sample_rate=None, header=None,
+
+    def __init__(self, raw, header0=None, sample_rate=None, nthread=1,
                  squeeze=True, **kwargs):
-        if header is None:
+        if header0 is None:
             if sample_rate is not None:
                 kwargs['sample_rate'] = sample_rate
-            header = VDIFHeader.fromvalues(**kwargs)
+            header0 = VDIFHeader.fromvalues(**kwargs)
 
         # If header was passed but not sample_rate, extract sample_rate.
         if sample_rate is None:
             try:
-                sample_rate = header.sample_rate
+                sample_rate = header0.sample_rate
             except AttributeError:
                 raise ValueError("the sample rate must be passed either "
                                  "explicitly, or through the header if it "
@@ -498,7 +505,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
 
         # No frame sets yet exist, so generate a sample shape from values.
         super(VDIFStreamWriter, self).__init__(
-            raw, header, None, nthread, sample_rate=sample_rate,
+            raw, header0, sample_rate=sample_rate, nthread=nthread,
             squeeze=squeeze)
         # Set sample rate in the header, if it's possible, and not set already.
         try:
@@ -532,44 +539,47 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
 
 
 open = make_opener('VDIF', globals(), doc="""
---- For reading : (see :class:`VDIFStreamReader`)
+--- For reading a stream : (see :class:`~baseband.vdif.base.VDIFStreamReader`)
 
+sample_rate : `~astropy.units.Quantity`, optional
+    Number of complete samples per second, i.e. the rate at which each channel
+    in each thread is sampled.  If `None` (default), will be inferred from the
+    header or by scanning one second of the file.
 subset : indexing object or tuple of objects, optional
     Specific components of the complete sample to decode.  If a single indexing
     object is passed, it selects threads.  If a tuple of objects is passed, the
-    first selects threads and the second selects channels.  By default, all
-    components are read.
-sample_rate : `~astropy.units.Quantity`, optional
-    Number of complete samples per second (ie. the rate at which each channel
-    in each thread is sampled).  If not given, will be inferred from the header
-    or by scanning one second of the file.
-fill_value : float or complex
-    Value to use for invalid or missing data. Default: 0.
+    first selects threads and the second selects channels.  If the tuple is
+    empty (default) all components are read.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
+fill_value : float or complex, optional
+    Value to use for invalid or missing data. Default: 0.
 
---- For writing : (see :class:`VDIFStreamWriter`)
+--- For writing a stream : (see :class:`~baseband.vdif.base.VDIFStreamWriter`)
 
-nthread : int
-    Number of threads the VLBI data has (e.g., 2 for 2 polarizations).
-sample_rate : `~astropy.units.Quantity`, optional
-    Number of complete samples per second (ie. the rate at which each
-    channel in each thread is sampled).
+header0 : `~baseband.vdif.VDIFHeader`
+    Header for the first frame, holding time information, etc.  Can instead
+    give keyword arguments to construct a header (see ``**kwargs``).
+sample_rate : `~astropy.units.Quantity`
+    Number of complete samples per second, i.e. the rate at which each
+    channel in each thread is sampled.  For EDV 1 and 3, can alternatively set
+    `sample_rate` within the header.
+nthread : int, optional
+    Number of threads (e.g., 2 for 2 polarisations).  Default: 1.
 squeeze : bool, optional
-    If `True` (default), ``write`` accepts squeezed arrays as input,
-    and adds channel and thread dimensions if they have length unity.
-header : `~baseband.vdif.VDIFHeader`, optional
-    Header for the first frame, holding time information, etc.
+    If `True` (default), ``write`` accepts squeezed arrays as input, and adds
+    any dimensions of length unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.  See :class:`VDIFStreamWriter`.
+    with any further keyword arguments.  See
+    :class:`~baseband.vdif.base.VDIFStreamWriter`.
 
 Returns
 -------
 Filehandle
     :class:`~baseband.vdif.base.VDIFFileReader` or
-    :class:`~baseband.vdif.base.VDIFFileWriter` instance (binary), or
+    :class:`~baseband.vdif.base.VDIFFileWriter` (binary), or
     :class:`~baseband.vdif.base.VDIFStreamReader` or
-    :class:`~baseband.vdif.base.VDIFStreamWriter` instance (stream).
+    :class:`~baseband.vdif.base.VDIFStreamWriter` (stream).
 """)

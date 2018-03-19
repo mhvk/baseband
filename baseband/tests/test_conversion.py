@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -21,7 +21,7 @@ class TestVDIFMark5B(object):
     def test_header(self):
         """Check Mark 5B header information can be stored in a VDIF header."""
         with open(SAMPLE_M5B, 'rb') as fh:
-            # start time kiloday is needed for Mark 5B to calculate time.
+            # Start time kiloday is needed for Mark 5B to calculate time.
             m5h1 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             # For the payload, pass in how data is encoded.
             m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
@@ -107,8 +107,8 @@ class TestVDIFMark5B(object):
         with mark5b.open(SAMPLE_M5B, 'rb') as fh:
             # pick second frame just to be different from header checks above.
             fh.seek(10016)
-            m5f = fh.read_frame(nchan=8, bps=2,
-                                ref_time=Time(57000, format='mjd'))
+            m5f = fh.read_frame(ref_time=Time(57000, format='mjd'),
+                                nchan=8, bps=2)
         assert m5f['frame_nr'] == 1
         frame = vdif.VDIFFrame.from_mark5b_frame(m5f)
         assert frame.size == 10032
@@ -163,8 +163,8 @@ class TestMark5BToVDIF3(object):
         # self-describe this.  Furthermore, we need to pass in a rough time,
         # and the rate at which samples were taken, so that absolute times can
         # be calculated.
-        with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, kday=56000,
-                         sample_rate=32.*u.MHz) as fr:
+        with mark5b.open(SAMPLE_M5B, 'rs', sample_rate=32.*u.MHz, kday=56000,
+                         nchan=8, bps=2) as fr:
             m5h = fr.header0
             # create VDIF header from Mark 5B stream information.
             header = vdif.VDIFHeader.fromvalues(
@@ -176,16 +176,16 @@ class TestMark5BToVDIF3(object):
         # Get a file name in our temporary testing directory.
         vdif_file = str(tmpdir.join('converted.vdif'))
         # create and fill vdif file with converted data.
-        with vdif.open(vdif_file, 'ws', nthread=data.shape[1],
-                       header=header) as fw:
+        with vdif.open(vdif_file, 'ws', header0=header,
+                       nthread=data.shape[1]) as fw:
             assert (fw.tell(unit='time') - m5h.time) < 2. * u.ns
             fw.write(data)
             assert (fw.tell(unit='time') - time1) < 2. * u.ns
 
-        # check two files contain same information.
-        with mark5b.open(SAMPLE_M5B, 'rs', nchan=8, bps=2, kday=56000,
-                         sample_rate=32.*u.MHz) as fm, vdif.open(vdif_file,
-                                                                 'rs') as fv:
+        # Check two files contain same information.
+        with mark5b.open(SAMPLE_M5B, 'rs', sample_rate=32.*u.MHz, kday=56000,
+                         nchan=8, bps=2) as fm, vdif.open(vdif_file,
+                                                          'rs') as fv:
             assert fm.header0.time == fv.header0.time
             dm = fm.read(20000)
             dv = fv.read(20000)
@@ -199,9 +199,9 @@ class TestMark5BToVDIF3(object):
             hm = fm.header0
             # Here, we fill some unimportant Mark 5B header information by
             # hand, so we can compare byte-for-byte.
-            with mark5b.open(mark5b_new_file, 'ws', nchan=dv.shape[1],
-                             bps=hv.bps, time=hv.time,
-                             sample_rate=hv.sample_rate, user=hm['user'],
+            with mark5b.open(mark5b_new_file, 'ws', sample_rate=hv.sample_rate,
+                             nchan=dv.shape[1], bps=hv.bps,
+                             time=hv.time, user=hm['user'],
                              internal_tvg=hm['internal_tvg']) as fw:
                 fw.write(dv)
 
@@ -226,13 +226,13 @@ class TestVDIF3ToMark5B(object):
             data = fr.read(20000)  # enough to fill two Mark 5B frames.
 
         fl = str(tmpdir.join('test.m5b'))
-        with mark5b.open(fl, 'ws', nchan=data.shape[1], bps=vh.bps,
-                         time=vh.time, sample_rate=vh.sample_rate) as fw:
+        with mark5b.open(fl, 'ws', sample_rate=vh.sample_rate,
+                         nchan=data.shape[1], bps=vh.bps, time=vh.time) as fw:
             fw.write(data)
 
         with vdif.open(SAMPLE_VDIF, 'rs') as fv, mark5b.open(
-                fl, 'rs', nchan=8, bps=2, ref_time=Time(57000, format='mjd'),
-                sample_rate=32.*u.MHz) as fm:
+                fl, 'rs', sample_rate=32.*u.MHz,
+                ref_time=Time(57000, format='mjd'), nchan=8, bps=2) as fm:
             assert fv.header0.time == fm.header0.time
             dv = fv.read(20000)
             dm = fm.read(20000)
@@ -253,15 +253,15 @@ class TestMark4ToVDIF1(object):
         with open(SAMPLE_M4, 'rb') as fh:
             fh.seek(0xa88)
             m4h = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
-        # check that we have enough information to create VDIF EDV 1 header.
+        # Check that we have enough information to create VDIF EDV 1 header.
         header = vdif.VDIFHeader.fromvalues(
             edv=1, bps=m4h.bps, nchan=1, station='Ar', time=m4h.time,
             sample_rate=32.*u.MHz, payloadsize=640*2//8, complex_data=False)
         assert abs(header.time - m4h.time) < 2. * u.ns
 
     def test_stream(self, tmpdir):
-        with mark4.open(SAMPLE_M4, 'rs', ntrack=64, decade=2010,
-                        sample_rate=32.*u.MHz) as fr:
+        with mark4.open(SAMPLE_M4, 'rs', sample_rate=32.*u.MHz,
+                        ntrack=64, decade=2010) as fr:
             m4header0 = fr.header0
             start_time = fr.start_time
             vheader0 = vdif.VDIFHeader.fromvalues(
@@ -279,8 +279,8 @@ class TestMark4ToVDIF1(object):
             orig_bytes = fh.read(number_of_bytes)
 
         fl = str(tmpdir.join('test.vdif'))
-        with vdif.open(fl, 'ws', nthread=data.shape[1], header=vheader0,
-                       sample_rate=vheader0.sample_rate) as fw:
+        with vdif.open(fl, 'ws', header0=vheader0,
+                       nthread=data.shape[1]) as fw:
             assert (fw.tell(unit='time') - start_time) < 2. * u.ns
             # Write first VDIF frame, matching Mark 4 Header, hence invalid.
             fw.write(data[:160], invalid_data=True)
@@ -301,7 +301,7 @@ class TestMark4ToVDIF1(object):
         # Convert VDIF file back to Mark 4, and check byte-for-byte.
         fl2 = str(tmpdir.join('test.m4'))
         with mark4.open(fl2, 'ws', sample_rate=vheader0.sample_rate,
-                        time=vheader0.time, ntrack=64, bps=2, fanout=4,
+                        ntrack=64, bps=2, fanout=4, time=vheader0.time,
                         system_id=108) as fw:
             fw.write(dv)
 
@@ -335,7 +335,7 @@ class TestDADAToVDIF1(object):
     def test_header(self):
         with open(SAMPLE_DADA, 'rb') as fh:
             ddh = dada.DADAHeader.fromfile(fh)
-        # check that we have enough information to create VDIF EDV 1 header.
+        # Check that we have enough information to create VDIF EDV 1 header.
         header = self.get_vdif_header(ddh)
         assert abs(header.time - ddh.time) < 2. * u.ns
         assert header.payloadsize == ddh.payloadsize // 2
@@ -343,14 +343,14 @@ class TestDADAToVDIF1(object):
     def test_payload(self):
         with open(SAMPLE_DADA, 'rb') as fh:
             fh.seek(4096)
-            ddp = dada.DADAPayload.fromfile(fh, sample_shape=(2, 1),
-                                            complex_data=True, bps=8,
-                                            payloadsize=64000)
+            ddp = dada.DADAPayload.fromfile(fh, payloadsize=64000,
+                                            sample_shape=(2, 1),
+                                            complex_data=True, bps=8)
         dada_data = ddp.data
-        # check that conversion between scalings works.
+        # Check that conversion between scalings works.
         vdif_data = self.get_vdif_data(dada_data)
         assert np.allclose(self.get_dada_data(vdif_data), dada_data)
-        # check that we can create correct payloads
+        # Check that we can create correct payloads.
         vdif_payload0 = vdif.VDIFPayload.fromdata(vdif_data[:, 0, :], bps=8)
         vdif_payload1 = vdif.VDIFPayload.fromdata(vdif_data[:, 1, :], bps=8)
         vd0, vd1 = vdif_payload0.data, vdif_payload1.data
@@ -374,8 +374,8 @@ class TestDADAToVDIF1(object):
         data = self.get_vdif_data(dada_data)
         assert abs(header.time - ddh.time) < 2. * u.ns
         vdif_file = str(tmpdir.join('converted_dada.vdif'))
-        with vdif.open(vdif_file, 'ws', nthread=data.shape[1],
-                       header=header) as fw:
+        with vdif.open(vdif_file, 'ws', header0=header,
+                       nthread=data.shape[1]) as fw:
             assert (fw.tell(unit='time') - header.time) < 2. * u.ns
             # Write all data in since frameset, made of two frames.
             fw.write(data)

@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 from copy import copy
@@ -85,10 +85,10 @@ class TestVLBIBase(object):
         self.Payload = Payload
         self.payload = Payload(np.array([0x12345678, 0xffff0000],
                                         dtype=Payload._dtype_word),
-                               bps=8, sample_shape=(2,), complex_data=False)
+                               sample_shape=(2,), bps=8, complex_data=False)
         self.payload1bit = Payload(np.array([0x12345678]*5,
                                             dtype=Payload._dtype_word),
-                                   bps=1, sample_shape=(5,), complex_data=True)
+                                   sample_shape=(5,), bps=1, complex_data=True)
 
         class Frame(VLBIFrameBase):
             _header_class = Header
@@ -113,9 +113,9 @@ class TestVLBIBase(object):
         header = self.Header(None)
         assert header.words == [0] * 4
         with pytest.raises(Exception):
-            self.Header([1]*5)
+            self.Header([1] * 5)
         with pytest.raises(Exception):
-            self.Header([1]*3)
+            self.Header([1] * 3)
         header = self.header.copy()
         assert header == self.header
         assert header is not self.header
@@ -238,13 +238,13 @@ class TestVLBIBase(object):
         data = self.payload.data
         sel_data = data[item]
         assert np.all(self.payload[item] == sel_data)
-        payload = self.Payload(self.payload.words.copy(), bps=8,
-                               sample_shape=(2,), complex_data=False)
+        payload = self.Payload(self.payload.words.copy(), sample_shape=(2,),
+                               bps=8, complex_data=False)
         assert payload == self.payload
-        payload[item] = 1-sel_data
+        payload[item] = 1 - sel_data
         check = self.payload.data
-        check[item] = 1-sel_data
-        assert np.all(payload[item] == 1-sel_data)
+        check[item] = 1 - sel_data
+        assert np.all(payload[item] == 1 - sel_data)
         assert np.all(payload.data == check)
         assert np.all(payload[:] ==
                       payload.words.view(np.int8).reshape(-1, 2))
@@ -255,9 +255,9 @@ class TestVLBIBase(object):
         payload = self.Payload.fromdata(data + 1j * data, bps=8)
         sel_data = payload.data[item]
         assert np.all(payload[item] == sel_data)
-        payload[item] = 1-sel_data
+        payload[item] = 1 - sel_data
         check = payload.data
-        check[item] = 1-sel_data
+        check[item] = 1 - sel_data
         assert np.all(payload.data == check)
 
     def test_payload_bad_fbps(self):
@@ -269,8 +269,8 @@ class TestVLBIBase(object):
         assert p11.size == 0
         assert p11.shape == (0,) + self.payload.sample_shape
         assert p11.dtype == self.payload.dtype
-        payload = self.Payload(self.payload.words.copy(), bps=8,
-                               sample_shape=(2,), complex_data=False)
+        payload = self.Payload(self.payload.words.copy(), sample_shape=(2,),
+                               bps=8, complex_data=False)
         payload[1:1] = 1
         assert payload == self.payload
 
@@ -279,22 +279,22 @@ class TestVLBIBase(object):
         with pytest.raises(IndexError):
             self.payload[item]
 
-        payload = self.Payload(self.payload.words.copy(), bps=8,
-                               sample_shape=(2,), complex_data=False)
+        payload = self.Payload(self.payload.words.copy(), sample_shape=(2,),
+                               bps=8, complex_data=False)
         with pytest.raises(IndexError):
             payload[item] = 1
 
     def test_payload_invalid_item2(self):
         with pytest.raises(TypeError):
             self.payload['l']
-        payload = self.Payload(self.payload.words.copy(), bps=8,
-                               sample_shape=(2,), complex_data=False)
+        payload = self.Payload(self.payload.words.copy(), sample_shape=(2,),
+                               bps=8, complex_data=False)
         with pytest.raises(TypeError):
             payload['l'] = 1
 
     def test_payload_setitem_wrong_shape(self):
-        payload = self.Payload(self.payload.words.copy(), bps=8,
-                               sample_shape=(2,), complex_data=False)
+        payload = self.Payload(self.payload.words.copy(), sample_shape=(2,),
+                               bps=8, complex_data=False)
         with pytest.raises(ValueError):
             payload[1] = np.ones(10)
 
@@ -434,7 +434,7 @@ class TestSqueezeAndSubset(object):
     def setup(self):
         self.other_args = dict(fh_raw=None, header0=None, bps=1,
                                complex_data=False, samples_per_frame=1000,
-                               sample_rate=10000*u.Hz)
+                               sample_rate=10000*u.Hz, fill_value=0.)
         self.sample_shape_maker = namedtuple('SampleShape',
                                              'n0, n1, n2, n3, n4')
         self.unsliced_shape = (1, 21, 33, 1, 2)
@@ -445,8 +445,6 @@ class TestSqueezeAndSubset(object):
 
     def make_reader_with_shape(self, squeeze=True, subset=None,
                                sample_shape_maker=None, unsliced_shape=None):
-        # StreamReaderBase is used instead of StreamBase so we can also test
-        # _squeeze_and_subset.
 
         class StreamReaderWithShape(VLBIStreamReaderBase):
             _sample_shape_maker = sample_shape_maker or self.sample_shape_maker
@@ -457,24 +455,22 @@ class TestSqueezeAndSubset(object):
 
     def make_writer_with_shape(self, squeeze=True, sample_shape_maker=None,
                                unsliced_shape=None):
-        # StreamWriterBase is used instead of StreamBase so we can also test
-        # _unsqueeze.
 
         class StreamWriterWithShape(VLBIStreamWriterBase):
             _sample_shape_maker = sample_shape_maker or self.sample_shape_maker
 
         return StreamWriterWithShape(
             unsliced_shape=unsliced_shape or self.unsliced_shape,
-            squeeze=squeeze, subset=None, **self.other_args)
+            subset=None, squeeze=squeeze, **self.other_args)
 
     def test_sample_shape_and_squeeze(self):
         # Tests stream base's sample and squeezing routines.
         # Try tuple only.
         sb = VLBIStreamBase(unsliced_shape=self.unsliced_shape,
-                            squeeze=False, subset=None, **self.other_args)
+                            subset=None, squeeze=False, **self.other_args)
         assert sb.sample_shape == self.unsliced_shape
         sb = VLBIStreamBase(unsliced_shape=self.unsliced_shape,
-                            squeeze=True, subset=None, **self.other_args)
+                            subset=None, squeeze=True, **self.other_args)
         assert sb.sample_shape == self.squeezed_shape
 
         # Try reader with equivalent sample shape.

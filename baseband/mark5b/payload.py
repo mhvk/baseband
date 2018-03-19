@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for VLBI Mark 5B payloads.
 
@@ -42,7 +43,7 @@ def init_luts():
       1   1  +Hi    3
      === === ===== =====
 
-    See table 13 in
+    See Table 13 in
     https://science.nrao.edu/facilities/vlba/publications/memos/upgrade/sensimemo13.pdf
     and
     http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
@@ -97,13 +98,13 @@ class Mark5BPayload(VLBIPayloadBase):
 
     Parameters
     ----------
-    words : ndarray
+    words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    nchan : int
-        Number of channels in the data.  Default: 1.
-    bps : int
-        Number of bits per sample.  Default: 2.
+    nchan : int, optional
+        Number of channels.   Default: 1.
+    bps : int, optional
+        Bits per elementary sample.  Default: 2.
     """
 
     _size = 2500 * 4
@@ -116,9 +117,8 @@ class Mark5BPayload(VLBIPayloadBase):
         if complex_data:
             raise ValueError("Mark5B format does not support complex data.")
 
-        super(Mark5BPayload, self).__init__(words, bps=bps,
-                                            sample_shape=(nchan,),
-                                            complex_data=False)
+        super(Mark5BPayload, self).__init__(words, sample_shape=(nchan,),
+                                            bps=bps, complex_data=False)
 
     @classmethod
     def fromdata(cls, data, bps=2):

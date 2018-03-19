@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -234,9 +234,9 @@ class SequentialFileWriter(SequentialFileBase):
         The mode with which the files should be opened (default: 'w+b'). If
         this does not include '+' for reading, memory maps are not possibe.
     file_size : int, optional
-        The maximum file size a file is allowed to have (the default of `None`
-        implies a file is allowed to grow indefinitely, which makes using this
-        class somewhat pointless).
+        The maximum size a file is allowed to have.  Default: `None`, which
+        means it is unlimited and only a single file will be written (making
+        using this class somewhat pointless).
     opener : callable, optional
         Function to open a single file (default: `io.open`).
     """
@@ -282,8 +282,8 @@ def open(files, mode='rb', file_size=None, opener=None):
         The mode with which the files should be opened (default: 'rb').
     file_size : int, optional
         For writing, the maximum size of a file, beyond which a new file should
-        be opened (default: `None`, which means it is unlimited and only a
-        single file will be written).
+        be opened.  Default: `None`, which means it is unlimited and only a
+        single file will be written.
     opener : callable, optional
         Function to open a single file (default: `io.open`).
 

@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for VLBI VDIF payloads.
 
@@ -110,18 +111,16 @@ class VDIFPayload(VLBIPayloadBase):
     words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    header : `~baseband.vdif.VDIFHeader`, optional
-        Information needed to interpret payload.  If not given, the
-        following keywords need to be set.
-
-    --- If no `header is given :
-
+    header : `~baseband.vdif.VDIFHeader`
+        If given, used to infer the number of channels, bps, and whether
+        the data is complex.
     nchan : int, optional
-        Number of channels.  Default: 1.
+        Number of channels, used if header is not given.  Default: 1.
     bps : int, optional
-        Bits per sample (or real, imaginary component).  Default: 2.
-    complex_data : bool
-        Complex or float data.  Default: `False`.
+        Bits per elementary sample, used if header is not given.  Default: 2.
+    complex_data : bool, optional
+        Whether the data is complex, used if header is not given.
+        Default: `False`.
     """
     _decoders = {2: decode_2bit,
                  4: decode_4bit,
@@ -133,8 +132,7 @@ class VDIFPayload(VLBIPayloadBase):
 
     _sample_shape_maker = namedtuple('SampleShape', 'nchan')
 
-    def __init__(self, words, header=None,
-                 nchan=1, bps=2, complex_data=False):
+    def __init__(self, words, header=None, nchan=1, bps=2, complex_data=False):
         if header is not None:
             nchan = header.nchan
             bps = header.bps
@@ -146,13 +144,12 @@ class VDIFPayload(VLBIPayloadBase):
                 self._encoders = Mark5BPayload._encoders
                 if complex_data:
                     raise ValueError("VDIF/Mark5B payload cannot be complex.")
-        super(VDIFPayload, self).__init__(words, bps=bps,
-                                          sample_shape=(nchan,),
-                                          complex_data=complex_data)
+        super(VDIFPayload, self).__init__(words, sample_shape=(nchan,),
+                                          bps=bps, complex_data=complex_data)
 
     @classmethod
     def fromfile(cls, fh, header):
-        """Read payload from file handle and decode it into data.
+        """Read payload from filehandle and decode it into data.
 
         Parameters
         ----------
@@ -179,10 +176,10 @@ class VDIFPayload(VLBIPayloadBase):
             If given, used to infer the encoding, and to verify the number of
             channels and whether the data is complex.
         bps : int, optional
-            Used if header is not given.
+            Bits per elementary sample, used if header is `None`.  Default: 2.
         edv : int, optional
-            Should be given if not header is specified and the payload is
-            encoded as Mark 5 data (i.e., edv=0xab).
+            Should be given if the header is `None` and the payload is encoded
+            as Mark 5 data (i.e., edv=0xab).
         """
         nchan = data.shape[-1]
         complex_data = (data.dtype.kind == 'c')

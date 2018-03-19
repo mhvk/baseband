@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import division, unicode_literals, print_function
 
 import io
@@ -51,9 +51,9 @@ class VLBIStreamBase(VLBIFileBase):
 
     _sample_shape_maker = None
 
-    def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
-                 subset, samples_per_frame, sample_rate, fill_value=0.,
-                 squeeze=True):
+    def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
+                 unsliced_shape, bps, complex_data, subset, squeeze,
+                 fill_value):
         super(VLBIStreamBase, self).__init__(fh_raw)
         self._header0 = header0
         self._bps = bps
@@ -88,7 +88,7 @@ class VLBIStreamBase(VLBIFileBase):
 
     @property
     def subset(self):
-        """Specific elements (threads/channels) of the sample to read.
+        """Specific components (e.g. threads, channels) of the sample to read.
 
         The order of dimensions is the same as for `sample_shape`.  Set by the
         class initializer.
@@ -151,7 +151,7 @@ class VLBIStreamBase(VLBIFileBase):
 
     @property
     def complex_data(self):
-        """Whether the decoded data is complex."""
+        """Whether the data is complex."""
         return self._complex_data
 
     @property
@@ -182,7 +182,7 @@ class VLBIStreamBase(VLBIFileBase):
         self._sample_rate = sample_rate
 
     def tell(self, unit=None):
-        """Current offset in file.
+        """Current offset in the file.
 
         Parameters
         ----------
@@ -194,7 +194,7 @@ class VLBIStreamBase(VLBIFileBase):
         Returns
         -------
         offset : int, `~astropy.units.Quantity`, or `~astropy.time.Time`
-             Offset in current file (or time at current position)
+             Offset in current file (or time at current position).
         """
         if unit is None:
             return self.offset
@@ -216,9 +216,9 @@ class VLBIStreamBase(VLBIFileBase):
 
 class VLBIStreamReaderBase(VLBIStreamBase):
 
-    def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
-                 subset, samples_per_frame, sample_rate=None, fill_value=0.,
-                 squeeze=True):
+    def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
+                 unsliced_shape, bps, complex_data, subset, squeeze,
+                 fill_value):
 
         if sample_rate is None:
             try:
@@ -234,8 +234,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 raise
 
         super(VLBIStreamReaderBase, self).__init__(
-            fh_raw, header0, unsliced_shape, bps, complex_data, subset,
-            samples_per_frame, sample_rate, fill_value, squeeze)
+            fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
+            bps, complex_data, subset, squeeze, fill_value)
 
     def _squeeze_and_subset(self, data):
         """Possibly remove unit dimensions and subset the given data.
@@ -314,15 +314,15 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         Parameters
         ----------
-        fh : io.BufferedReader
-            Binary file handle.
+        fh : filehandle
+            Filehandle of the raw stream.
         header_template : header class or instance
             Definition or instance of file format's header class.
 
         Returns
         -------
         framerate : `~astropy.units.Quantity`
-            Frames per second, in Hz.
+            Frames per second.
 
         Notes
         -----
@@ -388,9 +388,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return self._fill_value
 
     def seek(self, offset, whence=0):
-        """Change stream position.
+        """Change the stream position.
 
-        This works like a normal seek, but the offset is in samples
+        This works like a normal filehandle seek, but the offset is in samples
         (or a relative or absolute time).
 
         Parameters
@@ -440,20 +440,19 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         Parameters
         ----------
-        count : int
-            Number of complete/subset samples to read.  If omitted or negative,
-            the whole file is read.  Ignored if ``out`` is given.
-        out : `None` or array
+        count : int or None, optional
+            Number of complete/subset samples to read.  If `None` (default) or
+            negative, the whole file is read.  Ignored if ``out`` is given.
+        out : None or array, optional
             Array to store the data in. If given, ``count`` will be inferred
-            from the first dimension.  The other dimension should equal
+            from the first dimension; the other dimension should equal
             ``sample_shape``.
 
         Returns
         -------
-        out : array of float or complex
-            The first dimension is sample-time, and the second, given by
-            ``sample_shape``, is (channel,).  Any dimension of length unity is
-            removed if ``self.squeeze=True``.
+        out : `~numpy.ndarray` of float or complex
+            The first dimension is sample-time, and the remainder given by
+            ``sample_shape``.
         """
         if out is None:
             if count is None or count < 0:
@@ -493,6 +492,17 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
 class VLBIStreamWriterBase(VLBIStreamBase):
 
+    def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
+                 unsliced_shape, bps, complex_data, subset, squeeze,
+                 fill_value):
+
+        if sample_rate is None:
+            raise ValueError("must pass in an explicit `sample_rate`.")
+
+        super(VLBIStreamWriterBase, self).__init__(
+            fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
+            bps, complex_data, subset, squeeze, fill_value)
+
     def _unsqueeze(self, data):
         new_shape = list(data.shape)
         for i, dim in enumerate(self._unsliced_shape):
@@ -505,12 +515,12 @@ class VLBIStreamWriterBase(VLBIStreamBase):
 
         Parameters
         ----------
-        data : array
+        data : `~numpy.ndarray`
             Piece of data to be written, with sample dimensions as given by
             ``sample_shape``. This should be properly scaled to make best use
             of the dynamic range delivered by the encoding.
         invalid_data : bool, optional
-            Whether the current data is invalid.  Defaults to `False`.
+            Whether the current data is invalid.  Default: `False`.
         """
         assert data.shape[1:] == self.sample_shape, (
             "'data' should have trailing shape {}".format(self.sample_shape))
@@ -548,7 +558,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             count -= nsample
 
     def _write_frame(self, frame, valid=True):
-        # default implementation is to assume this is a frame and use
+        # Default implementation is to assume this is a frame and use
         # the binary file writer.
         frame.valid = valid
         self.write_frame(frame)
@@ -566,18 +576,18 @@ class VLBIStreamWriterBase(VLBIStreamBase):
 
 default_open_doc = """Open baseband file for reading or writing.
 
-Opened as a binary file, one gets a wrapped file handle that adds
+Opened as a binary file, one gets a wrapped filehandle that adds
 methods to read/write a frame.  Opened as a stream, the handle is
-wrapped further, with methods such as read and write access the file
+wrapped further, with methods such as reading and writing to the file
 as if it were a stream of samples.
 
 Parameters
 ----------
 name : str or filehandle
-    File name or handle
+    File name or handle.
 mode : {'rb', 'wb', 'rs', or 'ws'}, optional
     Whether to open for reading or writing, and as a regular binary
-    file or as a stream (default is reading a stream).
+    file or as a stream. Default: ``rs``, for reading a stream.
 **kwargs
     Additional arguments when opening the file as a stream.
 """
@@ -589,7 +599,7 @@ def make_opener(fmt, classes, doc='', append_doc=True):
     Parameters
     ----------
     fmt : str
-        Name of the baseband format
+        Name of the baseband format.
     classes : dict
         With the file/stream reader/writer classes keyed by names equal to
         'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed by

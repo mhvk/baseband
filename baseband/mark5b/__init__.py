@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """Mark5B VLBI data reader.
 
 Code inspired by Walter Brisken's mark5access.  See

@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for GSB payloads.
 
@@ -59,16 +60,15 @@ class GSBPayload(VLBIPayloadBase):
 
     Parameters
     ----------
-    words : ndarray
+    words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    bps : int
-        Number of bits per sample part (i.e., per channel and per real or
-        imaginary component).  Default: 2.
-    sample_shape : tuple
+    bps : int, optional
+        Bits per elementary sample.  Default: 2.
+    sample_shape : tuple, optional
         Shape of the samples; e.g., (nchan,).  Default: ().
-    complex_data : bool
-        Whether data is complex or float.  Default: False.
+    complex_data : bool, optional
+        Whether data is complex.  Default: `False`.
     """
 
     _encoders = {4: encode_4bit,
@@ -88,7 +88,7 @@ class GSBPayload(VLBIPayloadBase):
             return cls._sample_shape_maker_nthread(*args)
 
     @classmethod
-    def fromfile(cls, fh, payloadsize=None, bps=4, nchan=1,
+    def fromfile(cls, fh, payloadsize=None, nchan=1, bps=4,
                  complex_data=False):
         """Read payloads from several threads.
 
@@ -101,24 +101,23 @@ class GSBPayload(VLBIPayloadBase):
             two parts of each in which phased baseband data are stored.
         payloadsize : int
             Number of bytes to read from each part.
-        bps : int
-            Number of bits per sample part (i.e., per channel and per real or
-            imaginary component).  Default: 4.
-        nchan : int
-            Number of Fourier channels.  Default: 1.
-        complex_data : bool
-            Whether data is complex or float.  Default: False.
+        nchan : int, optional
+            Number of channels.  Default: 1.
+        bps : int, optional
+            Bits per elementary sample.  Default: 4.
+        complex_data : bool, optional
+            Whether data is complex.  Default: False.
         """
         if hasattr(fh, 'read'):
             return super(GSBPayload,
                          cls).fromfile(fh, payloadsize=payloadsize,
-                                       bps=bps, sample_shape=(nchan,),
+                                       sample_shape=(nchan,), bps=bps,
                                        complex_data=complex_data)
 
         nthread = len(fh)
         payloads = [[super(GSBPayload,
-                           cls).fromfile(fh1, payloadsize=payloadsize, bps=bps,
-                                         sample_shape=(nchan,),
+                           cls).fromfile(fh1, payloadsize=payloadsize,
+                                         sample_shape=(nchan,), bps=bps,
                                          complex_data=complex_data)
                      for fh1 in fh_set] for fh_set in fh]
         if nthread == 1:

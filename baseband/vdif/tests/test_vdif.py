@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -675,7 +675,7 @@ class TestVDIF(object):
 
     def test_stream_writer(self, tmpdir):
         vdif_file = str(tmpdir.join('simple.vdif'))
-        # try writing a very simple file, using edv=0.  With 16 samples per
+        # Try writing a very simple file, using edv=0.  With 16 samples per
         # frame and a sample_rate of 320 Hz, we have a frame rate of 20 Hz.
         # We start on purpose not on an integer second, to check that
         # frame numbers get set correctly automatically.
@@ -687,8 +687,8 @@ class TestVDIF(object):
             edv=0, time=start_time, nchan=2, bps=2,
             complex_data=False, thread_id=0, samples_per_frame=16,
             station='me', sample_rate=320*u.Hz)
-        with vdif.open(vdif_file, 'ws', header=header,
-                       nthread=2, sample_rate=320*u.Hz) as fw:
+        with vdif.open(vdif_file, 'ws', header0=header,
+                       sample_rate=320*u.Hz, nthread=2) as fw:
             assert fw.sample_rate == 320*u.Hz
             for i in range(17):
                 fw.write(data)
@@ -721,20 +721,27 @@ class TestVDIF(object):
             assert np.all(record[24:40] == data)
             assert np.all(record[40:] == data)
 
+        # Test that failing to pass a sample rate returns a ValueError.
+        with pytest.raises(ValueError) as excinfo:
+            with vdif.open(vdif_file, 'ws', header0=header,
+                           nthread=2) as fw:
+                pass
+        assert "sample rate must be passed" in str(excinfo.value)
+
         # Test that squeeze attribute works on write.
         with vdif.open(SAMPLE_FILE, 'rs') as fh:
             record = fh.read()
             header = fh.header0
 
         test_file_squeeze = str(tmpdir.join('test_squeeze.vdif'))
-        with vdif.open(test_file_squeeze, 'ws', nthread=8,
-                       header=header) as fws:
+        with vdif.open(test_file_squeeze, 'ws', header0=header,
+                       nthread=8) as fws:
             assert fws.sample_shape == (8,)
             assert fws.sample_shape.nthread == 8
             fws.write(record)
         test_file_nosqueeze = str(tmpdir.join('test_nosqueeze.vdif'))
-        with vdif.open(test_file_nosqueeze, 'ws', nthread=8,
-                       header=header, squeeze=False) as fwns:
+        with vdif.open(test_file_nosqueeze, 'ws', header0=header,
+                       nthread=8, squeeze=False) as fwns:
             assert fwns.sample_shape == (8, 1)
             assert fwns.sample_shape.nthread == 8
             assert fwns.sample_shape.nchan == 1
@@ -766,12 +773,11 @@ class TestVDIF(object):
 
         # Make an 8 channel file.
         test_file = str(tmpdir.join('test.vdif'))
-        with vdif.open(test_file, 'ws',
-                       nthread=1, nchan=8, sample_rate=sample_rate,
-                       samples_per_frame=samples_per_frame // 8,
-                       complex_data=header0['complex_data'], bps=header0.bps,
-                       edv=header0.edv, station=header0.station,
-                       time=fh.start_time) as fw:
+        with vdif.open(test_file, 'ws', sample_rate=sample_rate,
+                       samples_per_frame=samples_per_frame // 8, nthread=1,
+                       nchan=8, complex_data=header0['complex_data'],
+                       bps=header0.bps, edv=header0.edv,
+                       station=header0.station, time=fh.start_time) as fw:
             fw.write(data)
 
         with vdif.open(test_file, 'rs') as fhn:
@@ -790,12 +796,11 @@ class TestVDIF(object):
         # Make an 8 thread, 4 channel file.
         data4x = np.array([data, abs(data),
                            -data, -abs(data)]).transpose(1, 2, 0)
-        with vdif.open(test_file, 'ws',
-                       nthread=8, nchan=4, sample_rate=sample_rate,
-                       samples_per_frame=samples_per_frame // 4,
-                       complex_data=header0['complex_data'], bps=header0.bps,
-                       edv=header0.edv, station=header0.station,
-                       time=fh.start_time) as fw:
+        with vdif.open(test_file, 'ws', sample_rate=sample_rate,
+                       samples_per_frame=samples_per_frame // 4, nthread=8,
+                       nchan=4, complex_data=header0['complex_data'],
+                       bps=header0.bps, edv=header0.edv,
+                       station=header0.station, time=fh.start_time) as fw:
             fw.write(data4x)
 
         # Sanity check by re-reading the file.
@@ -834,8 +839,8 @@ class TestVDIF(object):
         with catch_warnings(UserWarning) as w:
             with vdif.open(SAMPLE_FILE, 'rs') as fr:
                 record = fr.read(10)
-                with vdif.open(vdif_incomplete, 'ws', header=fr.header0,
-                               nthread=8, sample_rate=32*u.MHz) as fw:
+                with vdif.open(vdif_incomplete, 'ws', header0=fr.header0,
+                               sample_rate=32*u.MHz, nthread=8) as fw:
                     fw.write(record)
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
@@ -849,7 +854,7 @@ class TestVDIF(object):
                 open(str(tmpdir.join('test.vdif')), 'w+b') as s:
             frame = fh.read_frame()
             frame.tofile(s)
-            # now add lots of the next frame, i.e., with a different thread_id
+            # Now add lots of the next frame, i.e., with a different thread_id
             # and different frame_nr
             fh.seek(-frame.header.framesize, 2)
             frame2 = fh.read_frame()
@@ -863,10 +868,10 @@ class TestVDIF(object):
 
     def test_io_invalid(self):
         with pytest.raises(TypeError):
-            # extra argument
+            # Extra argument.
             vdif.open('ts.dat', 'rb', bla=10)
         with pytest.raises(ValueError):
-            # missing w or r
+            # Missing w or r.
             vdif.open('ts.dat', 's')
 
 
@@ -906,7 +911,7 @@ def test_arochime_vdif():
         header0.time
     assert abs(header0.get_time(sample_rate=sample_rate) -
                Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
-    # also check writing Time.
+    # Also check writing Time.
     header1 = header0.copy()
     with pytest.raises(ValueError):
         header1.time = Time('2016-04-22T08:45:31.788759040')

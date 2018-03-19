@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for DADA pulsar baseband headers.
 
@@ -28,11 +28,12 @@ class DADAHeader(OrderedDict):
     *args : str or iterable
         If a string, parsed as a DADA header from a file, otherwise
         as for the OrderedDict baseclass.
-    verify : bool
+    verify : bool, optional
         Whether to do minimal verification that the header is consistent with
-        the DADA standard
-    mutable : bool
+        the DADA standard.  Default: `True`.
+    mutable : bool, optional
         Whether to allow the header to be changed after initialisation.
+        Default: `True`.
     **kwargs
         Any further header keywords to be set.  If any value is a 2-item tuple,
         the second one will be considered a comment.
@@ -53,7 +54,7 @@ class DADAHeader(OrderedDict):
     """
 
     _properties = ('payloadsize', 'framesize', 'bps', 'complex_data',
-                   'sample_shape', 'sample_rate', 'bandwidth', 'sideband',
+                   'sample_shape', 'sample_rate', 'sideband',
                    'tsamp', 'samples_per_frame', 'offset', 'start_time',
                    'time')
     """Properties accessible/usable in initialisation for all headers."""
@@ -166,8 +167,9 @@ class DADAHeader(OrderedDict):
         ----------
         fh : filehandle
             To read data from.
-        verify: bool
+        verify: bool, optional
             Whether to do basic checks on whether the header is valid.
+            Default: `True`.
         """
         start_pos = fh.tell()
         hdr_size = 4096

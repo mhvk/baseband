@@ -66,8 +66,8 @@ To set up a file for writing as a stream is possible as well::
 
     >>> from astropy.time import Time
     >>> fw = dada.open('{utc_start}.{obs_offset:016d}.000000.dada', 'ws',
-    ...                npol=2, samples_per_frame=5000, nchan=1, bps=8,
-    ...                sample_rate=16*u.MHz, complex_data=True,
+    ...                sample_rate=16*u.MHz, samples_per_frame=5000,
+    ...                npol=2, nchan=1, bps=8, complex_data=True,
     ...                time=Time('2013-07-02T01:39:20.000'))
     >>> fw.write(d)
     >>> fw.close()

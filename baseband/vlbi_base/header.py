@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 """
 Base definitions for VLBI Headers, used for VDIF and Mark 5B.
 
@@ -141,7 +141,7 @@ class HeaderProperty(object):
 
     Parameters
     ----------
-    header_parser : HeaderParser instance
+    header_parser : `HeaderParser`
         A dict with header encoding information.
     getter : function
         Function that uses the encoding information to calculate a result.
@@ -252,7 +252,7 @@ class VLBIHeaderBase(object):
 
       _struct: `~struct.Struct` instance that can pack/unpack header words.
 
-      _header_parser: HeaderParser instance corresponding to this class.
+      _header_parser: `HeaderParser` instance corresponding to this class.
 
       _properties: tuple of properties accessible/usable in initialisation
 
@@ -268,7 +268,7 @@ class VLBIHeaderBase(object):
     Parameters
     ----------
     words : tuple or list of int, or None
-        header words (generally, 32 bit unsigned int).  If ``None``,
+        header words (generally, 32 bit unsigned int).  If `None`,
         set to a list of zeros for later initialisation.  If given as a tuple,
         the header is immutable.
     verify : bool
@@ -368,9 +368,9 @@ class VLBIHeaderBase(object):
 
         Parameters
         ----------
-        *args :
+        *args
             Possible arguments required to initialize an empty header.
-        **kwargs :
+        **kwargs
             Values used to initialize header keys or methods.
         """
         # Initialize an empty header, and update it with the keyword arguments.

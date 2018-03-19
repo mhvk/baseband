@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for VLBI Mark 4 payloads.
 
@@ -40,14 +41,14 @@ else:
                 ((x & 0x55005500) >> 7) |
                 ((x & 0x00AA00AA) << 7))
 
-    # can speed this up from 140 to 132 us by predefining bit patterns as
+    # Can speed this up from 140 to 132 us by predefining bit patterns as
     # array scalars.  Inplace calculations do not seem to help much.
     def reorder64(x):
         """Reorder 64-track bits to bring signs & magnitudes together."""
         return (((x & 0xAA55AA55AA55AA55)) |
                 ((x & 0x5500550055005500) >> 7) |
                 ((x & 0x00AA00AA00AA00AA) << 7))
-    # check on 2015-JUL-12: C code: 738811025863578102 -> 738829572664316278
+    # Check on 2015-JUL-12: C code: 738811025863578102 -> 738829572664316278
     # 118, 209, 53, 244, 148, 217, 64, 10
     # reorder64(np.array([738811025863578102], dtype=np.uint64))
     # # array([738829572664316278], dtype=uint64)
@@ -223,15 +224,18 @@ class Mark4Payload(VLBIPayloadBase):
 
     Parameters
     ----------
-    words : ndarray
+    words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
+    header : `~baseband.mark4.Mark4Header`, optional
+        If given, used to infer the number of channels, bps, and fanout.
     nchan : int, optional
-        Number of channels in the data.  Default: 1.
+        Number of channels, used if header is not given.  Default: 1.
     bps : int, optional
-        Number of bits per sample.  Default: 2.
+        Number of bits per sample, used if header is not given.  Default: 2.
     fanout : int, optional
-        Number of tracks every bit stream is spread over.  Default: 1.
+        Number of tracks every bit stream is spread over, used if header is
+        not given.  Default: 1.
 
     Notes
     -----
@@ -259,14 +263,13 @@ class Mark4Payload(VLBIPayloadBase):
             self._size = header.payloadsize
         self._dtype_word = MARK4_DTYPES[nchan * bps * fanout]
         self.fanout = fanout
-        super(Mark4Payload, self).__init__(words, bps=bps,
-                                           sample_shape=(nchan,),
-                                           complex_data=False)
+        super(Mark4Payload, self).__init__(words, sample_shape=(nchan,),
+                                           bps=bps, complex_data=False)
         self._coder = (self.sample_shape.nchan, bps, fanout)
 
     @classmethod
     def fromfile(cls, fh, header):
-        """Read payload from file handle and decode it into data.
+        """Read payload from filehandle and decode it into data.
 
         The payloadsize, number of channels, bits per sample, and fanout ratio
         are all taken from the header.
