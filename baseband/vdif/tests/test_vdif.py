@@ -582,6 +582,9 @@ class TestVDIF(object):
                 fh.samples_per_frame / fh.sample_rate)) < 1. * u.ns
             assert abs(fh.stop_time - fh.start_time -
                        (fh.size / fh.sample_rate)) < 1. * u.ns
+            fh.seek(1, 'end')
+            with pytest.raises(EOFError):
+                fh.read()
 
         assert record.shape == (12, 8)
         assert np.all(record.astype(int)[:, 0] ==

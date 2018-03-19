@@ -371,6 +371,9 @@ class TestMark5B(object):
             assert fhseek_int == fhseek_str
             with pytest.raises(ValueError):
                 fh.seek(0, 'last')
+            fh.seek(1, 'end')
+            with pytest.raises(EOFError):
+                fh.read()
 
         assert last_header['frame_nr'] == 3
         assert last_header['user'] == header['user']

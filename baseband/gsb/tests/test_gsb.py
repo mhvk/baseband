@@ -620,6 +620,9 @@ class TestGSB(object):
             out1 = np.empty_like(data1)
             fh_r.read(out=out1)
             assert np.all(out1 == data1)
+            fh_r.seek(1, 'end')
+            with pytest.raises(EOFError):
+                fh_r.read()
 
         # Try again with squeezing.
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,

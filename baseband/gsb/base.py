@@ -296,6 +296,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         if out is None:
             if count is None or count < 0:
                 count = self.size - self.offset
+                if count < 0:
+                    raise EOFError
 
             dtype = np.complex64 if self.complex_data else np.float32
             out = np.empty((count,) + self.sample_shape, dtype)

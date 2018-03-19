@@ -523,6 +523,9 @@ class TestMark4(object):
             assert fhseek_int == fhseek_str
             with pytest.raises(ValueError):
                 fh.seek(0, 'last')
+            fh.seek(1, 'end')
+            with pytest.raises(EOFError):
+                fh.read()
 
         assert record.shape == (642, 8)
         assert np.all(record[:640] == 0.)
