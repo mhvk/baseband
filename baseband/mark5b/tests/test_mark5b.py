@@ -531,6 +531,26 @@ class TestMark5B(object):
             assert np.all(fhs.read(20000) == record[:, 0])
             assert np.all(fhns.read(20000) == record[:, 0])
 
+        # Test that sample_rate can be inferred from max frame number
+        m5_test_samplerate = str(tmpdir.join('test_samplerate.m5b'))
+        sample_rate = 1. * u.MHz
+        samples_per_frame = 5000
+        test_time = start_time + 198. * samples_per_frame / sample_rate
+        # TODO: frame_nr should be inferred from time & sample_rate;
+        # see gh-158
+        with mark5b.open(m5_test_samplerate, 'ws', time=test_time, nchan=8,
+                         bps=2, sample_rate=sample_rate, frame_nr=198) as fw:
+            assert fw.header0['frame_nr'] == 198
+            # Write 4 dummy frames, to include the max frame and frame 0
+            fw.write(np.zeros((20000, 8), dtype='float32'))
+            assert fw._header['frame_nr'] == 1
+
+        with mark5b.open(m5_test_samplerate, 'rs', nchan=8, kday=56000) as fh:
+            assert fh.sample_rate == sample_rate
+            # Might as well test some other properties
+            assert abs(fh.start_time - test_time) < 1.*u.ns
+            assert fh.header0['frame_nr'] == 198
+
     def test_stream_invalid(self):
         with pytest.raises(ValueError):
             mark5b.open('ts.dat', 's')
