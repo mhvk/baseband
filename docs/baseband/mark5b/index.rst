@@ -7,11 +7,11 @@ MARK 5B
 *******
 
 The Mark 5B format is the output format of the Mark 5B disk-based VLBI data
-system.  It is described in its `design specifications <m5bspec>`_ (these
+system.  It is described in its `design specifications`_ (these
 exact specifications are also found in the `Mark 5B user manual
 <https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf>`_).
 
-.. _m5bspec: http://www.haystack.mit.edu/tech/vlbi/mark5/mark5_memos/019.pdf
+.. _design specifications: http://www.haystack.mit.edu/tech/vlbi/mark5/mark5_memos/019.pdf
 
 .. _mark5b_file_structure:
 
@@ -22,19 +22,19 @@ Each :term:`data frame` consists of a :term:`header` consisting of four 32-bit
 words (16 bytes) followed by a :term:`payload` of 2500 32-bit words (10000
 bytes).  The header contains a sync word, frame number, and timestamp 
 (accurate to 1 ms), as well as user-specified data; see Sec. 1 of the
-`specifications <m5bspec>`_ for details.  The payload supports $2^n$
-1-bit-streams, for $0 \leq n \leq 5$, and the first sample of each stream
-corresponds precisely to the header time.  |Elementary samples| may be 1 or 2
-bits in size, with the latter being stored in two successive bit streams.  The
-number of |channels| is equal to the number of bit-streams
-divided by the number of bits per elementary sample (Baseband currently only
-supports files where all bit-streams are active).  Files begin at a header 
-(unlike for Mark 4), and an integer number of frames fit within 1 second.
+`design specifications`_ for details.  The payload supports $2^n$ 1-bit-streams,
+for $0 \leq n \leq 5$, and the first sample of each stream corresponds
+precisely to the header time.  |Elementary samples| may be 1 or 2 bits in size,
+with the latter being stored in two successive bit streams.  The number of
+|channels| is equal to the number of bit-streams divided by the number of bits
+per elementary sample (Baseband currently only supports files where all
+bit-streams are active).  Files begin at a header (unlike for Mark 4), and an
+integer number of frames fit within 1 second.
 
 The Mark 5B system also outputs files with the active bit-stream mask, number
-of frames per second, and observational metadata (Sec. 1.3 of the
-`specifications <m5bspec>`_).  Baseband does not use these files (instead
-requiring the user specify, for example, the :term:`sample rate`).
+of frames per second, and observational metadata (Sec. 1.3 of the `design
+specifications`_).  Baseband does not use these files (instead requiring the
+user specify, for example, the :term:`sample rate`).
 
 .. _mark5b_usage:
 
