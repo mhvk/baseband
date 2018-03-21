@@ -1,7 +1,6 @@
 import io
 import warnings
 import numpy as np
-from itertools import zip_longest
 from collections import namedtuple
 import astropy.units as u
 from astropy.utils import lazyproperty
@@ -107,19 +106,18 @@ class VLBIStreamBase(VLBIFileBase):
                 shape_cls = namedtuple('SampleShape', ','.join(fields))
                 sample_shape = shape_cls(*squeezed_shape)
 
-        self._squeezed_shape = sample_shape
-
         if not self.subset:
             return sample_shape
 
+        # Create a dummy sample that has the sample number as its value.
         dummy_data = np.arange(13.)
         dummy_sample = np.rollaxis(
             (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1)
         try:
             dummy_subset = dummy_sample[(slice(None),) + self.subset]
-            # Sanity checks on result.  First ax
+            # Sanity checks on result.  Sample numbers should be preserved.
             assert np.all(dummy_subset == dummy_data.reshape(
-                (-1,) + (1,) * (dummy_subset.ndim -1)))
+                (-1,) + (1,) * (dummy_subset.ndim - 1)))
             subset_shape = dummy_subset.shape[1:]
             assert 0 not in subset_shape
         except (IndexError, AssertionError) as exc:
@@ -129,26 +127,27 @@ class VLBIStreamBase(VLBIFileBase):
                              sample_shape),)
             raise exc
 
-        # We only construct a new SampleShape for cases where we know for
-        # sure what happened in the subsetting.
-        if fields is None or subset_shape == ():
+        # We only construct a new SampleShape namedtuple for cases where we
+        # know for sure what happened in the subsetting.
+        if (fields is None or subset_shape == () or
+                len(self.subset) > len(sample_shape)):
             return subset_shape
 
         try:
             # If each dimension can be indexed separately, and this gives
             # a consistent result with what we have from the complete subset,
             # we know which fields we have kept.
-            assert len(self.subset) <= len(sample_shape)
-            i = 0
+            subset_axis = 0
             final_fields = []
-            for subset_item, sample_dim, field in zip_longest(
-                    self.subset, sample_shape, fields, fillvalue=slice(None)):
-                subset_dim = np.empty(sample_dim)[subset_item].shape
+            subset = self.subset + (slice(None),) * (len(sample_shape) -
+                                                     len(self.subset))
+            for field, sample_dim, item in zip(fields, sample_shape, subset):
+                subset_dim = np.empty(sample_dim)[item].shape
                 assert len(subset_dim) <= 1
                 if len(subset_dim) == 1:
-                    assert subset_dim[0] == subset_shape[i]
+                    assert subset_dim[0] == subset_shape[subset_axis]
                     final_fields.append(field)
-                    i += 1
+                    subset_axis += 1
         except Exception:
             # Things did not make sense, probably some advanced indexing;
             # Just don't worry about having a named tuple.
@@ -300,9 +299,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             samples_per_frame, sample_rate, fill_value, squeeze)
 
     def _squeeze_and_subset(self, data):
-        """Possibly remove unit dimensions and subset the data.
+        """Possibly remove unit dimensions and subset the given data.
 
-        Unit dimensions are only removed from the sample shape.
+        The first dimension (sample number) is never removed.
         """
         if self.squeeze:
             data = data.reshape(data.shape[:1] +

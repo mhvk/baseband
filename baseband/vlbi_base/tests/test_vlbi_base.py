@@ -453,7 +453,7 @@ class TestSqueezeAndSubset(object):
             unsliced_shape=unsliced_shape or self.unsliced_shape,
             squeeze=squeeze, subset=subset, **self.other_args)
 
-    def make_writer_with_shape(self, squeeze, sample_shape_maker=None,
+    def make_writer_with_shape(self, squeeze=True, sample_shape_maker=None,
                                unsliced_shape=None):
         # StreamWriterBase is used instead of StreamBase so we can also test
         # _unsqueeze.

@@ -321,9 +321,11 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
         # Set _thread_ids.  If subsetting, decode first frameset again.
         if self.subset and (len(thread_ids) > 1 or not self.squeeze):
-            # Squeeze in case subset[0] uses broadcasting.
+            # Select the thread ids we want using first part of subset.
             thread_ids = np.array(thread_ids)[self.subset[0]]
-            # TODO: make this more elegant!!
+            # TODO: make this more elegant!! If there is a single thread,
+            # the dimension will not necessarily be removed, so we set
+            # an attribute that we can use in `_squeeze_and_subset`.
             self._squeeze_thread_id = thread_ids.shape == ()
             # Use squeese in case subset[0] uses broadcasting, and
             # atleast_1d to ensure single threads get upgraded to a list.
