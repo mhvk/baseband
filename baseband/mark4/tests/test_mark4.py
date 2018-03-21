@@ -662,10 +662,9 @@ class TestMark4(object):
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
         with mark4.open(m4_incomplete, 'rs', ntrack=64, decade=2010,
-                        sample_rate=32*u.MHz) as fwr:
+                        sample_rate=32*u.MHz, fill_value=fill_value) as fwr:
             assert not fwr._frame.valid
-            assert np.all(fwr.read(fill_value=fill_value) ==
-                          fwr._frame.invalid_data_value)
+            assert np.all(fwr.read() == fwr._frame.invalid_data_value)
             assert fwr._frame.invalid_data_value == fill_value
 
     def test_corrupt_stream(self, tmpdir):
