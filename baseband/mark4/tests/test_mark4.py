@@ -619,7 +619,7 @@ class TestMark4(object):
             assert np.all(out == record[:12, 0])
 
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
-                        subset=0, squeeze=False) as fh:
+                        subset=[0], squeeze=False) as fh:
             assert fh.sample_shape == (1,)
             assert fh.sample_shape.nchan == 1
             assert fh.read(1).shape == (1, 1)

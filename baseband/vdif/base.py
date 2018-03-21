@@ -301,7 +301,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         decoded data.
     """
 
-    def __init__(self, fh_raw, subset=None, sample_rate=None, fill_value=0.,
+    def __init__(self, fh_raw, subset=(), sample_rate=None, fill_value=0.,
                  squeeze=True):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
@@ -320,11 +320,14 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             fh_raw, header, subset, len(self._frameset.frames),
             sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
         # Set _thread_ids.  If subsetting, decode first frameset again.
-        if self.subset:
+        if self.subset and (len(thread_ids) > 1 or not self.squeeze):
             # Squeeze in case subset[0] uses broadcasting.
-            thread_ids = np.array(thread_ids)[self.subset[0]].squeeze()
-            # Use atleast_1d to ensure single threads get upgraded to a list.
-            self._thread_ids = np.atleast_1d(thread_ids).tolist()
+            thread_ids = np.array(thread_ids)[self.subset[0]]
+            # TODO: make this more elegant!!
+            self._squeeze_thread_id = thread_ids.shape == ()
+            # Use squeese in case subset[0] uses broadcasting, and
+            # atleast_1d to ensure single threads get upgraded to a list.
+            self._thread_ids = np.atleast_1d(thread_ids.squeeze()).tolist()
             self.fh_raw.seek(0)
             self._frameset = self.read_frameset(self._thread_ids)
         else:
@@ -405,17 +408,31 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 
             # Set decoded value for invalid data.
             self._frameset.invalid_data_value = self.fill_value
-            # Determine appropriate slice to decode.
+            # TODO: maybe slice with data_slice once frameset allows slicing,
+            # so we decode only what is needed.
+            data = self._frameset.data.transpose(1, 0, 2)
+            # Determine appropriate slice.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            data_slice = slice(sample_offset, sample_offset + nsample)
-            if self.subset and len(self.subset) > 1:
-                data_slice = (data_slice, slice(None)) + self.subset[1:]
+            data = data[sample_offset:sample_offset + nsample]
+            if self.squeeze:
+                data = self._squeeze_samples(data)
+            if self.subset:
+                if len(self._thread_ids) > 1 or not self.squeeze:
+                    # subset thread IDs have already been selected,
+                    # but ensure a single selected thread for no squeezing
+                    # is removed
+                    if self._squeeze_thread_id:
+                        subset = (slice(None), 0) + self.subset[1:]
+                    else:
+                        subset = (slice(None), slice(None),) + self.subset[1:]
+                else:
+                    # single thread already squeezed away.
+                    subset = (slice(None),) + self.subset[1:]
+                data = data[subset]
+
             # Copy relevant data from frame into output.
-            data = self._frameset.data.transpose(1, 0, 2)
-            out[sample:sample + nsample] = (
-                data[data_slice].squeeze() if self.squeeze else
-                data[data_slice])
+            out[sample:sample + nsample] = data
             self.offset += nsample
             count -= nsample
 

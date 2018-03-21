@@ -1,6 +1,7 @@
 import io
 import warnings
 import numpy as np
+from itertools import zip_longest
 from collections import namedtuple
 import astropy.units as u
 from astropy.utils import lazyproperty
@@ -66,20 +67,12 @@ class VLBIStreamBase(VLBIFileBase):
             self._unsliced_shape = unsliced_shape
 
         self._squeeze = bool(squeeze)
-
         if subset is None:
-            subset_wrapints = (slice(None),)
-        else:
-            # Check if enclosing structure is a tuple.
-            if not isinstance(subset, tuple):
-                subset = (subset,)
-            subset_wrapints = self._wrap_subset(subset)
-            # If we don't squeeze, use subset_wrapints to keep numpy from
-            # concatenating dimensions subset to length unity.
-            if not self.squeeze:
-                subset = subset_wrapints
+            subset = ()
+        elif not isinstance(subset, tuple):
+            subset = (subset,)
         self._subset = subset
-        self._sample_shape = self._get_sample_shape(subset_wrapints)
+        self._sample_shape = self._get_sample_shape()
 
     @property
     def squeeze(self):
@@ -90,18 +83,6 @@ class VLBIStreamBase(VLBIFileBase):
         """
         return self._squeeze
 
-    def _wrap_subset(self, subset):
-        """Creates subset where lone integers are replaced with slices."""
-        subset_wrapints = []
-        for item in subset:
-            try:
-                i = item.__index__()
-            except (AttributeError, TypeError):
-                subset_wrapints.append(item)
-            else:
-                subset_wrapints.append(slice(i, (None if i == -1 else i + 1)))
-        return tuple(subset_wrapints)
-
     @property
     def subset(self):
         """Specific elements (threads/channels) of the sample to read.
@@ -111,45 +92,70 @@ class VLBIStreamBase(VLBIFileBase):
         """
         return self._subset
 
-    def _get_sample_shape(self, subset_wrapints):
-        # Extract sample_shape by creating a dummy sample and indexing it
-        # with subset_wrapints.
-        dummy_sample = np.empty(self._unsliced_shape)
-        try:
-            dummy_subsample = dummy_sample[subset_wrapints]
-        except IndexError as exc:
-            exc.args += ("subset cannot be used to set sample shape.",)
-            raise exc
-        sample_shape = dummy_subsample.shape
-        # Check no slice is out of bounds.
-        assert 0 not in sample_shape, ("subset is out of bounds of "
-                                       "the sample shape.")
-
-        # If _sample_shape_maker is defined, use it to generate a named tuple.
-        if self._sample_shape_maker is not None:
-            try:
-                sample_shape = self._sample_shape_maker(*sample_shape)
-            except TypeError:
-                raise ValueError("sample shape and shape maker's dimensions "
-                                 "do not match.  This may be because subset "
-                                 "uses advanced indexing that changes the "
-                                 "number of dimensions.")
-
-        # If self.squeeze = True, remove any remaining unity dimensions.
+    def _get_sample_shape(self):
+        # Extract semple_shape by creating a possibly squeezed dummy sample,
+        # and then indexing it with subset.
+        sample_shape = self._unsliced_shape
+        fields = getattr(sample_shape, '_fields', None)
         if self.squeeze:
-            field_names = getattr(sample_shape, '_fields', None)
-            sqz_dims = [dim for dim in sample_shape if dim > 1]
-            if field_names is None:
-                return tuple(sqz_dims)
+            squeezed_shape = tuple(dim for dim in sample_shape if dim > 1)
+            if fields is None:
+                sample_shape = squeezed_shape
             else:
-                sqz_names = [field for field, dim in
-                             zip(field_names, sample_shape) if
-                             dim > 1]
-                sqz_shp_cls = namedtuple('SampleShape',
-                                         ','.join(sqz_names))
-                return sqz_shp_cls(*sqz_dims)
+                fields = [field for field, dim in zip(fields, sample_shape)
+                          if dim > 1]
+                shape_cls = namedtuple('SampleShape', ','.join(fields))
+                sample_shape = shape_cls(*squeezed_shape)
 
-        return sample_shape
+        self._squeezed_shape = sample_shape
+
+        if not self.subset:
+            return sample_shape
+
+        dummy_data = np.arange(13.)
+        dummy_sample = np.rollaxis(
+            (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1)
+        try:
+            dummy_subset = dummy_sample[(slice(None),) + self.subset]
+            # Sanity checks on result.  First ax
+            assert np.all(dummy_subset == dummy_data.reshape(
+                (-1,) + (1,) * (dummy_subset.ndim -1)))
+            subset_shape = dummy_subset.shape[1:]
+            assert 0 not in subset_shape
+        except (IndexError, AssertionError) as exc:
+            exc.args += ("subset {} cannot be used to properly index "
+                         "{}samples with shape {}.".format(
+                             self.subset, "squeezed " if self.squeeze else "",
+                             sample_shape),)
+            raise exc
+
+        # We only construct a new SampleShape for cases where we know for
+        # sure what happened in the subsetting.
+        if fields is None or subset_shape == ():
+            return subset_shape
+
+        try:
+            # If each dimension can be indexed separately, and this gives
+            # a consistent result with what we have from the complete subset,
+            # we know which fields we have kept.
+            assert len(self.subset) <= len(sample_shape)
+            i = 0
+            final_fields = []
+            for subset_item, sample_dim, field in zip_longest(
+                    self.subset, sample_shape, fields, fillvalue=slice(None)):
+                subset_dim = np.empty(sample_dim)[subset_item].shape
+                assert len(subset_dim) <= 1
+                if len(subset_dim) == 1:
+                    assert subset_dim[0] == subset_shape[i]
+                    final_fields.append(field)
+                    i += 1
+        except Exception:
+            # Things did not make sense, probably some advanced indexing;
+            # Just don't worry about having a named tuple.
+            return subset_shape
+
+        shape_cls = namedtuple('SampleShape', ','.join(final_fields))
+        return shape_cls(*subset_shape)
 
     @lazyproperty
     def sample_shape(self):
@@ -292,6 +298,10 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         super(VLBIStreamReaderBase, self).__init__(
             fh_raw, header0, unsliced_shape, bps, complex_data, subset,
             samples_per_frame, sample_rate, fill_value, squeeze)
+
+    def _squeeze_samples(self, data):
+        return data.reshape(data.shape[:1] +
+                            tuple(sh for sh in data.shape[1:] if sh > 1))
 
     @staticmethod
     def _get_frame_rate(fh, header_template):

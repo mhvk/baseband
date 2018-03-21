@@ -270,42 +270,41 @@ example, if we only wanted thread 3 of the sample VDIF file::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=3, squeeze=False)
     >>> fh.sample_shape
-    SampleShape(nthread=1, nchan=1)
+    SampleShape(nchan=1)
     >>> d = fh.read(20000)
     >>> d.shape
-    (20000, 1, 1)
+    (20000, 1)
     >>> fh.subset
-    (slice(3, 4, None),)
+    (3,)
     >>> fh.close()
 
-Since ``squeeze=False``, ``subset`` is converted from ``3`` to ``slice(3, 4,
-None)`` to retain dimensions of length unity.  This behaviour is turned off
-when ``squeeze=True`` (see below).
+Note that with ``squeeze=False``, the number of channels is still unity;
+they would be removed with ``squeeze=True`` (see below).
 
 Data with multi-dimensional samples can be subset by passing a `tuple` of
-indexing objects with the same dimensional ordering as the sample shape prior
-to squeezing (in the case of VDIF this is threads, then channels).  For
-example, if we wished to select threads 1 and 3, and channel 0::
+indexing objects with the same dimensional ordering as the sample shape
+(possibly post squeezing); in the case of VDIF this is threads, then channels.
+For example, if we wished to select threads 1 and 3, and channel 0::
 
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=([1, 3], 0), squeeze=False)
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False, subset=([1, 3], 0))
     >>> fh.sample_shape
-    SampleShape(nthread=2, nchan=1)
+    SampleShape(nthread=2)
     >>> fh.close()
 
 If a `tuple` is not used when subsetting multi-dimensional data, ``subset``
 will only act upon the the first dimension::
 
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=[1, 3], squeeze=False)
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False, subset=[1, 3])
     >>> fh.sample_shape
     SampleShape(nthread=2, nchan=1)
     >>> fh.close()
 
 No enclosing `tuple` is required for data with single-dimensional samples.
 
-If ``squeeze=True``, dimensions of length unity are removed from the decoded
-data after subsetting::
+If ``squeeze=True`` (which is the default), dimensions of length unity
+are removed from the decoded data priot to subsetting::
 
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=([1, 3], 0))
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=[1, 3])
     >>> fh.sample_shape
     SampleShape(nthread=2)
     >>> fh.close()
