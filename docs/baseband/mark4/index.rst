@@ -26,9 +26,9 @@ into 22500-bit "tape frames", each of which consists of a 160-bit
 :term:`header` followed by a 19840-bit :term:`payload`.  The header includes a
 timestamp (accurate to 1.25 ms), track ID, sideband, and fan-out/in factor
 (see below); the details of these can be found in 2.1.1 - 2.1.3 in the
-`design specifications`_.  The payload consists of a 1-bit :term:`stream`.  When recording
-2-bit |elementary samples|, the data is split into two tracks, with one
-carrying the sign bit, and the other the magnitude bit.
+`design specifications`_.  The payload consists of a 1-bit :term:`stream`.
+When recording 2-bit |elementary samples|, the data is split into two tracks,
+with one carrying the sign bit, and the other the magnitude bit.
 
 The header takes the place of the first 160 bits of payload data, so that the
 first sample occurs ``fanout * 160`` sample times after the header time.  This
