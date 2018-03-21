@@ -270,6 +270,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         Number of complete samples per second (ie. the rate at which each
         channel is sampled).  If not given, will be inferred from scanning two
         frames of the file.
+    fill_value : float or complex
+        Value to use for invalid or missing data. Default: 0.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
@@ -278,7 +280,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None,
-                 subset=None, sample_rate=None, squeeze=True):
+                 subset=None, sample_rate=None, fill_value=0., squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
@@ -303,7 +305,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             unsliced_shape=self._frame.payload.sample_shape,
             bps=header.bps, complex_data=False, subset=subset,
             samples_per_frame=header.samples_per_frame,
-            squeeze=squeeze)
+            fill_value=fill_value, squeeze=squeeze)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
@@ -350,7 +352,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         last_header.infer_decade(self.start_time)
         return last_header
 
-    def read(self, count=None, fill_value=0., out=None):
+    def read(self, count=None, out=None):
         """Read count samples.
 
         The range retrieved can span multiple frames.
@@ -360,8 +362,6 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         count : int
             Number of samples to read.  If omitted or negative, the whole
             file is read.  Ignored if ``out`` is given.
-        fill_value : float
-            Value to use for invalid or missing data.
         out : `None` or array
             Array to store the data in. If given, ``count`` will be inferred
             from the first dimension.  The other dimension should equal
@@ -395,7 +395,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
                 self._read_frame()
 
             # Set decoded value for invalid data.
-            self._frame.invalid_data_value = fill_value
+            self._frame.invalid_data_value = self.fill_value
             # Determine appropriate slice to decode.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
@@ -532,6 +532,8 @@ sample_rate : `~astropy.units.Quantity`, optional
     Number of complete samples per second (ie. the rate at which each channel
     is sampled).  If not given, will be inferred from scanning two frames of
     the file.
+fill_value : float or complex
+    Value to use for invalid or missing data. Default: 0.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.

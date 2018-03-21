@@ -238,7 +238,7 @@ class VDIFStreamBase(VLBIStreamBase):
     _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
 
     def __init__(self, fh_raw, header0, subset, nthread, sample_rate=None,
-                 squeeze=True):
+                 fill_value=0., squeeze=True):
         samples_per_frame = header0.samples_per_frame
         if sample_rate is None:
             try:
@@ -251,7 +251,7 @@ class VDIFStreamBase(VLBIStreamBase):
             unsliced_shape=(nthread, header0.nchan),
             bps=header0.bps, complex_data=header0['complex_data'],
             subset=subset, samples_per_frame=samples_per_frame,
-            sample_rate=sample_rate, squeeze=squeeze)
+            sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
 
     def _get_time(self, header):
         """Get time from a header.
@@ -294,12 +294,15 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         Number of complete samples per second (ie. the rate at which each
         channel in each thread is sampled).  If not given, will be inferred
         from the header or by scanning one second of the file.
+    fill_value : float or complex
+        Value to use for invalid or missing data. Default: 0.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
     """
 
-    def __init__(self, fh_raw, subset=None, sample_rate=None, squeeze=True):
+    def __init__(self, fh_raw, subset=None, sample_rate=None, fill_value=0.,
+                 squeeze=True):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
@@ -313,9 +316,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         self._frameset = self.read_frameset()
         thread_ids = [fr['thread_id'] for fr in self._frameset.frames]
         self._framesetsize = fh_raw.tell()
-        super(VDIFStreamReader, self).__init__(fh_raw, header, subset,
-                                               len(self._frameset.frames),
-                                               sample_rate, squeeze)
+        super(VDIFStreamReader, self).__init__(
+            fh_raw, header, subset, len(self._frameset.frames),
+            sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
         # Set _thread_ids.  If subsetting, decode first frameset again.
         if self.subset:
             # Squeeze in case subset[0] uses broadcasting.
@@ -353,7 +356,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         self.fh_raw.seek(raw_offset)
         return last_header
 
-    def read(self, count=None, fill_value=0., out=None):
+    def read(self, count=None, out=None):
         """Read a number of complete (or subset) samples.
 
         The range retrieved can span multiple frames.
@@ -363,8 +366,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         count : int, optional
             Number of complete/subset samples to read.  If omitted or negative,
             the whole file is read.  Ignored if ``out`` is given.
-        fill_value : float or complex
-            Value to use for invalid or missing data.
         out : `None` or array
             Array to store the data in. If given, ``count`` will be inferred
             from the first dimension.  The other dimensions should equal
@@ -403,7 +404,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
                 assert frame_nr == self._frameset['frame_nr']
 
             # Set decoded value for invalid data.
-            self._frameset.invalid_data_value = fill_value
+            self._frameset.invalid_data_value = self.fill_value
             # Determine appropriate slice to decode.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
@@ -435,7 +436,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
     raw : `~baseband.vdif.base.VDIFFileWriter`
         Which will write filled sets of frames to storage.
     nthread : int
-        Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
+        Number of threads the VLBI data has (e.g., 2 for 2 polarizations).
         Default is 1.
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second (ie. the rate at which each
@@ -554,6 +555,8 @@ sample_rate : `~astropy.units.Quantity`, optional
     Number of complete samples per second (ie. the rate at which each channel
     in each thread is sampled).  If not given, will be inferred from the header
     or by scanning one second of the file.
+fill_value : float or complex
+    Value to use for invalid or missing data. Default: 0.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
@@ -561,7 +564,7 @@ squeeze : bool, optional
 --- For writing : (see :class:`VDIFStreamWriter`)
 
 nthread : int
-    Number of threads the VLBI data has (e.g., 2 for 2 polarisations).
+    Number of threads the VLBI data has (e.g., 2 for 2 polarizations).
 sample_rate : `~astropy.units.Quantity`, optional
     Number of complete samples per second (ie. the rate at which each
     channel in each thread is sampled).

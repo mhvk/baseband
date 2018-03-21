@@ -49,7 +49,8 @@ class VLBIStreamBase(VLBIFileBase):
     _sample_shape_maker = None
 
     def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
-                 subset, samples_per_frame, sample_rate, squeeze=True):
+                 subset, samples_per_frame, sample_rate, fill_value=0.,
+                 squeeze=True):
         super(VLBIStreamBase, self).__init__(fh_raw)
         self._header0 = header0
         self._bps = bps
@@ -57,6 +58,7 @@ class VLBIStreamBase(VLBIFileBase):
         self.samples_per_frame = samples_per_frame
         self.sample_rate = sample_rate
         self.offset = 0
+        self._fill_value = fill_value
 
         if self._sample_shape_maker is not None:
             self._unsliced_shape = self._sample_shape_maker(*unsliced_shape)
@@ -271,7 +273,7 @@ class VLBIStreamBase(VLBIFileBase):
 class VLBIStreamReaderBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
-                 subset, samples_per_frame, sample_rate=None,
+                 subset, samples_per_frame, sample_rate=None, fill_value=0.,
                  squeeze=True):
 
         if sample_rate is None:
@@ -289,7 +291,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         super(VLBIStreamReaderBase, self).__init__(
             fh_raw, header0, unsliced_shape, bps, complex_data, subset,
-            samples_per_frame, sample_rate, squeeze)
+            samples_per_frame, sample_rate, fill_value, squeeze)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
@@ -315,7 +317,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         while keeping track of the largest frame number yet found.
 
         ``_get_frame_rate`` is called when the sample rate is not user-provided
-        or deducable from header information.  If less than one second of data
+        or deducible from header information.  If less than one second of data
         exists in the file, the function will raise an EOFError.  It also
         returns an error if any header cannot be read or does not verify as
         correct.
@@ -364,6 +366,11 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """Number of samples in the file."""
         return int(((self.stop_time - self.start_time) *
                     self.sample_rate).to(u.one).round())
+
+    @property
+    def fill_value(self):
+        """Value to use for invalid or missing data. Default: 0."""
+        return self._fill_value
 
     def seek(self, offset, whence=0):
         """Change stream position.
