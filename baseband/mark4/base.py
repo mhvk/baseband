@@ -401,10 +401,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             sample = self.offset - offset0
             # TODO: cannot yet index frame directly.
             data = self._frame.data[sample_offset:sample_offset + nsample]
-            if self.squeeze:
-                data = self._squeeze_samples(data)
-            if self.subset:
-                data = data[(slice(None),) + self.subset]
+            data = self._squeeze_and_subset(data)
             # Copy relevant data from frame into output.
             out[sample:sample + nsample] = data
             self.offset += nsample

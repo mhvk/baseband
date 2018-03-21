@@ -299,9 +299,18 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             fh_raw, header0, unsliced_shape, bps, complex_data, subset,
             samples_per_frame, sample_rate, fill_value, squeeze)
 
-    def _squeeze_samples(self, data):
-        return data.reshape(data.shape[:1] +
-                            tuple(sh for sh in data.shape[1:] if sh > 1))
+    def _squeeze_and_subset(self, data):
+        """Possibly remove unit dimensions and subset the data.
+
+        Unit dimensions are only removed from the sample shape.
+        """
+        if self.squeeze:
+            data = data.reshape(data.shape[:1] +
+                                tuple(sh for sh in data.shape[1:] if sh > 1))
+        if self.subset:
+            data = data[(slice(None),) + self.subset]
+
+        return data
 
     @staticmethod
     def _get_frame_rate(fh, header_template):

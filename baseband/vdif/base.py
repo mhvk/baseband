@@ -415,28 +415,35 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
             data = data[sample_offset:sample_offset + nsample]
-            if self.squeeze:
-                data = self._squeeze_samples(data)
-            if self.subset:
-                if len(self._thread_ids) > 1 or not self.squeeze:
-                    # subset thread IDs have already been selected,
-                    # but ensure a single selected thread for no squeezing
-                    # is removed
-                    if self._squeeze_thread_id:
-                        subset = (slice(None), 0) + self.subset[1:]
-                    else:
-                        subset = (slice(None), slice(None),) + self.subset[1:]
-                else:
-                    # single thread already squeezed away.
-                    subset = (slice(None),) + self.subset[1:]
-                data = data[subset]
-
+            data = self._squeeze_and_subset(data)
             # Copy relevant data from frame into output.
             out[sample:sample + nsample] = data
             self.offset += nsample
             count -= nsample
 
         return out
+
+    def _squeeze_and_subset(self, data):
+        # Overwrite vlbi base since the threads part of subset has already
+        # been used.
+        if self.squeeze:
+            data = data.reshape(data.shape[:1] +
+                                tuple(sh for sh in data.shape[1:] if sh > 1))
+        if self.subset:
+            if len(self._thread_ids) > 1 or not self.squeeze:
+                # subset thread IDs have already been selected, but a single
+                # thread without squeeze would not have removed that dimension.
+                if self._squeeze_thread_id:
+                    subset_base = (slice(None), 0)
+                else:
+                    subset_base = (slice(None), slice(None),)
+            else:
+                # Single thread already squeezed away.
+                subset_base = (slice(None),)
+
+            data = data[subset_base + self.subset[1:]]
+
+        return data
 
     def _read_frame_set(self):
         self.fh_raw.seek(self.offset // self.samples_per_frame *

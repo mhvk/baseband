@@ -288,10 +288,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
             data = self._frame[sample_offset:sample_offset + nsample]
-            if self.squeeze:
-                data = self._squeeze_samples(data)
-            if self.subset:
-                data = data[(slice(None),) + self.subset]
+            data = self._squeeze_and_subset(data)
             # Copy relevant data from frame into output.
             out[sample:sample + nsample] = data
             self.offset += nsample
