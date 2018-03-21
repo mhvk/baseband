@@ -668,7 +668,7 @@ class TestGSB(object):
 
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED[1],
                       sample_rate=sample_rate, payloadsize=self.payloadsize,
-                      subset=slice(0, 256), squeeze=False) as fh_r:
+                      subset=slice(0, 256)) as fh_r:
             assert fh_r.sample_shape == (256,)
             fraw = [[open(thread, 'rb') for thread in SAMPLE_PHASED[1]]]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
@@ -676,7 +676,7 @@ class TestGSB(object):
                     ft, fraw, nchan=nchan, bps=bps, complex_data=True,
                     payloadsize=self.payloadsize)
             assert np.all(fh_r.read(fh_r.samples_per_frame) ==
-                          frame1.data[:, :256])
+                          frame1.data[:, 0, :256])
             self.close_phased_rawfiles(fraw)
 
         # Try writing to file by passing header keywords into open.

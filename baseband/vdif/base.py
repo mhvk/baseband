@@ -319,20 +319,55 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         super(VDIFStreamReader, self).__init__(
             fh_raw, header, subset, len(self._frameset.frames),
             sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
-        # Set _thread_ids.  If subsetting, decode first frameset again.
+        # Check whether we are reading only some threads.  This is somewhat
+        # messy since normally we apply the whole subset to the whole data,
+        # but here we need to split it up in the part that selects specific
+        # threads, which we use to selectively read, and the rest, which we
+        # do post-decoding.  Ensuring dimensions are correct is tricky.
         if self.subset and (len(thread_ids) > 1 or not self.squeeze):
             # Select the thread ids we want using first part of subset.
-            thread_ids = np.array(thread_ids)[self.subset[0]]
-            # TODO: make this more elegant!! If there is a single thread,
-            # the dimension will not necessarily be removed, so we set
-            # an attribute that we can use in `_squeeze_and_subset`.
-            self._squeeze_thread_id = thread_ids.shape == ()
+            subset0 = self.subset[0]
+            thread_ids = np.array(thread_ids)[subset0]
             # Use squeese in case subset[0] uses broadcasting, and
-            # atleast_1d to ensure single threads get upgraded to a list.
+            # atleast_1d to ensure single threads get upgraded to a list,
+            # which is needed by the VDIFFrameSet reader.
             self._thread_ids = np.atleast_1d(thread_ids.squeeze()).tolist()
+            # Reload the frame, now only including the requested threads.
             self.fh_raw.seek(0)
             self._frameset = self.read_frameset(self._thread_ids)
+            # We now need to determine any remaining subset, which will
+            # be for subsetting channels, taking care to leave the correct
+            # dimension for the threads, even after squeezing.
+            subset1 = self.subset[1:]
+            if self.squeeze:
+                # Given the initial if statement, the file has multiple threads.
+                if len(self._thread_ids) == 1:
+                    # If we have a single remaining thread, then squeeze
+                    # will remove it.
+                    if thread_ids.shape == ():
+                        # If this was the intent, then we're fine.
+                        self._subset_channels = subset1
+                    else:
+                        # But if we wanted to keep it, we need to put it back.
+                        self._subset_channels = (np.newaxis,) + subset1
+                else:
+                    # If we have multiple remaining threads, we need
+                    # to pass all those on (and possibly subset channels).
+                    self._subset_channels = (slice(None),) + subset1
+            else:
+                # Here, squeezing will not happen.
+                if thread_ids.shape == ():
+                    # So, if we indexed a scalar thread, we should remove it.
+                    self._subset_channels = (0,) + subset1
+                else:
+                    # But we can just pass on all threads otherwise.
+                    self._subset_channels = (slice(None),) + subset1
+
         else:
+            # We either have no subset or we have a single thread that
+            # will be squeezed away, so the subset should apply to the
+            # channels.  It doesn't hurt to always set subset_channels.
+            self._subset_channels = self.subset
             self._thread_ids = thread_ids
 
     @lazyproperty
@@ -426,24 +461,13 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         return out
 
     def _squeeze_and_subset(self, data):
-        # Overwrite vlbi base since the threads part of subset has already
-        # been used.
+        # Overwrite VLBIStreamReaderBase version, since the threads part of
+        # subset has already been used.
         if self.squeeze:
             data = data.reshape(data.shape[:1] +
                                 tuple(sh for sh in data.shape[1:] if sh > 1))
         if self.subset:
-            if len(self._thread_ids) > 1 or not self.squeeze:
-                # subset thread IDs have already been selected, but a single
-                # thread without squeeze would not have removed that dimension.
-                if self._squeeze_thread_id:
-                    subset_base = (slice(None), 0)
-                else:
-                    subset_base = (slice(None), slice(None),)
-            else:
-                # Single thread already squeezed away.
-                subset_base = (slice(None),)
-
-            data = data[subset_base + self.subset[1:]]
+            data = data[(slice(None),) + self._subset_channels]
 
         return data
 

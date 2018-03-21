@@ -672,12 +672,15 @@ class TestVDIF(object):
             header0 = fh.header0
 
         with vdif.open(SAMPLE_FILE, 'rs', subset=slice(0, 8, 2)) as fhn:
-            assert np.all(fhn.read() == data[:, slice(0, 8, 2)])
             assert fhn.sample_shape == (4,)
+            check = fhn.read()
+            assert np.all(check == data[:, slice(0, 8, 2)])
 
         with vdif.open(SAMPLE_FILE, 'rs', subset=[0]) as fhn:
-            assert np.all(fhn.read() == data[:, 0])
             assert fhn.sample_shape == (1,)
+            check = fhn.read()
+            assert check.shape == (data.shape[0], 1)
+            assert np.all(check == data[:, :1])
 
         # Make an 8 channel file.
         test_file = str(tmpdir.join('test.vdif'))
@@ -693,12 +696,14 @@ class TestVDIF(object):
             assert np.all(fhn.read() == data)
 
         with vdif.open(SAMPLE_FILE, 'rs', subset=np.array([3, 7])) as fhn:
-            assert np.all(fhn.read() == data[:, np.array([3, 7])])
             assert fhn.sample_shape == (2,)
+            check = fhn.read()
+            assert np.all(check == data[:, np.array([3, 7])])
 
         with vdif.open(SAMPLE_FILE, 'rs', subset=[2]) as fhn:
-            assert np.all(fhn.read() == data[:, 2])
             assert fhn.sample_shape == (1,)
+            check = fhn.read()
+            assert np.all(check == data[:, 2:3])
 
         # Make an 8 thread, 4 channel file.
         data4x = np.array([data, abs(data),
@@ -713,18 +718,21 @@ class TestVDIF(object):
 
         # Sanity check by re-reading the file.
         with vdif.open(test_file, 'rs') as fhn:
-            assert np.all(fhn.read() == data4x)
             assert fhn.sample_shape == (8, 4)
+            check = fhn.read()
+            assert np.all(check == data4x)
 
         # Single thread and channel selection.
         with vdif.open(test_file, 'rs', subset=(6, 2)) as fhn:
             assert fhn.sample_shape == ()
-            assert np.all(fhn.read() == data4x[:, 6, 2])
+            check = fhn.read()
+            assert np.all(check == data4x[:, 6, 2])
 
         # Single thread, multi-channel selection.
         with vdif.open(test_file, 'rs', subset=(3, [1, 2])) as fhn:
             assert fhn.sample_shape == (2,)
-            assert np.all(fhn.read() == data4x[:, 3, 1:3])
+            check = fhn.read()
+            assert np.all(check == data4x[:, 3, 1:3])
 
         # Multi-thread, multi-channel selection
         subset_md = (np.array([5, 3])[:, np.newaxis], np.array([0, 2]))
@@ -733,7 +741,8 @@ class TestVDIF(object):
             thread_ids = [frame.header['thread_id'] for frame in
                           fhn._frameset.frames]
             assert thread_ids == [5, 3]
-            assert np.all(fhn.read() == data4x[(slice(None),) + subset_md])
+            check = fhn.read()
+            assert np.all(check == data4x[(slice(None),) + subset_md])
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.

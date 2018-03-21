@@ -109,13 +109,14 @@ class VLBIStreamBase(VLBIFileBase):
         if not self.subset:
             return sample_shape
 
-        # Create a dummy sample that has the sample number as its value.
+        # Create a dummy sample that has the sample number as its value
+        # (here, 13 is to bring bad luck to over-complicated subsets).
         dummy_data = np.arange(13.)
-        dummy_sample = np.rollaxis(
+        dummy_sample = np.rollaxis(  # use moveaxis when numpy_min>=1.11
             (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1)
         try:
             dummy_subset = dummy_sample[(slice(None),) + self.subset]
-            # Sanity checks on result.  Sample numbers should be preserved.
+            # Sample numbers should be preserved, but might as well check.
             assert np.all(dummy_subset == dummy_data.reshape(
                 (-1,) + (1,) * (dummy_subset.ndim - 1)))
             subset_shape = dummy_subset.shape[1:]
