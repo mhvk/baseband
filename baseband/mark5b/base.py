@@ -284,12 +284,15 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
 
     def __init__(self, raw, sample_rate, nchan=1, bps=2, header=None,
                  squeeze=True, **kwargs):
+        samples_per_frame = Mark5BHeader._payloadsize * 8 // bps // nchan
         if header is None:
+            if 'time' in kwargs:
+                kwargs['framerate'] = sample_rate / samples_per_frame
             header = Mark5BHeader.fromvalues(**kwargs)
         super(Mark5BStreamWriter, self).__init__(
-            raw, header0=header, unsliced_shape=(nchan,), bps=bps,
-            complex_data=False, subset=None,
-            samples_per_frame=header.payloadsize * 8 // bps // nchan,
+            raw, header0=header, unsliced_shape=(nchan,),
+            bps=bps, complex_data=False, subset=None,
+            samples_per_frame=samples_per_frame,
             sample_rate=sample_rate, squeeze=squeeze)
 
         self._data = np.zeros((self.samples_per_frame,
@@ -323,8 +326,9 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
             if sample_offset == 0:
                 # set up header for new frame.
                 self._header = self.header0.copy()
-                self._header.update(time=self.tell(unit='time'),
-                                    frame_nr=frame_nr)
+                self._header.set_time(time=self.tell(unit='time'),
+                                      frame_nr=frame_nr)
+                self._header.update()    # Update CRC.
 
             if invalid_data:
                 # Mark whole frame as invalid data.

@@ -435,8 +435,7 @@ class VDIFHeader(VLBIHeaderBase):
                         raise ValueError("cannot calculate sample rate for "
                                          "this header. Pass it in explicitly.")
                 framerate = sample_rate / self.samples_per_frame
-                frame_nr = int(round((frac_sec * framerate)
-                                     .to(u.dimensionless_unscaled).value))
+                frame_nr = int(round((frac_sec * framerate).to(u.one).value))
                 if abs(frame_nr / framerate - 1. * u.s) < 1. * u.ns:
                     frame_nr = 0
                     int_sec += 1
@@ -689,7 +688,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
     def set_time(self, time, sample_rate=None):
-        Mark5BHeader.set_time(self, time)
+        Mark5BHeader.set_time(self, time, frame_nr=self['mark5b_frame_nr'])
         # Without a sample rate, we assume the frame number calculated
         # by Mark5B header is correct; otherwise we calculate it here.
         super(VDIFMark5BHeader, self).set_time(
