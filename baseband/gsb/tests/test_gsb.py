@@ -454,7 +454,8 @@ class TestGSB(object):
             assert fh_r.header0 == frame1.header
             assert fh_r.size == 10 * fh_r.samples_per_frame
             assert fh_r.sample_rate == sample_rate
-            assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
+            check = fh_r.read(fh_r.samples_per_frame)
+            assert np.all(check == frame1.data)
             # Seek last offset.
             with open(SAMPLE_RAWDUMP_HEADER, 'rt') as ft, \
                     open(SAMPLE_RAWDUMP, 'rb') as fraw:
@@ -464,7 +465,8 @@ class TestGSB(object):
                                                 payloadsize=self.payloadsize)
             assert fh_r._last_header == frame10.header
             fh_r.seek(-10, 2)
-            assert np.all(fh_r.read(10) == frame10.data[-10:])
+            check = fh_r.read(10)
+            assert np.all(check == frame10.data[-10:])
             # Check validity of current and stopping time
             assert abs(fh_r.stop_time -
                        Time('2015-04-27T13:15:02.516582640')) < 1.*u.ns
@@ -482,9 +484,12 @@ class TestGSB(object):
         with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP,
                       sample_rate=sample_rate, payloadsize=self.payloadsize,
                       squeeze=True) as fh_r:
+            data2 = fh_r.read()
+            assert np.all(data2 == data1.squeeze())
             out2 = np.empty((fh_r.size,) + fh_r.sample_shape)
+            fh_r.seek(0)
             fh_r.read(out=out2)
-            assert np.all(out2 == out1.squeeze())
+            assert np.all(out2 == data1.squeeze())
             # To compare with directly psasing samples_per_frame below.
             spf_from_payloadsize = fh_r.samples_per_frame
             # For testing proper file closing below.
@@ -495,13 +500,19 @@ class TestGSB(object):
         with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP,
                       sample_rate=sample_rate, samples_per_frame=(
                           self.payloadsize * (8 // bps))) as fh_r:
+            # Check that passing samples_per_frame is identical to passing
+            # payloadsize.
+            assert fh_r.samples_per_frame == spf_from_payloadsize
+            check = fh_r.read()
+            assert np.all(check == data2)
+
             with gsb.open(gsbtest_ts, 'ws', raw=gsbtest_raw,
                           sample_rate=fh_r.sample_rate,
                           samples_per_frame=(self.payloadsize * (8 // bps)),
                           header=fh_r.header0) as fh_w:
                 assert fh_w.sample_rate == sample_rate
-                fh_w.write(fh_r.read())
-            fh_r.seek(0)
+                fh_w.write(data2)
+
             with gsb.open(gsbtest_ts, 'rs', raw=gsbtest_raw,
                           sample_rate=fh_r.sample_rate,
                           samples_per_frame=(
@@ -512,27 +523,23 @@ class TestGSB(object):
                 assert fh_n.sample_shape == fh_r.sample_shape
                 assert fh_n.start_time == fh_r.start_time
                 assert fh_n.sample_rate == sample_rate
-                assert np.all(fh_n.read() == fh_r.read())
+                check = fh_n.read()
+                assert np.all(check == data2)
                 assert abs(fh_n.stop_time - fh_n.time) < 1.*u.ns
                 assert abs(fh_n.stop_time - fh_r.stop_time) < 1.*u.ns
-            # Try writing a file with squeeze off.
-            fh_r.seek(0)
-            with gsb.open(gsbtest_ts, 'ws', raw=gsbtest_raw,
-                          sample_rate=fh_r.sample_rate,
-                          samples_per_frame=(self.payloadsize * (8 // bps)),
-                          header=fh_r.header0, squeeze=False) as fh_wns:
-                fh_wns.write(fh_r.read()[:, np.newaxis])
-            fh_r.seek(0)
-            with gsb.open(gsbtest_ts, 'rs', raw=gsbtest_raw,
-                          sample_rate=fh_r.sample_rate,
-                          samples_per_frame=(
-                              self.payloadsize * (8 // bps))) as fh_nns:
-                assert np.all(fh_nns.read() == fh_r.read())
-            # Check that passing samples_per_frame is identical to passing
-            # payloadsize.
-            fh_r.seek(0)
-            assert fh_r.samples_per_frame == spf_from_payloadsize
-            assert np.all(fh_r.read() == data1.squeeze())
+
+        # Try writing a file with squeeze off, and reading it back with squeeze.
+        with gsb.open(gsbtest_ts, 'ws', raw=gsbtest_raw,
+                      sample_rate=sample_rate,
+                      samples_per_frame=(self.payloadsize * (8 // bps)),
+                      header=header0, squeeze=False) as fh_wns:
+            fh_wns.write(data1)
+
+        with gsb.open(gsbtest_ts, 'rs', raw=gsbtest_raw,
+                      sample_rate=sample_rate,
+                      samples_per_frame=(self.payloadsize * (8 // bps))) as fh_nns:
+            check == fh_nns.read()
+            assert np.all(check == data2)
 
         # Test that opening that raises an exception correctly handles
         # file closing. (Note that the timestamp file always gets closed).

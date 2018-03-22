@@ -549,7 +549,7 @@ class TestSqueezeAndSubset(object):
         subset_data = sb._squeeze_and_subset(self.unsliced_data)
         assert subset_data.shape == (100,) + sliced_shape
 
-    def test_failty_subset(self):
+    def test_faulty_subset(self):
         # Advanced indexing changes dimensions, so sample_shape can't be set.
         with pytest.raises(IndexError) as excinfo:
             self.make_reader_with_shape(

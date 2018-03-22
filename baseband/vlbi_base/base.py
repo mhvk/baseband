@@ -271,7 +271,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         # Now apply subset to a dummy sample that has the sample number as its
         # value (where 13 is to bring bad luck to over-complicated subsets).
         dummy_data = np.arange(13.)
-        dummy_sample = np.rollaxis(  # use moveaxis when numpy_min>=1.11
+        dummy_sample = np.rollaxis(  # Use moveaxis when numpy_min>=1.11
             (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1)
         try:
             dummy_subset = dummy_sample[(slice(None),) + self.subset]
@@ -304,7 +304,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             for field, sample_dim, item in zip(sample_shape._fields,
                                                sample_shape, subset):
                 subset_dim = np.empty(sample_dim)[item].shape
-                assert len(subset_dim) <= 1  # no advanced multi-d indexing.
+                assert len(subset_dim) <= 1  # No advanced multi-d indexing.
                 if len(subset_dim) == 1:
                     # If this dimension was not removed and matches that
                     # of the real subset, we now have a field label for it.

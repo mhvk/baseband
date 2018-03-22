@@ -291,9 +291,10 @@ single dimension.  If one would like to keep all information, one has to pass
     >>> fh.close()
 
 Data with multi-dimensional samples can be subset by passing a `tuple` of
-indexing objects with the same dimensional ordering as the sample shape
-(possibly post squeezing); in the case of VDIF this is threads, then channels.
-For example, if we wished to select threads 1 and 3, and channel 0::
+indexing objects with the same dimensional ordering as the (possibly squeezed)
+sample shape; in the case of the sample VDIF with ``squeeze=False``, this is
+threads, then channels. For example, if we wished to select threads 1 and 3,
+and channel 0::
 
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False, subset=([1, 3], 0))
     >>> fh.sample_shape
