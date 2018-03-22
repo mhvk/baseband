@@ -143,8 +143,8 @@ class GSBStreamBase(VLBIStreamBase):
         super(GSBStreamBase, self).__init__(
             fh_raw, header0=header0, unsliced_shape=unsliced_shape, bps=bps,
             complex_data=complex_data, subset=subset,
-            samples_per_frame=samples_per_frame,
-            sample_rate=sample_rate, squeeze=squeeze)
+            samples_per_frame=samples_per_frame, sample_rate=sample_rate,
+            squeeze=squeeze)
         self._payloadsize = payloadsize
 
     def close(self):
@@ -269,7 +269,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             last_header = self.header0.__class__(second_last_line_tuple)
         return last_header
 
-    def read(self, count=None, fill_value=0., out=None):
+    def read(self, count=None, out=None):
         """Read a number of complete (or subset) samples.
 
         The range retrieved can span multiple frames.
@@ -279,8 +279,6 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         count : int, optional
             Number of complete/subset samples to read.  If omitted or negative,
             the whole file is read.  Ignored if ``out`` is given.
-        fill_value : float or complex
-            Value to use for invalid or missing data.
         out : `None` or array
             Array to store the data in. If given, ``count`` will be inferred
             from the first dimension.  The other dimensions should equal
@@ -313,7 +311,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             if(frame_nr != self._frame_nr):
                 # Read relevant frame (possibly reusing data array from
                 # previous frame set).
-                self._read_frame(fill_value)
+                self._read_frame()
                 framerate = self.sample_rate / self.samples_per_frame
                 assert np.isclose(self._frame_nr,
                                   ((self._frame.header.time -
@@ -334,7 +332,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
         return out
 
-    def _read_frame(self, fill_value=0., out=None):
+    def _read_frame(self, out=None):
         frame_nr = self.offset // self.samples_per_frame
         self.fh_ts.seek(self.header0.seek_offset(frame_nr))
         if self.header0.mode == 'rawdump':

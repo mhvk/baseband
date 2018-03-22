@@ -13,7 +13,7 @@ from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_VLBI_VDIF as
                      SAMPLE_VLBI, SAMPLE_MWA_VDIF as SAMPLE_MWA,
                      SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME)
 
-# Comparisn with m5access routines (check code on 2015-MAY-30) on vlba.m5a,
+# Comparison with m5access routines (check code on 2015-MAY-30) on vlba.m5a,
 # which contains the first 16 frames from evn/Fd/GP052D_FD_No0006.m5a.
 # 00000000  77 2c db 00 00 00 00 1c  75 02 00 20 fc ff 01 04  # header 0 - 3
 # 00000010  10 00 80 03 ed fe ab ac  00 00 40 33 83 15 03 f2  # header 4 - 7
@@ -717,10 +717,9 @@ class TestVDIF(object):
                     fw.write(record)
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
-        with vdif.open(vdif_incomplete, 'rs') as fwr:
+        with vdif.open(vdif_incomplete, 'rs', fill_value=fill_value) as fwr:
             assert all([not frame.valid for frame in fwr._frameset.frames])
-            assert np.all(fwr.read(fill_value=fill_value) ==
-                          fwr._frameset.invalid_data_value)
+            assert np.all(fwr.read() == fwr._frameset.invalid_data_value)
             assert fwr._frameset.invalid_data_value == fill_value
 
     def test_corrupt_stream(self, tmpdir):
