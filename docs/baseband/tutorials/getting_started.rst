@@ -6,7 +6,7 @@
 Getting Started
 ***************
 
-This tutorial covers the basic features of Baseband.  It assumes that 
+This tutorial covers the basic features of Baseband.  It assumes that
 `NumPy <http://www.numpy.org/>`_ and the `Astropy`_ units module have been
 imported::
 
@@ -77,7 +77,7 @@ As discussed in detail in the :ref:`VDIF section <vdif>`, VDIF files are
 sequences of data frames, each of which is comprised of a :term:`header` (which
 holds information like the time at which the data was taken) and a
 :term:`payload`, or block of data.  Multiple concurrent time streams can be
-stored within a single frame; each of these is called a ":term:`channel`". 
+stored within a single frame; each of these is called a ":term:`channel`".
 Moreover, groups of channels can be stored over multiple frames, each of which
 is called a ":term:`thread`".  Our sample file is an "8-thread, single-channel
 file" (8 concurrent time streams with 1 stream per frame), and in the example
@@ -152,7 +152,7 @@ To determine where the pointer is located, we use ``fh.tell()``::
     40000
     >>> fh.close()
 
-Caution should be used when decoding large blocks of data using ``fh.read``. 
+Caution should be used when decoding large blocks of data using ``fh.read``.
 For typical files, the resulting arrays are far too large to hold in memory.
 
 Seeking and Telling in Time With the Sample Pointer
@@ -268,44 +268,35 @@ decoding a :term:`subset` of the complete sample, we can select specific
 components by passing indexing objects to the ``subset`` keyword in open.  For
 example, if we only wanted thread 3 of the sample VDIF file::
 
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=3, squeeze=False)
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=3)
+    >>> fh.sample_shape
+    ()
+    >>> d = fh.read(20000)
+    >>> d.shape
+    (20000,)
+    >>> fh.subset
+    (3,)
+    >>> fh.close()
+
+Since by default data are squeezed, one obtains a data stream with just a
+single dimension.  If one would like to keep all information, one has to pass
+``squeeze=False`` and also make ``subset`` a list (or slice)::
+
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False, subset=[3])
     >>> fh.sample_shape
     SampleShape(nthread=1, nchan=1)
     >>> d = fh.read(20000)
     >>> d.shape
     (20000, 1, 1)
-    >>> fh.subset
-    (slice(3, 4, None),)
     >>> fh.close()
-
-Since ``squeeze=False``, ``subset`` is converted from ``3`` to ``slice(3, 4,
-None)`` to retain dimensions of length unity.  This behaviour is turned off
-when ``squeeze=True`` (see below).
 
 Data with multi-dimensional samples can be subset by passing a `tuple` of
-indexing objects with the same dimensional ordering as the sample shape prior
-to squeezing (in the case of VDIF this is threads, then channels).  For
-example, if we wished to select threads 1 and 3, and channel 0::
+indexing objects with the same dimensional ordering as the (possibly squeezed)
+sample shape; in the case of the sample VDIF with ``squeeze=False``, this is
+threads, then channels. For example, if we wished to select threads 1 and 3,
+and channel 0::
 
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=([1, 3], 0), squeeze=False)
-    >>> fh.sample_shape
-    SampleShape(nthread=2, nchan=1)
-    >>> fh.close()
-
-If a `tuple` is not used when subsetting multi-dimensional data, ``subset``
-will only act upon the the first dimension::
-
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=[1, 3], squeeze=False)
-    >>> fh.sample_shape
-    SampleShape(nthread=2, nchan=1)
-    >>> fh.close()
-
-No enclosing `tuple` is required for data with single-dimensional samples.
-
-If ``squeeze=True``, dimensions of length unity are removed from the decoded
-data after subsetting::
-
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=([1, 3], 0))
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False, subset=([1, 3], 0))
     >>> fh.sample_shape
     SampleShape(nthread=2)
     >>> fh.close()
@@ -316,6 +307,8 @@ Generally, ``subset`` accepts any object that can be used to `index
 ``subset=([1, 3], 0)``).  If possible, slices should be used instead
 of list of integers, since indexing with them returns a view rather
 than a copy and thus avoid unnecessary processing and memory allocation.
+(An exception to this is VDIF threads, where the subset is used to selectively
+read specific threads, and thus is not used for actual slicing of the data.)
 
 .. _getting_started_writing:
 
@@ -451,7 +444,7 @@ of rescaling, see the ``baseband/tests/test_conversion.py`` file.
 Reading or Writing to a Sequence of Files
 =========================================
 
-Data from one continuous observation is often spread over a sequence of files. 
+Data from one continuous observation is often spread over a sequence of files.
 The `~baseband.helpers.sequentialfile` module is available for reading in a
 sequence as if it were one contiguous file.  Simple usage examples can be found
 in the :ref:`Sequential File <sequential_file>` section.  DADA data is so

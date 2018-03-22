@@ -496,8 +496,8 @@ class TestMark5B(object):
 
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, kday=56000,
-                         subset=0, squeeze=False) as fh:
-            assert fh.subset == (slice(0, 1),)
+                         subset=[0], squeeze=False) as fh:
+            assert fh.subset == ([0],)
             assert fh.sample_shape == (1,)
             assert fh.sample_shape.nchan == 1
             assert fh.read(1).shape == (1, 1)

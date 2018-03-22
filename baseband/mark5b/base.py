@@ -286,13 +286,10 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             # Determine appropriate slice to decode.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            data_slice = slice(sample_offset, sample_offset + nsample)
-            if self.subset:
-                data_slice = (data_slice,) + self.subset
+            data = self._frame[sample_offset:sample_offset + nsample]
+            data = self._squeeze_and_subset(data)
             # Copy relevant data from frame into output.
-            out[sample:sample + nsample] = (
-                self._frame[data_slice].squeeze() if self.squeeze else
-                self._frame[data_slice])
+            out[sample:sample + nsample] = data
             self.offset += nsample
             count -= nsample
 
