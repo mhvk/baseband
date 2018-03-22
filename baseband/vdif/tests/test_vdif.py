@@ -394,7 +394,7 @@ class TestVDIF(object):
         assert len(frameset.frames) == 8
         assert frameset.samples_per_frame == 20000
         assert frameset.nchan == 1
-        assert frameset.shape == (8, 20000, 1)
+        assert frameset.shape == (20000, 8, 1)
         assert frameset.size == 8 * frameset.frames[0].size
         assert 'edv' in frameset
         assert 'edv' in frameset.keys()
@@ -419,9 +419,9 @@ class TestVDIF(object):
             frameset2 = fh.read_frameset(thread_ids=[2, 3])
             fh.fh_raw.seek(0)
             frameset3 = fh.read_frameset(thread_ids=[3, 4, 1])
-        assert frameset2.shape == (2, 20000, 1)
-        assert np.all(frameset2.data == frameset.data[2:4])
-        assert np.all(frameset3.data == frameset.data[[3, 4, 1]])
+        assert frameset2.shape == (20000, 2, 1)
+        assert np.all(frameset2.data == frameset.data[:, 2:4])
+        assert np.all(frameset3.data == frameset.data[:, [3, 4, 1]])
 
         frameset3 = vdif.VDIFFrameSet(frameset.frames, frameset.header0)
         assert frameset3 == frameset
@@ -442,7 +442,7 @@ class TestVDIF(object):
             # try reading just a few threads
             frameset4 = fh.read_frameset(thread_ids=[2, 3])
             assert frameset4.header0.time == frameset.header0.time
-            assert np.all(frameset.data[2:4] == frameset4.data)
+            assert np.all(frameset.data[:, 2:4] == frameset4.data)
             # Read beyond end
             fh.seek(-10064, 2)
             with pytest.raises(EOFError):
