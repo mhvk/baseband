@@ -123,14 +123,18 @@ class VLBIFrameBase(object):
         return cls(header, payload, valid=valid, verify=verify)
 
     @property
-    def shape(self):
-        """Shape of the data held in the payload (samples_per_frame, nchan)."""
-        return self.payload.shape
+    def sample_shape(self):
+        """Shape of the samples held in the frame (nchan,)."""
+        return self.payload.sample_shape
+
+    def __len__(self):
+        """Number of samples in the frame."""
+        return len(self.payload)
 
     @property
-    def sample_shape(self):
-        """Shape of the samples held in the payload (nchan,)."""
-        return self.payload.sample_shape
+    def shape(self):
+        """Shape of the data held in the frame (samples_per_frame, nchan)."""
+        return (len(self),) + self.sample_shape
 
     @property
     def dtype(self):

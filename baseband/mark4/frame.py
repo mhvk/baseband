@@ -20,8 +20,6 @@ from .payload import Mark4Payload
 
 __all__ = ['Mark4Frame']
 
-VALIDSTART = 160
-
 
 class Mark4Frame(VLBIFrameBase):
     """Representation of a Mark 4 frame, consisting of a header and payload.
@@ -77,7 +75,6 @@ class Mark4Frame(VLBIFrameBase):
             self.valid = valid
         if verify:
             self.verify()
-        self._valid_start = VALIDSTART * header.fanout
 
     @property
     def valid(self):
@@ -143,16 +140,16 @@ class Mark4Frame(VLBIFrameBase):
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)
         assert data.shape[0] == header.samples_per_frame
-        start = VALIDSTART * header.fanout
+        # Start of part not overwritten by header
+        # (see calculation of header.samples_per_frame)
+        start = header.size * 8 // (header.ntrack // header.fanout)
         payload = cls._payload_class.fromdata(data[start:], header=header)
 
         return cls(header, payload, verify=verify)
 
-    @property
-    def shape(self):
-        """Shape of the data held in the payload (samples_per_frame, nchan)."""
-        payload_shape = self.payload.shape
-        return (self._valid_start + payload_shape[0],) + payload_shape[1:]
+    def __len__(self):
+        """Number of samples (including those overwritten by header)."""
+        return self.header.samples_per_frame
 
     def __getitem__(self, item=()):
         if isinstance(item, six.string_types):
@@ -160,7 +157,8 @@ class Mark4Frame(VLBIFrameBase):
 
         # Normally, we would just pass on to the payload here, but for
         # Mark 4, we need to deal with data overwritten by the header.
-        valid_start = self._valid_start
+        nsample = len(self)
+        valid_start = nsample - len(self.payload)
         if item is () or item == slice(None):
             # Short-cut for full payload.
             if self.valid:
@@ -180,7 +178,6 @@ class Mark4Frame(VLBIFrameBase):
             sample_index = None
 
         # Interpret item as an index or slice.
-        nsample = self.shape[0]
         if not isinstance(item, slice):
             try:
                 item = item.__index__()
@@ -194,7 +191,7 @@ class Mark4Frame(VLBIFrameBase):
                 raise IndexError("{0} index out of range.".format(type(self)))
 
             payload_item = item - valid_start
-            if payload_item >= 0:
+            if payload_item >= 0 and self.valid:
                 data = self.payload[payload_item]
             else:
                 data = np.full(self.sample_shape, self.invalid_data_value,
@@ -202,17 +199,17 @@ class Mark4Frame(VLBIFrameBase):
 
             return data if sample_index is None else data[sample_index]
 
-        # We have a slice.
+        # Here, we know item is a slice.
         start, stop, step = item.indices(nsample)
         assert step > 0, "cannot deal with negative steps yet"
-        
+
         payload_start = start - valid_start
         payload_stop = stop - valid_start
         if payload_start >= 0 and self.valid:
             # All requested data falls within the payload.
             data = self.payload[payload_start:payload_stop:step]
         else:
-            shape = ((stop - start - 1) // step + 1,) + self.shape[1:]
+            shape = ((stop - start - 1) // step + 1,) + self.sample_shape
             if payload_stop > 0 and self.valid:
                 # Some requested data overlaps with the payload and is valid.
                 data = np.empty(shape, self.dtype)
@@ -224,8 +221,10 @@ class Mark4Frame(VLBIFrameBase):
                 # Everything is invalid.
                 data = np.full(shape, self.invalid_data_value, self.dtype)
 
-        return data if sample_index is None else data[(slice(None),) +
-                                                      sample_index]
+        if sample_index is None:
+            return data
+        else:
+            return data[(slice(None),) + sample_index]
 
     data = property(__getitem__,
                     doc="Decode the payload, invalidating the header part")

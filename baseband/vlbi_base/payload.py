@@ -128,15 +128,14 @@ class VLBIPayloadBase(object):
         """Size in bytes of payload."""
         return self.words.size * self.words.dtype.itemsize
 
-    @property
-    def nsample(self):
+    def __len__(self):
         """Number of samples in the payload."""
         return self.size * 8 // self._bpfs
 
     @property
     def shape(self):
         """Shape of the decoded data array (nsample, sample_shape)."""
-        return (self.nsample,) + self.sample_shape
+        return (len(self),) + self.sample_shape
 
     @property
     def dtype(self):
@@ -177,9 +176,10 @@ class VLBIPayloadBase(object):
         else:
             sample_index = ()
 
+        nsample = len(self)
         is_slice = isinstance(item, slice)
         if is_slice:
-            start, stop, step = item.indices(self.nsample)
+            start, stop, step = item.indices(nsample)
             n = stop - start
             if step == 1:
                 step = None
@@ -190,14 +190,14 @@ class VLBIPayloadBase(object):
                 raise TypeError("{0} object can only be indexed or sliced."
                                 .format(type(self)))
             if item < 0:
-                item += self.nsample
+                item += nsample
 
-            if not (0 <= item < self.nsample):
+            if not (0 <= item < nsample):
                 raise IndexError("{0} index out of range.".format(type(self)))
 
             start, stop, step, n = item, item+1, 1, 1
 
-        if n == self.nsample:
+        if n == nsample:
             words_slice = slice(None)
             data_slice = slice(None, None, step) if is_slice else 0
 

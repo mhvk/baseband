@@ -237,6 +237,7 @@ class TestMark4(object):
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
             payload = mark4.Mark4Payload.fromfile(fh, header)
         assert payload.size == (20000 - 160) * 64 // 8
+        assert len(payload) == (20000 - 160) * 4
         assert payload.shape == ((20000 - 160) * 4, 8)
         # Check sample shape validity
         assert payload.sample_shape == (8,)
@@ -316,6 +317,9 @@ class TestMark4(object):
         assert frame.header == header
         assert frame.payload == payload
         assert frame.valid is True
+        assert len(frame) == len(payload) + 640
+        assert frame.sample_shape == payload.sample_shape
+        assert frame.shape == (len(frame),) + frame.sample_shape
         assert frame == mark4.Mark4Frame(header, payload)
         data = frame.data
         assert np.all(data[:640] == 0.)
@@ -362,6 +366,12 @@ class TestMark4(object):
         assert np.all(frame5.data == 0.)
         frame5.valid = True
         assert frame5 == frame
+        frame5.valid = False
+        assert np.all(frame5.data == 0.)
+        # And check that __getitem__ now always returns 0.
+        assert frame5[655, 0] == 0.
+        assert np.all(frame5[930:950] == 0.)
+        assert np.all(frame5[630:650:5, :4] == 0.)
 
         # Check passing in a reference time.
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
