@@ -92,72 +92,21 @@ class VLBIStreamBase(VLBIFileBase):
         return self._subset
 
     def _get_sample_shape(self):
-        # Extract semple_shape by creating a possibly squeezed dummy sample,
-        # and then indexing it with subset.
+        """Get shape of possibly squeezed samples."""
+        if not self.squeeze:
+            return self._unsliced_shape
+
         sample_shape = self._unsliced_shape
+        squeezed_shape = tuple(dim for dim in sample_shape if dim > 1)
         fields = getattr(sample_shape, '_fields', None)
-        if self.squeeze:
-            squeezed_shape = tuple(dim for dim in sample_shape if dim > 1)
-            if fields is None:
-                sample_shape = squeezed_shape
-            else:
-                fields = [field for field, dim in zip(fields, sample_shape)
-                          if dim > 1]
-                shape_cls = namedtuple('SampleShape', ','.join(fields))
-                sample_shape = shape_cls(*squeezed_shape)
+        if fields is None:
+            return squeezed_shape
 
-        if not self.subset:
-            return sample_shape
+        fields = [field for field, dim in zip(fields, sample_shape) if dim > 1]
+        shape_cls = namedtuple('SampleShape', ','.join(fields))
+        return shape_cls(*squeezed_shape)
 
-        # Create a dummy sample that has the sample number as its value
-        # (here, 13 is to bring bad luck to over-complicated subsets).
-        dummy_data = np.arange(13.)
-        dummy_sample = np.rollaxis(  # use moveaxis when numpy_min>=1.11
-            (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1)
-        try:
-            dummy_subset = dummy_sample[(slice(None),) + self.subset]
-            # Sample numbers should be preserved, but might as well check.
-            assert np.all(dummy_subset == dummy_data.reshape(
-                (-1,) + (1,) * (dummy_subset.ndim - 1)))
-            subset_shape = dummy_subset.shape[1:]
-            assert 0 not in subset_shape
-        except (IndexError, AssertionError) as exc:
-            exc.args += ("subset {} cannot be used to properly index "
-                         "{}samples with shape {}.".format(
-                             self.subset, "squeezed " if self.squeeze else "",
-                             sample_shape),)
-            raise exc
-
-        # We only construct a new SampleShape namedtuple for cases where we
-        # know for sure what happened in the subsetting.
-        if (fields is None or subset_shape == () or
-                len(self.subset) > len(sample_shape)):
-            return subset_shape
-
-        try:
-            # If each dimension can be indexed separately, and this gives
-            # a consistent result with what we have from the complete subset,
-            # we know which fields we have kept.
-            subset_axis = 0
-            final_fields = []
-            subset = self.subset + (slice(None),) * (len(sample_shape) -
-                                                     len(self.subset))
-            for field, sample_dim, item in zip(fields, sample_shape, subset):
-                subset_dim = np.empty(sample_dim)[item].shape
-                assert len(subset_dim) <= 1
-                if len(subset_dim) == 1:
-                    assert subset_dim[0] == subset_shape[subset_axis]
-                    final_fields.append(field)
-                    subset_axis += 1
-        except Exception:
-            # Things did not make sense, probably some advanced indexing;
-            # Just don't worry about having a named tuple.
-            return subset_shape
-
-        shape_cls = namedtuple('SampleShape', ','.join(final_fields))
-        return shape_cls(*subset_shape)
-
-    @lazyproperty
+    @property
     def sample_shape(self):
         """Shape of a complete sample (possibly subset or squeezed)."""
         return self._sample_shape
@@ -311,6 +260,64 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             data = data[(slice(None),) + self.subset]
 
         return data
+
+    def _get_sample_shape(self):
+        """Get shape by applying squeeze and subset to a dummy data sample."""
+        # First apply base class, which squeezes if needed.
+        sample_shape = super(VLBIStreamReaderBase, self)._get_sample_shape()
+        if not self.subset:
+            return sample_shape
+
+        # Now apply subset to a dummy sample that has the sample number as its
+        # value (where 13 is to bring bad luck to over-complicated subsets).
+        dummy_data = np.arange(13.)
+        dummy_sample = np.rollaxis(  # use moveaxis when numpy_min>=1.11
+            (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1)
+        try:
+            dummy_subset = dummy_sample[(slice(None),) + self.subset]
+            # Check whether subset was in range and whether sample numbers were
+            # preserved (latter should be, but check anyway).
+            assert 0 not in dummy_subset.shape
+            assert np.all(dummy_subset == dummy_data.reshape(
+                (-1,) + (1,) * (dummy_subset.ndim - 1)))
+        except (IndexError, AssertionError) as exc:
+            exc.args += ("subset {} cannot be used to properly index "
+                         "{}samples with shape {}.".format(
+                             self.subset, "squeezed " if self.squeeze else "",
+                             sample_shape),)
+            raise exc
+
+        # We got the shape.  We only bother trying to associate names with the
+        # dimensions when we know for sure what happened in the subsetting.
+        subset_shape = dummy_subset.shape[1:]
+        if (not hasattr(sample_shape, '_fields') or subset_shape == () or
+                len(self.subset) > len(sample_shape)):
+            return subset_shape
+
+        # We can only associate names when indexing each dimension separately
+        # gives a consistent result with the complete subset.
+        subset_axis = 0
+        fields = []
+        subset = self.subset + (slice(None),) * (len(sample_shape) -
+                                                 len(self.subset))
+        try:
+            for field, sample_dim, item in zip(sample_shape._fields,
+                                               sample_shape, subset):
+                subset_dim = np.empty(sample_dim)[item].shape
+                assert len(subset_dim) <= 1  # no advanced multi-d indexing.
+                if len(subset_dim) == 1:
+                    # If this dimension was not removed and matches that
+                    # of the real subset, we now have a field label for it.
+                    assert subset_dim[0] == subset_shape[subset_axis]
+                    fields.append(field)
+                    subset_axis += 1
+        except Exception:
+            # Things did not make sense, probably some advanced indexing;
+            # Just don't worry about having a named tuple.
+            return subset_shape
+
+        shape_cls = namedtuple('SampleShape', ','.join(fields))
+        return shape_cls(*subset_shape)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
