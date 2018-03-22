@@ -113,7 +113,7 @@ class GSBStreamBase(VLBIStreamBase):
     def __init__(self, fh_ts, fh_raw, header0, subset=None,
                  nchan=None, bps=None, complex_data=None,
                  samples_per_frame=None, payloadsize=None,
-                 sample_rate=None, squeeze=True):
+                 sample_rate=None, fill_value=0., squeeze=True):
         self.fh_ts = fh_ts
         rawdump = header0.mode == 'rawdump'
         complex_data = (complex_data if complex_data is not None else
@@ -144,7 +144,7 @@ class GSBStreamBase(VLBIStreamBase):
             fh_raw, header0=header0, unsliced_shape=unsliced_shape, bps=bps,
             complex_data=complex_data, subset=subset,
             samples_per_frame=samples_per_frame,
-            sample_rate=sample_rate, squeeze=squeeze)
+            sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
         self._payloadsize = payloadsize
 
     def close(self):
@@ -215,6 +215,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         indexing object is passed, it selects (available) polarizations.  If a
         tuple of objects is passed, the first selects (available) polarizations
         and the second selects channels.  By default, all components are read.
+    fill_value : float or complex
+        Value to use for invalid or missing data (Default value is 0).
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from decoded
         data.
@@ -226,13 +228,13 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
     def __init__(self, fh_ts, fh_raw, sample_rate=None, nchan=None,
                  bps=None, complex_data=None, samples_per_frame=None,
-                 payloadsize=None, subset=None, squeeze=True):
+                 payloadsize=None, subset=None, fill_value=0., squeeze=True):
         header0 = fh_ts.read_timestamp()
         super(GSBStreamReader, self).__init__(
             fh_ts, fh_raw, header0, nchan=nchan, bps=bps,
             complex_data=complex_data, subset=subset,
             samples_per_frame=samples_per_frame, payloadsize=payloadsize,
-            sample_rate=sample_rate, squeeze=squeeze)
+            sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
         self.fh_ts.seek(0)
         self._frame_nr = None
 
@@ -269,7 +271,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             last_header = self.header0.__class__(second_last_line_tuple)
         return last_header
 
-    def read(self, count=None, fill_value=0., out=None):
+    def read(self, count=None, out=None):
         """Read a number of complete (or subset) samples.
 
         The range retrieved can span multiple frames.
@@ -279,8 +281,6 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         count : int, optional
             Number of complete/subset samples to read.  If omitted or negative,
             the whole file is read.  Ignored if ``out`` is given.
-        fill_value : float or complex
-            Value to use for invalid or missing data.
         out : `None` or array
             Array to store the data in. If given, ``count`` will be inferred
             from the first dimension.  The other dimensions should equal
@@ -313,7 +313,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             if(frame_nr != self._frame_nr):
                 # Read relevant frame (possibly reusing data array from
                 # previous frame set).
-                self._read_frame(fill_value)
+                self._read_frame()
                 framerate = self.sample_rate / self.samples_per_frame
                 assert np.isclose(self._frame_nr,
                                   ((self._frame.header.time -
@@ -334,7 +334,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
         return out
 
-    def _read_frame(self, fill_value=0., out=None):
+    def _read_frame(self, out=None):
         frame_nr = self.offset // self.samples_per_frame
         self.fh_ts.seek(self.header0.seek_offset(frame_nr))
         if self.header0.mode == 'rawdump':
@@ -550,6 +550,8 @@ def open(name, mode='rs', **kwargs):
         indexing object is passed, it selects (available) polarizations.  If a
         tuple of objects is passed, the first selects (available) polarizations
         and the second selects channels.  By default, all components are read.
+    fill_value : float or complex
+        Value to use for invalid or missing data (Default value is 0).
     squeeze : bool, optional
         If `True` (default) and reading, remove any dimensions of length unity
         from decoded data.  If `True` and writing, accept squeezed

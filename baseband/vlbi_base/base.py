@@ -49,7 +49,8 @@ class VLBIStreamBase(VLBIFileBase):
     _sample_shape_maker = None
 
     def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
-                 subset, samples_per_frame, sample_rate, squeeze=True):
+                 subset, samples_per_frame, sample_rate, fill_value=0., 
+                 squeeze=True):
         super(VLBIStreamBase, self).__init__(fh_raw)
         self._header0 = header0
         self._bps = bps
@@ -57,6 +58,7 @@ class VLBIStreamBase(VLBIFileBase):
         self.samples_per_frame = samples_per_frame
         self.sample_rate = sample_rate
         self.offset = 0
+        self._fill_value = fill_value
 
         if self._sample_shape_maker is not None:
             self._unsliced_shape = self._sample_shape_maker(*unsliced_shape)
@@ -78,6 +80,11 @@ class VLBIStreamBase(VLBIFileBase):
                 subset = subset_wrapints
         self._subset = subset
         self._sample_shape = self._get_sample_shape(subset_wrapints)
+
+    @property
+    def fill_value(self):
+        """Value to use for invalid or missing data (Default value is 0)."""
+        return self._fill_value
 
     @property
     def squeeze(self):
@@ -271,7 +278,7 @@ class VLBIStreamBase(VLBIFileBase):
 class VLBIStreamReaderBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, unsliced_shape, bps, complex_data,
-                 subset, samples_per_frame, sample_rate=None,
+                 subset, samples_per_frame, sample_rate=None, fill_value=0.,
                  squeeze=True):
 
         if sample_rate is None:
@@ -289,7 +296,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         super(VLBIStreamReaderBase, self).__init__(
             fh_raw, header0, unsliced_shape, bps, complex_data, subset,
-            samples_per_frame, sample_rate, squeeze)
+            samples_per_frame, sample_rate, fill_value, squeeze)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):

@@ -570,8 +570,8 @@ class TestMark5B(object):
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
         with mark5b.open(m5_incomplete, 'rs', nchan=8, bps=2,
-                         sample_rate=32*u.MHz, kday=56000) as fwr:
+                         sample_rate=32*u.MHz, kday=56000,
+                         fill_value=fill_value) as fwr:
             assert not fwr._frame.valid
-            assert np.all(fwr.read(fill_value=fill_value) ==
-                          fwr._frame.invalid_data_value)
+            assert np.all(fwr.read() == fwr._frame.invalid_data_value)
             assert fwr._frame.invalid_data_value == fill_value

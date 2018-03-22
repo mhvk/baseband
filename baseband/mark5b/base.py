@@ -197,6 +197,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         Number of complete samples per second (ie. the rate at which each
         channel is sampled).  If not given, will be inferred from scanning
         one second of the file.
+    fill_value : float or complex
+        Value to use for invalid or missing data (Default value is 0).
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
@@ -205,7 +207,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, fh_raw, nchan, bps=2, kday=None, ref_time=None,
-                 subset=None, sample_rate=None, squeeze=True):
+                 subset=None, sample_rate=None, fill_value=0., squeeze=True):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
@@ -217,7 +219,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             fh_raw, header0=header, bps=bps, complex_data=False, subset=subset,
             unsliced_shape=self._frame.payload.sample_shape,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
-            sample_rate=sample_rate, squeeze=squeeze)
+            sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
 
     @lazyproperty
     def _last_header(self):
@@ -228,7 +230,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         last_header.infer_kday(self.start_time)
         return last_header
 
-    def read(self, count=None, fill_value=0., out=None):
+    def read(self, count=None, out=None):
         """Read a number of complete (or subset) samples.
 
         The range retrieved can span multiple frames.
@@ -238,8 +240,6 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         count : int
             Number of complete/subset samples to read.  If omitted or negative,
             the whole file is read.  Ignored if ``out`` is given.
-        fill_value : float or complex
-            Value to use for invalid or missing data.
         out : `None` or array
             Array to store the data in. If given, ``count`` will be inferred
             from the first dimension.  The other dimension should equal
@@ -282,7 +282,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
                 assert frame_nr == self._frame['frame_nr']
 
             # Set decoded value for invalid data.
-            self._frame.invalid_data_value = fill_value
+            self._frame.invalid_data_value = self.fill_value
             # Determine appropriate slice to decode.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
@@ -298,7 +298,7 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
 
         return out
 
-    def _read_frame(self, fill_value=0.):
+    def _read_frame(self):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
         self._frame = self.read_frame(nchan=self._unsliced_shape.nchan,
@@ -420,6 +420,8 @@ sample_rate : `~astropy.units.Quantity`, optional
     Number of complete samples per second (ie. the rate at which each channel
     is sampled).  If not given, will be inferred from scanning one second of
     the file.
+fill_value : float or complex
+    Value to use for invalid or missing data (Default value is 0).
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
