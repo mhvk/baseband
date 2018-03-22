@@ -317,11 +317,33 @@ class TestMark4(object):
         assert frame.payload == payload
         assert frame.valid is True
         assert frame == mark4.Mark4Frame(header, payload)
-        assert np.all(frame.data[:640] == 0.)
-        assert np.all(frame.data[640].astype(int) ==
+        data = frame.data
+        assert np.all(data[:640] == 0.)
+        assert np.all(data[640].astype(int) ==
                       np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(frame.data[641].astype(int) ==
+        assert np.all(data[641].astype(int) ==
                       np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        # check __getitem__
+        assert np.all(frame['magnitude_bit'] == header['magnitude_bit'])
+        # Only invalid values (compare with data to ensure shape is right).
+        assert np.all(frame[10:90] == data[10:90])
+        assert np.all(frame[10:90:5] == data[10:90:5])
+        assert np.all(frame[10:90:5, :4] == data[10:90:5, :4])
+        # Mixed invalid, valid.
+        assert np.all(frame[635:655] == data[635:655])
+        # Check we do stepping correctly around the boundary.
+        for start in range(634, 642):
+            assert np.all(frame[start:655:5] == data[start:655:5])
+        assert np.all(frame[635:655:5, 5] == data[635:655:5, 5])
+        # All valid.
+        assert np.all(frame[935:955] == data[935:955])
+        assert np.all(frame[935:955:5] == data[935:955:5])
+        assert np.all(frame[935:955:5, 5] == data[935:955:5, 5])
+        # Check scalar, including whether the shape is correct.
+        assert frame[935].shape == data[935].shape
+        assert np.all(frame[639] == data[639])
+        assert np.all(frame[640] == data[640])
+        # Check writing and round-trip.
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
@@ -340,12 +362,6 @@ class TestMark4(object):
         assert np.all(frame5.data == 0.)
         frame5.valid = True
         assert frame5 == frame
-        # check __getitem__
-        assert np.all(frame['magnitude_bit'] == header['magnitude_bit'])
-        # indexing with a slice should not (yet) work, since we cannot just
-        # take the slice of the payload.
-        with pytest.raises(IndexError):
-            frame[10:20]
 
         # Check passing in a reference time.
         with mark4.open(SAMPLE_FILE, 'rb') as fh:

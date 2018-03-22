@@ -14,7 +14,7 @@ import numpy as np
 from astropy.extern import six
 
 from ..vlbi_base.frame import VLBIFrameBase
-from .header import Mark4Header, PAYLOADSIZE
+from .header import Mark4Header
 from .payload import Mark4Payload
 
 
@@ -77,6 +77,7 @@ class Mark4Frame(VLBIFrameBase):
             self.valid = valid
         if verify:
             self.verify()
+        self._valid_start = VALIDSTART * header.fanout
 
     @property
     def valid(self):
@@ -141,35 +142,90 @@ class Mark4Frame(VLBIFrameBase):
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)
-        assert VALIDSTART * data.shape[0] % PAYLOADSIZE == 0
-        start = VALIDSTART * data.shape[0] // PAYLOADSIZE
+        assert data.shape[0] == header.samples_per_frame
+        start = VALIDSTART * header.fanout
         payload = cls._payload_class.fromdata(data[start:], header=header)
 
         return cls(header, payload, verify=verify)
 
     @property
-    def data(self):
-        """Decode the payload, setting the header to ``invalid_data_value``."""
-        data = np.empty(self.shape, self.dtype)
-        if self.valid:
-            valid_start = self.shape[0] * VALIDSTART // PAYLOADSIZE
-            data[:valid_start] = self.invalid_data_value
-            data[valid_start:] = self.payload.data
-        else:
-            data[...] = self.invalid_data_value
-        return data
-
-    @property
     def shape(self):
         """Shape of the data held in the payload (samples_per_frame, nchan)."""
-        return (self.payload.shape[0] * PAYLOADSIZE //
-                (PAYLOADSIZE - VALIDSTART),) + self.payload.shape[1:]
+        payload_shape = self.payload.shape
+        return (self._valid_start + payload_shape[0],) + payload_shape[1:]
 
     def __getitem__(self, item=()):
         if isinstance(item, six.string_types):
             return self.header.__getitem__(item)
+
+        # Normally, we would just pass on to the payload here, but for
+        # Mark 4, we need to deal with data overwritten by the header.
+        valid_start = self._valid_start
+        if item is () or item == slice(None):
+            # Short-cut for full payload.
+            if self.valid:
+                # Note: Creating an empty array and setting part to invalid
+                # is much faster than creating one pre-filled with invalid.
+                data = np.empty(self.shape, self.dtype)
+                data[:valid_start] = self.invalid_data_value
+                data[valid_start:] = self.payload.data
+                return data
+            else:
+                return np.full(self.shape, self.invalid_data_value, self.dtype)
+
+        if isinstance(item, tuple):
+            sample_index = item[1:]
+            item = item[0]
         else:
-            # Need to learn how to deal with invalid data part!  Hence,
-            # we cannot just slice the payload like vlbi_base.frame.
-            raise IndexError("{0} object can not be indexed or sliced yet."
-                             .format(type(self)))
+            sample_index = None
+
+        # Interpret item as an index or slice.
+        nsample = self.shape[0]
+        if not isinstance(item, slice):
+            try:
+                item = item.__index__()
+            except Exception:
+                raise TypeError("{0} object can only be indexed or sliced."
+                                .format(type(self)))
+            if item < 0:
+                item += nsample
+
+            if not (0 <= item < nsample):
+                raise IndexError("{0} index out of range.".format(type(self)))
+
+            payload_item = item - valid_start
+            if payload_item >= 0:
+                data = self.payload[payload_item]
+            else:
+                data = np.full(self.sample_shape, self.invalid_data_value,
+                               self.dtype)
+
+            return data if sample_index is None else data[sample_index]
+
+        # We have a slice.
+        start, stop, step = item.indices(nsample)
+        assert step > 0, "cannot deal with negative steps yet"
+        
+        payload_start = start - valid_start
+        payload_stop = stop - valid_start
+        if payload_start >= 0 and self.valid:
+            # All requested data falls within the payload.
+            data = self.payload[payload_start:payload_stop:step]
+        else:
+            shape = ((stop - start - 1) // step + 1,) + self.shape[1:]
+            if payload_stop > 0 and self.valid:
+                # Some requested data overlaps with the payload and is valid.
+                data = np.empty(shape, self.dtype)
+                ninvalid, payload_start = divmod(payload_start, step)
+                ninvalid = -ninvalid
+                data[:ninvalid] = self.invalid_data_value
+                data[ninvalid:] = self.payload[payload_start:payload_stop:step]
+            else:
+                # Everything is invalid.
+                data = np.full(shape, self.invalid_data_value, self.dtype)
+
+        return data if sample_index is None else data[(slice(None),) +
+                                                      sample_index]
+
+    data = property(__getitem__,
+                    doc="Decode the payload, invalidating the header part")

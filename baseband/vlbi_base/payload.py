@@ -172,8 +172,10 @@ class VLBIPayloadBase(object):
         with 20 bits/sample).
         """
         if isinstance(item, tuple):
-            word_slice, data_slice = self._item_to_slices(item[0])
-            return word_slice, (data_slice,) + item[1:]
+            sample_index = item[1:]
+            item = item[0]
+        else:
+            sample_index = ()
 
         is_slice = isinstance(item, slice)
         if is_slice:
@@ -226,7 +228,7 @@ class VLBIPayloadBase(object):
                                 "samples have {0} bits and words have {1} bits"
                                 .format(bpfs, bpw))
 
-        return words_slice, data_slice
+        return words_slice, (data_slice,) + sample_index
 
     def __getitem__(self, item=()):
         decoder = self._decoders[self._coder]
