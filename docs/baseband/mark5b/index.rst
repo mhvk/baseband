@@ -32,7 +32,7 @@ where all bit-streams are active).  Files begin at a header (unlike for Mark
 The Mark 5B system also outputs files with the active bit-stream mask, number
 of frames per second, and observational metadata (Sec. 1.3 of the `design
 specifications`_).  Baseband does not yet use these files, and instead
-require the user specify, for example, the :term:`sample rate`.
+requires the user specify, for example, the :term:`sample rate`.
 
 .. _mark5b_usage:
 
