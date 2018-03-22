@@ -323,7 +323,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         # messy since normally we apply the whole subset to the whole data,
         # but here we need to split it up in the part that selects specific
         # threads, which we use to selectively read, and the rest, which we
-        # do post-decoding.  Ensuring dimensions are correct is tricky.
+        # do post-decoding.
         if self.subset and (len(thread_ids) > 1 or not self.squeeze):
             # Select the thread ids we want using first part of subset.
             thread_ids = np.array(thread_ids)[self.subset[0]]
@@ -334,39 +334,25 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             # Reload the frame, now only including the requested threads.
             self.fh_raw.seek(0)
             self._frameset = self.read_frameset(self._thread_ids)
-            # We now need to determine any remaining subset, which will
-            # be for subsetting channels, taking care to leave the correct
-            # dimension for the threads, even after squeezing.
-            subset = self.subset[1:]
-            if self.squeeze:
-                # Given the initial if statement, the file has multiple threads.
-                if len(self._thread_ids) == 1:
-                    # If we have a single remaining thread, then squeeze
-                    # will remove it.
-                    if thread_ids.shape == ():
-                        # If this was the intent, then we're fine.
-                        self._subset_channels = subset
-                    else:
-                        # But if we wanted to keep it, we need to put it back.
-                        self._subset_channels = (np.newaxis,) + subset
-                else:
-                    # If we have multiple remaining threads, we need
-                    # to pass all those on (and possibly subset channels).
-                    self._subset_channels = (slice(None),) + subset
+            # Since we have subset the threads already, we now need to
+            # determine a new subset that takes this into account.
+            if thread_ids.shape == ():
+                # If we indexed with a scalar, we're meant to remove that
+                # dimension. If we squeeze, this happens automatically, but if
+                # not, we need to do it explicitly (FrameSet does not do it).
+                new_subset0 = () if self.squeeze else (0,)
+            elif len(self._thread_ids) == 1 and self.squeeze:
+                # If we want a single remaining thread, undo the squeeze.
+                new_subset0 = (np.newaxis,)
             else:
-                # Here, squeezing will not happen.
-                if thread_ids.shape == ():
-                    # So, if we indexed a scalar thread, we should remove it.
-                    self._subset_channels = (0,) + subset
-                else:
-                    # But we can just pass on all threads otherwise.
-                    self._subset_channels = (slice(None),) + subset
+                # Just pass on multiple threads or unsqueezed single ones.
+                new_subset0 = (slice(None),)
 
+            self._frameset_subset = new_subset0 + self.subset[1:]
         else:
             # We either have no subset or we have a single thread that
-            # will be squeezed away, so the subset should apply to the
-            # channels.  It doesn't hurt to always set subset_channels.
-            self._subset_channels = self.subset
+            # will be squeezed away, so the subset is fine as is.
+            self._frameset_subset = self.subset
             self._thread_ids = thread_ids
 
     @lazyproperty
@@ -465,8 +451,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         if self.squeeze:
             data = data.reshape(data.shape[:1] +
                                 tuple(sh for sh in data.shape[1:] if sh > 1))
-        if self.subset:
-            data = data[(slice(None),) + self._subset_channels]
+        if self._frameset_subset:
+            data = data[(slice(None),) + self._frameset_subset]
 
         return data
 
