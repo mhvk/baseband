@@ -9,12 +9,12 @@ MARK 4
 The Mark 4 format is the output format of the MIT Haystack Observatory's Mark 4
 VLBI magnetic tape-based data acquisition system, and one output format of its
 successor, the Mark 5A hard drive-based system. The format's specification is
-in the `Mark IIIA/IV/VLBA documentation <m4spec>`_.
+in the Mark IIIA/IV/VLBA `design specifications`_.
 
 Baseband currently only supports files that have been parity-stripped and
 corrected for barrel roll and data modulation.
 
-.. _m4spec: http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+.. _design specifications: http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
 .. _mark4_file_structure:
 
@@ -26,10 +26,9 @@ into 22500-bit "tape frames", each of which consists of a 160-bit
 :term:`header` followed by a 19840-bit :term:`payload`.  The header includes a
 timestamp (accurate to 1.25 ms), track ID, sideband, and fan-out/in factor
 (see below); the details of these can be found in 2.1.1 - 2.1.3 in the
-`specification document <m4spec>`_.  The payload consists of a 1-bit
-:term:`stream`.  When recording 2-bit |elementary samples|, the data is split
-into two tracks, with one carrying the sign bit, and the other the magnitude
-bit.
+`design specifications`_.  The payload consists of a 1-bit :term:`stream`.
+When recording 2-bit |elementary samples|, the data is split into two tracks,
+with one carrying the sign bit, and the other the magnitude bit.
 
 The header takes the place of the first 160 bits of payload data, so that the
 first sample occurs ``fanout * 160`` sample times after the header time.  This
