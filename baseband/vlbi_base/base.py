@@ -481,9 +481,11 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         offset0 = self.offset
         start = 0
         while start < count:
-            # Get data chunk.  Generally, one frame's worth, but guaranteed
-            # to start at the current offset and have at most count samples.
-            data = self.get_chunk(count)
+            # Get reference to frame that overlaps the current offset, as well as offset
+            # we need to take to be at the current offset.
+            frame, sample_offset = self._read_frame()
+            sample_stop = min(sample_offset + count, len(frame))
+            data = frame[sample_offset:sample_stop]
             data = self._squeeze_and_subset(data)
             # Copy to relevant part of output.
             stop = start + len(data)

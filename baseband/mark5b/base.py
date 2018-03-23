@@ -216,17 +216,17 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
-        self._frame = self.read_frame(nchan=nchan, bps=bps,
-                                      ref_time=ref_time, kday=kday)
-        self._frame_data = None
-        header = self._frame.header
+        frame = self.read_frame(nchan=nchan, bps=bps,
+                                ref_time=ref_time, kday=kday)
+        header = frame.header
         super(Mark5BStreamReader, self).__init__(
             fh_raw, header0=header, bps=bps, complex_data=False, subset=subset,
-            unsliced_shape=self._frame.payload.sample_shape,
+            unsliced_shape=frame.payload.sample_shape,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
             sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
-        # Reread frame to ensure we're set up correctly.
-        self._read_frame()
+        # Store the first frame.
+        self._frame = frame
+        self._frame.invalid_data_value = self.fill_value
 
     @lazyproperty
     def _last_header(self):
@@ -237,39 +237,27 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         last_header.infer_kday(self.start_time)
         return last_header
 
-    def get_chunk(self, count=1 << 20):
-        """Return (part of) a frame starting from the current position.
-
-        Parameters
-        ----------
-        count : int
-            Maximum number of samples to return.
-        """
+    def _read_frame(self):
         dt, frame_nr, sample_offset = self._frame_info()
         dt_expected = (self._frame.seconds - self.header0.seconds +
                        86400 * (self._frame.kday + self._frame.jday -
                                 self.header0.kday - self.header0.jday))
         if dt != dt_expected or frame_nr != self._frame['frame_nr']:
             # Read relevant frame, reusing data array from previous frame.
-            self._read_frame()
+            self.fh_raw.seek(self.offset // self.samples_per_frame *
+                             self._frame.size)
+            self._frame = self.read_frame(nchan=self._unsliced_shape.nchan,
+                                          bps=self.bps,
+                                          ref_time=self.start_time)
             dt_expected = (self._frame.seconds - self.header0.seconds +
                            86400 * (self._frame.kday + self._frame.jday -
                                     self.header0.kday - self.header0.jday))
             assert dt == dt_expected
             assert frame_nr == self._frame['frame_nr']
+            # Set decoded value for invalid data.
+            self._frame.invalid_data_value = self.fill_value
 
-        # Determine appropriate slice to decode.
-        count = min(count, self.samples_per_frame - sample_offset)
-        self.offset += count
-        return self._frame[sample_offset:sample_offset + count]
-
-    def _read_frame(self):
-        self.fh_raw.seek(self.offset // self.samples_per_frame *
-                         self._frame.size)
-        self._frame = self.read_frame(nchan=self._unsliced_shape.nchan,
-                                      bps=self.bps, ref_time=self.start_time)
-        # Set decoded value for invalid data.
-        self._frame.invalid_data_value = self.fill_value
+        return self._frame, sample_offset
 
 
 class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
