@@ -273,7 +273,7 @@ class VDIFFrameSet(object):
         ----------
         data : ndarray
             Array holding complex or real data to be encoded.  Dimensions
-            should be (nthread, nsample, nchan).
+            should be (samples_per_frame, nthread, nchan).
         headers : list of VDIFHeader instances, VDIFHeader or None
             If a single header, a list with increasing ``thread_id`` is
             generated. If `None`, it is attempted to generate a header from
@@ -287,6 +287,7 @@ class VDIFFrameSet(object):
         -------
         frameset : VDIFFrameSet instance.
         """
+        assert data.ndim == 3
         if not isinstance(headers, (list, tuple)):
             if headers is None:
                 kwargs.setdefault('thread_id', 0)
@@ -295,13 +296,13 @@ class VDIFFrameSet(object):
                 header = headers.copy()
             header['thread_id'] = 0
             headers = [header]
-            for thread_id in range(1, len(data)):
+            for thread_id in range(1, data.shape[1]):
                 header = header.copy()
                 header['thread_id'] = thread_id
                 headers.append(header)
 
         frames = [VDIFFrame.fromdata(d, h, verify)
-                  for d, h in zip(data, headers)]
+                  for d, h in zip(data.transpose(1, 0, 2), headers)]
         return cls(frames)
 
     @property
@@ -309,7 +310,8 @@ class VDIFFrameSet(object):
         """Decode the payload."""
         if self._data is None:
             self._data = np.empty(self.shape, dtype=self.dtype)
-            for frame, datum in zip(self.frames, self._data):
+            for frame, datum in zip(self.frames,
+                                    self._data.transpose(1, 0, 2)):
                 datum[...] = (frame.data if frame.valid else
                               self.invalid_data_value)
         return self._data
@@ -319,8 +321,15 @@ class VDIFFrameSet(object):
         return len(self.frames) * self.frames[0].size
 
     @property
+    def sample_shape(self):
+        return (len(self.frames),) + self.frames[0].sample_shape
+
+    def __len__(self):
+        return len(self.frames[0])
+
+    @property
     def shape(self):
-        return (len(self.frames),) + self.frames[0].shape
+        return (len(self),) + self.sample_shape
 
     @property
     def dtype(self):
@@ -337,13 +346,10 @@ class VDIFFrameSet(object):
         return key in self.header0
 
     def __getattr__(self, attr):
-        try:
+        if attr in self.header0._properties:
+            return getattr(self.header0, attr)
+        else:
             return self.__getattribute__(attr)
-        except AttributeError:
-            if attr in self.header0._properties:
-                return getattr(self.header0, attr)
-            else:
-                raise
 
     # For tests, it is useful to define equality.
     def __eq__(self, other):

@@ -432,7 +432,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             self._frameset.invalid_data_value = self.fill_value
             # TODO: maybe slice with data_slice once frameset allows slicing,
             # so we decode only what is needed.
-            data = self._frameset.data.transpose(1, 0, 2)
+            data = self._frameset.data
             # Determine appropriate slice.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
@@ -527,8 +527,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
                 self.header0.sample_rate = self.sample_rate
             assert self.header0.sample_rate == self.sample_rate
         self._data = np.zeros(
-            (self._unsliced_shape.nthread, self.samples_per_frame,
-                self._unsliced_shape.nchan),
+            (self.samples_per_frame,) + self._unsliced_shape,
             np.complex64 if self.complex_data else np.float32)
 
     def write(self, data, invalid_data=False):
@@ -554,7 +553,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
         count = data.shape[0]
         sample = 0
         offset0 = self.offset
-        frame = self._data.transpose(1, 0, 2)
+        frame = self._data
         while count > 0:
             dt, frame_nr, sample_offset = self._frame_info()
             if sample_offset == 0:

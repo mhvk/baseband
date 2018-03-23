@@ -60,7 +60,7 @@ data container for storing a frame set as well as
     >>> fh = vdif.open(SAMPLE_VDIF, 'rb')
     >>> fs = fh.read_frameset()
     >>> fs.data.shape
-    (8, 20000, 1)
+    (20000, 8, 1)
     >>> fr = fh.read_frame()
     >>> fr.data.shape
     (20000, 1)
