@@ -440,6 +440,60 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         return self.offset
 
+    @property
+    def dtype(self):
+        return np.complex64 if self.complex_data else np.float32
+
+    def read(self, count=None, out=None):
+        """Read a number of complete (or subset) samples.
+
+        The range retrieved can span multiple frames.
+
+        Parameters
+        ----------
+        count : int
+            Number of complete/subset samples to read.  If omitted or negative,
+            the whole file is read.  Ignored if ``out`` is given.
+        out : `None` or array
+            Array to store the data in. If given, ``count`` will be inferred
+            from the first dimension.  The other dimension should equal
+            ``sample_shape``.
+
+        Returns
+        -------
+        out : array of float or complex
+            The first dimension is sample-time, and the second, given by
+            ``sample_shape``, is (channel,).  Any dimension of length unity is
+            removed if ``self.squeeze=True``.
+        """
+        if out is None:
+            if count is None or count < 0:
+                count = self.size - self.offset
+                if count < 0:
+                    raise EOFError("cannot read from beyond end of file.")
+
+            out = np.empty((count,) + self.sample_shape, dtype=self.dtype)
+        else:
+            assert out.shape[1:] == self.sample_shape, (
+                "'out' should have trailing shape {}".format(self.sample_shape))
+            count = out.shape[0]
+
+        offset0 = self.offset
+        start = 0
+        while start < count:
+            # Get data chunk.  Generally, one frame's worth, but guaranteed
+            # to start at the current offset and have at most count samples.
+            data = self.get_chunk(count)
+            data = self._squeeze_and_subset(data)
+            # Copy to relevant part of output.
+            stop = start + len(data)
+            out[start:stop] = data
+            start = stop
+            # We explicitly set offset here, so we do not have to count
+            # on get_chunk to keep track.
+            self.offset = offset0 + stop
+
+        return out
 
 class VLBIStreamWriterBase(VLBIStreamBase):
 

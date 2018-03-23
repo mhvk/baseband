@@ -225,6 +225,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             unsliced_shape=self._frame.payload.sample_shape,
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
             sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
+        # Reread frame to ensure we're set up correctly.
+        self._read_frame()
 
     @lazyproperty
     def _last_header(self):
@@ -235,76 +237,39 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         last_header.infer_kday(self.start_time)
         return last_header
 
-    def read(self, count=None, out=None):
-        """Read a number of complete (or subset) samples.
-
-        The range retrieved can span multiple frames.
+    def get_chunk(self, count=1 << 20):
+        """Return (part of) a frame starting from the current position.
 
         Parameters
         ----------
         count : int
-            Number of complete/subset samples to read.  If omitted or negative,
-            the whole file is read.  Ignored if ``out`` is given.
-        out : `None` or array
-            Array to store the data in. If given, ``count`` will be inferred
-            from the first dimension.  The other dimension should equal
-            ``sample_shape``.
-
-        Returns
-        -------
-        out : array of float or complex
-            The first dimension is sample-time, and the second, given by
-            ``sample_shape``, is (channel,).  Any dimension of length unity is
-            removed if ``self.squeeze=True``.
+            Maximum number of samples to return.
         """
-        if out is None:
-            if count is None or count < 0:
-                count = self.size - self.offset
-                if count < 0:
-                    raise EOFError
-
-            out = np.empty((count,) + self.sample_shape,
-                           dtype=self._frame.dtype)
-        else:
-            assert out.shape[1:] == self.sample_shape, (
-                "'out' should have trailing shape {}".format(self.sample_shape))
-            count = out.shape[0]
-
-        offset0 = self.offset
-        while count > 0:
-            dt, frame_nr, sample_offset = self._frame_info()
+        dt, frame_nr, sample_offset = self._frame_info()
+        dt_expected = (self._frame.seconds - self.header0.seconds +
+                       86400 * (self._frame.kday + self._frame.jday -
+                                self.header0.kday - self.header0.jday))
+        if dt != dt_expected or frame_nr != self._frame['frame_nr']:
+            # Read relevant frame, reusing data array from previous frame.
+            self._read_frame()
             dt_expected = (self._frame.seconds - self.header0.seconds +
                            86400 * (self._frame.kday + self._frame.jday -
                                     self.header0.kday - self.header0.jday))
-            if(dt != dt_expected or
-               frame_nr != self._frame['frame_nr']):
-                # Read relevant frame, reusing data array from previous frame.
-                self._read_frame()
-                dt_expected = (self._frame.seconds - self.header0.seconds +
-                               86400 * (self._frame.kday + self._frame.jday -
-                                        self.header0.kday - self.header0.jday))
-                assert dt == dt_expected
-                assert frame_nr == self._frame['frame_nr']
+            assert dt == dt_expected
+            assert frame_nr == self._frame['frame_nr']
 
-            # Set decoded value for invalid data.
-            self._frame.invalid_data_value = self.fill_value
-            # Determine appropriate slice to decode.
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample = self.offset - offset0
-            data = self._frame[sample_offset:sample_offset + nsample]
-            data = self._squeeze_and_subset(data)
-            # Copy relevant data from frame into output.
-            out[sample:sample + nsample] = data
-            self.offset += nsample
-            count -= nsample
-
-        return out
+        # Determine appropriate slice to decode.
+        count = min(count, self.samples_per_frame - sample_offset)
+        self.offset += count
+        return self._frame[sample_offset:sample_offset + count]
 
     def _read_frame(self):
         self.fh_raw.seek(self.offset // self.samples_per_frame *
                          self._frame.size)
         self._frame = self.read_frame(nchan=self._unsliced_shape.nchan,
                                       bps=self.bps, ref_time=self.start_time)
+        # Set decoded value for invalid data.
+        self._frame.invalid_data_value = self.fill_value
 
 
 class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
