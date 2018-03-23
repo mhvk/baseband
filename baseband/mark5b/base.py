@@ -208,13 +208,13 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
 
     def __init__(self, fh_raw, nchan, bps=2, kday=None, ref_time=None,
                  subset=None, sample_rate=None, fill_value=0., squeeze=True):
-        # Pre-set fh_raw, so FileReader methods work
-        # TODO: move this to StreamReaderBase?
 
         if kday is None and ref_time is None:
             raise ValueError("Mark5B stream reader requires kday or ref_time. "
                              "Please pass either explicitly.")
 
+        # Pre-set fh_raw, so FileReader methods work
+        # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
         self._frame = self.read_frame(nchan=nchan, bps=bps,
                                       ref_time=ref_time, kday=kday)
