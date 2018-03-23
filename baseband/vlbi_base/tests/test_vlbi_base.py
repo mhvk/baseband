@@ -330,7 +330,7 @@ class TestVLBIBase(object):
         assert payload.bps == 8
         assert payload.words.dtype is self.Payload._dtype_word
         assert len(payload.words) == 4
-        assert payload.nsample == len(data)
+        assert len(payload) == len(data)
         assert payload.size == 16
         payload2 = self.Payload.fromdata(self.payload.data, self.payload.bps)
         assert payload2 == self.payload
@@ -352,6 +352,8 @@ class TestVLBIBase(object):
     def test_frame_basics(self):
         assert self.frame.header is self.header
         assert self.frame.payload is self.payload
+        assert len(self.frame) == len(self.payload)
+        assert self.frame.sample_shape == self.payload.sample_shape
         assert self.frame.shape == self.payload.shape
         assert np.all(self.frame.data == self.payload.data)
         assert np.all(np.array(self.frame) == np.array(self.payload))

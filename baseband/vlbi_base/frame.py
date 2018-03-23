@@ -123,9 +123,18 @@ class VLBIFrameBase(object):
         return cls(header, payload, valid=valid, verify=verify)
 
     @property
+    def sample_shape(self):
+        """Shape of the samples held in the frame (nchan,)."""
+        return self.payload.sample_shape
+
+    def __len__(self):
+        """Number of samples in the frame."""
+        return len(self.payload)
+
+    @property
     def shape(self):
-        """Shape of the data held in the payload (samples_per_frame, nchan)."""
-        return self.payload.shape
+        """Shape of the data held in the frame (samples_per_frame, nchan)."""
+        return (len(self),) + self.sample_shape
 
     @property
     def dtype(self):
@@ -172,13 +181,11 @@ class VLBIFrameBase(object):
 
     # Try to get any attribute not on the frame from the header properties.
     def __getattr__(self, attr):
-        try:
+        if attr in self.header._properties:
+            return getattr(self.header, attr)
+        else:
+            # Raise appropriate error.
             return self.__getattribute__(attr)
-        except AttributeError:
-            if attr in self.header._properties:
-                return getattr(self.header, attr)
-            else:
-                raise
 
     # For tests, it is useful to define equality.
     def __eq__(self, other):

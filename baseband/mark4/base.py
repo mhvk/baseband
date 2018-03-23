@@ -399,8 +399,7 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             # Determine appropriate slice to decode.
             nsample = min(count, self.samples_per_frame - sample_offset)
             sample = self.offset - offset0
-            # TODO: cannot yet index frame directly.
-            data = self._frame.data[sample_offset:sample_offset + nsample]
+            data = self._frame[sample_offset:sample_offset + nsample]
             data = self._squeeze_and_subset(data)
             # Copy relevant data from frame into output.
             out[sample:sample + nsample] = data

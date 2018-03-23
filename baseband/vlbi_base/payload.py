@@ -128,15 +128,14 @@ class VLBIPayloadBase(object):
         """Size in bytes of payload."""
         return self.words.size * self.words.dtype.itemsize
 
-    @property
-    def nsample(self):
+    def __len__(self):
         """Number of samples in the payload."""
         return self.size * 8 // self._bpfs
 
     @property
     def shape(self):
         """Shape of the decoded data array (nsample, sample_shape)."""
-        return (self.nsample,) + self.sample_shape
+        return (len(self),) + self.sample_shape
 
     @property
     def dtype(self):
@@ -172,12 +171,15 @@ class VLBIPayloadBase(object):
         with 20 bits/sample).
         """
         if isinstance(item, tuple):
-            word_slice, data_slice = self._item_to_slices(item[0])
-            return word_slice, (data_slice,) + item[1:]
+            sample_index = item[1:]
+            item = item[0]
+        else:
+            sample_index = ()
 
+        nsample = len(self)
         is_slice = isinstance(item, slice)
         if is_slice:
-            start, stop, step = item.indices(self.nsample)
+            start, stop, step = item.indices(nsample)
             n = stop - start
             if step == 1:
                 step = None
@@ -188,14 +190,14 @@ class VLBIPayloadBase(object):
                 raise TypeError("{0} object can only be indexed or sliced."
                                 .format(type(self)))
             if item < 0:
-                item += self.nsample
+                item += nsample
 
-            if not (0 <= item < self.nsample):
+            if not (0 <= item < nsample):
                 raise IndexError("{0} index out of range.".format(type(self)))
 
             start, stop, step, n = item, item+1, 1, 1
 
-        if n == self.nsample:
+        if n == nsample:
             words_slice = slice(None)
             data_slice = slice(None, None, step) if is_slice else 0
 
@@ -226,7 +228,7 @@ class VLBIPayloadBase(object):
                                 "samples have {0} bits and words have {1} bits"
                                 .format(bpfs, bpw))
 
-        return words_slice, data_slice
+        return words_slice, (data_slice,) + sample_index
 
     def __getitem__(self, item=()):
         decoder = self._decoders[self._coder]
