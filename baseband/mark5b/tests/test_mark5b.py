@@ -551,10 +551,6 @@ class TestMark5B(object):
             assert abs(fh.start_time - test_time) < 1.*u.ns
             assert fh.header0['frame_nr'] == 198
 
-    def test_stream_invalid(self):
-        with pytest.raises(ValueError):
-            mark5b.open('ts.dat', 's')
-
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
     @pytest.mark.parametrize('fill_value', (0., -999.))
@@ -575,3 +571,12 @@ class TestMark5B(object):
             assert not fwr._frame.valid
             assert np.all(fwr.read() == fwr._frame.invalid_data_value)
             assert fwr._frame.invalid_data_value == fill_value
+
+    def test_stream_invalid(self):
+        with pytest.raises(ValueError):
+            mark5b.open('ts.dat', 's')
+
+    def test_stream_missing_kday(self):
+        with pytest.raises(ValueError):
+            mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
+                        sample_rate=32*u.MHz)

@@ -281,6 +281,11 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
 
     def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None,
                  subset=None, sample_rate=None, fill_value=0., squeeze=True):
+
+        if decade is None and ref_time is None:
+            raise ValueError("Mark4 stream reader requires decade or "
+                             "ref_time. Please pass either explicitly.")
+
         # Pre-set fh_raw, so FileReader methods work
         # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
