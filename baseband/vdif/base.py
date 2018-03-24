@@ -354,6 +354,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             # will be squeezed away, so the subset is fine as is.
             self._frameset_subset = self.subset
             self._thread_ids = thread_ids
+        self._frameset.invalid_data_value = self.fill_value
 
     @lazyproperty
     def _last_header(self):
@@ -381,70 +382,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         self.fh_raw.seek(raw_offset)
         return last_header
 
-    def read(self, count=None, out=None):
-        """Read a number of complete (or subset) samples.
-
-        The range retrieved can span multiple frames.
-
-        Parameters
-        ----------
-        count : int, optional
-            Number of complete/subset samples to read.  If omitted or negative,
-            the whole file is read.  Ignored if ``out`` is given.
-        out : `None` or array
-            Array to store the data in. If given, ``count`` will be inferred
-            from the first dimension.  The other dimensions should equal
-            ``sample_shape``.
-
-        Returns
-        -------
-        out : array of float or complex
-            The first dimension is sample-time, and the other two, given by
-            ``sample_shape``, are (thread, channel).  Any dimension of length
-            unity is removed if ``self.squeeze=True``.
-        """
-        if out is None:
-            if count is None or count < 0:
-                count = self.size - self.offset
-                if count < 0:
-                    raise EOFError
-
-            out = np.empty((count,) + self.sample_shape,
-                           dtype=self._frameset.dtype)
-        else:
-            assert out.shape[1:] == self.sample_shape, (
-                "'out' should have trailing shape {}".format(self.sample_shape))
-            count = out.shape[0]
-
-        offset0 = self.offset
-        while count > 0:
-            dt, frame_nr, sample_offset = self._frame_info()
-            if(dt != self._frameset['seconds'] - self.header0['seconds'] or
-               frame_nr != self._frameset['frame_nr']):
-                # Read relevant frame (possibly reusing data array from
-                # previous frame set).
-                self._read_frame_set()
-                assert dt == (self._frameset['seconds'] -
-                              self.header0['seconds'])
-                assert frame_nr == self._frameset['frame_nr']
-
-            # Set decoded value for invalid data.
-            self._frameset.invalid_data_value = self.fill_value
-            # TODO: maybe slice with data_slice once frameset allows slicing,
-            # so we decode only what is needed.
-            data = self._frameset.data
-            # Determine appropriate slice.
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample = self.offset - offset0
-            data = data[sample_offset:sample_offset + nsample]
-            data = self._squeeze_and_subset(data)
-            # Copy relevant data from frame into output.
-            out[sample:sample + nsample] = data
-            self.offset += nsample
-            count -= nsample
-
-        return out
-
     def _squeeze_and_subset(self, data):
         # Overwrite VLBIStreamReaderBase version, since the threads part of
         # subset has already been used.
@@ -456,11 +393,20 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 
         return data
 
-    def _read_frame_set(self):
-        self.fh_raw.seek(self.offset // self.samples_per_frame *
-                         self._framesetsize)
-        self._frameset = self.read_frameset(self._thread_ids,
-                                            edv=self.header0.edv)
+    def _read_frame(self):
+        dt, frame_nr, sample_offset = self._frame_info()
+        if (dt != self._frameset['seconds'] - self.header0['seconds'] or
+                frame_nr != self._frameset['frame_nr']):
+            self.fh_raw.seek(self.offset // self.samples_per_frame *
+                             self._framesetsize)
+            self._frameset = self.read_frameset(self._thread_ids,
+                                                edv=self.header0.edv)
+            self._frameset.invalid_data_value = self.fill_value
+            assert dt == self._frameset['seconds'] - self.header0['seconds']
+            assert frame_nr == self._frameset['frame_nr']
+
+        # TODO: once framesets are sliceable, just return self._frameset
+        return self._frameset.data, sample_offset
 
 
 class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):

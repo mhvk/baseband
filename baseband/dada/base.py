@@ -235,7 +235,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     def __init__(self, fh_raw, subset=None, squeeze=True):
         header = DADAHeader.fromfile(fh_raw)
         super(DADAStreamReader, self).__init__(fh_raw, header, subset, squeeze)
-        self._get_frame(0)
+        self._frame_nr = None
 
     @lazyproperty
     def _last_header(self):
@@ -244,65 +244,18 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         last_frame = self.read_frame(memmap=True)
         return last_frame.header
 
-    def read(self, count=None, out=None):
-        """Read a number of complete (or subset) samples.
+    def _read_frame(self):
+        frame_nr, sample_offset = self._frame_info()
+        if frame_nr != self._frame_nr:
+            # Open relevant file.
+            self.fh_raw.seek(frame_nr * self.header0.framesize)
+            self._frame = self.read_frame(memmap=True)
+            self._frame_nr = frame_nr
+            assert (self._frame.header['OBS_OFFSET'] ==
+                    self.header0['OBS_OFFSET'] + frame_nr *
+                    self.header0.payloadsize)
 
-        Parameters
-        ----------
-        count : int, optional
-            Number of complete/subset samples to read.  If omitted or negative,
-            the whole file is read.  Ignored if ``out`` is given.
-        out : `None` or array
-            Array to store the data in. If given, ``count`` will be inferred
-            from the first dimension.  The other dimensions should equal
-            ``sample_shape``.
-
-        Returns
-        -------
-        out : array of float or complex
-            The first dimension is sample-time, and the other two, given by
-            ``sample_shape``, are (polarization, channel).  Any dimension of
-            length unity is removed if ``self.squeeze=True``.
-        """
-        if out is None:
-            if count is None or count < 0:
-                count = self.size - self.offset
-                if count < 0:
-                    raise EOFError
-
-            out = np.empty((count,) + self.sample_shape,
-                           dtype=self._frame.dtype)
-        else:
-            assert out.shape[1:] == self.sample_shape, (
-                "'out' should have trailing shape {}".format(self.sample_shape))
-            count = out.shape[0]
-
-        offset0 = self.offset
-        while count > 0:
-            frame_nr, sample_offset = self._frame_info()
-            if frame_nr != self._frame_nr:
-                # Open relevant file.
-                self._get_frame(frame_nr)
-
-            # Determine appropriate slice to decode.
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample = self.offset - offset0
-            data = self._frame[sample_offset:sample_offset + nsample]
-            data = self._squeeze_and_subset(data)
-            # Copy relevant data from frame into output.
-            out[sample:sample + nsample] = data
-            self.offset += nsample
-            count -= nsample
-
-        return out
-
-    def _get_frame(self, frame_nr):
-        self.fh_raw.seek(frame_nr * self.header0.framesize)
-        self._frame = self.read_frame(memmap=True)
-        self._frame_nr = frame_nr
-        assert (self._frame.header['OBS_OFFSET'] ==
-                self.header0['OBS_OFFSET'] + frame_nr *
-                self.header0.payloadsize)
+        return self._frame, sample_offset
 
 
 class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):

@@ -412,10 +412,9 @@ class TestDADA(object):
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
         with dada.open(filename, 'rs', squeeze=False) as fwr:
-            assert fwr._frame.valid
             data = fwr.read()
             assert np.all(data[:10] == self.payload[:10])
-            assert np.all(data[10:] == fwr._frame.invalid_data_value)
+            assert np.all(data[10:] == fwr.fill_value)
 
     def test_multiple_files_stream(self, tmpdir):
         start_time = self.header.time

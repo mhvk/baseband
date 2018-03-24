@@ -479,23 +479,22 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             count = out.shape[0]
 
         offset0 = self.offset
-        start = 0
-        while start < count:
-            # Get reference to frame that overlaps the current offset, as well as offset
-            # we need to take to be at the current offset.
+        sample = 0
+        while count > 0:
+            # For current position, get frame plus offset in that frame.
             frame, sample_offset = self._read_frame()
-            sample_stop = min(sample_offset + count, len(frame))
-            data = frame[sample_offset:sample_stop]
+            nsample = min(count, len(frame) - sample_offset)
+            data = frame[sample_offset:sample_offset + nsample]
             data = self._squeeze_and_subset(data)
             # Copy to relevant part of output.
-            stop = start + len(data)
-            out[start:stop] = data
-            start = stop
-            # We explicitly set offset here, so we do not have to count
-            # on get_chunk to keep track.
-            self.offset = offset0 + stop
+            out[sample:sample + nsample] = data
+            sample += nsample
+            # Explicitly set offset (just in case read_frame adjusts it too).
+            self.offset = offset0 + sample
+            count -= nsample
 
         return out
+
 
 class VLBIStreamWriterBase(VLBIStreamBase):
 
