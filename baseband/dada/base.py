@@ -235,7 +235,6 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     def __init__(self, fh_raw, subset=None, squeeze=True):
         header = DADAHeader.fromfile(fh_raw)
         super(DADAStreamReader, self).__init__(fh_raw, header, subset, squeeze)
-        self._frame_nr = None
 
     @lazyproperty
     def _last_header(self):
@@ -244,18 +243,13 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         last_frame = self.read_frame(memmap=True)
         return last_frame.header
 
-    def _read_frame(self):
-        frame_nr, sample_offset = self._frame_info()
-        if frame_nr != self._frame_nr:
-            # Open relevant file.
-            self.fh_raw.seek(frame_nr * self.header0.framesize)
-            self._frame = self.read_frame(memmap=True)
-            self._frame_nr = frame_nr
-            assert (self._frame.header['OBS_OFFSET'] ==
-                    self.header0['OBS_OFFSET'] + frame_nr *
-                    self.header0.payloadsize)
-
-        return self._frame, sample_offset
+    def _read_frame(self, frame_nr):
+        self.fh_raw.seek(frame_nr * self.header0.framesize)
+        frame = self.read_frame(memmap=True)
+        assert ((frame.header['OBS_OFFSET'] -
+                 self.header0['OBS_OFFSET']) / self.header0.payloadsize ==
+                frame_nr)
+        return frame
 
 
 class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):

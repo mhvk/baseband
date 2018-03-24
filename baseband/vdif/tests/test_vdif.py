@@ -759,8 +759,8 @@ class TestVDIF(object):
         assert 'partial buffer' in str(w[0].message)
         with vdif.open(vdif_incomplete, 'rs', fill_value=fill_value) as fwr:
             assert all([not frame.valid for frame in fwr._frameset.frames])
-            assert np.all(fwr.read() == fwr._frameset.invalid_data_value)
-            assert fwr._frameset.invalid_data_value == fill_value
+            assert fwr.fill_value == fill_value
+            assert np.all(fwr.read() == fill_value)
 
     def test_corrupt_stream(self, tmpdir):
         with vdif.open(SAMPLE_FILE, 'rb') as fh, \

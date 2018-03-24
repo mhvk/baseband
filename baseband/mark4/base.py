@@ -287,7 +287,6 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
                              "ref_time. Please pass either explicitly.")
 
         # Pre-set fh_raw, so FileReader methods work
-        # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
         # Find offset for first header, and ntrack if not specified.
         if ntrack is None:
@@ -301,13 +300,13 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             assert self.offset0 is not None, (
                 "could not find a first frame using ntrack={}. Perhaps "
                 "try ntrack=None for auto-determination.".format(ntrack))
-        self._frame = self.read_frame(ntrack, decade=decade, ref_time=ref_time)
-        self._frame_data = None
-        self._frame_nr = None
-        header = self._frame.header
+        header = Mark4Header.fromfile(self.fh_raw, ntrack,
+                                      decade=decade, ref_time=ref_time)
+        # Go back to start of frame (for possible sample rate detection).
+        self.fh_raw.seek(self.offset0)
         super(Mark4StreamReader, self).__init__(
             fh_raw, header0=header, sample_rate=sample_rate,
-            unsliced_shape=self._frame.payload.sample_shape,
+            unsliced_shape=(header.nchan,),
             bps=header.bps, complex_data=False, subset=subset,
             samples_per_frame=header.samples_per_frame,
             fill_value=fill_value, squeeze=squeeze)
@@ -357,19 +356,14 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         last_header.infer_decade(self.start_time)
         return last_header
 
-    def _read_frame(self):
-        """Return the frame at and offset to the current position."""
-        # TODO: this does no checking at all that the frame is correct!
-        frame_nr, sample_offset = divmod(self.offset, self.samples_per_frame)
-        if frame_nr != self._frame_nr:
-            self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
-            self._frame = self.read_frame(ntrack=self.header0.ntrack,
-                                          ref_time=self.start_time)
-            # Set decoded value for invalid data.
-            self._frame.invalid_data_value = self.fill_value
-            self._frame_nr = frame_nr
-
-        return self._frame, sample_offset
+    def _read_frame(self, frame_nr):
+        self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
+        frame = self.read_frame(ntrack=self.header0.ntrack,
+                                ref_time=self.start_time)
+        # Set decoded value for invalid data.
+        frame.invalid_data_value = self.fill_value
+        # TODO: add check that we got the right frame.
+        return frame
 
 
 class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):

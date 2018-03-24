@@ -213,20 +213,17 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
             raise ValueError("Mark5B stream reader requires kday or ref_time. "
                              "Please pass either explicitly.")
 
-        # Pre-set fh_raw, so FileReader methods work
-        # TODO: move this to StreamReaderBase?
-        self.fh_raw = fh_raw
-        frame = self.read_frame(nchan=nchan, bps=bps,
-                                ref_time=ref_time, kday=kday)
-        header = frame.header
+        header = Mark5BHeader.fromfile(fh_raw, ref_time=ref_time, kday=kday)
+        # Go back to start of frame (for possible sample rate detection).
+        fh_raw.seek(0)
         super(Mark5BStreamReader, self).__init__(
             fh_raw, header0=header, bps=bps, complex_data=False, subset=subset,
-            unsliced_shape=frame.payload.sample_shape,
+            unsliced_shape=(nchan,),
             samples_per_frame=header.payloadsize * 8 // bps // nchan,
             sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
-        # Store the first frame.
-        self._frame = frame
-        self._frame.invalid_data_value = self.fill_value
+
+        self._framerate = int(round((self.sample_rate /
+                                     self.samples_per_frame).to_value(u.Hz)))
 
     @lazyproperty
     def _last_header(self):
@@ -237,27 +234,19 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         last_header.infer_kday(self.start_time)
         return last_header
 
-    def _read_frame(self):
-        dt, frame_nr, sample_offset = self._frame_info()
-        dt_expected = (self._frame.seconds - self.header0.seconds +
-                       86400 * (self._frame.kday + self._frame.jday -
-                                self.header0.kday - self.header0.jday))
-        if dt != dt_expected or frame_nr != self._frame['frame_nr']:
-            # Read relevant frame, reusing data array from previous frame.
-            self.fh_raw.seek(self.offset // self.samples_per_frame *
-                             self._frame.size)
-            self._frame = self.read_frame(nchan=self._unsliced_shape.nchan,
-                                          bps=self.bps,
-                                          ref_time=self.start_time)
-            dt_expected = (self._frame.seconds - self.header0.seconds +
-                           86400 * (self._frame.kday + self._frame.jday -
-                                    self.header0.kday - self.header0.jday))
-            assert dt == dt_expected
-            assert frame_nr == self._frame['frame_nr']
-            # Set decoded value for invalid data.
-            self._frame.invalid_data_value = self.fill_value
-
-        return self._frame, sample_offset
+    def _read_frame(self, frame_nr):
+        self.fh_raw.seek(frame_nr * self.header0.framesize)
+        frame = self.read_frame(nchan=self._unsliced_shape.nchan,
+                                bps=self.bps, ref_time=self.start_time)
+        # Set decoded value for invalid data.
+        frame.invalid_data_value = self.fill_value
+        # TODO: OK to ignore leap seconds? Not sure what writer does.
+        dt = (frame.seconds - self.header0.seconds +
+              86400 * (frame.kday + frame.jday -
+                       self.header0.kday - self.header0.jday))
+        assert (dt * self._framerate +
+                frame['frame_nr'] - self.header0['frame_nr']) == frame_nr
+        return frame
 
 
 class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):

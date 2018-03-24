@@ -269,30 +269,22 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             last_header = self.header0.__class__(second_last_line_tuple)
         return last_header
 
-    def _read_frame(self):
-        frame_nr, sample_offset = divmod(self.offset,
-                                         self.samples_per_frame)
-        if frame_nr != self._frame_nr:
-            # Read relevant frame (possibly reusing data array from
-            # previous frame set).
-            self.fh_ts.seek(self.header0.seek_offset(frame_nr))
-            if self.header0.mode == 'rawdump':
-                self.fh_raw.seek(frame_nr * self._payloadsize)
-            else:
-                for fh_pair in self.fh_raw:
-                    for fh in fh_pair:
-                        fh.seek(frame_nr * self._payloadsize)
-            self._frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
-                                            payloadsize=self._payloadsize,
-                                            nchan=self._unsliced_shape.nchan,
-                                            bps=self.bps,
-                                            complex_data=self.complex_data)
-            self._frame_nr = frame_nr
-            framerate = self.sample_rate / self.samples_per_frame
-            assert np.isclose(self._frame_nr,
-                              ((self._frame.header.time -
-                                self.start_time) * framerate).to(u.one))
-        return self._frame, sample_offset
+    def _read_frame(self, frame_nr):
+        self.fh_ts.seek(self.header0.seek_offset(frame_nr))
+        if self.header0.mode == 'rawdump':
+            self.fh_raw.seek(frame_nr * self._payloadsize)
+        else:
+            for fh_pair in self.fh_raw:
+                for fh in fh_pair:
+                    fh.seek(frame_nr * self._payloadsize)
+        frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
+                                  payloadsize=self._payloadsize,
+                                  nchan=self._unsliced_shape.nchan,
+                                  bps=self.bps, complex_data=self.complex_data)
+        assert int(round(((frame.header.time - self.start_time) *
+                          self.sample_rate / self.samples_per_frame)
+                         .to_value(u.one))) == frame_nr
+        return frame
 
 
 class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
