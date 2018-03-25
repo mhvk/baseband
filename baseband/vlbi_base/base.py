@@ -201,21 +201,6 @@ class VLBIStreamBase(VLBIFileBase):
 
         return (self.offset / self.sample_rate).to(unit)
 
-    def _frame_info(self):
-        # Can be made less unwieldy if we abstract a StreamBase class such that
-        # VLBIStreamBase is only for VLBI formats.
-        try:
-            framerate = self._framerate
-            offset0 = self._offset0
-        except AttributeError:
-            framerate = self._framerate = int(np.round(
-                (self.sample_rate / self.samples_per_frame).to_value(u.Hz)))
-            offset0 = self._offset0 = self.header0['frame_nr']
-        offset = (self.offset + offset0 * self.samples_per_frame)
-        full_frame_nr, extra = divmod(offset, self.samples_per_frame)
-        dt, frame_nr = divmod(full_frame_nr, framerate)
-        return dt, frame_nr, extra
-
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
                 "    sample_rate={s.sample_rate},"
@@ -511,6 +496,55 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             if dim == 1:
                 new_shape.insert(i + 1, 1)
         return data.reshape(new_shape)
+
+    def write(self, data, invalid_data=False):
+        """Write data, buffering by frames as needed.
+
+        Parameters
+        ----------
+        data : array
+            Piece of data to be written, with sample dimensions as given by
+            ``sample_shape``. This should be properly scaled to make best use
+            of the dynamic range delivered by the encoding.
+        invalid_data : bool, optional
+            Whether the current data is invalid.  Defaults to `False`.
+        """
+        assert data.shape[1:] == self.sample_shape, (
+            "'data' should have trailing shape {}".format(self.sample_shape))
+
+        if self.squeeze:
+            data = self._unsqueeze(data)
+
+        count = data.shape[0]
+        offset0 = self.offset
+        sample = 0
+        while count > 0:
+            frame_index, sample_offset = divmod(self.offset,
+                                                self.samples_per_frame)
+            if frame_index != self._frame_index:
+                frame = self._frame = self._make_frame(frame_index)
+                self._frame_index = frame_index
+                self._valid = not invalid_data
+            else:
+                frame = self._frame
+                self._valid &= not invalid_data
+
+            nsample = min(count, len(frame) - sample_offset)
+            sample_end = sample_offset + nsample
+            frame[sample_offset:sample_end] = data[sample:sample + nsample]
+            if sample_end == self.samples_per_frame:
+                self._write_frame(frame, valid=self._valid)
+
+            sample += nsample
+            # Explicitly set offset (just in case write_frame adjusts it too).
+            self.offset = offset0 + sample
+            count -= nsample
+
+    def _write_frame(self, frame, valid=True):
+        # default implementation is to assume this is a frame and use
+        # the binary file writer.
+        frame.valid = valid
+        self.write_frame(frame)
 
     def close(self):
         extra = self.offset % self.samples_per_frame

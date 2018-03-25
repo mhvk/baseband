@@ -288,10 +288,10 @@ class TestMark4ToVDIF1(object):
             assert (fw.tell(unit='time') - time1) < 2. * u.ns
 
         with vdif.open(fl, 'rs') as fv:
+            assert abs(fv.header0.time - start_time) < 2. * u.ns
             expected = vheader0.copy()
             expected['invalid_data'] = True
             assert fv.header0 == expected
-            assert abs(fv.header0.time - start_time) < 2. * u.ns
             dv = fv.read(80000)
             assert np.all(dv == data)
             assert fv.offset == offset1

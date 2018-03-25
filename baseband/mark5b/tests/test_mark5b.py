@@ -248,7 +248,16 @@ class TestMark5B(object):
         frame8 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2,
                                              valid=False)
         assert frame8.valid is False
-        assert np.all(frame8.payload.words == 0x11223344)
+        assert np.all(frame8.data == 0.)
+        with open(str(tmpdir.join('test8.m5b')), 'w+b') as s:
+            frame8.tofile(s)
+            s.seek(0)
+            frame9 = mark5b.Mark5BFrame.fromfile(s, kday=56000,
+                                                 nchan=frame8.shape[1],
+                                                 bps=frame8.payload.bps)
+        assert frame9.valid is False
+        assert np.all(frame9.data == 0.)
+        assert np.all(frame9.payload.words == 0x11223344)
 
     def test_header_times(self):
         with mark5b.open(SAMPLE_FILE, 'rb') as fh:
@@ -571,7 +580,7 @@ class TestMark5B(object):
             assert fw.header0['frame_nr'] == 198
             # Write 4 dummy frames, to include the max frame and frame 0
             fw.write(np.zeros((20000, 8), dtype='float32'))
-            assert fw._header['frame_nr'] == 1
+            assert fw._frame.header['frame_nr'] == 1
 
         with mark5b.open(m5_test_samplerate, 'rs', nchan=8, kday=56000) as fh:
             assert fh.sample_rate == sample_rate

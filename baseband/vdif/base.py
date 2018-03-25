@@ -252,6 +252,8 @@ class VDIFStreamBase(VLBIStreamBase):
             bps=header0.bps, complex_data=header0['complex_data'],
             subset=subset, samples_per_frame=samples_per_frame,
             sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
+        self._framerate = int(round((self.sample_rate /
+                                     self.samples_per_frame).to_value(u.Hz)))
 
     def _get_time(self, header):
         """Get time from a header.
@@ -356,8 +358,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             self._thread_ids = thread_ids
 
         self._frameset = frameset
-        self._framerate = int(round((self.sample_rate /
-                                     self.samples_per_frame).to_value(u.Hz)))
 
     @lazyproperty
     def _last_header(self):
@@ -473,55 +473,26 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
             if header_sample_rate == 0:
                 self.header0.sample_rate = self.sample_rate
             assert self.header0.sample_rate == self.sample_rate
+        # TODO: once frameset allows slicing when writing, can replace this
+        # with a frameset.
         self._data = np.zeros(
             (self.samples_per_frame,) + self._unsliced_shape,
             np.complex64 if self.complex_data else np.float32)
 
-    def write(self, data, invalid_data=False):
-        """Write data, using multiple files as needed.
+    def _make_frame(self, index):
+        self._header = self.header0.copy()
+        dt, frame_nr = divmod(index + self.header0['frame_nr'],
+                              self._framerate)
+        self._header['seconds'] = self.header0['seconds'] + dt
+        self._header['frame_nr'] = frame_nr
+        return self._data
 
-        Parameters
-        ----------
-        data : array
-            Piece of data to be written, with sample dimensions as given by
-            ``sample_shape``. This should be properly scaled to make best use
-            of the dynamic range delivered by the encoding.
-        invalid_data : bool, optional
-            Whether the current data is valid.  Defaults to `False`.
-        """
-        assert data.shape[1:] == self.sample_shape, (
-            "'data' should have trailing shape {}".format(self.sample_shape))
-        assert data.dtype.kind == self._data.dtype.kind, (
-            "'data' should be {}".format('complex' if self.data.dtype == 'c'
-                                         else 'float'))
-        if self.squeeze:
-            data = self._unsqueeze(data)
-
-        count = data.shape[0]
-        sample = 0
-        offset0 = self.offset
-        frame = self._data
-        while count > 0:
-            dt, frame_nr, sample_offset = self._frame_info()
-            if sample_offset == 0:
-                # set up header for new frame.
-                self._header = self.header0.copy()
-                self._header['seconds'] = self.header0['seconds'] + dt
-                self._header['frame_nr'] = frame_nr
-
-            if invalid_data:
-                # Mark whole frame as invalid data.
-                self._header['invalid_data'] = invalid_data
-
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample_end = sample_offset + nsample
-            sample = self.offset - offset0
-            frame[sample_offset:sample_end] = data[sample:sample + nsample]
-            if sample_end == self.samples_per_frame:
-                self.write_frameset(self._data, self._header)
-
-            self.offset += nsample
-            count -= nsample
+    def _write_frame(self, frame, valid=True):
+        assert frame is self._data
+        frameset = VDIFFrameSet.fromdata(frame, self._header)
+        for frame in frameset.frames:
+            frame.valid = valid
+        self.write_frameset(frameset)
 
 
 open = make_opener('VDIF', globals(), doc="""

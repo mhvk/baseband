@@ -500,7 +500,6 @@ class TestDADA(object):
             assert fw.start_time == header.time
             assert (np.abs(fw.time - (start_time + 7000 / (16. * u.MHz))) <
                     1. * u.ns)
-            assert fw._frame_nr == 3
             fw.write(data[7000:])
             assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
                     1. * u.ns)

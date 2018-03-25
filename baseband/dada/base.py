@@ -208,10 +208,6 @@ class DADAStreamBase(VLBIStreamBase):
             samples_per_frame=header0.samples_per_frame,
             sample_rate=header0.sample_rate, squeeze=squeeze)
 
-    def _frame_info(self):
-        """Convert offset to file number and offset into that file."""
-        return divmod(self.offset, self.samples_per_frame)
-
 
 class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     """DADA format reader.
@@ -268,56 +264,21 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
     def __init__(self, fh_raw, header, squeeze=True):
         assert header.get('OBS_OVERLAP', 0) == 0
         super(DADAStreamWriter, self).__init__(fh_raw, header, squeeze=squeeze)
-        self._frame = self.memmap_frame(header)
-        self._frame_nr = 0
 
-    def write(self, data, invalid_data=False):
-        """Write data, using multiple files as needed.
-
-        Parameters
-        ----------
-        data : array
-            Piece of data to be written, with sample dimensions as given by
-            ``sample_shape``. This should be properly scaled to make best use
-            of the dynamic range delivered by the encoding.
-        invalid_data : bool, optional
-            Whether the current data is valid.  Defaults to `False`.  Present
-            for consistency with other stream writers.  It does not seem
-            possible to store this information in DADA files.
-        """
-        assert data.shape[1:] == self.sample_shape, (
-            "'data' should have trailing shape {}".format(self.sample_shape))
-        if self.squeeze:
-            data = self._unsqueeze(data)
-
-        count = data.shape[0]
-        sample = 0
-        offset0 = self.offset
-        while count > 0:
-            frame_nr, sample_offset = self._frame_info()
-            if self._frame_nr is None:
-                assert sample_offset == 0
-                self._get_frame(frame_nr)
-
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample_end = sample_offset + nsample
-            sample = self.offset - offset0
-            self._frame[sample_offset:
-                        sample_end] = data[sample:sample + nsample]
-            if sample_end == self.samples_per_frame:
-                # deleting frame flushes memmap'd data to disk
-                del self._frame
-                self._frame_nr = None
-
-            self.offset += nsample
-            count -= nsample
-
-    def _get_frame(self, frame_nr):
+    def _make_frame(self, index):
         header = self.header0.copy()
         header.update(obs_offset=self.header0['OBS_OFFSET'] +
-                      frame_nr * self.header0.payloadsize)
-        self._frame = self.memmap_frame(header)
-        self._frame_nr = frame_nr
+                      index * self.header0.payloadsize)
+        return self.memmap_frame(header)
+
+    def _write_frame(self, frame, valid=True):
+        assert frame is self._frame
+        frame.valid = valid
+        # Deleting frame flushes memmap'd data to disk.
+        del self._frame
+        del frame
+        # Be absolutely sure that no attempt will be made to use it again.
+        self._frame_index = None
 
 
 opener = make_opener('DADA', globals(), doc="""

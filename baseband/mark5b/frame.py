@@ -10,6 +10,8 @@ http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import numpy as np
+
 from ..vlbi_base.frame import VLBIFrameBase
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
@@ -117,6 +119,13 @@ class Mark5BFrame(VLBIFrameBase):
         if header is None:
             header = Mark5BHeader.fromvalues(verify=verify, **kwargs)
         payload = cls._payload_class.fromdata(data, bps=bps)
-        if not valid:
-            payload.words[...] = cls._fill_pattern
         return cls(header, payload, valid=valid, verify=verify)
+
+    def tofile(self, fh):
+        """Write encoded frame to filehandle."""
+        self.header.tofile(fh)
+        if self.valid:
+            self.payload.tofile(fh)
+        else:
+            fh.write(np.full_like(self.payload.words,
+                                  self._fill_pattern).tostring())
