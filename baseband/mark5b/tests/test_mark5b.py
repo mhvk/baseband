@@ -285,6 +285,37 @@ class TestMark5B(object):
         with pytest.raises(ValueError):
             header.get_time(frame_nr=1)
 
+        # Check setting time using framerate.
+        sample_rate = 128. * u.MHz
+        samples_per_frame = 5000
+        # Max frame_nr is 2**15; this sets it to 25600.
+        frame_rate = sample_rate / samples_per_frame
+        header.set_time(time=(start_time + 1. / frame_rate),
+                        framerate=frame_rate)
+        header.get_time(frame_rate)
+        assert abs(header.get_time(frame_rate) -
+                   start_time - 1. / frame_rate) < 1. * u.ns
+        header.set_time(time=(start_time + 3921. / frame_rate),
+                        framerate=frame_rate)
+        assert abs(header.get_time(frame_rate) -
+                   start_time - 3921. / frame_rate) < 1. * u.ns
+        # Test using bcd_fraction gives us within 0.1 ms accuracy
+        assert abs(header.time - start_time - 3921. / frame_rate) < 0.1 * u.ms
+        header.set_time(time=(start_time + 25599. / frame_rate),
+                        framerate=frame_rate)
+        assert abs(header.get_time(frame_rate) -
+                   start_time - 25599. / frame_rate) < 1. * u.ns
+        # Check rounding when using passing fractional frametimes.
+        header.set_time(time=(start_time + 25598.53 / frame_rate),
+                        framerate=frame_rate)
+        assert abs(header.get_time(frame_rate) -
+                   start_time - 25599. / frame_rate) < 1. * u.ns
+        # Check rounding to the nearest second when less than 2 ns away.
+        header.set_time(time=(start_time + 0.9 * u.ns), frame_nr=0)
+        assert header.seconds == header0.seconds
+        header.set_time(time=(start_time - 0.9 * u.ns), frame_nr=0)
+        assert header.seconds == header0.seconds
+
     def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,
         # since otherwise they run *very* slow.  This is somehow related to
@@ -530,15 +561,13 @@ class TestMark5B(object):
             assert np.all(fhs.read(20000) == record[:, 0])
             assert np.all(fhns.read(20000) == record[:, 0])
 
-        # Test that sample_rate can be inferred from max frame number
+        # Test that sample_rate can be inferred from max frame number.
         m5_test_samplerate = str(tmpdir.join('test_samplerate.m5b'))
         sample_rate = 1. * u.MHz
         samples_per_frame = 5000
         test_time = start_time + 198. * samples_per_frame / sample_rate
-        # TODO: frame_nr should be inferred from time & sample_rate;
-        # see gh-158
         with mark5b.open(m5_test_samplerate, 'ws', time=test_time, nchan=8,
-                         bps=2, sample_rate=sample_rate, frame_nr=198) as fw:
+                         bps=2, sample_rate=sample_rate) as fw:
             assert fw.header0['frame_nr'] == 198
             # Write 4 dummy frames, to include the max frame and frame 0
             fw.write(np.zeros((20000, 8), dtype='float32'))

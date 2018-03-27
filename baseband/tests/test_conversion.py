@@ -55,7 +55,7 @@ class TestVDIFMark5B(object):
             m5h2, nchan=m5pl.sample_shape.nchan, bps=m5pl.bps,
             sample_rate=64*u.MHz)
         assert header3.time == header2.time
-        assert header3['frame_nr'] == header2['frame_nr'] + 1
+        assert header3['frame_nr'] == m5h2['frame_nr']
 
         # A copy might remove any `kday` keywords set, but should still work
         # (Regression test for #34)

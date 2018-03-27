@@ -76,6 +76,7 @@ class Mark5BHeader(VLBIHeaderBase):
     """Properties accessible/usable in initialisation."""
 
     kday = None
+    _payloadsize = 10000  # 2500 words
 
     def __init__(self, words, kday=None, ref_time=None, verify=True, **kwargs):
         super(Mark5BHeader, self).__init__(words, verify=False, **kwargs)
@@ -97,6 +98,41 @@ class Mark5BHeader(VLBIHeaderBase):
 
     def copy(self, **kwargs):
         return super(Mark5BHeader, self).copy(kday=self.kday, **kwargs)
+
+    @classmethod
+    def fromvalues(cls, **kwargs):
+        """Initialise a header from parsed values.
+
+        Here, the parsed values must be given as keyword arguments, i.e., for
+        any ``header = cls(<data>)``, ``cls.fromvalues(**header) == header``.
+
+        However, unlike for the :meth:`Mark5BHeader.fromkeys` class method,
+        data can also be set using arguments named after methods such as
+        ``jday`` and ``seconds``.
+
+        Given defaults:
+
+        sync_pattern : 0xABADDEED
+
+        Values set by other keyword arguments (if present):
+
+        bcd_jday : from ``jday`` or ``time``
+        bcd_seconds : from ``seconds`` or ``time``
+        bcd_fraction : from ``ns`` or ``time``
+        frame_nr : from ``time``
+        """
+        time = kwargs.pop('time', None)
+        framerate = kwargs.pop('framerate', None)
+        # Pop verify and pass on False so verify happens after time is set.
+        verify = kwargs.pop('verify', True)
+        kwargs['verify'] = False
+        self = super(Mark5BHeader, cls).fromvalues(**kwargs)
+        if time is not None:
+            self.set_time(time, framerate=framerate)
+            self.update()    # Recalculate CRC.
+        if verify:
+            self.verify()
+        return self
 
     def update(self, **kwargs):
         """Update the header by setting keywords or properties.
@@ -147,12 +183,12 @@ class Mark5BHeader(VLBIHeaderBase):
     @property
     def payloadsize(self):
         """Size of the payload, in bytes."""
-        return 10000  # 2500 words
+        return self._payloadsize    # Hardcoded in class definition.
 
     @payloadsize.setter
     def payloadsize(self, payloadsize):
-        if payloadsize != 10000:  # 2500 words
-            raise ValueError("Mark5B payload has a fixed size of 10000 bytes "
+        if payloadsize != self._payloadsize:  # 2500 words
+            raise ValueError("Mark 5B payload has a fixed size of 10000 bytes "
                              "(2500 words).")
 
     @property
@@ -163,7 +199,7 @@ class Mark5BHeader(VLBIHeaderBase):
     @framesize.setter
     def framesize(self, framesize):
         if framesize != self.size + self.payloadsize:
-            raise ValueError("Mark5B frame has a fixed size of 10016 bytes "
+            raise ValueError("Mark 5B frame has a fixed size of 10016 bytes "
                              "(4 header words plus 2500 payload words).")
 
     @property
@@ -254,13 +290,54 @@ class Mark5BHeader(VLBIHeaderBase):
         return Time(self.kday + self.jday, (self.seconds + offset) / 86400,
                     format='mjd', scale='utc', precision=9)
 
-    def set_time(self, time):
+    def set_time(self, time, framerate=None, frame_nr=None):
+        """
+        Convert Time object to BCD timestamp elements and frame_nr.
+
+        For non-integer seconds, the frame_nr will be calculated if not given
+        explicitly. Doing so requires the frame rate.
+
+        Parameters
+        ----------
+        time : Time instance
+            The time to use for this header.
+        framerate : `~astropy.units.Quantity`, optional
+            For calculating the ``frame_nr`` from the fractional seconds.
+        frame_nr : int, optional
+            An explicit frame number associated with the fractions of seconds.
+        """
         self.kday = int(time.mjd // 1000) * 1000
         self.jday = int(time.mjd - self.kday)
-        ns = int(round((time - Time(self.kday + self.jday, format='mjd')).sec *
-                       1e9))
-        sec, ns = divmod(ns, 1000000000)
-        self.seconds = sec
-        self.ns = ns
+        seconds = time - Time(self.kday + self.jday, format='mjd')
+        int_sec = int(seconds.sec)
+        frac_sec = seconds - int_sec * u.s
+
+        # Round to nearest ns to handle timestamp difference errors.
+        if abs(frac_sec) < 1. * u.ns:
+            frame_nr = 0
+            ns = 0.
+        elif abs(1. * u.s - frac_sec) < 1. * u.ns:
+            int_sec += 1
+            frame_nr = 0
+            ns = 0.
+        else:
+            if frame_nr is None:
+                if framerate is None:
+                    raise ValueError("cannot calculate framerate. Pass it "
+                                     "in explicitly.")
+                frame_nr = int(round((frac_sec * framerate).to(u.one).value))
+                frac_sec_framestart = frame_nr / framerate
+                if abs(frac_sec_framestart - 1. * u.s) < 1. * u.ns:
+                    int_sec += 1
+                    frame_nr = 0
+                    ns = 0.
+                else:
+                    ns = frac_sec_framestart.to(u.ns).value
+            else:
+                ns = frac_sec.to(u.ns).value
+
+        self.seconds = int_sec
+        self.ns = int(round(ns))
+        self['frame_nr'] = frame_nr
 
     time = property(get_time, set_time)
