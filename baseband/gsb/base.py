@@ -234,7 +234,6 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             samples_per_frame=samples_per_frame, payloadsize=payloadsize,
             sample_rate=sample_rate, squeeze=squeeze)
         self.fh_ts.seek(0)
-        self._frame_nr = None
 
     @lazyproperty
     def _last_header(self):
@@ -269,82 +268,22 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             last_header = self.header0.__class__(second_last_line_tuple)
         return last_header
 
-    def read(self, count=None, out=None):
-        """Read a number of complete (or subset) samples.
-
-        The range retrieved can span multiple frames.
-
-        Parameters
-        ----------
-        count : int, optional
-            Number of complete/subset samples to read.  If omitted or negative,
-            the whole file is read.  Ignored if ``out`` is given.
-        out : `None` or array
-            Array to store the data in. If given, ``count`` will be inferred
-            from the first dimension.  The other dimensions should equal
-            ``sample_shape``.
-
-        Returns
-        -------
-        out : array of float or complex
-            The first dimension is sample-time, and the other two, given by
-            ``sample_shape``, are (polarization, channel).  Any
-            dimension of length unity is removed if ``self.squeeze=True``.
-        """
-        if out is None:
-            if count is None or count < 0:
-                count = self.size - self.offset
-                if count < 0:
-                    raise EOFError
-
-            dtype = np.complex64 if self.complex_data else np.float32
-            out = np.empty((count,) + self.sample_shape, dtype)
-        else:
-            assert out.shape[1:] == self.sample_shape, (
-                "'out' should have trailing shape {}".format(self.sample_shape))
-            count = out.shape[0]
-
-        offset0 = self.offset
-        while count > 0:
-            frame_nr, sample_offset = divmod(self.offset,
-                                             self.samples_per_frame)
-            if(frame_nr != self._frame_nr):
-                # Read relevant frame (possibly reusing data array from
-                # previous frame set).
-                self._read_frame()
-                framerate = self.sample_rate / self.samples_per_frame
-                assert np.isclose(self._frame_nr,
-                                  ((self._frame.header.time -
-                                    self.start_time) * framerate).to(u.one))
-
-            # Determine appropriate slice to decode.
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample = self.offset - offset0
-            data = self._frame[sample_offset:sample_offset + nsample]
-            data = self._squeeze_and_subset(data)
-            # Copy relevant data from frame into output.
-            out[sample:sample + nsample] = data
-            self.offset += nsample
-            count -= nsample
-
-        return out
-
-    def _read_frame(self, out=None):
-        frame_nr = self.offset // self.samples_per_frame
-        self.fh_ts.seek(self.header0.seek_offset(frame_nr))
+    def _read_frame(self, index):
+        self.fh_ts.seek(self.header0.seek_offset(index))
         if self.header0.mode == 'rawdump':
-            self.fh_raw.seek(frame_nr * self._payloadsize)
+            self.fh_raw.seek(index * self._payloadsize)
         else:
             for fh_pair in self.fh_raw:
                 for fh in fh_pair:
-                    fh.seek(frame_nr * self._payloadsize)
-        self._frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
-                                        payloadsize=self._payloadsize,
-                                        nchan=self._unsliced_shape.nchan,
-                                        bps=self.bps,
-                                        complex_data=self.complex_data)
-        self._frame_nr = frame_nr
-        return self._frame
+                    fh.seek(index * self._payloadsize)
+        frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
+                                  payloadsize=self._payloadsize,
+                                  nchan=self._unsliced_shape.nchan,
+                                  bps=self.bps, complex_data=self.complex_data)
+        assert int(round(((frame.header.time - self.start_time) *
+                          self.sample_rate / self.samples_per_frame)
+                         .to_value(u.one))) == index
+        return frame
 
 
 class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):

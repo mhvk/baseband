@@ -287,7 +287,6 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
                              "ref_time. Please pass either explicitly.")
 
         # Pre-set fh_raw, so FileReader methods work
-        # TODO: move this to StreamReaderBase?
         self.fh_raw = fh_raw
         # Find offset for first header, and ntrack if not specified.
         if ntrack is None:
@@ -301,13 +300,13 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
             assert self.offset0 is not None, (
                 "could not find a first frame using ntrack={}. Perhaps "
                 "try ntrack=None for auto-determination.".format(ntrack))
-        self._frame = self.read_frame(ntrack, decade=decade, ref_time=ref_time)
-        self._frame_data = None
-        self._frame_nr = None
-        header = self._frame.header
+        header = Mark4Header.fromfile(self.fh_raw, ntrack,
+                                      decade=decade, ref_time=ref_time)
+        # Go back to start of frame (for possible sample rate detection).
+        self.fh_raw.seek(self.offset0)
         super(Mark4StreamReader, self).__init__(
             fh_raw, header0=header, sample_rate=sample_rate,
-            unsliced_shape=self._frame.payload.sample_shape,
+            unsliced_shape=(header.nchan,),
             bps=header.bps, complex_data=False, subset=subset,
             samples_per_frame=header.samples_per_frame,
             fill_value=fill_value, squeeze=squeeze)
@@ -357,69 +356,14 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         last_header.infer_decade(self.start_time)
         return last_header
 
-    def read(self, count=None, out=None):
-        """Read count samples.
-
-        The range retrieved can span multiple frames.
-
-        Parameters
-        ----------
-        count : int
-            Number of samples to read.  If omitted or negative, the whole
-            file is read.  Ignored if ``out`` is given.
-        out : `None` or array
-            Array to store the data in. If given, ``count`` will be inferred
-            from the first dimension.  The other dimension should equal
-            ``sample_shape``.
-
-        Returns
-        -------
-        out : array of float
-            The first dimension is sample-time, and the second, given by
-            ``sample_shape``, is (channel,).  Any dimension of length unity is
-            removed if ``self.squeeze=True``.
-        """
-        if out is None:
-            if count is None or count < 0:
-                count = self.size - self.offset
-                if count < 0:
-                    raise EOFError
-
-            out = np.empty((count,) + self.sample_shape,
-                           dtype=self._frame.dtype)
-        else:
-            assert out.shape[1:] == self.sample_shape, (
-                "'out' should have trailing shape {}".format(self.sample_shape))
-            count = out.shape[0]
-
-        offset0 = self.offset
-        while count > 0:
-            frame_nr, sample_offset = divmod(self.offset,
-                                             self.samples_per_frame)
-            if frame_nr != self._frame_nr:
-                self._read_frame()
-
-            # Set decoded value for invalid data.
-            self._frame.invalid_data_value = self.fill_value
-            # Determine appropriate slice to decode.
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample = self.offset - offset0
-            data = self._frame[sample_offset:sample_offset + nsample]
-            data = self._squeeze_and_subset(data)
-            # Copy relevant data from frame into output.
-            out[sample:sample + nsample] = data
-            self.offset += nsample
-            count -= nsample
-
-        return out
-
-    def _read_frame(self):
-        frame_nr = self.offset // self.samples_per_frame
-        self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
-        self._frame = self.read_frame(ntrack=self.header0.ntrack,
-                                      ref_time=self.start_time)
-        # Convert payloads to data array.
-        self._frame_nr = frame_nr
+    def _read_frame(self, index):
+        self.fh_raw.seek(self.offset0 + index * self.header0.framesize)
+        frame = self.read_frame(ntrack=self.header0.ntrack,
+                                ref_time=self.start_time)
+        # Set decoded value for invalid data.
+        frame.invalid_data_value = self.fill_value
+        # TODO: add check that we got the right frame.
+        return frame
 
 
 class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):

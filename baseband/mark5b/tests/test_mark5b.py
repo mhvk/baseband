@@ -343,7 +343,6 @@ class TestMark5B(object):
         with mark5b.open(SAMPLE_FILE, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, kday=56000) as fh:
             assert header == fh.header0
-            assert fh.fh_raw.tell() == header.framesize
             assert fh.samples_per_frame == 5000
             assert fh.sample_rate == 32 * u.MHz
             last_header = fh._last_header
@@ -568,9 +567,9 @@ class TestMark5B(object):
         with mark5b.open(m5_incomplete, 'rs', nchan=8, bps=2,
                          sample_rate=32*u.MHz, kday=56000,
                          fill_value=fill_value) as fwr:
-            assert not fwr._frame.valid
-            assert np.all(fwr.read() == fwr._frame.invalid_data_value)
-            assert fwr._frame.invalid_data_value == fill_value
+            assert fwr.fill_value == fill_value
+            check = fwr.read()
+            assert np.all(check == fill_value)
 
     def test_stream_invalid(self):
         with pytest.raises(ValueError):

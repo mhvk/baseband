@@ -527,8 +527,6 @@ class TestMark4(object):
         with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz) as fh:
             assert header == fh.header0
-            # Raw file should be just after frame 0.
-            assert fh.fh_raw.tell() == 0xa88 + fh.header0.framesize
             assert fh.samples_per_frame == 80000
             assert fh.size == 2 * fh.samples_per_frame
             assert fh.sample_rate == 32 * u.MHz
@@ -690,9 +688,8 @@ class TestMark4(object):
         assert 'partial buffer' in str(w[0].message)
         with mark4.open(m4_incomplete, 'rs', ntrack=64, decade=2010,
                         sample_rate=32*u.MHz, fill_value=fill_value) as fwr:
-            assert not fwr._frame.valid
             assert np.all(fwr.read() == fwr._frame.invalid_data_value)
-            assert fwr._frame.invalid_data_value == fill_value
+            assert fwr.fill_value == fill_value
 
     def test_corrupt_stream(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb') as fh, \
