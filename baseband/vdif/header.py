@@ -536,13 +536,20 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
 
     @property
     def sample_rate(self):
-        """Number of complete samples per second."""
+        """Number of complete samples per second.
+
+        Assumes the 'sampling_rate' header field represents a per-channel
+        sample rate for complex samples, or half the sample rate for real ones.
+        """
+        # Interprets sample rate correctly for EDV=3, but may not for EDV=1.
         return u.Quantity(self['sampling_rate'] *
                           (1 if self['complex_data'] else 2),
                           u.MHz if self['sampling_unit'] else u.kHz)
 
     @sample_rate.setter
     def sample_rate(self, sample_rate):
+        # Sets sample rate correctly for EDV=3, but may not for EDV=1 or for
+        # multiple channels per frame (illegal for EDV=3).
         assert sample_rate.to_value(u.Hz) % 1 == 0
         bandwidth = sample_rate / (1 if self['complex_data'] else 2)
         self['sampling_unit'] = not (bandwidth.unit == u.kHz or

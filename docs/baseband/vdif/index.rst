@@ -120,6 +120,7 @@ For small files, one could just do::
 
     >>> with vdif.open(SAMPLE_VDIF, 'rs') as fr, \
     ...         vdif.open('try.vdif', 'ws', header=fr.header0,
+    ...                   sample_rate=fr.sample_rate,
     ...                   nthread=fr.sample_shape.nthread) as fw:
     ...     fw.write(fr.read())
 

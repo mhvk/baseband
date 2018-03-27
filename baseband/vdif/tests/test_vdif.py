@@ -728,13 +728,13 @@ class TestVDIF(object):
 
         test_file_squeeze = str(tmpdir.join('test_squeeze.vdif'))
         with vdif.open(test_file_squeeze, 'ws', nthread=8,
-                       header=header) as fws:
+                       header=header, sample_rate=header.sample_rate) as fws:
             assert fws.sample_shape == (8,)
             assert fws.sample_shape.nthread == 8
             fws.write(record)
         test_file_nosqueeze = str(tmpdir.join('test_nosqueeze.vdif'))
         with vdif.open(test_file_nosqueeze, 'ws', nthread=8, header=header,
-                       squeeze=False) as fwns:
+                       sample_rate=header.sample_rate, squeeze=False) as fwns:
             assert fwns.sample_shape == (8, 1)
             assert fwns.sample_shape.nthread == 8
             assert fwns.sample_shape.nchan == 1

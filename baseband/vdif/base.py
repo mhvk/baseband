@@ -242,11 +242,6 @@ class VDIFStreamBase(VLBIStreamBase):
     def __init__(self, fh_raw, header0, subset, nthread, sample_rate=None,
                  fill_value=0., squeeze=True):
         samples_per_frame = header0.samples_per_frame
-        if sample_rate is None:
-            try:
-                sample_rate = header0.sample_rate
-            except AttributeError:
-                pass  # super below will scan file to get sample rate.
 
         super(VDIFStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0,
@@ -360,6 +355,40 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             self._thread_ids = thread_ids
 
         self._frameset = frameset
+
+    @staticmethod
+    def _get_frame_rate(fh, header):
+        """Returns the number of frames per second in a VDIF file.
+
+        Parameters
+        ----------
+        fh : io.BufferedReader
+            Binary file handle.
+        header_template : header class or instance
+            Definition or instance of file format's header class.
+
+        Returns
+        -------
+        framerate : `~astropy.units.Quantity`
+            Frames per second, in Hz.
+
+        Notes
+        -----
+
+        This function defaults to using `VLBIStreamReaderBase._get_frame_rate`.
+        If that leads to an Exception, it attempts to extract the sample rate
+        from the header, and passes the Exception on if this too is impossible.
+        """
+        try:
+            return super(VDIFStreamReader, VDIFStreamReader)._get_frame_rate(
+                fh, header)
+        except Exception:
+            if 'sample_rate' in header._properties:
+                return int(np.round(
+                    (header.sample_rate /
+                     header.samples_per_frame).to_value(u.Hz))) * u.Hz
+            else:
+                raise
 
     @lazyproperty
     def _last_header(self):
