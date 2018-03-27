@@ -417,14 +417,16 @@ class VDIFHeader(VLBIHeaderBase):
         self['ref_epoch'] = ref_index
         seconds = time - ref_epochs[ref_index]
         int_sec = int(seconds.sec)
-        if frame_nr is None:
-            frac_sec = seconds - int_sec * u.s
-            if abs(frac_sec) < 2. * u.ns:
-                frame_nr = 0
-            elif abs(1. * u.s - frac_sec) < 2. * u.ns:
-                int_sec += 1
-                frame_nr = 0
-            else:
+
+        # Round to nearest ns to handle timestamp difference errors.
+        frac_sec = seconds - int_sec * u.s
+        if abs(frac_sec) < 1. * u.ns:
+            frame_nr = 0
+        elif abs(1. * u.s - frac_sec) < 1. * u.ns:
+            int_sec += 1
+            frame_nr = 0
+        else:
+            if frame_nr is None:
                 if sample_rate is None:
                     try:
                         sample_rate = self.sample_rate

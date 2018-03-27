@@ -114,7 +114,7 @@ class TestVDIF(object):
         assert header5 != header
         with pytest.raises(TypeError):
             header['thread_id'] = 0
-        # Also test time setting
+        # Also test time setting.
         header5.time = header.time + 1.*u.s
         framerate = header.sample_rate / header.samples_per_frame
         assert abs(header5.time - header.time - 1.*u.s) < 1.*u.ns
@@ -153,6 +153,7 @@ class TestVDIF(object):
             samples_per_frame=headerT.samples_per_frame,
             station=headerT.station, thread_id=headerT['thread_id'])
         assert header8_usetime == header8
+
         # Without a sample rate or frame_nr, cannot initialize using time.
         with pytest.raises(ValueError):
             vdif.VDIFHeader.fromvalues(
@@ -167,6 +168,13 @@ class TestVDIF(object):
                 samples_per_frame=headerT.samples_per_frame,
                 bps=headerT.bps, complex_data=headerT['complex_data'],
                 thread_id=headerT['thread_id'])
+
+        # Check rounding in corner case when passing explicit frame_nr.
+        header9 = headerT.copy()
+        header9.set_time(Time('2018-01-01T00:34:07.999999999996'),
+                         frame_nr=0)
+        assert header9['seconds'] == 2048
+        assert header9['frame_nr'] == 0
 
     def test_custom_header(self, tmpdir):
         # Custom header with an EDV that already exists
