@@ -234,7 +234,6 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             samples_per_frame=samples_per_frame, payloadsize=payloadsize,
             sample_rate=sample_rate, squeeze=squeeze)
         self.fh_ts.seek(0)
-        self._frame_nr = None
 
     @lazyproperty
     def _last_header(self):
@@ -269,21 +268,21 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             last_header = self.header0.__class__(second_last_line_tuple)
         return last_header
 
-    def _read_frame(self, frame_nr):
-        self.fh_ts.seek(self.header0.seek_offset(frame_nr))
+    def _read_frame(self, index):
+        self.fh_ts.seek(self.header0.seek_offset(index))
         if self.header0.mode == 'rawdump':
-            self.fh_raw.seek(frame_nr * self._payloadsize)
+            self.fh_raw.seek(index * self._payloadsize)
         else:
             for fh_pair in self.fh_raw:
                 for fh in fh_pair:
-                    fh.seek(frame_nr * self._payloadsize)
+                    fh.seek(index * self._payloadsize)
         frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
                                   payloadsize=self._payloadsize,
                                   nchan=self._unsliced_shape.nchan,
                                   bps=self.bps, complex_data=self.complex_data)
         assert int(round(((frame.header.time - self.start_time) *
                           self.sample_rate / self.samples_per_frame)
-                         .to_value(u.one))) == frame_nr
+                         .to_value(u.one))) == index
         return frame
 
 

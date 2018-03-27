@@ -356,8 +356,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         last_header.infer_decade(self.start_time)
         return last_header
 
-    def _read_frame(self, frame_nr):
-        self.fh_raw.seek(self.offset0 + frame_nr * self.header0.framesize)
+    def _read_frame(self, index):
+        self.fh_raw.seek(self.offset0 + index * self.header0.framesize)
         frame = self.read_frame(ntrack=self.header0.ntrack,
                                 ref_time=self.start_time)
         # Set decoded value for invalid data.

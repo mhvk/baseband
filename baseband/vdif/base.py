@@ -396,14 +396,14 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 
         return data
 
-    def _read_frame(self, frame_nr):
-        self.fh_raw.seek(frame_nr * self._framesetsize)
+    def _read_frame(self, index):
+        self.fh_raw.seek(index * self._framesetsize)
         frameset = self.read_frameset(self._thread_ids,
                                       edv=self.header0.edv)
         frameset.invalid_data_value = self.fill_value
         assert ((frameset['seconds'] - self.header0['seconds']) *
                 self._framerate +
-                frameset['frame_nr'] - self.header0['frame_nr']) == frame_nr
+                frameset['frame_nr'] - self.header0['frame_nr']) == index
         # TODO: once framesets are sliceable, just return frameset itself.
         # For now, keep it around for testing, inspection.
         self._frameset = frameset

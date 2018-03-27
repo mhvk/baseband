@@ -243,12 +243,11 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         last_frame = self.read_frame(memmap=True)
         return last_frame.header
 
-    def _read_frame(self, frame_nr):
-        self.fh_raw.seek(frame_nr * self.header0.framesize)
+    def _read_frame(self, index):
+        self.fh_raw.seek(index * self.header0.framesize)
         frame = self.read_frame(memmap=True)
-        assert ((frame.header['OBS_OFFSET'] -
-                 self.header0['OBS_OFFSET']) / self.header0.payloadsize ==
-                frame_nr)
+        assert (frame.header['OBS_OFFSET'] - self.header0['OBS_OFFSET'] ==
+                index * self.header0.payloadsize)
         return frame
 
 

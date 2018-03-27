@@ -234,18 +234,18 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         last_header.infer_kday(self.start_time)
         return last_header
 
-    def _read_frame(self, frame_nr):
-        self.fh_raw.seek(frame_nr * self.header0.framesize)
+    def _read_frame(self, index):
+        self.fh_raw.seek(index * self.header0.framesize)
         frame = self.read_frame(nchan=self._unsliced_shape.nchan,
                                 bps=self.bps, ref_time=self.start_time)
         # Set decoded value for invalid data.
         frame.invalid_data_value = self.fill_value
         # TODO: OK to ignore leap seconds? Not sure what writer does.
-        dt = (frame.seconds - self.header0.seconds +
-              86400 * (frame.kday + frame.jday -
-                       self.header0.kday - self.header0.jday))
-        assert (dt * self._framerate +
-                frame['frame_nr'] - self.header0['frame_nr']) == frame_nr
+        assert (self._framerate *
+                (frame.seconds - self.header0.seconds +
+                 86400 * (frame.kday + frame.jday -
+                          self.header0.kday - self.header0.jday)) +
+                frame['frame_nr'] - self.header0['frame_nr']) == index
         return frame
 
 

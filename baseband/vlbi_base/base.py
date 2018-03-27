@@ -72,7 +72,7 @@ class VLBIStreamBase(VLBIFileBase):
             subset = (subset,)
         self._subset = subset
         self._sample_shape = self._get_sample_shape()
-        self._frame_nr = None
+        self._frame_index = None
 
     @property
     def squeeze(self):
@@ -483,11 +483,11 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         sample = 0
         while count > 0:
             # For current position, get frame plus offset in that frame.
-            frame_nr, sample_offset = divmod(self.offset,
-                                             self.samples_per_frame)
-            if frame_nr != self._frame_nr:
-                self._frame = self._read_frame(frame_nr)
-                self._frame_nr = frame_nr
+            frame_index, sample_offset = divmod(self.offset,
+                                                self.samples_per_frame)
+            if frame_index != self._frame_index:
+                self._frame = self._read_frame(frame_index)
+                self._frame_index = frame_index
 
             frame = self._frame
             nsample = min(count, len(frame) - sample_offset)
