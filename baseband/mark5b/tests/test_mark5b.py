@@ -311,10 +311,10 @@ class TestMark5B(object):
         assert abs(header.get_time(frame_rate) -
                    start_time - 25599. / frame_rate) < 1. * u.ns
         # Check rounding to the nearest second when less than 2 ns away.
-        header.set_time(time=(start_time + 1.8 * u.ns), frame_nr=0)
-        assert header.time == start_time
-        header.set_time(time=(start_time - 1.8 * u.ns), frame_nr=0)
-        assert header.time == start_time
+        header.set_time(time=(start_time + 0.9 * u.ns), frame_nr=0)
+        assert header.seconds == header0.seconds
+        header.set_time(time=(start_time - 0.9 * u.ns), frame_nr=0)
+        assert header.seconds == header0.seconds
 
     def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,
@@ -567,7 +567,7 @@ class TestMark5B(object):
         samples_per_frame = 5000
         test_time = start_time + 198. * samples_per_frame / sample_rate
         with mark5b.open(m5_test_samplerate, 'ws', time=test_time, nchan=8,
-                         bps=2, sample_rate=sample_rate, frame_nr=198) as fw:
+                         bps=2, sample_rate=sample_rate) as fw:
             assert fw.header0['frame_nr'] == 198
             # Write 4 dummy frames, to include the max frame and frame 0
             fw.write(np.zeros((20000, 8), dtype='float32'))
