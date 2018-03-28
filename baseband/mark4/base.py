@@ -1,10 +1,12 @@
 # Licensed under the GPLv3 - see LICENSE.rst
+from __future__ import division, unicode_literals, print_function
+
 import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
 
-from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase)
+from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
+                              VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import Mark4Header
 from .payload import Mark4Payload
 from .frame import Mark4Frame
@@ -242,7 +244,22 @@ class Mark4FileWriter(VLBIFileBase):
         return data.tofile(self.fh_raw)
 
 
-class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
+class Mark4StreamBase(VLBIStreamBase):
+    """Base for Mark 5B streams."""
+    def __init__(self, fh_raw, header, sample_rate=None,
+                 squeeze=True, subset=None, fill_value=0.):
+        super(Mark4StreamBase, self).__init__(
+            fh_raw, header0=header, sample_rate=sample_rate,
+            bps=header.bps, complex_data=False, subset=subset,
+            unsliced_shape=(header.nchan,),
+            samples_per_frame=header.samples_per_frame,
+            fill_value=fill_value, squeeze=squeeze)
+        self._framerate = int(round((self.sample_rate /
+                                     self.samples_per_frame).to_value(u.Hz)))
+
+
+class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase,
+                        Mark4FileReader):
     """VLBI Mark 4 format reader.
 
     This wrapper is allows one to access a Mark 4 file as a continues series
@@ -305,11 +322,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         # Go back to start of frame (for possible sample rate detection).
         self.fh_raw.seek(self.offset0)
         super(Mark4StreamReader, self).__init__(
-            fh_raw, header0=header, sample_rate=sample_rate,
-            unsliced_shape=(header.nchan,),
-            bps=header.bps, complex_data=False, subset=subset,
-            samples_per_frame=header.samples_per_frame,
-            fill_value=fill_value, squeeze=squeeze)
+            fh_raw, header=header, sample_rate=sample_rate,
+            squeeze=squeeze, subset=subset, fill_value=fill_value)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
@@ -366,7 +380,8 @@ class Mark4StreamReader(VLBIStreamReaderBase, Mark4FileReader):
         return frame
 
 
-class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
+class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase,
+                        Mark4FileWriter):
     """VLBI Mark 4 format writer.
 
     Parameters
@@ -404,58 +419,26 @@ class Mark4StreamWriter(VLBIStreamWriterBase, Mark4FileWriter):
         if header is None:
             header = Mark4Header.fromvalues(**kwargs)
         super(Mark4StreamWriter, self).__init__(
-            fh_raw=raw, header0=header, unsliced_shape=(header.nchan,),
-            subset=None, bps=header.bps, complex_data=False,
-            samples_per_frame=(header.framesize * 8 // header.bps //
-                               header.nchan),
-            sample_rate=sample_rate, squeeze=squeeze)
+            fh_raw=raw, header=header, sample_rate=sample_rate,
+            squeeze=squeeze)
+        # Set up initial data with right shape.
+        # TODO: Once Mark4Frame.__setitem__ is OK, we can construct a
+        # re-usable payload here.
+        self._data = np.zeros((self.samples_per_frame, header.nchan),
+                              np.float32)
 
-        self._data = np.zeros((self.samples_per_frame,
-                               self._unsliced_shape.nchan), np.float32)
+    def _make_frame(self, frame_index):
+        self._header = self.header0.copy()
+        self._header.update(time=self.start_time + frame_index /
+                            self._framerate * u.s)
+        # Reuse data
+        return self._data
 
-    def write(self, data, invalid_data=False):
-        """Write data, buffering by frames as needed.
-
-        Parameters
-        ----------
-        data : array
-            Piece of data to be written, with sample dimensions as given by
-            ``sample_shape``. This should be properly scaled to make best use
-            of the dynamic range delivered by the encoding.
-        invalid_data : bool, optional
-            Whether the current data is valid.  Defaults to `False`.
-        """
-        assert data.shape[1:] == self.sample_shape, (
-            "'data' should have trailing shape {}".format(self.sample_shape))
-
-        if self.squeeze:
-            data = self._unsqueeze(data)
-
-        count = data.shape[0]
-        sample = 0
-        offset0 = self.offset
-        frame = self._data
-        while count > 0:
-            frame_nr, sample_offset = divmod(self.tell(),
-                                             self.samples_per_frame)
-            if sample_offset == 0:
-                # set up header for new frame.
-                self._header = self.header0.copy()
-                self._header.update(time=self.tell(unit='time'))
-
-            if invalid_data:
-                # Mark whole frame as invalid data.
-                self._header['communication_error'] = True
-
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample_end = sample_offset + nsample
-            sample = self.offset - offset0
-            frame[sample_offset:sample_end] = data[sample:sample + nsample]
-            if sample_end == self.samples_per_frame:
-                self.write_frame(self._data, self._header)
-
-            self.offset += nsample
-            count -= nsample
+    def _write_frame(self, frame, valid=True):
+        assert frame is self._data
+        frame = Mark4Frame.fromdata(frame, self._header)
+        frame.valid = valid
+        self.write_frame(frame)
 
 
 open = make_opener('Mark4', globals(), doc="""

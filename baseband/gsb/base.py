@@ -364,61 +364,29 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
             complex_data=complex_data, samples_per_frame=samples_per_frame,
             payloadsize=payloadsize, sample_rate=sample_rate,
             squeeze=squeeze)
-        self._data = np.zeros((self.samples_per_frame,) + self._unsliced_shape,
-                              (np.complex64 if self.complex_data
-                               else np.float32))
-        self._valid = True
+        self._payload = GSBPayload.fromdata(
+            np.zeros((self.samples_per_frame,) + self._unsliced_shape,
+                     (np.complex64 if self.complex_data else np.float32)),
+            bps=self.bps)
 
-    def write(self, data):
-        """Write data, buffering by frames as needed.
+    def _make_frame(self, index):
+        # Set up header for new frame.  (mem_block is set to a rotating
+        # modulo-8 value with no meaning.)
+        time_offset = index * self.samples_per_frame / self.sample_rate
+        if self.header0.mode == 'phased':
+            header = self.header0.fromvalues(
+                gps_time=self.header0.gps_time + time_offset,
+                pc_time=self.header0.pc_time + time_offset,
+                seq_nr=(index + self.header0['seq_nr']),
+                mem_block=((self.header0['mem_block'] + index) % 8))
+        else:
+            header = self.header0.fromvalues(time=self.start_time + time_offset)
 
-        Parameters
-        ----------
-        data : array
-            Piece of data to be written, with sample dimensions as given by
-            ``sample_shape``. This should be properly scaled to make best use
-            of the dynamic range delivered by the encoding.
-        """
-        assert data.shape[1:] == self.sample_shape, (
-            "'data' should have trailing shape {}".format(self.sample_shape))
-        assert data.dtype.kind == self._data.dtype.kind, (
-            "'data' should be {}".format('complex' if self.data.dtype == 'c'
-                                         else 'float'))
-        if self.squeeze:
-            data = self._unsqueeze(data)
+        return GSBFrame(header, self._payload, valid=True, verify=False)
 
-        count = data.shape[0]
-        sample = 0
-        offset0 = self.offset
-        while count > 0:
-            frame_nr, sample_offset = divmod(self.offset,
-                                             self.samples_per_frame)
-            if sample_offset == 0:
-                # Set up header for new frame.  (mem_block is set to a rotating
-                # modulo-8 value with no meaning.)
-                time_offset = self.tell(unit=u.s)
-                if self.header0.mode == 'phased':
-                    self._header = self.header0.__class__.fromvalues(
-                        gps_time=self.header0.gps_time + time_offset,
-                        pc_time=self.header0.pc_time + time_offset,
-                        seq_nr=(frame_nr + self.header0['seq_nr']),
-                        mem_block=((self.header0['mem_block'] + frame_nr) % 8))
-                else:
-                    self._header = self.header0.__class__.fromvalues(
-                        time=self.start_time + time_offset)
-
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample_end = sample_offset + nsample
-            sample = self.offset - offset0
-            self._data[sample_offset:sample_end] = data[sample:
-                                                        sample + nsample]
-            if sample_end == self.samples_per_frame:
-                self._frame = GSBFrame.fromdata(self._data, self._header,
-                                                self.bps)
-                self._frame.tofile(self.fh_ts, self.fh_raw)
-
-            self.offset += nsample
-            count -= nsample
+    def _write_frame(self, frame, valid=True):
+        assert valid
+        frame.tofile(self.fh_ts, self.fh_raw)
 
     def flush(self):
         self.fh_ts.flush()

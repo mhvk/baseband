@@ -81,7 +81,7 @@ class VLBIFrameBase(object):
 
     @valid.setter
     def valid(self, valid):
-        self._valid = valid
+        self._valid = bool(valid)
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):

@@ -620,17 +620,31 @@ class TestVDIF(object):
 
     def test_stream_writer(self, tmpdir):
         vdif_file = str(tmpdir.join('simple.vdif'))
-        # try writing a very simple file, using edv=0
+        # try writing a very simple file, using edv=0.  With 16 samples per
+        # frame and a sample_rate of 320 Hz, we have a frame rate of 20 Hz.
+        # We start on purpose not on an integer second, to check that
+        # frame numbers get set correctly automatically.
+        start_time = Time('2010-11-12T13:14:15.25')
+        # Same fake data for all frames.
         data = np.ones((16, 2, 2))
         data[5, 0, 0] = data[6, 1, 1] = -1.
         header = vdif.VDIFHeader.fromvalues(
-            edv=0, time=Time('2010-01-01'), nchan=2, bps=2,
-            complex_data=False, frame_nr=0, thread_id=0, samples_per_frame=16,
-            station='me')
+            edv=0, time=start_time, nchan=2, bps=2,
+            complex_data=False, thread_id=0, samples_per_frame=16,
+            station='me', sample_rate=320*u.Hz)
         with vdif.open(vdif_file, 'ws', header=header,
                        nthread=2, sample_rate=320*u.Hz) as fw:
             assert fw.sample_rate == 320*u.Hz
-            for i in range(30):
+            for i in range(17):
+                fw.write(data)
+            # Write an invalid frame.
+            fw.write(data, invalid_data=True)
+            # Write 3 frames using pieces.
+            fw.write(data[:4])
+            fw.write(np.concatenate((data[4:], data, data[:-4]), axis=0))
+            fw.write(data[-4:])
+            # Add 9 more just to fill it out to 30 frames.
+            for i in range(9):
                 fw.write(data)
 
         with vdif.open(vdif_file, 'rs') as fh:
@@ -641,11 +655,16 @@ class TestVDIF(object):
             assert fh.header0.bps == 2
             assert fh.sample_shape.nchan == 2
             assert fh.sample_shape.nthread == 2
-            assert fh.start_time == Time('2010-01-01')
-            assert fh.stop_time == fh.start_time + 1.5 * u.s
-            fh.seek(16)
-            record = fh.read(16)
-        assert np.all(record == data)
+            assert fh.start_time == start_time
+            assert np.abs(fh.stop_time - fh.start_time - 1.5 * u.s) < 1. * u.ns
+            # Seek to 8 samples before the 17th frame (which has invalid data),
+            # and check reading around that.
+            fh.seek(16 * 17 - 8)
+            record = fh.read(56)
+            assert np.all(record[:8] == data[8:])
+            assert np.all(record[8:24] == 0.)
+            assert np.all(record[24:40] == data)
+            assert np.all(record[40:] == data)
 
         # Test that squeeze attribute works on write.
         with vdif.open(SAMPLE_FILE, 'rs') as fh:

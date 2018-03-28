@@ -1,9 +1,13 @@
+# Licensed under the GPLv3 - see LICENSE.rst
+from __future__ import division, unicode_literals, print_function
+
 import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (VLBIFileBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase, make_opener)
+from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
+                              VLBIStreamReaderBase, VLBIStreamWriterBase,
+                              make_opener)
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 from .frame import Mark5BFrame
@@ -169,7 +173,21 @@ class Mark5BFileWriter(VLBIFileBase):
         return data.tofile(self.fh_raw)
 
 
-class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
+class Mark5BStreamBase(VLBIStreamBase):
+    """Base for Mark 5B streams."""
+    def __init__(self, fh_raw, header, nchan, bps=2, subset=None,
+                 sample_rate=None, fill_value=0., squeeze=True):
+        super(Mark5BStreamBase, self).__init__(
+            fh_raw, header0=header, bps=bps, complex_data=False, subset=subset,
+            unsliced_shape=(nchan,),
+            samples_per_frame=header.payloadsize * 8 // bps // nchan,
+            sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
+        self._framerate = int(round((self.sample_rate /
+                                     self.samples_per_frame).to_value(u.Hz)))
+
+
+class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
+                         Mark5BFileReader):
     """VLBI Mark 5B format reader.
 
     This wrapper is allows one to access a Mark 5B file as a continues series
@@ -217,13 +235,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         # Go back to start of frame (for possible sample rate detection).
         fh_raw.seek(0)
         super(Mark5BStreamReader, self).__init__(
-            fh_raw, header0=header, bps=bps, complex_data=False, subset=subset,
-            unsliced_shape=(nchan,),
-            samples_per_frame=header.payloadsize * 8 // bps // nchan,
+            fh_raw, header=header, nchan=nchan, bps=bps, subset=subset,
             sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
-
-        self._framerate = int(round((self.sample_rate /
-                                     self.samples_per_frame).to_value(u.Hz)))
 
     @lazyproperty
     def _last_header(self):
@@ -249,7 +262,8 @@ class Mark5BStreamReader(VLBIStreamReaderBase, Mark5BFileReader):
         return frame
 
 
-class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
+class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase,
+                         Mark5BFileWriter):
     """VLBI Mark 5B format writer.
 
     Parameters
@@ -290,61 +304,25 @@ class Mark5BStreamWriter(VLBIStreamWriterBase, Mark5BFileWriter):
                 kwargs['framerate'] = sample_rate / samples_per_frame
             header = Mark5BHeader.fromvalues(**kwargs)
         super(Mark5BStreamWriter, self).__init__(
-            raw, header0=header, unsliced_shape=(nchan,),
-            bps=bps, complex_data=False, subset=None,
-            samples_per_frame=samples_per_frame,
+            raw, header=header, nchan=nchan, bps=bps,
             sample_rate=sample_rate, squeeze=squeeze)
+        # Initial payload, reused for every frame.
+        self._payload = Mark5BPayload(np.zeros((2500,), np.uint32),
+                                      nchan=self._unsliced_shape.nchan,
+                                      bps=self.bps)
 
-        self._data = np.zeros((self.samples_per_frame,
-                               self._unsliced_shape.nchan), np.float32)
-        self._valid = True
-
-    def write(self, data, invalid_data=False):
-        """Write data, buffering by frames as needed.
-
-        Parameters
-        ----------
-        data : array
-            Piece of data to be written, with sample dimensions as given by
-            ``sample_shape``. This should be properly scaled to make best use
-            of the dynamic range delivered by the encoding.
-        invalid_data : bool, optional
-            Whether the current data is valid.  Defaults to `False`.
-        """
-        assert data.shape[1:] == self.sample_shape, (
-            "'data' should have trailing shape {}".format(self.sample_shape))
-
-        if self.squeeze:
-            data = self._unsqueeze(data)
-
-        count = data.shape[0]
-        sample = 0
-        offset0 = self.offset
-        frame = self._data
-        while count > 0:
-            dt, frame_nr, sample_offset = self._frame_info()
-            if sample_offset == 0:
-                # set up header for new frame.
-                self._header = self.header0.copy()
-                self._header.set_time(time=self.tell(unit='time'),
-                                      frame_nr=frame_nr)
-                self._header.update()    # Update CRC.
-
-            if invalid_data:
-                # Mark whole frame as invalid data.
-                self._valid = False
-
-            nsample = min(count, self.samples_per_frame - sample_offset)
-            sample_end = sample_offset + nsample
-            sample = self.offset - offset0
-            frame[sample_offset:sample_end] = data[sample:sample + nsample]
-            if sample_end == self.samples_per_frame:
-                self.write_frame(self._data, self._header,
-                                 bps=self.bps, valid=self._valid)
-                self._valid = True
-
-            self.offset += nsample
-            count -= nsample
+    def _make_frame(self, index):
+        # set up header for new frame.
+        header = self.header0.copy()
+        # Update time and frame_nr in one go.
+        # (Note: could also pass on frame rate instead of explicit frame)
+        header.set_time(time=self.start_time + index / self._framerate * u.s,
+                        frame_nr=((self.header0['frame_nr'] + index) %
+                                  self._framerate))
+        # Recalculate CRC.
+        header.update()
+        # Reuse payload.
+        return Mark5BFrame(header, self._payload, valid=True)
 
 
 open = make_opener('Mark5B', globals(), doc="""
