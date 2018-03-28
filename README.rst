@@ -43,5 +43,8 @@ ASCL for ADS link?  Zenodo?
 License
 -------
 
-Baseband is licensed under the GNU General Public License v3.0 - see
-LICENSE.rst.
+Baseband is licensed under the GNU General Public License v3.0 - see the
+``LICENSE`` file.
+
+.. _@mhvk: https://github.com/mhvk
+.. _@cczhu: https://github.com/cczhu
