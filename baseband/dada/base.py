@@ -276,10 +276,10 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
         assert frame is self._frame
         frame.valid = valid
         # Deleting frame flushes memmap'd data to disk.
-        del self._frame
+        # (Of course, this gets deleted automatically when going out of
+        # scope, and furthermore the link in self._frame will still exist
+        # -- it only gets deleted in VLBIStreamWriter.write)
         del frame
-        # Be absolutely sure that no attempt will be made to use it again.
-        self._frame_index = None
 
 
 opener = make_opener('DADA', globals(), doc="""

@@ -537,6 +537,10 @@ class VLBIStreamWriterBase(VLBIStreamBase):
                                                          sample + nsample]
             if sample_end == self.samples_per_frame:
                 self._write_frame(self._frame, valid=self._valid)
+                # Be sure we do not reuse this frame (might also be needed
+                # to write memmaps to disk).
+                del self._frame
+                self._frame_index = None
 
             sample += nsample
             # Explicitly set offset (just in case write_frame adjusts it too).

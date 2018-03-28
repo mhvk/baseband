@@ -578,9 +578,11 @@ class TestMark5B(object):
         with mark5b.open(m5_test_samplerate, 'ws', time=test_time, nchan=8,
                          bps=2, sample_rate=sample_rate) as fw:
             assert fw.header0['frame_nr'] == 198
-            # Write 4 dummy frames, to include the max frame and frame 0
+            # Check that the fourth frame has wrapped the frame counter.
+            frame = fw._make_frame(3)
+            frame.header['frame_nr'] == 1
+            # Write 4 dummy frames for the sample rate inference check.
             fw.write(np.zeros((20000, 8), dtype='float32'))
-            assert fw._frame.header['frame_nr'] == 1
 
         with mark5b.open(m5_test_samplerate, 'rs', nchan=8, kday=56000) as fh:
             assert fh.sample_rate == sample_rate
