@@ -525,18 +525,18 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             frame_index, sample_offset = divmod(self.offset,
                                                 self.samples_per_frame)
             if frame_index != self._frame_index:
-                frame = self._frame = self._make_frame(frame_index)
+                self._frame = self._make_frame(frame_index)
                 self._frame_index = frame_index
                 self._valid = not invalid_data
             else:
-                frame = self._frame
                 self._valid &= not invalid_data
 
-            nsample = min(count, len(frame) - sample_offset)
+            nsample = min(count, len(self._frame) - sample_offset)
             sample_end = sample_offset + nsample
-            frame[sample_offset:sample_end] = data[sample:sample + nsample]
+            self._frame[sample_offset:sample_end] = data[sample:
+                                                         sample + nsample]
             if sample_end == self.samples_per_frame:
-                self._write_frame(frame, valid=self._valid)
+                self._write_frame(self._frame, valid=self._valid)
 
             sample += nsample
             # Explicitly set offset (just in case write_frame adjusts it too).
