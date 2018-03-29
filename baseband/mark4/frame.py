@@ -151,34 +151,73 @@ class Mark4Frame(VLBIFrameBase):
         """Number of samples (including those overwritten by header)."""
         return self.header.samples_per_frame
 
-    def __getitem__(self, item=()):
-        if isinstance(item, six.string_types):
-            return self.header.__getitem__(item)
+    def _get_payload_item(self, item):
+        """Translate frame item to payload item, correcting for header part.
 
-        # Normally, we would just pass on to the payload here, but for
-        # Mark 4, we need to deal with data overwritten by the header.
+        For Mark 4 frames, part of the actual data is overwritten by the
+        header.  In slicing a frame, these parts should be set to invalid.
+
+        Parameters
+        ----------
+        item : int, slice, or tuple
+            Sample indices.  Int represents a single sample, slice
+            a sample range, and tuple of ints/slices a range for
+            multi-channel data.
+
+        Returns
+        -------
+        payload_item : int, slice, or None
+            Part of the payload that should be decoded. `None` if all the
+            requested data is in the invalid part.
+        sample_index : tuple
+            Any slicing beyond the sample number.
+        data_shape : tuple
+            Shape of the data array that the indexing will lead to.  Useful
+            to create an array that partially needs to be set to invalid.
+        ninvalid : int
+            Number of points in the data that should be set to invalid (or that
+            should be ignored for setting).
+
+        Notes
+        -----
+        ``item`` is restricted to (tuples of) ints or slices, so one cannot
+        access non-contiguous samples using fancy indexing.  If ``item``
+        is a slice, a negative increment cannot be used.
+        """
         nsample = len(self)
         valid_start = nsample - len(self.payload)
         if item is () or item == slice(None):
             # Short-cut for full payload.
-            if self.valid:
-                # Note: Creating an empty array and setting part to invalid
-                # is much faster than creating one pre-filled with invalid.
-                data = np.empty(self.shape, self.dtype)
-                data[:valid_start] = self.invalid_data_value
-                data[valid_start:] = self.payload.data
-                return data
-            else:
-                return np.full(self.shape, self.invalid_data_value, self.dtype)
+            return slice(None), (), self.shape, valid_start
 
         if isinstance(item, tuple):
             sample_index = item[1:]
             item = item[0]
         else:
-            sample_index = None
+            sample_index = ()
 
-        # Interpret item as an index or slice.
-        if not isinstance(item, slice):
+        if isinstance(item, slice):
+            start, stop, step = item.indices(nsample)
+            assert step > 0, "cannot deal with negative steps yet"
+
+            data_shape = ((stop - start - 1) // step + 1,) + self.sample_shape
+            payload_start = start - valid_start
+            payload_stop = stop - valid_start
+            if payload_start >= 0:
+                # All requested data falls within the payload.
+                payload_item = slice(payload_start, payload_stop, step)
+                ninvalid = 0
+            elif payload_stop > 0:
+                # Some data overlaps with the payload.
+                ninvalid, payload_start = divmod(payload_start, step)
+                ninvalid = -ninvalid
+                payload_item = slice(payload_start, payload_stop, step)
+            else:
+                # Everything is invalid.
+                payload_item = None
+                ninvalid = data_shape[0]
+        else:
+            # Not a slice. Maybe an index?
             try:
                 item = item.__index__()
             except Exception:
@@ -190,41 +229,71 @@ class Mark4Frame(VLBIFrameBase):
             if not (0 <= item < nsample):
                 raise IndexError("{0} index out of range.".format(type(self)))
 
+            data_shape = self.sample_shape
             payload_item = item - valid_start
-            if payload_item >= 0 and self.valid:
-                data = self.payload[payload_item]
+            if payload_item >= 0:
+                ninvalid = 0
             else:
-                data = np.full(self.sample_shape, self.invalid_data_value,
-                               self.dtype)
+                payload_item = None
+                ninvalid = 1
 
-            return data if sample_index is None else data[sample_index]
+        return payload_item, sample_index, data_shape, ninvalid
 
-        # Here, we know item is a slice.
-        start, stop, step = item.indices(nsample)
-        assert step > 0, "cannot deal with negative steps yet"
+    def __getitem__(self, item=()):
+        if isinstance(item, six.string_types):
+            return self.header.__getitem__(item)
 
-        payload_start = start - valid_start
-        payload_stop = stop - valid_start
-        if payload_start >= 0 and self.valid:
-            # All requested data falls within the payload.
-            data = self.payload[payload_start:payload_stop:step]
+        # Normally, we would just pass on to the payload here, but for
+        # Mark 4, we need to deal with data overwritten by the header.
+        (payload_item, sample_index, data_shape,
+         ninvalid) = self._get_payload_item(item)
+        if not self.valid or payload_item is None:
+            data = np.full(data_shape, self.invalid_data_value, self.dtype)
+
+        elif ninvalid == 0:
+            data = self.payload[payload_item]
+
         else:
-            shape = ((stop - start - 1) // step + 1,) + self.sample_shape
-            if payload_stop > 0 and self.valid:
-                # Some requested data overlaps with the payload and is valid.
-                data = np.empty(shape, self.dtype)
-                ninvalid, payload_start = divmod(payload_start, step)
-                ninvalid = -ninvalid
-                data[:ninvalid] = self.invalid_data_value
-                data[ninvalid:] = self.payload[payload_start:payload_stop:step]
-            else:
-                # Everything is invalid.
-                data = np.full(shape, self.invalid_data_value, self.dtype)
+            # Note: Creating an empty array and setting part to invalid
+            # is much faster than creating one pre-filled with invalid.
+            data = np.empty(data_shape, self.dtype)
+            data[:ninvalid] = self.invalid_data_value
+            data[ninvalid:] = self.payload[payload_item]
 
-        if sample_index is None:
+        if sample_index is ():
             return data
         else:
-            return data[(slice(None),) + sample_index]
+            return data[(Ellipsis,) + sample_index]
+
+    def __setitem__(self, item, value):
+        if isinstance(item, six.string_types):
+            return self.header.__setitem__(item, value)
+
+        # Normally, we would just pass on to the payload here, but for
+        # Mark 4, we need to deal with data overwritten by the header.
+        data = np.asanyarray(value)
+        assert data.ndim <= 2
+
+        (payload_item, sample_index, data_shape,
+         ninvalid) = self._get_payload_item(item)
+
+        if payload_item is None:
+            return
+
+        if ninvalid > 0:
+            # See if data has enough dimensions so that we need to remove
+            # the part that cannot set anything in the payload.
+            if sample_index is ():
+                sample_ndim = len(self.sample_shape)
+            else:
+                sample_ndim = np.empty(self.sample_shape)[sample_index].ndim
+            if data.ndim == 1 + sample_ndim:
+                data = data[ninvalid:]
+
+        if sample_index is not ():
+            payload_item = (payload_item,) + sample_index
+
+        self.payload[payload_item] = data
 
     data = property(__getitem__,
                     doc="Decode the payload, invalidating the header part")
