@@ -177,7 +177,7 @@ class TestMark5BToVDIF3(object):
         vdif_file = str(tmpdir.join('converted.vdif'))
         # create and fill vdif file with converted data.
         with vdif.open(vdif_file, 'ws', nthread=data.shape[1],
-                       header=header, sample_rate=header.sample_rate) as fw:
+                       header=header) as fw:
             assert (fw.tell(unit='time') - m5h.time) < 2. * u.ns
             fw.write(data)
             assert (fw.tell(unit='time') - time1) < 2. * u.ns
@@ -375,7 +375,7 @@ class TestDADAToVDIF1(object):
         assert abs(header.time - ddh.time) < 2. * u.ns
         vdif_file = str(tmpdir.join('converted_dada.vdif'))
         with vdif.open(vdif_file, 'ws', nthread=data.shape[1],
-                       header=header, sample_rate=header.sample_rate) as fw:
+                       header=header) as fw:
             assert (fw.tell(unit='time') - header.time) < 2. * u.ns
             # Write all data in since frameset, made of two frames.
             fw.write(data)

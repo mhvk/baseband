@@ -374,7 +374,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 
         Notes
         -----
-
         This function defaults to using `VLBIStreamReaderBase._get_frame_rate`.
         If that leads to an Exception, it attempts to extract the sample rate
         from the header, and passes the Exception on if this too is impossible.
@@ -384,9 +383,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
                 fh, header)
         except Exception:
             if 'sample_rate' in header._properties:
-                return int(np.round(
-                    (header.sample_rate /
-                     header.samples_per_frame).to_value(u.Hz))) * u.Hz
+                return np.round((header.sample_rate /
+                                header.samples_per_frame).to(u.Hz))
             else:
                 raise
 
@@ -488,6 +486,16 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
             if sample_rate is not None:
                 kwargs['sample_rate'] = sample_rate
             header = VDIFHeader.fromvalues(**kwargs)
+
+        # If header was passed but not sample_rate, extract sample_rate.
+        if sample_rate is None:
+            try:
+                sample_rate = header.sample_rate
+            except AttributeError:
+                raise ValueError("the sample rate must be passed either "
+                                 "explicitly, or through the header if it "
+                                 "can be stored there.")
+
         # No frame sets yet exist, so generate a sample shape from values.
         super(VDIFStreamWriter, self).__init__(
             raw, header, None, nthread, sample_rate=sample_rate,
