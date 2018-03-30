@@ -414,13 +414,15 @@ class TestVDIF(object):
             frameset.update(1)
         assert ([fr.header['thread_id'] for fr in frameset.frames] ==
                 list(range(8)))
+        # Check frame associated with header makes sense.
         first_frame = frameset.frames[header['thread_id']]
         assert first_frame.header == header
-        assert np.all(first_frame.data[:12, 0].astype(int) ==
+        assert np.all(first_frame[:12, 0].astype(int) ==
                       np.array([1, 1, 1, -3, 1, 1, -3, -3, -3, 3, 3, -1]))
-        assert np.all(frameset.frames[0].data[:12, 0].astype(int) ==
+        # Check two other frames are in the right place.
+        assert np.all(frameset.frames[0][:12, 0].astype(int) ==
                       np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
-        assert np.all(frameset.frames[3].data[:12, 0].astype(int) ==
+        assert np.all(frameset.frames[3][:12, 0].astype(int) ==
                       np.array([-1, 1, -1, 1, -3, -1, 3, -1, 3, -3, 1, 3]))
 
         with vdif.open(SAMPLE_FILE, 'rb') as fh:
@@ -428,6 +430,7 @@ class TestVDIF(object):
             fh.fh_raw.seek(0)
             frameset3 = fh.read_frameset(thread_ids=[3, 4, 1])
         assert frameset2.shape == (20000, 2, 1)
+        # Note: slicing of framesets themselves is checked below.
         assert np.all(frameset2.data == frameset.data[:, 2:4])
         assert np.all(frameset3.data == frameset.data[:, [3, 4, 1]])
 
@@ -459,6 +462,58 @@ class TestVDIF(object):
             fh.seek(0)
             with pytest.raises(IOError):
                 fh.read_frameset(thread_ids=[1, 9])
+
+    def test_frameset_getitem_setitem(self):
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
+            frameset = fh.read_frameset()
+
+        # Try slicing a bit more, assuming whole-frameset read works.
+        data = frameset.data
+        # Whole frameset.
+        assert np.all(frameset[()] == data)
+        assert np.all(frameset[:] == data)
+        # Select just samples.
+        assert np.all(frameset[15] == data[15])
+        assert np.all(frameset[10:20] == data[10:20])
+        # Select just frames.
+        assert np.all(frameset[:, 3] == data[:, 3])
+        assert np.all(frameset[:, 2:4] == data[:, 2:4])
+        # Select just channels (there is only one).
+        assert np.all(frameset[:, :, 0] == data[:, :, 0])
+        assert np.all(frameset[:, :, :1] == data[:, :, :1])
+        # Check direct access to frames with known results.
+        assert np.all(frameset[:12, 0, 0].astype(int) ==
+                      np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
+        assert np.all(frameset[:12, 3, 0].astype(int) ==
+                      np.array([-1, 1, -1, 1, -3, -1, 3, -1, 3, -3, 1, 3]))
+
+        frameset2 = vdif.VDIFFrameSet.fromdata(data, frameset.header0)
+        assert np.all(frameset2.data == data)
+        frameset2[()] = 1.
+        assert np.all(frameset2.data == 1.)
+        frameset2[:] = data
+        assert np.all(frameset2.data == data)
+        # Select just samples.
+        frameset2[15] = -data[15]
+        assert np.all(frameset2[15] == -data[15])
+        frameset2[10:20] = -1.
+        assert np.all(frameset2[10:20] == -1.)
+        frameset2[10:20:2] = data[10:20:2]
+        assert np.all(frameset2[10:20:2] == data[10:20:2])
+        assert np.all(frameset2[11:20:2] == -1.)
+        # Select just frames.
+        frameset2[:, 3] = -1
+        assert np.all(frameset2[:, 3] == -1.)
+        frameset2[:, 2:4] = 1.
+        assert np.all(frameset2[:, 2:4] == 1.)
+        frameset2[:, [0, 4, 5, 6]] = data[:, :4]
+        frameset2[:, [1, 2, 3, 7]] = data[:, 4:]
+        assert np.all(frameset2[:, [0, 4, 5, 6, 1, 2, 3, 7]] == data)
+        # Select just channels (there is only one).
+        frameset2[:, :, 0] = -data[:, :, 0]
+        assert np.all(frameset2[:, :, 0] == -data[:, :, 0])
+        frameset2[:, :, :1] = 1.
+        assert np.all(frameset2[:, :, :1] == 1.)
 
     def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,

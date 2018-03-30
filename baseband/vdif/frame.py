@@ -11,6 +11,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
+from astropy.extern import six
 
 from ..vlbi_base.frame import VLBIFrameBase
 from .header import VDIFHeader
@@ -188,8 +189,6 @@ class VDIFFrameSet(object):
     is not defined on the frame set itself, such as ``.time`` will also be
     looked up on the header.
     """
-    invalid_data_value = 0.
-
     def __init__(self, frames, header0=None):
         self.frames = frames
         # Used in .data below to decode data only once.
@@ -306,17 +305,6 @@ class VDIFFrameSet(object):
         return cls(frames)
 
     @property
-    def data(self):
-        """Decode the payload."""
-        if self._data is None:
-            self._data = np.empty(self.shape, dtype=self.dtype)
-            for frame, datum in zip(self.frames,
-                                    self._data.transpose(1, 0, 2)):
-                datum[...] = (frame.data if frame.valid else
-                              self.invalid_data_value)
-        return self._data
-
-    @property
     def size(self):
         return len(self.frames) * self.frames[0].size
 
@@ -335,9 +323,119 @@ class VDIFFrameSet(object):
     def dtype(self):
         return self.frames[0].dtype
 
-    def __getitem__(self, item):
-        # Header behaves as a dictionary.
-        return self.header0.__getitem__(item)
+    @property
+    def invalid_data_value(self):
+        return self.frames[0].invalid_data_value
+
+    @invalid_data_value.setter
+    def invalid_data_value(self, invalid_data_value):
+        for frame in self.frames:
+            frame.invalid_data_value = invalid_data_value
+
+    def _get_frames(self, item):
+        """Get frames and other information required to obtain given item.
+
+        Parameters
+        ----------
+        item : int, slice, or tuple
+            Sample indices.  Int represents a single sample, slice
+            a sample range, and tuple of ints/slices a range for
+            multi-frame and multi-channel data.
+
+        Returns
+        -------
+        frames : list
+            List of frames needed for this slice.  For a list of length unity,
+            ``single_frame`` determines whether it is an index or unit-length
+            slice.
+        frame_item : int, slice, or tuple
+            The item that should be gotten/set for each frame
+        single_sample, single_frame, single_channel : bool
+            Whether the sample, frame, or channel axes are simple indices,
+            and thus whether the corresponding dimension should be removed.
+
+        Notes
+        -----
+        The sample part of ``item`` is restricted to (tuples of) ints or slices,
+        so one cannot access non-contiguous samples using fancy indexing.
+        Futhermore, if ``item`` is a slice, a negative increment cannot be used.
+        The function is unable to parse payloads whose words have unused space
+        (eg. VDIF files with 20 bits/sample).
+        """
+        if item is ():
+            return self.frames, (), False, False, False
+
+        if not isinstance(item, tuple):
+            return self.frames, item, not isinstance(item, slice), False, False
+
+        single_sample = not isinstance(item[0], slice)
+        if len(item) == 1:
+            return self.frames, False, item[0], single_sample, False
+
+        single_channel = (len(item) > 2 and
+                          np.empty(self.shape[2:])[item[2:]].ndim == 0)
+        frame_indices = np.arange(len(self.frames))[item[1]]
+        assert frame_indices.ndim <= 1
+        single_frame = frame_indices.ndim == 0
+        frames = [self.frames[i] for i in np.atleast_1d(frame_indices)]
+        return (frames, item[:1] + item[2:],
+                single_sample, single_frame, single_channel)
+
+    # Header behaves as a dictionary, while Payload can be indexed/sliced.
+    # Let frameset behave appropriately.
+    def __getitem__(self, item=()):
+        if isinstance(item, six.string_types):
+            # Header behaves as a dictionary.
+            return self.header0.__getitem__(item)
+
+        (frames, frame_item,
+         single_sample, single_frame, single_channel) = self._get_frames(item)
+
+        data0 = frames[0][frame_item]
+        if single_frame:
+            return data0
+
+        if single_sample:
+            swapped = data = np.empty((len(frames),) + data0.shape,
+                                      dtype=self.dtype)
+        else:
+            data = np.empty((data0.shape[0], len(frames)) +
+                            data0.shape[1:], dtype=self.dtype)
+            swapped = data.swapaxes(0, 1)
+
+        swapped[0] = data0
+        for frame, frame_data in zip(frames[1:], swapped[1:]):
+            frame_data[...] = frame[frame_item]
+        return data
+
+    def __setitem__(self, item, data):
+        (frames, frame_item,
+         single_sample, single_frame, single_channel) = self._get_frames(item)
+
+        if single_frame:
+            frames[0][frame_item] = data
+            return
+
+        data = np.asanyarray(data)
+        if single_channel:
+            if single_sample or data.ndim <= 1:
+                swapped = np.broadcast_to(data, (len(frames),))
+            else:
+                new_shape = (data.shape[0], len(frames))
+                swapped = np.broadcast_to(data, new_shape).swapaxes(0, 1)
+        else:
+            if single_sample or data.ndim <= 2:
+                new_shape = (len(frames),) + data.shape[1:]
+                swapped = np.broadcast_to(data, new_shape)
+            else:
+                new_shape = (data.shape[0], len(frames)) + data.shape[2:]
+                swapped = np.broadcast_to(data, new_shape).swapaxes(0, 1)
+
+        for frame, frame_data in zip(frames, swapped):
+            frame[frame_item] = frame_data
+
+    data = property(__getitem__,
+                    doc="Decode the payloads, zeroing it if not valid.")
 
     def keys(self):
         return self.header0.keys()
