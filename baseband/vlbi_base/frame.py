@@ -8,6 +8,7 @@ payload, providing access to the values encoded in both.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import numpy as np
 from astropy.extern import six
 
 __all__ = ['VLBIFrameBase']
@@ -158,14 +159,14 @@ class VLBIFrameBase(object):
     def __getitem__(self, item=()):
         if isinstance(item, six.string_types):
             return self.header.__getitem__(item)
+        elif self.valid:
+            return self.payload.__getitem__(item)
         else:
-            data = self.payload.__getitem__(item)
-            if not self.valid:
-                data[...] = self.invalid_data_value
-            return data
+            data_shape = np.empty(self.shape, dtype=bool)[item].shape
+            return np.full(data_shape, self.invalid_data_value,
+                           dtype=self.dtype)
 
-    data = property(__getitem__,
-                    doc="Decode the payload, zeroing it if not valid.")
+    data = property(__getitem__, doc="Full decoded frame.")
 
     def __setitem__(self, item, value):
         if isinstance(item, six.string_types):

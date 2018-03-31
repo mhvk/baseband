@@ -295,4 +295,4 @@ class Mark4Frame(VLBIFrameBase):
         self.payload[payload_item] = data
 
     data = property(__getitem__,
-                    doc="Decode the payload, invalidating the header part")
+                    doc="Full decoded frame, with header part filled in.")

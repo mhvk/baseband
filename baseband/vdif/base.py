@@ -406,10 +406,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         assert ((frameset['seconds'] - self.header0['seconds']) *
                 self._framerate +
                 frameset['frame_nr'] - self.header0['frame_nr']) == index
-        # TODO: once framesets are sliceable, just return frameset itself.
-        # For now, keep it around for testing, inspection.
-        self._frameset = frameset
-        return frameset.data
+        return frameset
 
 
 class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
