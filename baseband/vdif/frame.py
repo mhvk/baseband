@@ -434,8 +434,7 @@ class VDIFFrameSet(object):
         for frame, frame_data in zip(frames, swapped):
             frame[frame_item] = frame_data
 
-    data = property(__getitem__,
-                    doc="Decode the payloads, zeroing it if not valid.")
+    data = property(__getitem__, doc="Full decoded frame.")
 
     def keys(self):
         return self.header0.keys()
