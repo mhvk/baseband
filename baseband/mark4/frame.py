@@ -198,7 +198,6 @@ class Mark4Frame(VLBIFrameBase):
 
         if isinstance(item, slice):
             start, stop, step = item.indices(nsample)
-            assert step > 0, "cannot deal with negative steps yet"
 
             data_shape = ((stop - start - 1) // step + 1,) + self.sample_shape
             payload_start = start - valid_start
