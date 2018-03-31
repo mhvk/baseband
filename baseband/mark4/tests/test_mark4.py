@@ -327,26 +327,6 @@ class TestMark4(object):
                       np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
         assert np.all(data[641].astype(int) ==
                       np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
-        # check __getitem__
-        assert np.all(frame['magnitude_bit'] == header['magnitude_bit'])
-        # Only invalid values (compare with data to ensure shape is right).
-        assert np.all(frame[10:90] == data[10:90])
-        assert np.all(frame[10:90:5] == data[10:90:5])
-        assert np.all(frame[10:90:5, :4] == data[10:90:5, :4])
-        # Mixed invalid, valid.
-        assert np.all(frame[635:655] == data[635:655])
-        # Check we do stepping correctly around the boundary.
-        for start in range(634, 642):
-            assert np.all(frame[start:655:5] == data[start:655:5])
-        assert np.all(frame[635:655:5, 5] == data[635:655:5, 5])
-        # All valid.
-        assert np.all(frame[935:955] == data[935:955])
-        assert np.all(frame[935:955:5] == data[935:955:5])
-        assert np.all(frame[935:955:5, 5] == data[935:955:5, 5])
-        # Check scalar, including whether the shape is correct.
-        assert frame[935].shape == data[935].shape
-        assert np.all(frame[639] == data[639])
-        assert np.all(frame[640] == data[640])
         # Check writing and round-trip.
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             frame.tofile(s)
@@ -368,10 +348,6 @@ class TestMark4(object):
         assert frame5 == frame
         frame5.valid = False
         assert np.all(frame5.data == 0.)
-        # And check that __getitem__ now always returns 0.
-        assert frame5[655, 0] == 0.
-        assert np.all(frame5[930:950] == 0.)
-        assert np.all(frame5[630:650:5, :4] == 0.)
 
         # Check passing in a reference time.
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
@@ -385,6 +361,89 @@ class TestMark4(object):
             frame7 = fh.read_frame(ntrack=64,
                                    ref_time=Time('2019:1:9:00:00'))
             assert frame7 == frame
+
+    def test_frame_getitem_setitem(self):
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            frame = fh.read_frame(ntrack=64,
+                                  ref_time=Time('2009:345:15:00:00'))
+            header = frame.header
+            data = frame.data
+        # Check __getitem__.
+        assert np.all(frame['magnitude_bit'] == header['magnitude_bit'])
+        # Only invalid values (compare with data to ensure shape is right).
+        assert np.all(frame[10:90] == data[10:90])
+        assert np.all(frame[10:90:5] == data[10:90:5])
+        assert np.all(frame[10:90:5, :4] == data[10:90:5, :4])
+        # Mixed invalid, valid.
+        assert np.all(frame[635:655] == data[635:655])
+        # Check we do stepping correctly around the boundary.
+        for start in range(634, 642):
+            assert np.all(frame[start:655:5] == data[start:655:5])
+        assert np.all(frame[635:655:5, 5] == data[635:655:5, 5])
+        # All valid.
+        assert np.all(frame[935:955] == data[935:955])
+        assert np.all(frame[935:955:5] == data[935:955:5])
+        assert np.all(frame[935:955:5, 5] == data[935:955:5, 5])
+        # Check scalar, including whether the shape is correct.
+        assert frame[935].shape == data[935].shape
+        assert np.all(frame[639] == data[639])
+        assert np.all(frame[640] == data[640])
+        # Check __setitem__.
+        # Default frame read from a file is not mutable.
+        with pytest.raises(ValueError):
+            frame[640:] = 0.
+        # So create a mutable version of the frame.
+        frame = mark4.Mark4Frame.fromdata(frame.data, header.copy())
+        # Check that setting invalid part has no effect.
+        frame[10:90] == 1.
+        frame[10:90:5] == 1.
+        frame[10:90:5, :4] == 1.
+        assert np.all(frame[:640] == 0.)
+        # Mixed invalid, valid.
+        frame[635:655] = 1.
+        assert np.all(frame[635:640] == 0.)
+        assert np.all(frame[640:655] == 1.)
+        frame[635:655] = data[635:655]
+        assert np.all(frame[:] == data)
+        # Check we do stepping correctly around the boundary.
+        for start in range(634, 642):
+            frame[start:655:5] = 1.
+            valid_start = 640 + start % 5
+            if start < 640:
+                assert np.all(frame[start:640:5] == 0.)
+            assert np.all(frame[valid_start:655:5] == 1.)
+        frame[634:655] = data[634:655]
+        frame[635:655:5, 5] = -data[635:655:5, 5]
+        assert np.all(frame[635:655:5, 5] == -data[635:655:5, 5])
+        assert np.all(frame[635:655:5, :5] == data[635:655:5, :5])
+        assert np.all(frame[635:655:5, 6:] == data[635:655:5, 6:])
+        # All valid.
+        frame[935:955] = 1.
+        assert np.all(frame[935:955] == 1.)
+        frame[935:955:5] = -1.
+        assert np.all(frame[935:955:5] == -1.)
+        assert np.all(frame[936:955:5] == 1.)
+        frame[935:955:5, 5] = 1.
+        assert np.all(frame[935:955:5, 5] == 1.)
+        assert np.all(frame[935:955:5, :5] == -1.)
+        frame[935:955] = data[935:955]
+        # Check scalar, including whether the shape is correct.
+        frame[935] = -data[935]
+        assert np.all(frame[935] == -data[935])
+        assert np.all(frame[934] == data[934])
+        assert np.all(frame[936] == data[936])
+        frame[:] = data
+        assert np.all(frame[:] == data)
+        # Finally, check that __getitem__ always returns 0 for invalid data.
+        frame.valid = False
+        assert frame[655, 0] == 0.
+        assert np.all(frame[930:950] == 0.)
+        assert np.all(frame[630:650:5, :4] == 0.)
+        frame.valid = True
+        # And check propagation of strings to header.
+        frame['bcd_headstack2'] = 0
+        assert np.all(frame.header['bcd_headstack2'] == 0.)
 
     def test_header_times(self):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:

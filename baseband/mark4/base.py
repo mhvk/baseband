@@ -421,24 +421,19 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase,
         super(Mark4StreamWriter, self).__init__(
             fh_raw=raw, header=header, sample_rate=sample_rate,
             squeeze=squeeze)
-        # Set up initial data with right shape.
-        # TODO: Once Mark4Frame.__setitem__ is OK, we can construct a
-        # re-usable payload here.
-        self._data = np.zeros((self.samples_per_frame, header.nchan),
-                              np.float32)
+        # Set up initial payload with right shape.
+        samples_per_payload = (header.samples_per_frame * header.payloadsize //
+                               header.framesize)
+        self._payload = Mark4Payload.fromdata(
+            np.zeros((samples_per_payload, header.nchan), np.float32),
+            header)
 
     def _make_frame(self, frame_index):
-        self._header = self.header0.copy()
-        self._header.update(time=self.start_time + frame_index /
-                            self._framerate * u.s)
-        # Reuse data
-        return self._data
-
-    def _write_frame(self, frame, valid=True):
-        assert frame is self._data
-        frame = Mark4Frame.fromdata(frame, self._header)
-        frame.valid = valid
-        self.write_frame(frame)
+        header = self.header0.copy()
+        header.update(time=self.start_time + frame_index /
+                      self._framerate * u.s)
+        # Reuse payload.
+        return Mark4Frame(header, self._payload)
 
 
 open = make_opener('Mark4', globals(), doc="""

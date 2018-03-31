@@ -180,6 +180,7 @@ class VLBIPayloadBase(object):
         is_slice = isinstance(item, slice)
         if is_slice:
             start, stop, step = item.indices(nsample)
+            assert step > 0, "cannot deal with negative steps yet."
             n = stop - start
             if step == 1:
                 step = None
