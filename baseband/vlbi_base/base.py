@@ -608,9 +608,6 @@ def make_opener(fmt, classes, doc='', append_doc=True):
     def open(name, mode='rs', **kwargs):
         if 'b' in mode:
             cls_type = 'File'
-            if kwargs:
-                raise TypeError('got unexpected arguments {}'
-                                .format(kwargs.keys()))
         else:
             cls_type = 'Stream'
 
