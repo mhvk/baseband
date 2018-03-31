@@ -431,13 +431,9 @@ class TestGSB(object):
         testfile = str(tmpdir.join('test.dat'))
         with gsb.open(testfile, 'wb') as fw:
             fw.write_payload(payload1, bps=4)
-        with gsb.open(testfile, 'rb') as fh:
-            payload2 = fh.read_payload(2**12)
+        with gsb.open(testfile, 'rb', payloadsize=2**12) as fh:
+            payload2 = fh.read_payload()
             assert payload2 == payload1
-
-        # check that extra arguments raise TypeError
-        with pytest.raises(TypeError):
-            gsb.open(SAMPLE_RAWDUMP, 'rb', bps=2)
 
     def test_raw_stream(self, tmpdir):
         bps = 4
