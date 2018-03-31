@@ -893,13 +893,17 @@ class TestVDIF(object):
                 with pytest.raises(ValueError):
                     f2._last_header
 
-    def test_io_invalid(self):
+    def test_io_invalid(self, tmpdir):
+        tmp_file = str(tmpdir.join('ts.dat'))
+        with open(tmp_file, 'wb') as fw:
+            fw.write(b'      ')
+
         with pytest.raises(TypeError):
             # Extra argument.
-            vdif.open('ts.dat', 'rb', bla=10)
+            vdif.open(tmp_file, 'rb', bla=10)
         with pytest.raises(ValueError):
             # Missing w or r.
-            vdif.open('ts.dat', 's')
+            vdif.open(tmp_file, 's')
 
 
 def test_vlbi_vdif():

@@ -33,7 +33,7 @@ representing the voltage stream from one polarization of a single dish.  Each
 such file is accompanied by a header file which contains GPS timestamps, in the
 form::
 
-    YYYY MM DD HH MM SS 0.SSSSSSSSS 
+    YYYY MM DD HH MM SS 0.SSSSSSSSS
 
 In the default rawdump observing setup, samples are recorded at a rate of
 33.3333... megasamples per second (Msps).  Each sample is 4 bits in size, and
@@ -128,9 +128,9 @@ the size of one frame in bytes.  Since rawdump samples are 4 bits,
 
     >>> rawdump_samples_per_frame = 2**13
     >>> payloadsize = rawdump_samples_per_frame // 2
-    >>> fb = gsb.open(SAMPLE_GSB_RAWDUMP, 'rb')
-    >>> payload = fb.read_payload(payloadsize, nchan=1, bps=4,
-    ...                           complex_data=False)
+    >>> fb = gsb.open(SAMPLE_GSB_RAWDUMP, 'rb', payloadsize=payloadsize,
+    ...               nchan=1, bps=4, complex_data=False)
+    >>> payload = fb.read_payload()
     >>> payload[:4]
     array([[ 0.],
            [-2.],
