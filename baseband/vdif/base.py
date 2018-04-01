@@ -9,7 +9,6 @@ import astropy.units as u
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import VDIFHeader
-from .payload import VDIFPayload
 from .frame import VDIFFrame, VDIFFrameSet
 
 
@@ -517,29 +516,20 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
             if header_sample_rate == 0:
                 self.header0.sample_rate = self.sample_rate
             assert self.header0.sample_rate == self.sample_rate
-        # TODO: once frameset allows slicing when writing, can replace this
-        # with a frameset.
 
-        payload_words = VDIFPayload.fromdata(
-            np.zeros((self.samples_per_frame, self._unsliced_shape.nchan),
+        self._frameset = VDIFFrameSet.fromdata(
+            np.zeros((self.samples_per_frame,) + self._unsliced_shape,
                      dtype=np.complex64 if self.complex_data else np.float32),
-            header=header).words
-        self._payloads = [VDIFPayload(payload_words.copy(), header=header)
-                          for _ in range(self._unsliced_shape.nthread)]
+            self.header0)
 
     def _make_frame(self, index):
-        header = self.header0.copy()
         dt, frame_nr = divmod(index + self.header0['frame_nr'],
                               self._framerate)
-        header['seconds'] = self.header0['seconds'] + dt
-        header['frame_nr'] = frame_nr
-        header['thread_id'] = 0
-        frames = [VDIFFrame(header, self._payloads[0])]
-        for i, payload in enumerate(self._payloads[1:]):
-            header = header.copy()
-            header['thread_id'] = i+1
-            frames.append(VDIFFrame(header, payload))
-        return VDIFFrameSet(frames)
+        seconds = self.header0['seconds'] + dt
+        # Reuse frameset.
+        self._frameset['seconds'] = seconds
+        self._frameset['frame_nr'] = frame_nr
+        return self._frameset
 
 
 open = make_opener('VDIF', globals(), doc="""

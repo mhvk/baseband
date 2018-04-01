@@ -514,6 +514,33 @@ class TestVDIF(object):
         assert np.all(frameset2[:, :, 0] == -data[:, :, 0])
         frameset2[:, :, :1] = 1.
         assert np.all(frameset2[:, :, :1] == 1.)
+        # Test header getting/setting.
+        assert np.all(frameset2['thread_id'] == [f.header['thread_id']
+                                                 for f in frameset2.frames])
+        assert frameset2['frame_nr'] == frameset2.header0['frame_nr']
+        frameset2['frame_nr'] = 25
+        assert all(f.header['frame_nr'] == 25 for f in frameset2.frames)
+        assert frameset2['frame_nr'] == 25
+        frameset2['thread_id'] = np.arange(10, 18)
+        assert all(f.header['thread_id'] == v
+                   for f, v in zip(frameset2.frames, np.arange(10, 18)))
+        assert all(frameset2['thread_id'] == np.arange(10, 18))
+        with pytest.raises(ValueError):
+            frameset2['thread_id'] = 0
+        with pytest.raises(ValueError):
+            frameset2['thread_id'] = 0, 1, 2, 3, 4, 5, 6, 1
+        with pytest.raises(ValueError):
+            frameset2['frame_nr'] = 0, 1, 0, 1, 0, 1, 0, 1
+        # And a bit of getattr.
+        assert frameset2.time == frameset2.header0.time
+        assert frameset2.valid
+        mixed_valid = True, True, False, False, True, True, False, False
+        frameset2.valid = mixed_valid
+        assert np.all(frameset2.valid == mixed_valid)
+        frameset2.valid = True
+        assert frameset2.valid
+        frameset2.valid = False
+        assert not frameset2.valid
 
     def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,
