@@ -561,7 +561,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         # Default implementation is to assume this is a frame and use
         # the binary file writer.
         frame.valid = valid
-        self.write_frame(frame)
+        frame.tofile(self.fh_raw)
 
     def close(self):
         extra = self.offset % self.samples_per_frame

@@ -541,11 +541,6 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
             frames.append(VDIFFrame(header, payload))
         return VDIFFrameSet(frames)
 
-    def _write_frame(self, frameset, valid=True):
-        for frame in frameset.frames:
-            frame.valid = valid
-        self.write_frameset(frameset)
-
 
 open = make_opener('VDIF', globals(), doc="""
 --- For reading a stream : (see :class:`~baseband.vdif.base.VDIFStreamReader`)

@@ -332,6 +332,16 @@ class VDIFFrameSet(object):
         return self.frames[0].dtype
 
     @property
+    def valid(self):
+        return [frame.valid for frame in self.frames]
+
+    @valid.setter
+    def valid(self, valid):
+        valid = np.broadcast_to(valid, (len(self.frames),))
+        for f, v in zip(self.frames, valid):
+            f.valid = v
+
+    @property
     def invalid_data_value(self):
         return self.frames[0].invalid_data_value
 
