@@ -205,7 +205,7 @@ class DADAStreamBase(VLBIStreamBase):
         super(DADAStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, bps=header0.bps,
             complex_data=header0.complex_data, subset=subset,
-            unsliced_shape=(header0.npol, header0.nchan),
+            unsliced_shape=header0.sample_shape,
             samples_per_frame=header0.samples_per_frame,
             sample_rate=header0.sample_rate, squeeze=squeeze)
 
