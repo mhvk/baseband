@@ -36,8 +36,6 @@ class TestDADA(object):
         with pytest.raises(TypeError):
             header['NCHAN'] = 2
         assert header['NCHAN'] == 1
-        # access key via attribute
-        assert header.nchan == 1
         with pytest.raises(AttributeError):
             header.python
 

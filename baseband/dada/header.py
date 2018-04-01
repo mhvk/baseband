@@ -275,17 +275,6 @@ class DADAHeader(OrderedDict):
 
         super(DADAHeader, self).__setitem__(key.upper(), value)
 
-    def __getattr__(self, attr):
-        """Get attribute, or, failing that, try to get key from header."""
-        try:
-            # Note that OrderDict does not have __getattr__
-            return super(DADAHeader, self).__getattribute__(attr)
-        except AttributeError as exc:
-            try:
-                return self[attr.upper()]
-            except Exception:
-                raise exc
-
     @property
     def size(self):
         """Size in bytes of the header."""
