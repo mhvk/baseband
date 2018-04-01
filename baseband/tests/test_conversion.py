@@ -279,7 +279,8 @@ class TestMark4ToVDIF1(object):
             orig_bytes = fh.read(number_of_bytes)
 
         fl = str(tmpdir.join('test.vdif'))
-        with vdif.open(fl, 'ws', nthread=data.shape[1], header=vheader0) as fw:
+        with vdif.open(fl, 'ws', nthread=data.shape[1], header=vheader0,
+                       sample_rate=vheader0.sample_rate) as fw:
             assert (fw.tell(unit='time') - start_time) < 2. * u.ns
             # Write first VDIF frame, matching Mark 4 Header, hence invalid.
             fw.write(data[:160], invalid_data=True)
