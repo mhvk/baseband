@@ -57,8 +57,8 @@ normal file reader extended with methods to read a
 MJD) and number of bits per sample must all be passed when using
 `~baseband.mark5b.base.Mark5BFileReader.read_frame`::
 
-    >>> fb = mark5b.open(SAMPLE_MARK5B, 'rb')
-    >>> frame = fb.read_frame(nchan=8, kday=56000)
+    >>> fb = mark5b.open(SAMPLE_MARK5B, 'rb', nchan=8, kday=56000)
+    >>> frame = fb.read_frame()
     >>> frame.shape
     (5000, 8)
     >>> fb.close()

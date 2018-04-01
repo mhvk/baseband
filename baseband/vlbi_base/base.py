@@ -357,9 +357,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek(-self.header0.framesize, 2)
-        last_header = self.find_header(template_header=self.header0,
-                                       maximum=10*self.header0.framesize,
-                                       forward=False)
+        last_header = self.find_header(forward=False,
+                                       template_header=self.header0)
         self.fh_raw.seek(raw_offset)
         if last_header is None:
             raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
@@ -608,9 +607,6 @@ def make_opener(fmt, classes, doc='', append_doc=True):
     def open(name, mode='rs', **kwargs):
         if 'b' in mode:
             cls_type = 'File'
-            if kwargs:
-                raise TypeError('got unexpected arguments {}'
-                                .format(kwargs.keys()))
         else:
             cls_type = 'Stream'
 

@@ -66,37 +66,22 @@ modules::
 Opening a Mark 4 file with `~baseband.mark4.open` in binary mode provides
 a normal file reader but extended with methods to read a
 `~baseband.mark4.Mark4Frame`.  Mark 4 files generally **do not start (or end)
-at a frame boundary**, so in binary mode one has to seek the
-first frame using `~baseband.mark4.base.Mark4FileReader.find_frame`.  To use
-`~baseband.mark4.base.Mark4FileReader.find_frame` and 
-`~baseband.mark4.base.Mark4FileReader.read_frame`, one must pass both the
-number of tracks, and either the decade the data was taken, or an equivalent
-reference `~astropy.time.Time` object, since those numbers cannot be inferred
-from the data themselves::
+at a frame boundary**, so in binary mode one has to seek the first
+frame using `~baseband.mark4.base.Mark4FileReader.locate_frame` (which will
+also determine the number of Mark 4 tracks, if not given explicitly). Since
+Mark 4 files do not store the full time information, one must pass either the
+the decade the data was taken, or an equivalent reference `~astropy.time.Time`
+object::
 
-    >>> fb = mark4.open(SAMPLE_MARK4, 'rb')
-    >>> fb.find_frame(ntrack=64)    # Find first frame.
+    >>> fb = mark4.open(SAMPLE_MARK4, 'rb', decade=2010)
+    >>> fb.locate_frame()  # Locate first frame.
     2696
-    >>> frame = fb.read_frame(ntrack=64, decade=2010)
+    >>> frame = fb.read_frame()
     >>> frame.shape
     (80000, 8)
-
-If one does not know the number of tracks, one can attempt to determine
-this using `~baseband.mark4.base.Mark4FileReader.determine_ntracks`
-(which will leave the file pointer at the start of a frame as well)::
-
-    >>> fb.seek(0)
-    0
-    >>> ntrack = fb.determine_ntrack()    # Also finds first frame.
-    >>> ntrack
-    64
-    >>> frame2 = fb.read_frame(ntrack=ntrack, decade=2010)
-    >>> frame2 == frame
-    True
     >>> fb.close()
 
-Opening in stream mode automatically seeks for the first frame (determing
-the number of tracks if not given explicitly), and wraps the
+Opening in stream mode automatically seeks for the first frame, and wraps the
 low-level routines such that reading and writing is in units of samples.  It
 also provides access to header information.  Here we pass a reference
 `~astropy.time.Time` object within 4 years of the observation start time to

@@ -307,12 +307,12 @@ class TestMark4(object):
         assert payload2 == payload
 
     def test_frame(self, tmpdir):
-        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+        with mark4.open(SAMPLE_FILE, 'rb', ntrack=64, decade=2010) as fh:
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
             payload = mark4.Mark4Payload.fromfile(fh, header)
             fh.seek(0xa88)
-            frame = fh.read_frame(ntrack=64, decade=2010)
+            frame = fh.read_frame()
 
         assert frame.header == header
         assert frame.payload == payload
@@ -350,23 +350,23 @@ class TestMark4(object):
         assert np.all(frame5.data == 0.)
 
         # Check passing in a reference time.
-        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+        with mark4.open(SAMPLE_FILE, 'rb', ntrack=64,
+                        ref_time=Time('2009:345:15:00:00')) as fh:
             fh.seek(0xa88)
-            frame6 = fh.read_frame(ntrack=64,
-                                   ref_time=Time('2009:345:15:00:00'))
+            frame6 = fh.read_frame()
             assert frame6 == frame
 
-        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+        with mark4.open(SAMPLE_FILE, 'rb', ntrack=64,
+                        ref_time=Time('2019:1:9:00:00')) as fh:
             fh.seek(0xa88)
-            frame7 = fh.read_frame(ntrack=64,
-                                   ref_time=Time('2019:1:9:00:00'))
+            frame7 = fh.read_frame()
             assert frame7 == frame
 
     def test_frame_getitem_setitem(self):
-        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+        with mark4.open(SAMPLE_FILE, 'rb', ntrack=64,
+                        ref_time=Time('2009:345:15:00:00')) as fh:
             fh.seek(0xa88)
-            frame = fh.read_frame(ntrack=64,
-                                  ref_time=Time('2009:345:15:00:00'))
+            frame = fh.read_frame()
             header = frame.header
             data = frame.data
         # Check __getitem__.
@@ -446,7 +446,7 @@ class TestMark4(object):
         assert np.all(frame.header['bcd_headstack2'] == 0.)
 
     def test_header_times(self):
-        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+        with mark4.open(SAMPLE_FILE, 'rb', ntrack=64, decade=2010) as fh:
             fh.seek(0xa88)
             header0 = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
             start_time = header0.time
@@ -457,7 +457,7 @@ class TestMark4(object):
             fh.seek(0xa88)
             for frame_nr in range(100):
                 try:
-                    frame = fh.read_frame(ntrack=64, decade=2010)
+                    frame = fh.read_frame()
                 except EOFError:
                     break
                 header_time = frame.header.time
@@ -468,43 +468,38 @@ class TestMark4(object):
         # Below, the tests set the file pointer to very close to a header,
         # since otherwise they run *very* slow.  This is somehow related to
         # pytest, since speed is not a big issue running stuff on its own.
-        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+        with mark4.open(SAMPLE_FILE, 'rb', decade=2010) as fh:
             fh.seek(0xa88)
             header0 = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
             fh.seek(0)
-            header_0 = fh.find_header(template_header=header0)
+            header_0 = fh.find_header()
             assert fh.tell() == 0xa88
+            assert fh.ntrack == 64
+            assert header_0 == header0
             fh.seek(0xa89)
-            header_0xa89 = fh.find_header(template_header=header0)
+            header_0xa89 = fh.find_header()
             assert fh.tell() == 0xa88 + header0.framesize
             fh.seek(160000)
-            header_160000f = fh.find_header(template_header=header0,
-                                            forward=True)
+            header_160000f = fh.find_header(forward=True)
             assert fh.tell() == 0xa88 + header0.framesize
             fh.seek(0xa87)
-            header_0xa87b = fh.find_header(ntrack=header0.ntrack,
-                                           decade=header0.decade,
-                                           forward=False)
+            header_0xa87b = fh.find_header(forward=False)
             assert header_0xa87b is None
             assert fh.tell() == 0xa87
             fh.seek(0xa88)
-            header_0xa88f = fh.find_header(ntrack=header0.ntrack,
-                                           decade=header0.decade)
+            header_0xa88f = fh.find_header()
             assert fh.tell() == 0xa88
             fh.seek(0xa88)
-            header_0xa88b = fh.find_header(template_header=header0,
-                                           forward=False)
+            header_0xa88b = fh.find_header(forward=False)
             assert fh.tell() == 0xa88
             fh.seek(0xa88 + 100)
-            header_100b = fh.find_header(template_header=header0,
-                                         forward=False)
+            header_100b = fh.find_header(forward=False)
             assert fh.tell() == 0xa88
             fh.seek(-10000, 2)
-            header_m10000b = fh.find_header(template_header=header0,
-                                            forward=False)
+            header_m10000b = fh.find_header(forward=False)
             assert fh.tell() == 0xa88 + 2*header0.framesize
             fh.seek(-300, 2)
-            header_end = fh.find_header(template_header=header0, forward=True)
+            header_end = fh.find_header(forward=True)
             assert header_end is None
         assert header_100b == header_0
         assert header_0xa88f == header_0
@@ -516,67 +511,70 @@ class TestMark4(object):
         with open(SAMPLE_FILE, 'rb') as fh:
             # One that simply is too small altogether
             m4_test = str(tmpdir.join('test.m4'))
-            with open(m4_test, 'w+b') as s, mark4.open(s, 'rb') as fh_short:
+            with open(m4_test, 'w+b') as s, mark4.open(s, 'rb',
+                                                       ntrack=64) as fh_short:
                 s.write(fh.read(80000))
                 fh_short.seek(100)
-                assert fh_short.find_header(template_header=header0) is None
+                assert fh_short.find_header() is None
                 assert fh_short.tell() == 100
-                assert fh_short.find_header(template_header=header0,
-                                            forward=False) is None
+                assert fh_short.find_header(forward=False) is None
                 assert fh_short.tell() == 100
 
             # And one that could fit one frame, but doesn't.
-            with open(m4_test, 'w+b') as s, mark4.open(s, 'rb') as fh_short:
+            with open(m4_test, 'w+b') as s, mark4.open(s, 'rb',
+                                                       ntrack=64) as fh_short:
                 fh.seek(0)
                 s.write(fh.read(162690))
                 fh_short.seek(200)
-                assert fh_short.find_header(template_header=header0) is None
+                assert fh_short.find_header() is None
                 assert fh_short.tell() == 200
-                assert fh_short.find_header(template_header=header0,
-                                            forward=False) is None
+                assert fh_short.find_header(forward=False) is None
                 assert fh_short.tell() == 200
 
             # now add enough that the file does include a complete header.
-            with open(m4_test, 'w+b') as s, mark4.open(s, 'rb') as fh_short2:
+            with open(m4_test, 'w+b') as s, mark4.open(s, 'rb',
+                                                       ntrack=64) as fh_short2:
                 fh.seek(0)
                 s.write(fh.read(163000))
                 s.seek(0)
                 fh_short2.seek(100)
-                header_100f = fh_short2.find_header(template_header=header0)
+                header_100f = fh_short2.find_header()
                 assert fh_short2.tell() == 0xa88
                 fh_short2.seek(-1000, 2)
-                header_m1000b = fh_short2.find_header(template_header=header0,
-                                                      forward=False)
+                header_m1000b = fh_short2.find_header(forward=False)
                 assert fh_short2.tell() == 0xa88
             assert header_100f == header0
             assert header_m1000b == header0
 
     def test_determine_ntrack(self):
-        with mark4.open(SAMPLE_FILE, 'rb') as fh:
-            offset0 = fh.find_frame(ntrack=64)
+        with mark4.open(SAMPLE_FILE, 'rb', ntrack=64) as fh:
+            offset0 = fh.locate_frame()
             assert offset0 == 2696
-            fh.seek(0)
+        with mark4.open(SAMPLE_FILE, 'rb') as fh:
+            assert fh.ntrack is None
             ntrack = fh.determine_ntrack()
-            assert ntrack == 64
+            assert ntrack == fh.ntrack == 64
             assert fh.fh_raw.tell() == offset0
 
-        with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
+        with mark4.open(SAMPLE_32TRACK, 'rb', ntrack=32) as fh:
             # Seek past first frame header; find second frame.
             fh.seek(10000)
-            offset0 = fh.find_frame(ntrack=32)
+            offset0 = fh.locate_frame()
             assert offset0 == 89656
+        with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
             fh.seek(10000)
             ntrack = fh.determine_ntrack()
             assert fh.fh_raw.tell() == offset0
-            assert ntrack == 32
+            assert ntrack == fh.ntrack == 32
 
-        with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
-            offset0 = fh.find_frame(ntrack=32)
+        with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb', ntrack=32) as fh:
+            offset0 = fh.locate_frame()
             assert offset0 == 17436
-            fh.seek(0)
+        with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
             ntrack = fh.determine_ntrack()
             assert fh.fh_raw.tell() == offset0
-            assert ntrack == 32
+            assert ntrack == fh.ntrack == 32
+            assert fh.ntrack == 32
 
     def test_filestreamer(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
@@ -751,27 +749,27 @@ class TestMark4(object):
             assert fwr.fill_value == fill_value
 
     def test_corrupt_stream(self, tmpdir):
-        with mark4.open(SAMPLE_FILE, 'rb') as fh, \
+        with mark4.open(SAMPLE_FILE, 'rb', ntrack=64, decade=2010) as fh, \
                 open(str(tmpdir.join('test.m4')), 'w+b') as s:
             fh.seek(0xa88)
-            frame = fh.read_frame(ntrack=64, decade=2010)
+            frame = fh.read_frame()
             # Write single frame to file.
             frame.tofile(s)
             # Now add lots of data without headers.
             for i in range(5):
                 frame.payload.tofile(s)
             s.seek(0)
-            # With too many payload samples for one frame, f2.find_frame
+            # With too many payload samples for one frame, f2.locate_frame
             # will fail.
             with pytest.raises(AssertionError):
                 f2 = mark4.open(s, 'rs', ntrack=64, decade=2010,
                                 sample_rate=32*u.MHz)
 
-        with mark4.open(SAMPLE_FILE, 'rb') as fh, \
+        with mark4.open(SAMPLE_FILE, 'rb', ntrack=64, decade=2010) as fh, \
                 open(str(tmpdir.join('test.m4')), 'w+b') as s:
             fh.seek(0xa88)
-            frame0 = fh.read_frame(ntrack=64, decade=2010)
-            frame1 = fh.read_frame(ntrack=64, decade=2010)
+            frame0 = fh.read_frame()
+            frame1 = fh.read_frame()
             frame0.tofile(s)
             frame1.tofile(s)
             # now add lots of data without headers.
@@ -794,9 +792,10 @@ class TestMark4(object):
 
 
 class Test32TrackFanout4():
-    def test_find_frame(self):
+    def test_locate_frame(self):
         with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
-            assert fh.find_frame(ntrack=32) == 9656
+            assert fh.locate_frame() == 9656
+            assert fh.ntrack == 32
 
     def test_header(self):
         with open(SAMPLE_32TRACK, 'rb') as fh:
@@ -856,9 +855,10 @@ class Test32TrackFanout4():
 
 
 class Test32TrackFanout2():
-    def test_find_frame(self):
+    def test_locate_frame(self):
         with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
-            assert fh.find_frame(ntrack=32) == 17436
+            assert fh.locate_frame() == 17436
+            assert fh.ntrack == 32
 
     def test_header(self):
         with open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
@@ -918,9 +918,10 @@ class Test32TrackFanout2():
 
 
 class Test16TrackFanout4():
-    def test_find_frame(self):
+    def test_locate_frame(self):
         with mark4.open(SAMPLE_16TRACK, 'rb') as fh:
-            assert fh.find_frame(ntrack=16) == 22124
+            assert fh.locate_frame() == 22124
+            assert fh.ntrack == 16
 
     def test_header(self):
         with open(SAMPLE_16TRACK, 'rb') as fh:

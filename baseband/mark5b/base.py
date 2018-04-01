@@ -21,23 +21,56 @@ class Mark5BFileReader(VLBIFileBase):
     """Simple reader for Mark 5B files.
 
     Adds ``read_frame`` and ``find_header`` methods to the VLBI file wrapper.
+
+    Parameters
+    ----------
+    nchan : int
+        Number of channels encoded in the payload (default=1).
+    bps : int
+        Bits per sample (default=2).
+    kday : int
+        Explicit thousands of MJD of the observation time.  Can instead
+        pass an approximate `ref_time`.
+    ref_time : `~astropy.time.Time`
+        Reference time within 500 days of the observation time, used to
+        infer the full MJD.  Used only if `kday` is ``None``.
     """
+    def __init__(self, fh_raw, nchan=1, bps=2, kday=None, ref_time=None):
+        self._nchan = nchan
+        self._bps = bps
+        self._kday = kday
+        self._ref_time = ref_time
+        super(Mark5BFileReader, self).__init__(fh_raw)
 
-    def read_frame(self, nchan, bps=2, kday=None, ref_time=None):
+    @property
+    def bps(self):
+        """Bits per elementary sample."""
+        return self._bps
+
+    @property
+    def nchan(self):
+        """Number of channels in each sample."""
+        return self._nchan
+
+    @property
+    def kday(self):
+        """Thousands of MJD of the observation time.
+
+        Used to infer the full MJD for headers. If `None`, ``ref_time`` is
+        used instead.
+        """
+        return self._kday
+
+    @property
+    def ref_time(self):
+        """Reference time within 500 days of the observation time.
+
+        Used to infer the full MJD for headers if ``kday`` is `None`.
+        """
+        return self._ref_time
+
+    def read_frame(self):
         """Read a single frame (header plus payload).
-
-        Parameters
-        ----------
-        nchan : int
-            Number of channels encoded in the payload.
-        bps : int
-            Bits per sample (default=2).
-        kday : int, or None, optional
-            Explicit thousands of MJD of the observation time.  Can instead
-            pass an approximate `ref_time`.
-        ref_time : `~astropy.time.Time`, or None, optional
-            Reference time within 500 days of the observation time, used to
-            infer the full MJD.  Used only if `kday` is ``None``.
 
         Returns
         -------
@@ -45,11 +78,11 @@ class Mark5BFileReader(VLBIFileBase):
             With ``header`` and ``data`` properties that return the
             Mark5BHeader and data encoded in the frame, respectively.
         """
-        return Mark5BFrame.fromfile(self.fh_raw, nchan, bps=bps,
-                                    kday=kday, ref_time=ref_time)
+        return Mark5BFrame.fromfile(self.fh_raw, nchan=self.nchan,
+                                    bps=self.bps, kday=self.kday,
+                                    ref_time=self.ref_time)
 
-    def find_header(self, template_header=None, framesize=None, kday=None,
-                    maximum=None, forward=True):
+    def find_header(self, template_header=None, maximum=None, forward=True):
         """Look for the first occurrence of a frame.
 
         Search is from the current position.  If given, a template_header
@@ -60,16 +93,9 @@ class Mark5BFileReader(VLBIFileBase):
         template_header : :class:`~baseband.mark5b.Mark5BHeader`, optional
             Template Mark 5B header, from which `kday` and `framesize`
             are extracted.
-        framesize : int, optional
-            Size of a frame, in bytes.  Required if `template_header` is
-            ``None``.
-        kday : int, optional
-            Explicit thousands of MJD of the observation time, used to infer
-            the full MJD.  If `template_header` and `kday` are both ``None``,
-            any header returned will have its `kday` set to ``None``.
         maximum : int, optional
             Maximum number of bytes to search through.  Default is twice the
-            framesize.
+            framesize of 10016 bytes.
         forward : bool, optional
             Seek forward if ``True`` (default), backward if ``False``.
 
@@ -78,10 +104,12 @@ class Mark5BFileReader(VLBIFileBase):
         header : :class:`~baseband.mark5b.Mark5BHeader`, or None
             Retrieved Mark 5B header, or ``None`` if nothing found.
         """
+        framesize = 10016  # This is fixed for Mark 5B.
         fh = self.fh_raw
         if template_header:
             kday = template_header.kday
-            framesize = template_header.framesize
+        else:
+            kday = self.kday
         if maximum is None:
             maximum = 2 * framesize
         # Loop over chunks to try to find the frame marker.
@@ -144,7 +172,6 @@ class Mark5BFileWriter(VLBIFileBase):
 
     Adds ``write_frame`` method to the VLBI binary file wrapper.
     """
-
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
 
@@ -237,6 +264,11 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
         super(Mark5BStreamReader, self).__init__(
             fh_raw, header=header, nchan=nchan, bps=bps, subset=subset,
             sample_rate=sample_rate, fill_value=fill_value, squeeze=squeeze)
+        # Information for FileReader (set to defaults by the above super).
+        # Note: bps is set already and we use ref_time in preference to kday
+        # so we can handle files that are span a change in 1000s of MJD.
+        self._ref_time = self.start_time
+        self._nchan = nchan
 
     @lazyproperty
     def _last_header(self):
@@ -249,8 +281,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
 
     def _read_frame(self, index):
         self.fh_raw.seek(index * self.header0.framesize)
-        frame = self.read_frame(nchan=self._unsliced_shape.nchan,
-                                bps=self.bps, ref_time=self.start_time)
+        frame = self.read_frame()
         # Set decoded value for invalid data.
         frame.invalid_data_value = self.fill_value
         # TODO: OK to ignore leap seconds? Not sure what writer does.

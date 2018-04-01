@@ -56,31 +56,58 @@ class GSBFileReader(VLBIFileBase):
     """Simple reader for GSB data files.
 
     Adds ``read_payload`` method to the basic VLBI binary file wrapper.
+
+    Parameters
+    ----------
+    payloadsize : int
+        Number of bytes to read.
+    nchan : int
+        Number of channels in the data.  Default: 1.
+    bps : int
+        Number of bits per sample (or real/imaginary component).
+        Default: 4.
+    complex_data : bool
+        Whether data is complex or float.  Default: False.
     """
+    def __init__(self, fh_raw, payloadsize, nchan=1, bps=4,
+                 complex_data=False):
+        self._payloadsize = payloadsize
+        self._nchan = nchan
+        self._bps = bps
+        self._complex_data = complex_data
+        super(GSBFileReader, self).__init__(fh_raw)
 
-    def read_payload(self, payloadsize, nchan=1, bps=4, complex_data=False):
+    @property
+    def payloadsize(self):
+        """Size of the payload in bytes."""
+        return self._payloadsize
+
+    @property
+    def nchan(self):
+        """Number of channels in each sample."""
+        return self._nchan
+
+    @property
+    def bps(self):
+        """Bits per elementary sample."""
+        return self._bps
+
+    @property
+    def complex_data(self):
+        """Whether data stored in payload is complex."""
+        return self._complex_data
+
+    def read_payload(self):
         """Read a single block.
-
-        Parameters
-        ----------
-        payloadsize : int
-            Number of bytes to read.
-        nchan : int
-            Number of channels in the data.  Default: 1.
-        bps : int
-            Number of bits per sample (or real/imaginary component).
-            Default: 4.
-        complex_data : bool
-            Whether data is complex or float.  Default: False.
 
         Returns
         -------
         frame : `~baseband.gsb.GSBPayload`
             With a ``.data`` property that returns the data encoded.
         """
-        return GSBPayload.fromfile(self.fh_raw, payloadsize=payloadsize,
-                                   nchan=nchan, bps=bps,
-                                   complex_data=complex_data)
+        return GSBPayload.fromfile(self.fh_raw, payloadsize=self.payloadsize,
+                                   nchan=self.nchan, bps=self.bps,
+                                   complex_data=self.complex_data)
 
 
 class GSBFileWriter(VLBIFileBase):
@@ -486,10 +513,6 @@ def open(name, mode='rs', **kwargs):
                          "or writing (mode='r' or 'w').")
     fh_attr = 'read' if 'r' in mode else 'write'
     if 't' in mode or 'b' in mode:
-        if kwargs:
-            raise TypeError('got unexpected arguments {}'
-                            .format(kwargs.keys()))
-
         opened_files = []
         if not hasattr(name, fh_attr):
             name = io.open(name, mode.replace('t', '').replace('b', '') + 'b')
