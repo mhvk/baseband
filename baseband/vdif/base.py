@@ -9,6 +9,7 @@ import astropy.units as u
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import VDIFHeader
+from .payload import VDIFPayload
 from .frame import VDIFFrame, VDIFFrameSet
 
 
@@ -518,21 +519,29 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
             assert self.header0.sample_rate == self.sample_rate
         # TODO: once frameset allows slicing when writing, can replace this
         # with a frameset.
-        self._data = np.zeros(
-            (self.samples_per_frame,) + self._unsliced_shape,
-            np.complex64 if self.complex_data else np.float32)
+
+        payload_words = VDIFPayload.fromdata(
+            np.zeros((self.samples_per_frame, self._unsliced_shape.nchan),
+                     dtype=np.complex64 if self.complex_data else np.float32),
+            header=header).words
+        self._payloads = [VDIFPayload(payload_words.copy(), header=header)
+                          for _ in range(self._unsliced_shape.nthread)]
 
     def _make_frame(self, index):
-        self._header = self.header0.copy()
+        header = self.header0.copy()
         dt, frame_nr = divmod(index + self.header0['frame_nr'],
                               self._framerate)
-        self._header['seconds'] = self.header0['seconds'] + dt
-        self._header['frame_nr'] = frame_nr
-        return self._data
+        header['seconds'] = self.header0['seconds'] + dt
+        header['frame_nr'] = frame_nr
+        header['thread_id'] = 0
+        frames = [VDIFFrame(header, self._payloads[0])]
+        for i, payload in enumerate(self._payloads[1:]):
+            header = header.copy()
+            header['thread_id'] = i+1
+            frames.append(VDIFFrame(header, payload))
+        return VDIFFrameSet(frames)
 
-    def _write_frame(self, frame, valid=True):
-        assert frame is self._data
-        frameset = VDIFFrameSet.fromdata(frame, self._header)
+    def _write_frame(self, frameset, valid=True):
         for frame in frameset.frames:
             frame.valid = valid
         self.write_frameset(frameset)

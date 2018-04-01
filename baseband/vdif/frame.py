@@ -199,8 +199,6 @@ class VDIFFrameSet(object):
     """
     def __init__(self, frames, header0=None):
         self.frames = frames
-        # Used in .data below to decode data only once.
-        self._data = None
         if header0 is None:
             self.header0 = self.frames[0].header
         else:
