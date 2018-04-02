@@ -179,12 +179,12 @@ class Mark5BStreamBase(VLBIStreamBase):
     """Base for Mark 5B streams."""
 
     def __init__(self, fh_raw, header0, sample_rate=None, nchan=1,
-                 bps=2, subset=(), squeeze=True, fill_value=0.):
+                 bps=2, squeeze=True, subset=(), fill_value=0.):
         super(Mark5BStreamBase, self).__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=header0.payloadsize * 8 // bps // nchan,
             unsliced_shape=(nchan,), bps=bps, complex_data=False,
-            subset=subset, squeeze=squeeze, fill_value=fill_value)
+            squeeze=squeeze, subset=subset, fill_value=fill_value)
         self._framerate = int(round((self.sample_rate /
                                      self.samples_per_frame).to_value(u.Hz)))
 
@@ -214,12 +214,12 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
         Number of channels.  Default: 1.
     bps : int, optional
         Bits per elementary sample.  Default: 2.
-    subset : indexing object, optional
-        Specific components (i.e. channels) of the complete sample to decode.
-        If an empty tuple (default), all channels are read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
+    subset : indexing object, optional
+        Specific channels of the complete sample to decode (after possible
+        squeezing). If an empty tuple (default), all channels are read.
     fill_value : float or complex
         Value to use for invalid or missing data. Default: 0.
     """
@@ -227,7 +227,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, kday=None, ref_time=None,
-                 nchan=1, bps=2, subset=(), squeeze=True, fill_value=0.):
+                 nchan=1, bps=2, squeeze=True, subset=(), fill_value=0.):
 
         if kday is None and ref_time is None:
             raise ValueError("Mark5B stream reader requires kday or ref_time. "
@@ -238,7 +238,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
         fh_raw.seek(0)
         super(Mark5BStreamReader, self).__init__(
             fh_raw, header0, sample_rate=sample_rate, nchan=nchan, bps=bps,
-            subset=subset, squeeze=squeeze, fill_value=fill_value)
+            squeeze=squeeze, subset=subset, fill_value=fill_value)
 
     @lazyproperty
     def _last_header(self):
@@ -347,12 +347,12 @@ nchan : int, optional
     Number of channels.  Default: 1.
 bps : int, optional
     Bits per elementary sample.  Default: 2.
-subset : indexing object, optional
-    Specific components (i.e. channels) of the complete sample to decode.  If
-    an empty tuple (default), all channels are read.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
+subset : indexing object, optional
+    Specific channels of the complete sample to decode (after possible
+    squeezing). If an empty tuple (default), all channels are read.
 fill_value : float or complex
     Value to use for invalid or missing data. Default: 0.
 

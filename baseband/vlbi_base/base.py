@@ -52,7 +52,7 @@ class VLBIStreamBase(VLBIFileBase):
     _sample_shape_maker = None
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, subset, squeeze,
+                 unsliced_shape, bps, complex_data, squeeze, subset,
                  fill_value):
         super(VLBIStreamBase, self).__init__(fh_raw)
         self._header0 = header0
@@ -217,7 +217,7 @@ class VLBIStreamBase(VLBIFileBase):
 class VLBIStreamReaderBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, subset, squeeze,
+                 unsliced_shape, bps, complex_data, squeeze, subset,
                  fill_value):
 
         if sample_rate is None:
@@ -235,7 +235,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         super(VLBIStreamReaderBase, self).__init__(
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
-            bps, complex_data, subset, squeeze, fill_value)
+            bps, complex_data, squeeze, subset, fill_value)
 
     def _squeeze_and_subset(self, data):
         """Possibly remove unit dimensions and subset the given data.
@@ -493,7 +493,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 class VLBIStreamWriterBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, subset, squeeze,
+                 unsliced_shape, bps, complex_data, squeeze, subset,
                  fill_value):
 
         if sample_rate is None:
@@ -501,7 +501,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
 
         super(VLBIStreamWriterBase, self).__init__(
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
-            bps, complex_data, subset, squeeze, fill_value)
+            bps, complex_data, squeeze, subset, fill_value)
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)

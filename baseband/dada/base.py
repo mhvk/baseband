@@ -186,14 +186,14 @@ class DADAStreamBase(VLBIStreamBase):
 
     _sample_shape_maker = DADAPayload._sample_shape_maker
 
-    def __init__(self, fh_raw, header0, subset=(), squeeze=True):
+    def __init__(self, fh_raw, header0, squeeze=True, subset=()):
 
         super(DADAStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, sample_rate=header0.sample_rate,
             samples_per_frame=header0.samples_per_frame,
             unsliced_shape=header0.sample_shape, bps=header0.bps,
-            complex_data=header0.complex_data, subset=subset,
-            squeeze=squeeze, fill_value=0.)
+            complex_data=header0.complex_data, squeeze=squeeze, subset=subset,
+            fill_value=0.)
 
 
 class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
@@ -205,20 +205,20 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     ----------
     fh_raw : filehandle
         Filehandle of the raw DADA stream.
-    subset : indexing object or tuple of objects, optional
-        Specific components of the complete sample to decode.  If a single
-        indexing object is passed, it selects polarizations.  If a tuple of
-        objects is passed, the first selects polarizations and the second
-        selects channels.  If the tuple is empty (default), all components are
-        read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode (after possibly
+        squeezing).  If a single indexing object is passed, it selects
+        polarizations.  With a tuple, the first selects polarizations and the
+        second selects channels.  If the tuple is empty (default), all
+        components are read.
     """
-    def __init__(self, fh_raw, subset=(), squeeze=True):
+    def __init__(self, fh_raw, squeeze=True, subset=()):
         header0 = DADAHeader.fromfile(fh_raw)
-        super(DADAStreamReader, self).__init__(fh_raw, header0, subset=subset,
-                                               squeeze=squeeze)
+        super(DADAStreamReader, self).__init__(fh_raw, header0,
+                                               squeeze=squeeze, subset=subset)
 
     @lazyproperty
     def _last_header(self):
@@ -274,14 +274,15 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
 opener = make_opener('DADA', globals(), doc="""
 --- For reading a stream : (see :class:`~baseband.dada.base.DADAStreamReader`)
 
-subset : indexing object or tuple of objects, optional
-    Specific components of the complete sample to decode.  If a single indexing
-    object is passed, it selects polarizations.  If a tuple of objects is
-    passed, the first selects polarizations and the second selects channels.
-    If the tuple is empty (default), all components are read.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
+subset : indexing object or tuple of objects, optional
+    Specific components of the complete sample to decode (after possibly
+    squeezing).  If a single indexing object is passed, it selects
+    polarizations.  With a tuple, the first selects polarizations and the
+    second selects channels.  If the tuple is empty (default), all
+    components are read.
 
 --- For writing a stream : (see :class:`~baseband.dada.base.DADAStreamWriter`)
 

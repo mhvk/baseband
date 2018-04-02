@@ -242,15 +242,15 @@ class VDIFStreamBase(VLBIStreamBase):
     _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
 
     def __init__(self, fh_raw, header0, sample_rate=None, nthread=1,
-                 subset=(), squeeze=True, fill_value=0.):
+                 squeeze=True, subset=(), fill_value=0.):
         samples_per_frame = header0.samples_per_frame
 
         super(VDIFStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame,
             unsliced_shape=(nthread, header0.nchan), bps=header0.bps,
-            complex_data=header0['complex_data'], subset=subset,
-            squeeze=squeeze, fill_value=fill_value)
+            complex_data=header0['complex_data'], squeeze=squeeze,
+            subset=subset, fill_value=fill_value)
 
         self._framerate = int(round((self.sample_rate /
                                      self.samples_per_frame).to_value(u.Hz)))
@@ -289,19 +289,19 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         Number of complete samples per second, i.e. the rate at which each
         channel in each thread is sampled.  If `None` (default), will be
         inferred from the header or by scanning one second of the file.
-    subset : indexing object or tuple of objects, optional
-        Specific components of the complete sample to decode.  If a single
-        indexing object is passed, it selects threads.  If a tuple of
-        objects is passed, the first selects threads and the second selects
-        channels.  If the tuple is empty (default) all components are read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode (after possible
+        squeezing).  If a single indexing object is passed, it selects threads.
+        If a tuple is passed, the first selects threads and the second selects
+        channels.  If the tuple is empty (default), all components are read.
     fill_value : float or complex, optional
         Value to use for invalid or missing data. Default: 0.
     """
 
-    def __init__(self, fh_raw, sample_rate=None, subset=(), squeeze=True,
+    def __init__(self, fh_raw, sample_rate=None, squeeze=True, subset=(),
                  fill_value=0.):
         # We use the very first header in the file, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
@@ -318,8 +318,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         self._framesetsize = fh_raw.tell()
         super(VDIFStreamReader, self).__init__(
             fh_raw, header0, sample_rate=sample_rate,
-            nthread=len(frameset.frames), subset=subset,
-            squeeze=squeeze, fill_value=fill_value)
+            nthread=len(frameset.frames), squeeze=squeeze, subset=subset,
+            fill_value=fill_value)
         # Check whether we are reading only some threads.  This is somewhat
         # messy since normally we apply the whole subset to the whole data,
         # but here we need to split it up in the part that selects specific
@@ -545,14 +545,14 @@ sample_rate : `~astropy.units.Quantity`, optional
     Number of complete samples per second, i.e. the rate at which each channel
     in each thread is sampled.  If `None` (default), will be inferred from the
     header or by scanning one second of the file.
-subset : indexing object or tuple of objects, optional
-    Specific components of the complete sample to decode.  If a single indexing
-    object is passed, it selects threads.  If a tuple of objects is passed, the
-    first selects threads and the second selects channels.  If the tuple is
-    empty (default) all components are read.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
+subset : indexing object or tuple of objects, optional
+    Specific components of the complete sample to decode (after possible
+    squeezing).  If a single indexing object is passed, it selects threads.
+    If a tuple is passed, the first selects threads and the second selects
+    channels.  If the tuple is empty (default), all components are read.
 fill_value : float or complex, optional
     Value to use for invalid or missing data. Default: 0.
 

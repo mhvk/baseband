@@ -113,7 +113,7 @@ class GSBStreamBase(VLBIStreamBase):
 
     def __init__(self, fh_ts, fh_raw, header0, sample_rate=None,
                  samples_per_frame=None, payloadsize=None, nchan=None,
-                 bps=None, complex_data=None, subset=(), squeeze=True):
+                 bps=None, complex_data=None, squeeze=True, subset=()):
 
         self.fh_ts = fh_ts
         rawdump = header0.mode == 'rawdump'
@@ -144,8 +144,8 @@ class GSBStreamBase(VLBIStreamBase):
         super(GSBStreamBase, self).__init__(
             fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, unsliced_shape=unsliced_shape,
-            bps=bps, complex_data=complex_data, subset=subset,
-            squeeze=squeeze, fill_value=0.)
+            bps=bps, complex_data=complex_data, squeeze=squeeze, subset=subset,
+            fill_value=0.)
 
         self._payloadsize = payloadsize
 
@@ -212,15 +212,15 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     complex_data : bool, optional
         Whether data is complex.  Default: `False` for rawdump, `True` for
         phased.
-    subset : indexing object or tuple of objects, optional
-        Specific components of the complete sample to decode.  If a single
-        indexing object is passed, it selects (available) polarizations.  If a
-        tuple of objects is passed, the first selects (available) polarizations
-        and the second selects channels.  If the tuple is empty (default), all
-        components are read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from decoded
         data.
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode (after possibly
+        squeezing).  If a single indexing object is passed, it selects
+        (available) polarizations.  If a tuple is passed, the first selects
+        polarizations and the second selects channels.  If the tuple is empty
+        (default), all components are read.
     """
     # TODO: right now cannot inherit from GSBFileReader, unlike for other
     # baseband classes, since we need to access multiple files.  Can this
@@ -229,13 +229,13 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
     def __init__(self, fh_ts, fh_raw, sample_rate=None, samples_per_frame=None,
                  payloadsize=None, nchan=None, bps=None, complex_data=None,
-                 subset=(), squeeze=True):
+                 squeeze=True, subset=()):
         header0 = fh_ts.read_timestamp()
         super(GSBStreamReader, self).__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, payloadsize=payloadsize,
-            nchan=nchan, bps=bps, complex_data=complex_data, subset=subset,
-            squeeze=squeeze)
+            nchan=nchan, bps=bps, complex_data=complex_data,
+            squeeze=squeeze, subset=subset)
         self.fh_ts.seek(0)
 
     @lazyproperty
@@ -357,8 +357,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         super(GSBStreamWriter, self).__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, payloadsize=payloadsize,
-            nchan=nchan, bps=bps, complex_data=complex_data, subset=None,
-            squeeze=squeeze)
+            nchan=nchan, bps=bps, complex_data=complex_data, squeeze=squeeze)
         self._payload = GSBPayload.fromdata(
             np.zeros((self.samples_per_frame,) + self._unsliced_shape,
                      (np.complex64 if self.complex_data else np.float32)),
@@ -451,11 +450,11 @@ def open(name, mode='rs', **kwargs):
     --- For reading only :  (see `~baseband.gsb.base.GSBStreamReader`)
 
     subset : indexing object or tuple of objects, optional
-        Specific components of the complete sample to decode.  If a single
-        indexing object is passed, it selects (available) polarizations.  If a
-        tuple of objects is passed, the first selects (available) polarizations
-        and the second selects channels.  If the tuple is empty (default), all
-        components are read.
+        Specific components of the complete sample to decode (after possibly
+        squeezing).  If a single indexing object is passed, it selects
+        (available) polarizations.  If a tuple is passed, the first selects
+        polarizations and the second selects channels.  If the tuple is empty
+        (default), all components are read.
 
     --- For writing only : (see `~baseband.gsb.base.GSBStreamWriter`)
 

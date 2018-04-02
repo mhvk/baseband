@@ -248,14 +248,14 @@ class Mark4FileWriter(VLBIFileBase):
 class Mark4StreamBase(VLBIStreamBase):
     """Base for Mark 4 streams."""
 
-    def __init__(self, fh_raw, header0, sample_rate=None, subset=(),
-                 squeeze=True, fill_value=0.):
+    def __init__(self, fh_raw, header0, sample_rate=None, squeeze=True,
+                 subset=(), fill_value=0.):
         super(Mark4StreamBase, self).__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=header0.samples_per_frame,
             unsliced_shape=(header0.nchan,),
-            bps=header0.bps, complex_data=False, subset=subset,
-            squeeze=squeeze, fill_value=fill_value)
+            bps=header0.bps, complex_data=False, squeeze=squeeze,
+            subset=subset, fill_value=fill_value)
         self._framerate = int(round((self.sample_rate /
                                      self.samples_per_frame).to_value(u.Hz)))
 
@@ -285,12 +285,12 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase,
     ref_time : `~astropy.time.Time` or None
         Reference time within 4 years of the start time of the observations.
         Used only if `decade` is not given.
-    subset : indexing object, optional
-        Specific components (i.e. channels) of the complete sample to decode.
-        If an empty tuple (default), all channels are read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
+    subset : indexing object, optional
+        Specific channels of the complete sample to decode (after possible
+        squeezing).  If an empty tuple (default), all channels are read.
     fill_value : float or complex, optional
         Value to use for invalid or missing data. Default: 0.
     """
@@ -298,7 +298,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase,
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, ntrack=None, decade=None,
-                 ref_time=None, subset=(), squeeze=True, fill_value=0.):
+                 ref_time=None, squeeze=True, subset=(), fill_value=0.):
 
         if decade is None and ref_time is None:
             raise ValueError("Mark 4 stream reader requires decade or "
@@ -323,8 +323,8 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase,
         # Go back to start of frame (for possible sample rate detection).
         self.fh_raw.seek(self.offset0)
         super(Mark4StreamReader, self).__init__(
-            fh_raw, header0, sample_rate=sample_rate, subset=subset,
-            squeeze=squeeze, fill_value=fill_value)
+            fh_raw, header0, sample_rate=sample_rate, squeeze=True,
+            subset=subset, fill_value=fill_value)
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
@@ -458,12 +458,12 @@ decade : int or None
 ref_time : `~astropy.time.Time` or None
     Reference time within 4 years of the start time of the observations.  Used
     only if `decade` is not given.
-subset : indexing object, optional
-    Specific components (i.e. channels) of the complete sample to decode.  If
-    an empty tuple (default), all channels are read.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
+subset : indexing object, optional
+    Specific channels of the complete sample to decode (after possible
+    squeezing).  If an empty tuple (default), all channels are read.
 fill_value : float or complex, optional
     Value to use for invalid or missing data. Default: 0.
 
