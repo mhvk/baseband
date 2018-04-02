@@ -216,7 +216,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         Specific components of the complete sample to decode.  If a single
         indexing object is passed, it selects (available) polarizations.  If a
         tuple of objects is passed, the first selects (available) polarizations
-        and the second selects channels.  If the tuple is empty (default) all
+        and the second selects channels.  If the tuple is empty (default), all
         components are read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from decoded
@@ -454,7 +454,7 @@ def open(name, mode='rs', **kwargs):
         Specific components of the complete sample to decode.  If a single
         indexing object is passed, it selects (available) polarizations.  If a
         tuple of objects is passed, the first selects (available) polarizations
-        and the second selects channels.  If the tuple is empty (default) all
+        and the second selects channels.  If the tuple is empty (default), all
         components are read.
 
     --- For writing only : (see `~baseband.gsb.base.GSBStreamWriter`)

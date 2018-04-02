@@ -63,10 +63,10 @@ class GSBPayload(VLBIPayloadBase):
     words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    bps : int, optional
-        Bits per elementary sample.  Default: 2.
     sample_shape : tuple, optional
         Shape of the samples; e.g., (nchan,).  Default: ().
+    bps : int, optional
+        Bits per elementary sample.  Default: 2.
     complex_data : bool, optional
         Whether data is complex.  Default: `False`.
     """

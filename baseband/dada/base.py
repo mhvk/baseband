@@ -204,12 +204,12 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     Parameters
     ----------
     fh_raw : filehandle
-        Filehandle of the (first) raw DADA stream.
+        Filehandle of the raw DADA stream.
     subset : indexing object or tuple of objects, optional
         Specific components of the complete sample to decode.  If a single
         indexing object is passed, it selects polarizations.  If a tuple of
         objects is passed, the first selects polarizations and the second
-        selects channels.  If the tuple is empty (default) all components are
+        selects channels.  If the tuple is empty (default), all components are
         read.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
@@ -245,7 +245,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
     raw : filehandle
         For writing the header and raw data to storage.
     header0 : :class:`~baseband.dada.DADAHeader`
-        Header for the file, holding time information, etc.
+        Header for the first frame, holding time information, etc.
     squeeze : bool, optional
         If `True` (default), ``write`` accepts squeezed arrays as input,
         and adds any dimensions of length unity.
@@ -278,7 +278,7 @@ subset : indexing object or tuple of objects, optional
     Specific components of the complete sample to decode.  If a single indexing
     object is passed, it selects polarizations.  If a tuple of objects is
     passed, the first selects polarizations and the second selects channels.
-    If the tuple is empty (default) all components are read.
+    If the tuple is empty (default), all components are read.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
@@ -328,7 +328,8 @@ Filehandle
 
 # Need to wrap the opener to be able to deal with file lists or templates.
 # TODO: move this up to the opener??
-def open(name, mode='rs', subset=None, header0=None, **kwargs):
+def open(name, mode='rs', **kwargs):
+    header0 = kwargs.get('header0', None)
     # If sequentialfile object, check that it's opened properly.
     if isinstance(name, sf.SequentialFileBase):
         assert (('r' in mode and name.mode == 'rb') or
@@ -373,8 +374,6 @@ def open(name, mode='rs', subset=None, header0=None, **kwargs):
 
         if header0 and 'w' in mode:
             kwargs['header0'] = header0
-        if subset is not None and 'r' in mode:
-            kwargs['subset'] = subset
 
     return opener(name, mode, **kwargs)
 

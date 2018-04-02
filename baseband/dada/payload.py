@@ -48,8 +48,8 @@ class DADAPayload(VLBIPayloadBase):
     def __init__(self, words, header=None, sample_shape=(), bps=8,
                  complex_data=False):
         if header is not None:
-            bps = header.bps
             sample_shape = header.sample_shape
+            bps = header.bps
             complex_data = header.complex_data
         super(DADAPayload, self).__init__(words, sample_shape=sample_shape,
                                           bps=bps, complex_data=complex_data)
