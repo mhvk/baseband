@@ -42,7 +42,7 @@ Usage Notes
 ===========
 
 This section covers reading and writing VDIF files with Baseband; general
-usage can be found under the :ref:`Using Baseband <using_baseband_toc>` section.
+usage can be found under the :ref:`Getting Started <getting_started>` section.
 The examples below use the small sample file ``baseband/data/sample.vdif``, and
 the `numpy`, `astropy.units`, and `baseband.vdif` modules::
 

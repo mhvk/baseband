@@ -72,9 +72,9 @@ Usage Notes
 ===========
 
 This section covers reading and writing GSB files with Baseband; general usage
-is covered in the :ref:`Using Baseband <using_baseband_toc>` section.
-The examples below use the sample files in the ``baseband/data/gsb/``
-directory, and the `numpy`, `astropy.units` and `baseband.gsb` modules::
+is covered in the :ref:`Getting Started <getting_started>` section. The
+examples below use the sample files in the ``baseband/data/gsb/`` directory,
+and the `numpy`, `astropy.units` and `baseband.gsb` modules::
 
     >>> import numpy as np
     >>> import astropy.units as u
