@@ -1,10 +1,12 @@
 .. _baseband_docs:
 
-*************
-Documentation
-*************
+********
+Baseband
+********
 
-The Baseband package provides:
+Welcome to the Baseband documentation! Baseband is a package for reading and
+writing VLBI and other radio baseband files, with the aim of simplifying and
+streamlining data conversion and standardization.  It provides:
 
 - File input/output functions for supported radio baseband formats, listed under
   :ref:`specific file formats <specific_file_formats_toc>`.
@@ -17,14 +19,16 @@ The Baseband package provides:
 
 .. _using_baseband_toc:
 
-Using Baseband
-==============
+Basics
+======
 
 .. toctree::
    :maxdepth: 1
 
+   install
    tutorials/getting_started
    tutorials/glossary
+   authors_for_sphinx
 
 .. _specific_file_formats_toc:
 
