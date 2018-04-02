@@ -23,22 +23,28 @@ nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
 class Mark4FileReader(VLBIFileBase):
     """Simple reader for Mark 4 files.
 
-    Adds ``read_frame`` and ``find_frame`` methods to the VLBI file wrapper.
+    Adds ``read_frame`` and ``locate_frame`` methods to the VLBI file wrapper.
+
+    Parameters
+    ----------
+    ntrack : int or None, optional.
+        Number of Mark 4 bitstreams.  Can be determined automatically as
+        part of locating the first frame.
+    decade : int or None
+        Decade in which the observations were taken.  Can instead pass an
+        approximate `ref_time`.
+    ref_time : `~astropy.time.Time` or None
+        Reference time within 4 years of the observation time.  Used only
+        if `decade` is not given.
     """
+    def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None):
+        self.ntrack = ntrack
+        self.decade = decade
+        self.ref_time = ref_time
+        super(Mark4FileReader, self).__init__(fh_raw)
 
-    def read_frame(self, ntrack, decade=None, ref_time=None):
+    def read_frame(self):
         """Read a single frame (header plus payload).
-
-        Parameters
-        ----------
-        ntrack : int
-            Number of Mark 4 bitstreams.
-        decade : int or None
-            Decade in which the observations were taken.  Can instead pass an
-            approximate `ref_time`.
-        ref_time : `~astropy.time.Time` or None
-            Reference time within 4 years of the observation time.  Used only
-            if `decade` is not given.
 
         Returns
         -------
@@ -47,11 +53,11 @@ class Mark4FileReader(VLBIFileBase):
             :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
             respectively.
         """
-        return Mark4Frame.fromfile(self.fh_raw, ntrack, decade=decade,
-                                   ref_time=ref_time)
+        return Mark4Frame.fromfile(self.fh_raw, self.ntrack,
+                                   decade=self.decade, ref_time=self.ref_time)
 
-    def find_frame(self, ntrack, maximum=None, forward=True):
-        """Look for the first occurrence of a frame, from the current position.
+    def locate_frame(self, forward=True, maximum=None):
+        """Locate the frame nearest the current position.
 
         The search is for the following pattern:
 
@@ -63,27 +69,40 @@ class Mark4FileReader(VLBIFileBase):
         a frame ahead, which is in word 2, plus the lsb of word 1, which is
         'system_id'.
 
+        If the file does not have ntrack is set, it will be auto-determined.
+
         Parameters
         ----------
-        ntrack : int
-            Number of Mark 4 bitstreams.
-        maximum : int, optional
-            Maximum number of bytes forward to search through.
-            Default: twice the framesize (20000 * ntrack // 8).
         forward : bool, optional
             Whether to search forwards or backwards.  Default: `True`.
+        maximum : int, optional
+            Maximum number of bytes forward to search through.
+            Default: twice the framesize (of 20000 * ntrack // 8).
 
         Returns
         -------
-        offset : int or None
-            Byte offset of the next frame.  `None` if the search was not
+        offset : int or `None`
+            Byte offset of the next frame. `None` if the search was not
             successful.
         """
         fh = self.fh_raw
+        file_pos = fh.tell()
+        # Use initializer value (determines ntrack if not already given).
+        ntrack = self.ntrack
+        if ntrack is None:
+            fh.seek(0)
+            ntrack = self.determine_ntrack(maximum=maximum)
+            if ntrack is None:
+                raise ValueError("cannot determine ntrack automatically. "
+                                 "Try passing in an explicit value.")
+            if forward and fh.tell() >= file_pos:
+                return fh.tell()
+
+            fh.seek(file_pos)
+
         nset = np.ones(32 * ntrack // 8, dtype=np.int16)
         nunset = np.ones(ntrack // 8, dtype=np.int16)
         framesize = ntrack * 2500
-        file_pos = fh.tell()
         fh.seek(0, 2)
         filesize = fh.tell()
         if filesize < framesize:
@@ -158,63 +177,59 @@ class Mark4FileReader(VLBIFileBase):
 
         Uses ``find_frame`` to look for the first occurrence of a frame from
         the current position for all supported ``ntrack`` values.  Returns the
-        first ``ntrack`` for which ``find_frame`` is successful, leaving the
+        first ``ntrack`` for which ``find_frame`` is successful, setting
+        the file's ``ntrack`` property appropriately, and leaving the
         file pointer at the start of the frame.
 
         Parameters
         ----------
         maximum : int, optional
             Maximum number of bytes forward to search through.
-            Default: the framesize (20000 * ntrack // 8).
+            Default: twice the framesize (of 20000 * ntrack // 8).
 
         Returns
         -------
         ntrack : int or None
             Number of Mark 4 bitstreams.  `None` if no frame was found.
         """
-        # Currently only 32 and 64-track frames supported.
-        for nt in 16, 32, 64:
-            if self.find_frame(nt, maximum=maximum) is not None:
-                return nt
+        # Currently only 16, 32 and 64-track frames supported.
+        old_ntrack = self.ntrack
+        for ntrack in 16, 32, 64:
+            try:
+                self.ntrack = ntrack
+                if self.locate_frame(maximum=maximum) is not None:
+                    return ntrack
+            except Exception:
+                self.ntrack = old_ntrack
+                raise
 
+        self.ntrack = old_ntrack
         return None
 
-    def find_header(self, template_header=None, ntrack=None, decade=None,
-                    maximum=None, forward=True):
-        """Look for the first occurrence of a frame, from the current position.
+    def find_header(self, forward=True, maximum=None):
+        """Read header at the frame nearest the current position.
 
-        Read the header at that location and return it.
         The file pointer is left at the start of the header.
 
         Parameters
         ----------
-        template_header : `~baseband.mark4.Mark4Header`, optional
-            Template Mark 4 header, from which `ntrack` and `decade` are read.
-        ntrack : int, optional
-            Number of Mark 4 bitstreams.  Required if ``template_header`` is
-            `None`.
-        decade : int, optional
-            Decade in which the observations were taken.  If `template_header`
-            and `decade` are both not given, any header returned will have its
-            `decade` set to `None`.
-        maximum : int, optional
-            Maximum number of bytes to search through.  Default: twice the
-            framesize.
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
+        maximum : int, optional
+            Maximum number of bytes forward to search through.
+            Default: twice the framesize (of 20000 * ntrack // 8).
 
         Returns
         -------
         header : :class:`~baseband.mark4.Mark4Header` or None
             Retrieved Mark 4 header, or `None` if nothing found.
         """
-        if template_header is not None:
-            ntrack = template_header.ntrack
-            decade = template_header.decade
-        offset = self.find_frame(ntrack, maximum, forward)
+        offset = self.locate_frame(forward=forward)
         if offset is None:
             return None
-        header = Mark4Header.fromfile(self.fh_raw, ntrack, decade=decade)
+        header = Mark4Header.fromfile(self.fh_raw, ntrack=self.ntrack,
+                                      decade=self.decade,
+                                      ref_time=self.ref_time)
         self.fh_raw.seek(offset)
         return header
 
@@ -260,8 +275,7 @@ class Mark4StreamBase(VLBIStreamBase):
                                      self.samples_per_frame).to_value(u.Hz)))
 
 
-class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase,
-                        Mark4FileReader):
+class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
     """VLBI Mark 4 format reader.
 
     Allows access to a Mark 4 file as a continuous series of samples.  Parts
@@ -304,27 +318,22 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase,
             raise ValueError("Mark 4 stream reader requires decade or "
                              "ref_time. Please pass either explicitly.")
 
-        # Pre-set fh_raw, so FileReader methods work
-        self.fh_raw = fh_raw
-        # Find offset for first header, and ntrack if not specified.
-        if ntrack is None:
-            ntrack = self.determine_ntrack()
-            assert ntrack is not None, (
-                "could not automatically determine the number of tracks. "
-                "Try passing in an explicit ntrack.")
-            self.offset0 = self.fh_raw.tell()
-        else:
-            self.offset0 = self.find_frame(ntrack=ntrack)
-            assert self.offset0 is not None, (
-                "could not find a first frame using ntrack={}. Perhaps "
-                "try ntrack=None for auto-determination.".format(ntrack))
-        header0 = Mark4Header.fromfile(self.fh_raw, ntrack,
-                                       decade=decade, ref_time=ref_time)
-        # Go back to start of frame (for possible sample rate detection).
-        self.fh_raw.seek(self.offset0)
+        # Get binary file reader.
+        fh_raw = Mark4FileReader(fh_raw, ntrack=ntrack, decade=decade,
+                                 ref_time=ref_time)
+        # Find first header, determining ntrack if needed.
+        header0 = fh_raw.find_header()
+        assert header0 is not None, (
+            "could not find a first frame using ntrack={}. Perhaps "
+            "try ntrack=None for auto-determination.".format(ntrack))
+        self._offset0 = fh_raw.tell()
         super(Mark4StreamReader, self).__init__(
-            fh_raw, header0, sample_rate=sample_rate, squeeze=True,
-            subset=subset, fill_value=fill_value)
+            fh_raw, header0=header0, sample_rate=sample_rate,
+            squeeze=squeeze, subset=subset, fill_value=fill_value)
+        # Use reference time in preference to decade so that a stream wrapping
+        # a decade will work.
+        self.fh_raw.decade = None
+        self.fh_raw.ref_time = self.start_time
 
     @staticmethod
     def _get_frame_rate(fh, header_template):
@@ -371,17 +380,15 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase,
         return last_header
 
     def _read_frame(self, index):
-        self.fh_raw.seek(self.offset0 + index * self.header0.framesize)
-        frame = self.read_frame(ntrack=self.header0.ntrack,
-                                ref_time=self.start_time)
+        self.fh_raw.seek(self._offset0 + index * self.header0.framesize)
+        frame = self.fh_raw.read_frame()
         # Set decoded value for invalid data.
         frame.invalid_data_value = self.fill_value
         # TODO: add check that we got the right frame.
         return frame
 
 
-class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase,
-                        Mark4FileWriter):
+class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
     """VLBI Mark 4 format writer.
 
     Encodes and writes sequences of samples to file.
@@ -419,12 +426,13 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase,
 
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
-    def __init__(self, raw, header0=None, sample_rate=None, squeeze=True,
+    def __init__(self, fh_raw, header0=None, sample_rate=None, squeeze=True,
                  **kwargs):
         if header0 is None:
             header0 = Mark4Header.fromvalues(**kwargs)
         super(Mark4StreamWriter, self).__init__(
-            raw, header0, sample_rate=sample_rate, squeeze=squeeze)
+            fh_raw=fh_raw, header0=header0, sample_rate=sample_rate,
+            squeeze=squeeze)
         # Set up initial payload with right shape.
         samples_per_payload = (
             header0.samples_per_frame * header0.payloadsize //

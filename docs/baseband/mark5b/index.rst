@@ -18,7 +18,7 @@ File Structure
 
 Each :term:`data frame` consists of a :term:`header` consisting of four 32-bit
 words (16 bytes) followed by a :term:`payload` of 2500 32-bit words (10000
-bytes).  The header contains a sync word, frame number, and timestamp 
+bytes).  The header contains a sync word, frame number, and timestamp
 (accurate to 1 ms), as well as user-specified data; see Sec. 1 of the
 `design specifications`_ for details.  The payload supports :math:`2^n` bit
 streams, for :math:`0 \leq n \leq 5`, and the first sample of each stream
@@ -57,8 +57,8 @@ normal file reader extended with methods to read a
 MJD) and number of bits per sample must all be passed when using
 `~baseband.mark5b.base.Mark5BFileReader.read_frame`::
 
-    >>> fb = mark5b.open(SAMPLE_MARK5B, 'rb')
-    >>> frame = fb.read_frame(kday=56000, nchan=8)
+    >>> fb = mark5b.open(SAMPLE_MARK5B, 'rb', kday=56000, nchan=8)
+    >>> frame = fb.read_frame()
     >>> frame.shape
     (5000, 8)
     >>> fb.close()

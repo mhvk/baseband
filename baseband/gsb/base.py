@@ -57,31 +57,38 @@ class GSBFileReader(VLBIFileBase):
     """Simple reader for GSB data files.
 
     Adds ``read_payload`` method to the basic VLBI binary file wrapper.
+
+    Parameters
+    ----------
+    payloadsize : int
+        Number of bytes to read.
+    nchan : int, optional
+        Number of channels.  Default: 1.
+    bps : int, optional
+        Bits per elementary sample, i.e. per real or imaginary component
+        for complex data.  Default: 4.
+    complex_data : bool, optional
+        Whether data is complex.  Default: False.
     """
+    def __init__(self, fh_raw, payloadsize, nchan=1, bps=4,
+                 complex_data=False):
+        self.payloadsize = payloadsize
+        self.nchan = nchan
+        self.bps = bps
+        self.complex_data = complex_data
+        super(GSBFileReader, self).__init__(fh_raw)
 
-    def read_payload(self, payloadsize, nchan=1, bps=4, complex_data=False):
+    def read_payload(self):
         """Read a single block.
-
-        Parameters
-        ----------
-        payloadsize : int
-            Number of bytes to read.
-        nchan : int, optional
-            Number of channels.  Default: 1.
-        bps : int, optional
-            Bits per elementary sample, i.e. per real or imaginary component
-            for complex data.  Default: 4.
-        complex_data : bool, optional
-            Whether data is complex.  Default: False.
 
         Returns
         -------
         frame : `~baseband.gsb.GSBPayload`
             With a ``.data`` property that returns the data encoded.
         """
-        return GSBPayload.fromfile(self.fh_raw, payloadsize=payloadsize,
-                                   nchan=nchan, bps=bps,
-                                   complex_data=complex_data)
+        return GSBPayload.fromfile(self.fh_raw, payloadsize=self.payloadsize,
+                                   nchan=self.nchan, bps=self.bps,
+                                   complex_data=self.complex_data)
 
 
 class GSBFileWriter(VLBIFileBase):
@@ -485,10 +492,6 @@ def open(name, mode='rs', **kwargs):
                          "or writing (mode='r' or 'w').")
     fh_attr = 'read' if 'r' in mode else 'write'
     if 't' in mode or 'b' in mode:
-        if kwargs:
-            raise TypeError('got unexpected arguments {}'
-                            .format(kwargs.keys()))
-
         opened_files = []
         if not hasattr(name, fh_attr):
             name = io.open(name, mode.replace('t', '').replace('b', '') + 'b')

@@ -203,11 +203,11 @@ class TestMark5B(object):
         assert payload2 == payload
 
     def test_frame(self, tmpdir):
-        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
+        with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
             fh.seek(0)
-            frame = fh.read_frame(nchan=8, bps=2, kday=56000)
+            frame = fh.read_frame()
 
         assert frame.header == header
         assert frame.payload == payload
@@ -225,13 +225,13 @@ class TestMark5B(object):
         assert frame2 == frame
 
         # Check passing in reference time.
-        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            frame3 = fh.read_frame(nchan=8, bps=2,
-                                   ref_time=Time('2014-06-13 12:00:00'))
+        with mark5b.open(SAMPLE_FILE, 'rb', nchan=8, bps=2,
+                         ref_time=Time('2014-06-13 12:00:00')) as fh:
+            frame3 = fh.read_frame()
         assert frame3 == frame
-        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
-            frame4 = fh.read_frame(nchan=8, bps=2,
-                                   ref_time=Time('2015-12-13 12:00:00'))
+        with mark5b.open(SAMPLE_FILE, 'rb', nchan=8, bps=2,
+                         ref_time=Time('2015-12-13 12:00:00')) as fh:
+            frame4 = fh.read_frame()
         assert frame4 == frame
 
         frame5 = mark5b.Mark5BFrame.fromdata(payload.data, header, bps=2)
@@ -260,7 +260,7 @@ class TestMark5B(object):
         assert np.all(frame9.payload.words == 0x11223344)
 
     def test_header_times(self):
-        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
+        with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
             header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             start_time = header0.time
             samples_per_frame = header0.payloadsize * 8 // 2 // 8
@@ -269,7 +269,7 @@ class TestMark5B(object):
             fh.seek(0)
             while True:
                 try:
-                    frame = fh.read_frame(kday=56000, nchan=8, bps=2)
+                    frame = fh.read_frame()
                 except EOFError:
                     break
                 header_time = frame.header.time
@@ -329,25 +329,22 @@ class TestMark5B(object):
         # Below, the tests set the file pointer to very close to a header,
         # since otherwise they run *very* slow.  This is somehow related to
         # pytest, since speed is not a big issue running stuff on its own.
-        with mark5b.open(SAMPLE_FILE, 'rb') as fh:
+        with mark5b.open(SAMPLE_FILE, 'rb', kday=56000) as fh:
             header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             fh.seek(0)
-            header_0 = fh.find_header(template_header=header0)
+            header_0 = fh.find_header()
             assert fh.tell() == 0
             fh.seek(10000)
-            header_10000f = fh.find_header(template_header=header0,
-                                           forward=True)
+            header_10000f = fh.find_header(forward=True)
             assert fh.tell() == header0.framesize
             fh.seek(16)
-            header_16b = fh.find_header(template_header=header0, forward=False)
+            header_16b = fh.find_header(forward=False)
             assert fh.tell() == 0
             fh.seek(-10000, 2)
-            header_m10000b = fh.find_header(kday=header0.kday,
-                                            framesize=header0.framesize,
-                                            forward=False)
+            header_m10000b = fh.find_header(forward=False)
             assert fh.tell() == 3 * header0.framesize
             fh.seek(-30, 2)
-            header_end = fh.find_header(template_header=header0, forward=True)
+            header_end = fh.find_header(forward=True)
             assert header_end is None
         assert header_16b == header_0
         assert header_10000f['frame_nr'] == 1
@@ -357,22 +354,19 @@ class TestMark5B(object):
             s.write(f.read(10040))
             f.seek(20000)
             s.write(f.read())
-        with mark5b.open(m5_test, 'rb') as fh:
+        with mark5b.open(m5_test, 'rb', kday=header0.kday) as fh:
             fh.seek(0)
-            header_0 = fh.find_header(kday=header0.kday,
-                                      framesize=header0.framesize)
+            header_0 = fh.find_header()
             assert fh.tell() == 0
             fh.seek(10000)
-            header_10000f = fh.find_header(template_header=header0,
-                                           forward=True)
+            header_10000f = fh.find_header(forward=True)
             assert fh.tell() == header0.framesize * 2 - 9960
         # For completeness, also check a really short file...
         with open(m5_test, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
             s.write(f.read(10018))
         with mark5b.open(m5_test, 'rb') as fh:
             fh.seek(10)
-            header_10 = fh.find_header(template_header=header0,
-                                       forward=False)
+            header_10 = fh.find_header(forward=False)
             assert fh.tell() == 0
         assert header_10 == header0
 

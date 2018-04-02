@@ -46,15 +46,15 @@ class VLBIFileBase(object):
         return "{0}(fh_raw={1})".format(self.__class__.__name__, self.fh_raw)
 
 
-class VLBIStreamBase(VLBIFileBase):
+class VLBIStreamBase(object):
     """VLBI file wrapper, allowing access as a stream of data."""
 
     _sample_shape_maker = None
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, squeeze, subset,
-                 fill_value):
-        super(VLBIStreamBase, self).__init__(fh_raw)
+                 unsliced_shape, bps, complex_data, squeeze, subset=(),
+                 fill_value=0.):
+        self.fh_raw = fh_raw
         self._header0 = header0
         self._bps = bps
         self._complex_data = complex_data
@@ -203,6 +203,25 @@ class VLBIStreamBase(VLBIFileBase):
             return self.start_time + self.tell(unit=u.s)
 
         return (self.offset / self.sample_rate).to(unit)
+
+    def __getattr__(self, attr):
+        """Try to get things on the current open file if it is not on self."""
+        if attr in {'readable', 'writable', 'seekable', 'closed', 'name'}:
+            try:
+                return getattr(self.fh_raw, attr)
+            except AttributeError:
+                pass
+        #  __getattribute__ to raise appropriate error.
+        return self.__getattribute__(attr)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def close(self):
+        self.fh_raw.close()
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
@@ -357,9 +376,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek(-self.header0.framesize, 2)
-        last_header = self.find_header(template_header=self.header0,
-                                       maximum=10*self.header0.framesize,
-                                       forward=False)
+        last_header = self.fh_raw.find_header(forward=False)
         self.fh_raw.seek(raw_offset)
         if last_header is None:
             raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
@@ -558,8 +575,8 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             count -= nsample
 
     def _write_frame(self, frame, valid=True):
-        # Default implementation is to assume this is a frame and use
-        # the binary file writer.
+        # Default implementation is to assume this is a frame that can write
+        # the underlying binary file.
         frame.valid = valid
         frame.tofile(self.fh_raw)
 
@@ -618,9 +635,6 @@ def make_opener(fmt, classes, doc='', append_doc=True):
     def open(name, mode='rs', **kwargs):
         if 'b' in mode:
             cls_type = 'File'
-            if kwargs:
-                raise TypeError('got unexpected arguments {}'
-                                .format(kwargs.keys()))
         else:
             cls_type = 'Stream'
 

@@ -196,7 +196,7 @@ class DADAStreamBase(VLBIStreamBase):
             fill_value=0.)
 
 
-class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
+class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
     """DADA format reader.
 
     Allows access to DADA files as a continuous series of samples.
@@ -216,6 +216,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
         components are read.
     """
     def __init__(self, fh_raw, squeeze=True, subset=()):
+        fh_raw = DADAFileReader(fh_raw)
         header0 = DADAHeader.fromfile(fh_raw)
         super(DADAStreamReader, self).__init__(fh_raw, header0,
                                                squeeze=squeeze, subset=subset)
@@ -224,18 +225,18 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase, DADAFileReader):
     def _last_header(self):
         """Header of the last file for this stream."""
         self.fh_raw.seek(-self.header0.framesize, 2)
-        last_frame = self.read_frame(memmap=True)
+        last_frame = self.fh_raw.read_frame(memmap=True)
         return last_frame.header
 
     def _read_frame(self, index):
         self.fh_raw.seek(index * self.header0.framesize)
-        frame = self.read_frame(memmap=True)
+        frame = self.fh_raw.read_frame(memmap=True)
         assert (frame.header['OBS_OFFSET'] - self.header0['OBS_OFFSET'] ==
                 index * self.header0.payloadsize)
         return frame
 
 
-class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
+class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     """DADA format writer.
 
     Encodes and writes sequences of samples to file.
@@ -252,6 +253,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
     """
     def __init__(self, fh_raw, header0, squeeze=True):
         assert header0.get('OBS_OVERLAP', 0) == 0
+        fh_raw = DADAFileWriter(fh_raw)
         super(DADAStreamWriter, self).__init__(fh_raw, header0,
                                                squeeze=squeeze)
 
@@ -259,7 +261,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase, DADAFileWriter):
         header = self.header0.copy()
         header.update(obs_offset=self.header0['OBS_OFFSET'] +
                       index * self.header0.payloadsize)
-        return self.memmap_frame(header)
+        return self.fh_raw.memmap_frame(header)
 
     def _write_frame(self, frame, valid=True):
         assert frame is self._frame

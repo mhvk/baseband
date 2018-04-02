@@ -276,7 +276,7 @@ class VDIFStreamBase(VLBIStreamBase):
                              if self.subset else '')))
 
 
-class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
+class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     """VLBI VDIF format reader.
 
     Allows access to a VDIF file as a continuous series of samples.
@@ -303,17 +303,14 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 
     def __init__(self, fh_raw, sample_rate=None, squeeze=True, subset=(),
                  fill_value=0.):
-        # We use the very first header in the file, since in some VLBA files
+        fh_raw = VDIFFileReader(fh_raw)
+        # We read the first frameset, since we need to know how many threads
+        # there are, and what the frameset size is.
+        # Note that frameset keeps the first header, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
-        header0 = VDIFHeader.fromfile(fh_raw)
-        # TODO: make this a bit less ugly?  Maybe don't read frameset twice?
-        fh_raw.seek(0)
-        # Now also read the first frameset, since we need to know how many
-        # threads there are, and what the frameset size is. For this purpose,
-        # pre-attach the filehandle (it will just get reset anyway).
-        self.fh_raw = fh_raw
-        frameset = self.read_frameset()
+        frameset = fh_raw.read_frameset()
+        header0 = frameset.header0
         thread_ids = [fr['thread_id'] for fr in frameset.frames]
         self._framesetsize = fh_raw.tell()
         super(VDIFStreamReader, self).__init__(
@@ -333,8 +330,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
             # which is needed by the VDIFFrameSet reader.
             self._thread_ids = np.atleast_1d(thread_ids.squeeze()).tolist()
             # Reload the frame set, now only including the requested threads.
-            self.fh_raw.seek(0)
-            frameset = self.read_frameset(self._thread_ids)
+            fh_raw.seek(0)
+            frameset = fh_raw.read_frameset(self._thread_ids)
             # Since we have subset the threads already, we now need to
             # determine a new subset that takes this into account.
             if thread_ids.shape == ():
@@ -403,7 +400,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         maximum = 2 * self._framesetsize
         while not found:
             self.fh_raw.seek(-self.header0.framesize, 1)
-            last_header = self.find_header(
+            last_header = self.fh_raw.find_header(
                 template_header=self.header0,
                 maximum=maximum, forward=False)
             if last_header is None or raw_size - self.fh_raw.tell() > maximum:
@@ -429,8 +426,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
 
     def _read_frame(self, index):
         self.fh_raw.seek(index * self._framesetsize)
-        frameset = self.read_frameset(self._thread_ids,
-                                      edv=self.header0.edv)
+        frameset = self.fh_raw.read_frameset(self._thread_ids,
+                                             edv=self.header0.edv)
         frameset.invalid_data_value = self.fill_value
         assert ((frameset['seconds'] - self.header0['seconds']) *
                 self._framerate +
@@ -438,14 +435,14 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase, VDIFFileReader):
         return frameset
 
 
-class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
+class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
     """VLBI VDIF format writer.
 
     Encodes and writes sequences of samples to file.
 
     Parameters
     ----------
-    raw : filehandle
+    fh_raw : filehandle
         Which will write filled sets of frames to storage.
     header0 : :class:`~baseband.vdif.VDIFHeader`
         Header for the first frame, holding time information, etc.  Can instead
@@ -487,8 +484,9 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
         Extended Data Version.
     """
 
-    def __init__(self, raw, header0=None, sample_rate=None, nthread=1,
+    def __init__(self, fh_raw, header0=None, sample_rate=None, nthread=1,
                  squeeze=True, **kwargs):
+        fh_raw = VDIFFileWriter(fh_raw)
         if header0 is None:
             if sample_rate is not None:
                 kwargs['sample_rate'] = sample_rate
@@ -503,9 +501,8 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
                                  "explicitly, or through the header if it "
                                  "can be stored there.")
 
-        # No frame sets yet exist, so generate a sample shape from values.
         super(VDIFStreamWriter, self).__init__(
-            raw, header0, sample_rate=sample_rate, nthread=nthread,
+            fh_raw, header0, sample_rate=sample_rate, nthread=nthread,
             squeeze=squeeze)
         # Set sample rate in the header, if it's possible, and not set already.
         try:

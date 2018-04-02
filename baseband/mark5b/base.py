@@ -21,23 +21,29 @@ class Mark5BFileReader(VLBIFileBase):
     """Simple reader for Mark 5B files.
 
     Adds ``read_frame`` and ``find_header`` methods to the VLBI file wrapper.
+
+    Parameters
+    ----------
+    kday : int or None
+        Explicit thousands of MJD of the observation time.  Can instead
+        pass an approximate `ref_time`.
+    ref_time : `~astropy.time.Time` or None
+        Reference time within 500 days of the observation time, used to
+        infer the full MJD.  Used only if `kday` is not given.
+    nchan : int, optional
+        Number of channels.   Default: 1.
+    bps : int, optional
+        Bits per elementary sample.  Default: 2.
     """
+    def __init__(self, fh_raw, kday=None, ref_time=None, nchan=1, bps=2):
+        self.kday = kday
+        self.ref_time = ref_time
+        self.nchan = nchan
+        self.bps = bps
+        super(Mark5BFileReader, self).__init__(fh_raw)
 
-    def read_frame(self, kday=None, ref_time=None, nchan=1, bps=2):
+    def read_frame(self):
         """Read a single frame (header plus payload).
-
-        Parameters
-        ----------
-        kday : int or None
-            Explicit thousands of MJD of the observation time.  Can instead
-            pass an approximate `ref_time`.
-        ref_time : `~astropy.time.Time` or None
-            Reference time within 500 days of the observation time, used to
-            infer the full MJD.  Used only if `kday` is not given.
-        nchan : int, optional
-            Number of channels.   Default: 1.
-        bps : int, optional
-            Bits per elementary sample.  Default: 2.
 
         Returns
         -------
@@ -46,50 +52,40 @@ class Mark5BFileReader(VLBIFileBase):
             `~baseband.mark5b.Mark5BHeader` and data encoded in the frame,
             respectively.
         """
-        return Mark5BFrame.fromfile(self.fh_raw, kday=kday, ref_time=ref_time,
-                                    nchan=nchan, bps=bps)
+        return Mark5BFrame.fromfile(self.fh_raw, kday=self.kday,
+                                    ref_time=self.ref_time, nchan=self.nchan,
+                                    bps=self.bps)
 
-    def find_header(self, template_header=None, framesize=None, kday=None,
-                    maximum=None, forward=True):
+    def find_header(self, forward=True, maximum=None):
         """Look for the first occurrence of a frame.
 
-        Search is from the current position.  If given, a template_header
-        is used to initialize the framesize, as well as kday in the header.
+        Search is from the current position.
 
         Parameters
         ----------
-        template_header : :class:`~baseband.mark5b.Mark5BHeader`
-            Template Mark 5B header, from which `kday` and `framesize`
-            are extracted.
-        framesize : int
-            Size of a frame, in bytes.  Required if `template_header` is
-            not given.
-        kday : int, optional
-            Explicit thousands of MJD of the observation time, used to infer
-            the full MJD.  If `template_header` and `kday` are both
-            not given, any header returned will have its `kday` set to `None`.
-        maximum : int, optional
-            Maximum number of bytes to search through.  Default: twice the
-            framesize.
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default: twice the
+            framesize of 10016 bytes.
 
         Returns
         -------
         header : :class:`~baseband.mark5b.Mark5BHeader` or None
             Retrieved Mark 5B header, or `None` if nothing found.
         """
+        framesize = 10016  # This is fixed for Mark 5B.
         fh = self.fh_raw
-        if template_header:
-            kday = template_header.kday
-            framesize = template_header.framesize
+        kday = self.kday
+        ref_time = self.ref_time
         if maximum is None:
             maximum = 2 * framesize
         # Loop over chunks to try to find the frame marker.
         file_pos = fh.tell()
         # First check whether we are right at a frame marker (usually true).
         try:
-            header = Mark5BHeader.fromfile(fh, kday=kday, verify=True)
+            header = Mark5BHeader.fromfile(fh, kday=kday, ref_time=ref_time,
+                                           verify=True)
             fh.seek(-header.size, 1)
             return header
         except AssertionError:
@@ -107,7 +103,8 @@ class Mark5BFileReader(VLBIFileBase):
         for frame in iterate:
             try:
                 fh.seek(frame)
-                header1 = Mark5BHeader.fromfile(fh, kday=kday, verify=True)
+                header1 = Mark5BHeader.fromfile(fh, kday=kday,
+                                                ref_time=ref_time, verify=True)
             except AssertionError:
                 continue
 
@@ -125,7 +122,8 @@ class Mark5BFileReader(VLBIFileBase):
 
             fh.seek(next_frame)
             try:
-                header2 = Mark5BHeader.fromfile(fh, kday=kday, verify=True)
+                header2 = Mark5BHeader.fromfile(fh, kday=kday,
+                                                ref_time=ref_time, verify=True)
             except AssertionError:
                 continue
 
@@ -145,7 +143,6 @@ class Mark5BFileWriter(VLBIFileBase):
 
     Adds ``write_frame`` method to the VLBI binary file wrapper.
     """
-
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
 
@@ -189,8 +186,7 @@ class Mark5BStreamBase(VLBIStreamBase):
                                      self.samples_per_frame).to_value(u.Hz)))
 
 
-class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
-                         Mark5BFileReader):
+class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
     """VLBI Mark 5B format reader.
 
     Allows access a Mark 5B file as a continues series of samples.
@@ -233,12 +229,16 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
             raise ValueError("Mark5B stream reader requires kday or ref_time. "
                              "Please pass either explicitly.")
 
-        header0 = Mark5BHeader.fromfile(fh_raw, ref_time=ref_time, kday=kday)
-        # Go back to start of frame (for possible sample rate detection).
-        fh_raw.seek(0)
+        fh_raw = Mark5BFileReader(fh_raw, nchan=nchan, bps=bps,
+                                  ref_time=ref_time, kday=kday)
+        header0 = fh_raw.find_header()
         super(Mark5BStreamReader, self).__init__(
             fh_raw, header0, sample_rate=sample_rate, nchan=nchan, bps=bps,
             squeeze=squeeze, subset=subset, fill_value=fill_value)
+        # Use ref_time in preference to kday so we can handle files that
+        # span a change in 1000s of MJD.
+        self.fh_raw.kday = None
+        self.fh_raw.ref_time = self.start_time
 
     @lazyproperty
     def _last_header(self):
@@ -251,8 +251,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
 
     def _read_frame(self, index):
         self.fh_raw.seek(index * self.header0.framesize)
-        frame = self.read_frame(nchan=self._unsliced_shape.nchan,
-                                bps=self.bps, ref_time=self.start_time)
+        frame = self.fh_raw.read_frame()
         # Set decoded value for invalid data.
         frame.invalid_data_value = self.fill_value
         # TODO: OK to ignore leap seconds? Not sure what writer does.
@@ -264,15 +263,14 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase,
         return frame
 
 
-class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase,
-                         Mark5BFileWriter):
+class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
     """VLBI Mark 5B format writer.
 
     Encodes and writes sequences of samples to file.
 
     Parameters
     ----------
-    raw : filehandle
+    fh_raw : filehandle
         For writing filled sets of frames to storage.
     header0 : `~baseband.mark5b.Mark5BHeader`
         Header for the first frame, holding time information, etc.  Can instead
@@ -300,15 +298,17 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase,
 
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
-    def __init__(self, raw, header0=None, sample_rate=None, nchan=1, bps=2,
+    def __init__(self, fh_raw, header0=None, sample_rate=None, nchan=1, bps=2,
                  squeeze=True, **kwargs):
         samples_per_frame = Mark5BHeader._payloadsize * 8 // bps // nchan
         if header0 is None:
             if 'time' in kwargs:
                 kwargs['framerate'] = sample_rate / samples_per_frame
             header0 = Mark5BHeader.fromvalues(**kwargs)
+
+        fh_raw = Mark5BFileWriter(fh_raw)
         super(Mark5BStreamWriter, self).__init__(
-            raw, header0, sample_rate=sample_rate, nchan=nchan,
+            fh_raw, header0, sample_rate=sample_rate, nchan=nchan,
             bps=bps, squeeze=squeeze)
         # Initial payload, reused for every frame.
         self._payload = Mark5BPayload(np.zeros((2500,), np.uint32),
