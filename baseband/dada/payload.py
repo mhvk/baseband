@@ -36,7 +36,7 @@ class DADAPayload(VLBIPayloadBase):
     sample_shape : tuple, optional
         Shape of the samples; e.g., (nchan,).  Default: ().
     complex_data : bool, optional
-        Whether data is complex.  Default: `False`.
+        Whether data are complex.  Default: `False`.
     """
     _decoders = {
         8: decode_8bit}

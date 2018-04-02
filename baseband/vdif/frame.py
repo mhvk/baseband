@@ -33,8 +33,8 @@ class VDIFFrame(VLBIFrameBase):
     payload : `~baseband.vdif.VDIFPayload`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool or None
-        Whether the data is valid.  If `None` (default), is inferred from
-        header.  Note that ``header`` is changed in-place if `True` or `False`.
+        Whether the data are valid.  If `None` (default), is inferred from
+        header.  Note that `header` is changed in-place if `True` or `False`.
     verify : bool
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and whether or not data are complex
@@ -56,7 +56,7 @@ class VDIFFrame(VLBIFrameBase):
 
     One can decode part of the payload by indexing or slicing the frame.
     If the frame does not contain valid data, all values returned are set
-    to ``self.invalid_data_value``.
+    to ``self.fill_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, and ``size`` the frame size in bytes.
@@ -188,7 +188,7 @@ class VDIFFrameSet(object):
 
     One can decode part of the payload by indexing or slicing the frame.
     If the frame does not contain valid data, all values returned are set
-    to ``self.invalid_data_value``.
+    to ``self.fill_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, and ``size`` the total size in bytes.  Like a
@@ -343,13 +343,13 @@ class VDIFFrameSet(object):
             f.valid = v
 
     @property
-    def invalid_data_value(self):
-        return self.frames[0].invalid_data_value
+    def fill_value(self):
+        return self.frames[0].fill_value
 
-    @invalid_data_value.setter
-    def invalid_data_value(self, invalid_data_value):
+    @fill_value.setter
+    def fill_value(self, fill_value):
         for frame in self.frames:
-            frame.invalid_data_value = invalid_data_value
+            frame.fill_value = fill_value
 
     def _get_frames(self, item):
         """Get frames and other information required to obtain given item.

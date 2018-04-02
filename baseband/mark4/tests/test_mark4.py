@@ -659,7 +659,7 @@ class TestMark4(object):
             # write in bits and pieces and with some invalid data as well.
             fw.write(record[:11])
             fw.write(record[11:80000])
-            fw.write(record[80000:], invalid_data=True)
+            fw.write(record[80000:], valid=False)
             assert fw.tell(unit='time') == stop_time
 
         with mark4.open(rewritten_file, 'rs', sample_rate=32*u.MHz,

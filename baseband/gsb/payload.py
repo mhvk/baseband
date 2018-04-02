@@ -68,7 +68,7 @@ class GSBPayload(VLBIPayloadBase):
     bps : int, optional
         Bits per elementary sample.  Default: 2.
     complex_data : bool, optional
-        Whether data is complex.  Default: `False`.
+        Whether data are complex.  Default: `False`.
     """
 
     _encoders = {4: encode_4bit,
@@ -95,7 +95,7 @@ class GSBPayload(VLBIPayloadBase):
         Parameters
         ----------
         fh : filehandle or tuple of tuple of filehandle
-            Handles to the sets of files from which data is read.  The outer
+            Handles to the sets of files from which data are read.  The outer
             tuple holds distinct threads, while the inner ones holds parts of
             those threads.  Typically, these are the two polarisations and the
             two parts of each in which phased baseband data are stored.
@@ -106,7 +106,7 @@ class GSBPayload(VLBIPayloadBase):
         bps : int, optional
             Bits per elementary sample.  Default: 4.
         complex_data : bool, optional
-            Whether data is complex.  Default: False.
+            Whether data are complex.  Default: False.
         """
         if hasattr(fh, 'read'):
             return super(GSBPayload,

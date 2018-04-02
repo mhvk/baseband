@@ -113,13 +113,13 @@ class VDIFPayload(VLBIPayloadBase):
         encode the payload.
     header : `~baseband.vdif.VDIFHeader`
         If given, used to infer the number of channels, bps, and whether
-        the data is complex.
+        the data are complex.
     nchan : int, optional
         Number of channels, used if header is not given.  Default: 1.
     bps : int, optional
         Bits per elementary sample, used if header is not given.  Default: 2.
     complex_data : bool, optional
-        Whether the data is complex, used if header is not given.
+        Whether the data are complex, used if header is not given.
         Default: `False`.
     """
     _decoders = {2: decode_2bit,
@@ -157,7 +157,7 @@ class VDIFPayload(VLBIPayloadBase):
             To read data from.
         header : `~baseband.vdif.VDIFHeader`
             Used to infer the payloadsize, number of channels, bits per sample,
-            and whether the data is complex.
+            and whether the data are complex.
         """
         s = fh.read(header.payloadsize)
         if len(s) < header.payloadsize:
@@ -174,7 +174,7 @@ class VDIFPayload(VLBIPayloadBase):
             Values to be encoded.
         header : `~baseband.vdif.VDIFHeader`, optional
             If given, used to infer the encoding, and to verify the number of
-            channels and whether the data is complex.
+            channels and whether the data are complex.
         bps : int, optional
             Bits per elementary sample, used if header is `None`.  Default: 2.
         edv : int, optional
@@ -188,7 +188,7 @@ class VDIFPayload(VLBIPayloadBase):
                 raise ValueError("header is for {0} channels but data has {1}"
                                  .format(header.nchan, data.shape[-1]))
             if header['complex_data'] != complex_data:
-                raise ValueError("header is for {0} data but data is {1}"
+                raise ValueError("header is for {0} data but data are {1}"
                                  .format(*(('complex' if c else 'real') for c
                                            in (header['complex_data'],
                                                complex_data))))

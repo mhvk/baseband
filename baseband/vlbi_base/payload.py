@@ -34,7 +34,7 @@ class VLBIPayloadBase(object):
         Bits per elementary sample, i.e., per channel and per real or
         imaginary component.  Default: 2.
     complex_data : bool
-        Whether the data is complex.  Default: False.
+        Whether the data are complex.  Default: False.
     """
     # Possible fixed payload size.
     _size = None

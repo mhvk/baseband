@@ -160,7 +160,7 @@ class Mark5BFileWriter(VLBIFileBase):
             Ignored if `data` is a `~baseband.mark5b.Mark5BFrame` instance.
             Default: 2.
         valid : bool, optional
-            Whether the data is valid; if `False`, a payload filled with an
+            Whether the data are valid; if `False`, a payload filled with an
             appropriate pattern will be crated.  Ignored if `data` is a
             `~baseband.mark5b.Mark5BFrame` instance.  Default: `True`.
         **kwargs
@@ -253,7 +253,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         self.fh_raw.seek(index * self.header0.framesize)
         frame = self.fh_raw.read_frame()
         # Set decoded value for invalid data.
-        frame.invalid_data_value = self.fill_value
+        frame.fill_value = self.fill_value
         # TODO: OK to ignore leap seconds? Not sure what writer does.
         assert (self._framerate *
                 (frame.seconds - self.header0.seconds +

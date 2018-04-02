@@ -20,19 +20,19 @@ class DADAFrame(VLBIFrameBase):
     payload : `~baseband.dada.DADAPayload`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool, optional
-        Whether this frame contains valid data (default: True).
+        Whether the data are valid.  Default: `True`.
     verify : bool, optional
-        Whether to do basic verification of integrity (default: True)
+        Whether to do basic verification of integrity.  Default: `True`.
 
     Notes
     -----
     DADA files do not support storing whether data are valid or not on disk.
     Hence, this has to be determined independently.  If ``valid=False``, any
-    decoded data is set to ``cls.invalid_data_value`` (by default, 0).
+    decoded data are set to ``cls.fill_value`` (by default, 0).
 
     The Frame can also be instantiated using class methods:
 
-      fromfile : read header and and map or read payload from a filehandle
+      fromfile : read header and map or read payload from a filehandle
 
       fromdata : encode data as payload
 
@@ -65,9 +65,9 @@ class DADAFrame(VLBIFrameBase):
             If `True` (default), use `~numpy.memmap` to map the payload.
             If `False`, just read it from disk.
         valid : bool, optional
-            Whether the data is valid. Note that this cannot be inferred from
-            the header or payload itself.  If `True`, any data read will be
-            set to ``cls.invalid_data_value``.
+            Whether the data are valid (default: `True`). Note that this cannot
+            be inferred from the header or payload itself.  If `False`, any
+            data read will be set to ``cls.fill_value``.
         verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
         """
@@ -90,7 +90,7 @@ class DADAFrame(VLBIFrameBase):
         header : `~baseband.dada.DADAHeader` or None
             If not given, will attempt to generate one using the keywords.
         valid : bool, optional
-            Whether the data is valid (default: `True`). Note that this
+            Whether the data are valid (default: `True`). Note that this
             information cannot be written to disk.
         verify : bool
             Whether or not to do basic assertions that check the integrity.

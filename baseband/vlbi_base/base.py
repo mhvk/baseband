@@ -151,7 +151,7 @@ class VLBIStreamBase(object):
 
     @property
     def complex_data(self):
-        """Whether the data is complex."""
+        """Whether the data are complex."""
         return self._complex_data
 
     @property
@@ -527,7 +527,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
                 new_shape.insert(i + 1, 1)
         return data.reshape(new_shape)
 
-    def write(self, data, invalid_data=False):
+    def write(self, data, valid=True):
         """Write data, buffering by frames as needed.
 
         Parameters
@@ -536,8 +536,8 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             Piece of data to be written, with sample dimensions as given by
             ``sample_shape``. This should be properly scaled to make best use
             of the dynamic range delivered by the encoding.
-        invalid_data : bool, optional
-            Whether the current data is invalid.  Default: `False`.
+        valid : bool, optional
+            Whether the current data are valid.  Default: `True`.
         """
         assert data.shape[1:] == self.sample_shape, (
             "'data' should have trailing shape {}".format(self.sample_shape))
@@ -554,9 +554,9 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             if frame_index != self._frame_index:
                 self._frame = self._make_frame(frame_index)
                 self._frame_index = frame_index
-                self._valid = not invalid_data
+                self._valid = valid
             else:
-                self._valid &= not invalid_data
+                self._valid &= valid
 
             nsample = min(count, len(self._frame) - sample_offset)
             sample_end = sample_offset + nsample
@@ -586,7 +586,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             warnings.warn("closing with partial buffer remaining.  "
                           "Writing padded frame, marked as invalid.")
             self.write(np.zeros((self.samples_per_frame - extra,) +
-                                self.sample_shape), invalid_data=True)
+                                self.sample_shape), valid=False)
             assert self.offset % self.samples_per_frame == 0
         return super(VLBIStreamWriterBase, self).close()
 

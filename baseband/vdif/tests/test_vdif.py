@@ -720,7 +720,7 @@ class TestVDIF(object):
             for i in range(17):
                 fw.write(data)
             # Write an invalid frame.
-            fw.write(data, invalid_data=True)
+            fw.write(data, valid=False)
             # Write 3 frames using pieces.
             fw.write(data[:4])
             fw.write(np.concatenate((data[4:], data, data[:-4]), axis=0))

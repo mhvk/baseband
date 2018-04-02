@@ -68,7 +68,7 @@ class GSBFileReader(VLBIFileBase):
         Bits per elementary sample, i.e. per real or imaginary component
         for complex data.  Default: 4.
     complex_data : bool, optional
-        Whether data is complex.  Default: False.
+        Whether data are complex.  Default: False.
     """
     def __init__(self, fh_raw, payloadsize, nchan=1, bps=4,
                  complex_data=False):
@@ -217,7 +217,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         Bits per elementary sample, i.e. per real or imaginary component for
         complex data.  Default: 4 for rawdump, 8 for phased.
     complex_data : bool, optional
-        Whether data is complex.  Default: `False` for rawdump, `True` for
+        Whether data are complex.  Default: `False` for rawdump, `True` for
         phased.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from decoded
@@ -333,7 +333,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         Bits per elementary sample, i.e. per real or imaginary component for
         complex data.  Default: 4 for rawdump, 8 for phased.
     complex_data : bool, optional
-        Whether data is complex.  Default: `False` for rawdump, `True` for
+        Whether data are complex.  Default: `False` for rawdump, `True` for
         phased.
     squeeze : bool, optional
         If `True` (default), ``write`` accepts squeezed arrays as input, and
@@ -447,7 +447,7 @@ def open(name, mode='rs', **kwargs):
         Bits per elementary sample, i.e. per real or imaginary component for
         complex data.  Default: 4 for rawdump, 8 for phased.
     complex_data : bool, optional
-        Whether data is complex.  Default: `False` for rawdump, `True` for
+        Whether data are complex.  Default: `False` for rawdump, `True` for
         phased.
     squeeze : bool, optional
         If `True` (default) and reading, remove any dimensions of length unity

@@ -383,7 +383,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         self.fh_raw.seek(self._offset0 + index * self.header0.framesize)
         frame = self.fh_raw.read_frame()
         # Set decoded value for invalid data.
-        frame.invalid_data_value = self.fill_value
+        frame.fill_value = self.fill_value
         # TODO: add check that we got the right frame.
         return frame
 
