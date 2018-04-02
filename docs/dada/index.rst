@@ -14,7 +14,7 @@ Usage
 =====
 
 This section covers reading and writing DADA files with Baseband; general usage
-is covered in the :ref:`Using Baseband <using_baseband_toc>` section.  The
+is covered in the :ref:`Getting Started <getting_started>` section.  The
 examples below use the sample file ``baseband/data/sample.dada``, and the
 the `astropy.units` and `baseband.dada` modules::
 

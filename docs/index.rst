@@ -8,19 +8,17 @@ Welcome to the Baseband documentation! Baseband is a package for reading and
 writing VLBI and other radio baseband files, with the aim of simplifying and
 streamlining data conversion and standardization.  It provides:
 
-- File input/output functions for supported radio baseband formats, listed under
+- File input/output objects for supported radio baseband formats, enabling
+  selective decoding of data into `Numpy arrays <numpy.ndarray>`, and encoding
+  user-defined arrays into baseband formats. Supported formats are listed under
   :ref:`specific file formats <specific_file_formats_toc>`.
-- Data container classes for supported formats, which can be used for accessing
-  and manipulating data samples and for generating baseband formats from
-  user-defined data.  The latter functionality can be used for converting
-  between file formats.
-- Classes for reading from and writing to an ordered sequence of files as if
-  it was a single file.
+- Helper objects for reading from and writing to an ordered sequence of files
+  as if it was a single file.
 
-.. _using_baseband_toc:
+.. _overview_toc:
 
-Basics
-======
+Overview
+========
 
 .. toctree::
    :maxdepth: 1
@@ -75,3 +73,13 @@ format extensions such as VDIF EDV.
    :maxdepth: 1
 
    tutorials/new_edv
+
+.. _project_details_toc:
+
+Project details
+===============
+
+.. toctree::
+   :maxdepth: 1
+
+   authors_for_sphinx
