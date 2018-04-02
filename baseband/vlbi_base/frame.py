@@ -178,6 +178,10 @@ class VLBIFrameBase(object):
     def keys(self):
         return self.header.keys()
 
+    def _ipython_key_completions_(self):
+        # Enables tab-completion of header keys in IPython.
+        return self.header.keys()
+
     def __contains__(self, key):
         return key in self.keys()
 

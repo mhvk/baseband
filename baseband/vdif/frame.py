@@ -483,6 +483,10 @@ class VDIFFrameSet(object):
     def keys(self):
         return self.header0.keys()
 
+    def _ipython_key_completions_(self):
+        # Enables tab-completion of header keys in IPython.
+        return self.keys()
+
     def __contains__(self, key):
         return key in self.header0
 
