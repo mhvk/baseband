@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for VLBI VDIF Headers.
 
@@ -42,9 +43,9 @@ class VDIFHeaderMeta(type):
     dict.  Checks for keyword and subclass conflicts before registering.
 
     This metaclass automatically registers any subclass of
-    ``~baseband.vdif.header.VDIFHeader``.  This feature can be used to insert
-    new EDV types into ``VDIF_HEADER_CLASSES``; see the :ref:`New VDIF EDV
-    <new_edv>` tutorial.
+    `~baseband.vdif.VDIFHeader`. This feature can be used to insert new EDV
+    types into ``VDIF_HEADER_CLASSES``; see the :ref:`New VDIF EDV <new_edv>`
+    tutorial.
     """
     _registry = VDIF_HEADER_CLASSES
 
@@ -54,7 +55,7 @@ class VDIFHeaderMeta(type):
         if name not in ('VDIFHeader', 'VDIFBaseHeader',
                         'VDIFSampleRateHeader'):
 
-            # Extract edv from class; convert to -1 if edv == False
+            # Extract edv from class; convert to -1 if edv is False
             # for VDIFLegacy
             edv = cls._edv
             if edv is False:
@@ -84,8 +85,8 @@ class VDIFHeader(VLBIHeaderBase):
     ----------
     words : tuple of int, or None
         Eight (or four for legacy VDIF) 32-bit unsigned int header words.
-        If ``None``, set to a tuple of zeros for later initialisation.
-    edv : int, False, or None
+        If `None`, set to a tuple of zeros for later initialisation.
+    edv : int, False, or None, optional
         Extended data version.  If `False`, a legacy header is used.
         If `None` (default), it is determined from the header.  (Given it
         explicitly is mostly useful for a slight speed-up.)
@@ -94,7 +95,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     Returns
     -------
-    header : `VDIFHeader` subclass
+    header : `~baseband.vdif.VDIFHeader` subclass
         As appropriate for the extended data version.
     """
 
@@ -147,11 +148,11 @@ class VDIFHeader(VLBIHeaderBase):
         ----------
         fh : filehandle
             To read data from.
-        edv : int, `False`, or `None`
+        edv : int, False, or None, optional
             Extended data version.  If `False`, a legacy header is used.
             If `None` (default), it is determined from the header.  (Given it
             explicitly is mostly useful for a slight speed-up.)
-        verify : bool
+        verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
         """
         # Assume non-legacy header to ensure those are done fastest.
@@ -177,9 +178,9 @@ class VDIFHeader(VLBIHeaderBase):
         Here, the parsed values must be given as keyword arguments, i.e., for
         any ``header = cls(<data>)``, ``cls.fromvalues(**header) == header``.
 
-        However, unlike for the :meth:`VDIFHeader.fromkeys` class method, data
-        can also be set using arguments named after methods such as ``bps`` and
-        ``time``.
+        However, unlike for the :meth:`~baseband.vdif.VDIFHeader.fromkeys`
+        class method, data can also be set using arguments named after methods
+        such as ``bps`` and ``time``.
 
         Given defaults for standard header keywords:
 
@@ -226,8 +227,8 @@ class VDIFHeader(VLBIHeaderBase):
     def fromkeys(cls, **kwargs):
         """Initialise a header from parsed values.
 
-        Like :meth:`VDIFHeader.fromvalues`, but without any interpretation of
-        keywords.
+        Like :meth:`~baseband.vdif.VDIFHeader.fromvalues`, but without any
+        interpretation of keywords.
 
         Raises
         ------
@@ -250,12 +251,12 @@ class VDIFHeader(VLBIHeaderBase):
 
         Parameters
         ----------
-        mark5b_header : Mark5BHeader
+        mark5b_header : `~baseband.mark5b.Mark5BHeader`
             Used to set time, etc.
         bps : int
-            bits per sample.
+            Bits per elementary sample.
         nchan : int
-            Number of channels carried in the Mark 5B paylod.
+            Number of channels carried in the Mark 5B payload.
         **kwargs
             Any further arguments.  Strictly, none are necessary to create a
             valid VDIF header, but this can be used to pass on, e.g.,
@@ -276,7 +277,7 @@ class VDIFHeader(VLBIHeaderBase):
             self.verify()
         return self
 
-    # properties common to all VDIF headers.
+    # Properties common to all VDIF headers.
     @property
     def edv(self):
         """VDIF Extended Data Version (EDV)."""
@@ -358,7 +359,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     def get_time(self, sample_rate=None, frame_nr=None):
         """
-        Convert ref_epoch, seconds, and frame_nr to Time object.
+        Converts ref_epoch, seconds, and frame_nr to Time object.
 
         Uses 'ref_epoch', which stores the number of half-years from 2000,
         and 'seconds'.  By default, it also calculates the offset using
@@ -382,7 +383,7 @@ class VDIFHeader(VLBIHeaderBase):
 
         Returns
         -------
-        `~astropy.time.Time`
+        time : `~astropy.time.Time`
         """
         if frame_nr is None:
             frame_nr = self['frame_nr']
@@ -404,7 +405,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     def set_time(self, time, sample_rate=None, frame_nr=None):
         """
-        Convert Time object to ref_epoch, seconds, and frame_nr.
+        Converts Time object to ref_epoch, seconds, and frame_nr.
 
         For non-integer seconds, the frame_nr will be calculated if not given
         explicitly. This requires the frame rate, which is calculated from the
@@ -413,7 +414,7 @@ class VDIFHeader(VLBIHeaderBase):
 
         Parameters
         ----------
-        time : Time instance
+        time : `~astropy.time.Time`
             The time to use for this header.
         sample_rate : `~astropy.units.Quantity`, optional
             For calculating the ``frame_nr`` from the fractional seconds.
@@ -683,7 +684,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
 
         Returns
         -------
-        `~astropy.time.Time`
+        time : `~astropy.time.Time`
         """
         if sample_rate is None and frame_nr is None:
             # Get fractional second from the Mark 5B part of the header.

@@ -49,9 +49,9 @@ def stream2words(stream, track=None):
 
     Parameters
     ----------
-    stream : array of int
+    stream : `~numpy.array` of int
         For each int, every bit corresponds to a particular track.
-    track : int, array, or None
+    track : int, array, or None, optional
         The track to extract.  If `None` (default), extract all tracks that
         the type of int in the stream can hold.
     """
@@ -69,17 +69,17 @@ def words2stream(words):
 
     Parameters
     ----------
-    words : array of uint32
+    words : `~numpy.array` of uint32
 
     Returns
     -------
-    stream : array of int
+    stream : `~numpy.array` of int
         For each int, every bit corresponds to a particular track.
     """
     ntrack = words.shape[1]
     dtype = MARK4_DTYPES[ntrack]
     nbits = words.dtype.itemsize * 8
-    bit = np.arange(nbits-1, -1, -1, dtype=words.dtype).reshape(-1, 1)
+    bit = np.arange(nbits - 1, -1, -1, dtype=words.dtype).reshape(-1, 1)
 
     bit_sel = ((words[:, np.newaxis, :] >> bit) & 1).astype(dtype[1:])
     bit_sel <<= np.arange(ntrack, dtype=dtype[1:])
@@ -96,17 +96,20 @@ class Mark4TrackHeader(VLBIHeaderBase):
     Parameters
     ----------
     words : tuple of int, or None
-        Five 32-bit unsigned int header words.  If ``None``, set to a list
+        Five 32-bit unsigned int header words.  If `None`, set to a list
         of zeros for later initialisation.
-    decade : int, or None, optional
+    decade : int or None
         Decade in which the observations were taken (needed to remove ambiguity
-        in the Mark 4 time stamp).
-    verify : bool
+        in the Mark 4 time stamp).  Can instead pass an approximate `ref_time`.
+    ref_time : `~astropy.time.Time` or None
+        Reference time within 4 years of the observation time, used to infer
+        the full Mark 4 timestamp.  Used only if `decade` is not given.
+    verify : bool, optional
         Whether to do basic verification of integrity.  Default: `True`.
 
     Returns
     -------
-    header : Mark4TrackHeader instance.
+    header : `~baseband.mark4.header.Mark4TrackHeader`
     """
 
     _header_parser = HeaderParser(
@@ -205,8 +208,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
                                           .astype(np.int32))
 
     def get_time(self):
-        """
-        Convert BCD time code to Time object.
+        """Convert BCD time code to Time object.
 
         Uses bcd-encoded 'unit_year', 'day', 'hour', 'minute', 'second' and
         'frac_sec', plus ``decade`` from the initialisation to calculate the
@@ -245,23 +247,23 @@ class Mark4Header(Mark4TrackHeader):
 
     Parameters
     ----------
-    words : ndarray of int, or None
+    words : `~numpy.ndarray` of int, or None
         Shape should be (5, number-of-tracks), and dtype np.uint32.  If `None`,
         ``ntrack`` should be given and words will be initialized to 0.
-    decade : int, or None, optional
+    ntrack : None or int
+        Number of Mark 4 bitstreams, to help initialize ``words`` if needed.
+    decade : int or None
         Decade in which the observations were taken (needed to remove ambiguity
         in the Mark 4 time stamp).  Can instead pass an approximate `ref_time`.
-    ref_time : `~astropy.time.Time`, or None, optional
+    ref_time : `~astropy.time.Time` or None
         Reference time within 4 years of the observation time, used to infer
-        the full Mark 4 timestamp.  Used only if `decade` is ``None``.
-    verify : bool
+        the full Mark 4 timestamp.  Used only if `decade` is not given.
+    verify : bool, optional
         Whether to do basic verification of integrity.  Default: `True`.
-    ntrack : None or int
-        To help initialize ``words`` if needed.
 
     Returns
     -------
-    header : Mark4Header instance.
+    header : `~baseband.mark4.Mark4Header` instance.
     """
 
     _track_header = Mark4TrackHeader
@@ -375,13 +377,13 @@ class Mark4Header(Mark4TrackHeader):
             To read header from.
         ntrack : int
             Number of Mark 4 bitstreams.
-        decade : int, or None, optional
+        decade : int or None
             Decade in which the observations were taken.  Can instead pass an
-            approximate `ref_time`.
-        ref_time : `~astropy.time.Time`, or None, optional
+            approximate ``ref_time``.
+        ref_time : `~astropy.time.Time` or None
             Reference time within 4 years of the observation time.  Used only
-            if `decade` is ``None``.
-        verify : bool
+            if ``decade`` is not given.
+        verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
         """
         dtype = cls._stream_dtype(ntrack)
@@ -415,12 +417,12 @@ class Mark4Header(Mark4TrackHeader):
         ----------
         ntrack : int
             Number of Mark 4 bitstreams.
-        decade : int, or None, optional
-            Decade in which the observations were taken.  Not needed if
-            ``time`` is given.  Can instead pass an approximate `ref_time`.
-        ref_time : `~astropy.time.Time`, or None, optional
-            Reference time within 4 years of the observation time.  Not needed
-            if ``time`` is given, and used only if `decade` is ``None``.
+        decade : int or None, optional
+            Decade in which the observations were taken.  Can instead pass an
+            approximate ``ref_time``.  Not needed if ``time`` is given.
+        ref_time : `~astropy.time.Time` or None, optional
+            Reference time within 4 years of the observation time.  Used only
+            if `decade` is not given, and not needed if ``time`` is given.
         **kwargs :
             Values used to initialize header keys or methods.
 
@@ -429,7 +431,7 @@ class Mark4Header(Mark4TrackHeader):
         time : `~astropy.time.Time` instance
             Time of the first sample.
         bps : int
-            Bits per sample.
+            Bits per elementary sample.
         fanout : int
             Number of tracks over which a given channel is spread out.
         """
@@ -460,7 +462,7 @@ class Mark4Header(Mark4TrackHeader):
 
         Parameters
         ----------
-        crc : int or `None`, optional
+        crc : int or None, optional
             If `None` (default), recalculate the CRC after updating.
         verify : bool, optional
             If `True` (default), verify integrity after updating.
@@ -661,8 +663,7 @@ class Mark4Header(Mark4TrackHeader):
         self['converter_id'] = converter_id
 
     def get_time(self):
-        """
-        Convert BCD time code to Time object for all tracks.
+        """Convert BCD time code to Time object for all tracks.
 
         If all tracks have the same fractional seconds, only a single Time
         instance is returned.

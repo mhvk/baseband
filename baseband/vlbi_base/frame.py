@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Base definitions for VLBI frames, used for VDIF and Mark 5B.
 
@@ -19,10 +20,10 @@ class VLBIFrameBase(object):
 
     Parameters
     ----------
-    header : VLBIHeaderBase
+    header : `baseband.vlbi_base.header.VLBIHeaderBase`
         Wrapper around the encoded header words, providing access to the
         header information.
-    payload : VLBIPayloadBase
+    payload : `~baseband.vlbi_base.payload.VLBIPayloadBase`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool
         Whether this frame contains valid data (default: True).
@@ -109,9 +110,9 @@ class VLBIFrameBase(object):
 
         Parameters
         ----------
-        data : ndarray
+        data : `~numpy.ndarray`
             Array holding data to be encoded.
-        header : VLBIHeaderBase
+        header : `~baseband.vlbi_base.header.VLBIHeaderBase`
             Header for the frame.
         *args, **kwargs :
             Any arguments beyond the filehandle are used to help initialize the

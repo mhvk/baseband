@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for VLBI VDIF frames and frame sets.
 
@@ -26,14 +27,14 @@ class VDIFFrame(VLBIFrameBase):
 
     Parameters
     ----------
-    header : VDIFHeader
+    header : `~baseband.vdif.VDIFHeader`
         Wrapper around the encoded header words, providing access to the
         header information.
-    payload : VDIFPayload
+    payload : `~baseband.vdif.VDIFPayload`
         Wrapper around the payload, provding mechanisms to decode it.
-    valid : bool or `None`
-        Whether the data is valid.  If `None` (default), inferred from header.
-        Note that header is changed in-place if `True` or `False`.
+    valid : bool or None
+        Whether the data is valid.  If `None` (default), is inferred from
+        header.  Note that ``header`` is changed in-place if `True` or `False`.
     verify : bool
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and whether or not data are complex
@@ -107,10 +108,10 @@ class VDIFFrame(VLBIFrameBase):
         ----------
         fh : filehandle
             From which the header and payload are read.
-        edv : int, False, or None.
-            VDIF Extended Data Version.  ``False`` is for legacy headers.
-            If ``None``, it will be determined from the words itself.
-        verify : bool
+        edv : int, False, or None, optional
+            Extended Data Version.  `False` is for legacy headers.  If `None`
+            (default), it will be determined from the words themselves.
+        verify : bool, optional
             Whether or not to do basic assertions that check the integrity
             (e.g., that channel information and whether or not data are complex
             are consistent between header and data).  Default: `True`.
@@ -125,14 +126,16 @@ class VDIFFrame(VLBIFrameBase):
 
         Parameters
         ----------
-        data : ndarray
+        data : `~numpy.ndarray`
             Array holding complex or real data to be encoded.
-        header : VDIFHeader or None
-            If `None`, it will be attemtped to create one using the keywords.
-        verify : bool
+        header : `~baseband.vdif.VDIFHeader` or None
+            If not given, will attempt to generate one using the keywords.
+        verify : bool, optional
             Whether or not to do basic assertions that check the integrity
             (e.g., that channel information and whether or not data are complex
             are consistent between header and data). Default: `True`.
+        **kwargs
+            If `header` is not given, these are used to initialize one.
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)
@@ -163,12 +166,17 @@ class VDIFFrameSet(object):
 
     Parameters
     ----------
-    frames : list of VDIFFrame instances
+    frames : list of `~baseband.vdif.VDIFFrame`
         Should all cover the same time span.
+    header0 : `~baseband.vdif.VDIFHeader`
+        First header of the frame set.  If `None` (default), is extracted from
+        `frames[0]`.
 
+    Notes
+    -----
     The FrameSet can also be read instantiated using class methods:
 
-      fromfile : read frames from a filehandle, optionally selecting threads.
+      fromfile : read frames from a filehandle, optionally selecting threads
 
       fromdata : encode data as a set of frames
 
@@ -207,22 +215,22 @@ class VDIFFrameSet(object):
         fh : filehandle
             Handle to the VDIF file.  Should be at the location where the
             frames are read from.
-        thread_ids : list or None
-            The thread ids that should be read.  If `None`, continue reading
-            threads as long as the frame number does not increase.
-        edv : int or None
-            The expected extended data version for the VDIF Header.  If not
-            given, use that of the first frame.  (Passing it in slightly
+        thread_ids : list or None, optional
+            The thread ids that should be read.  If `None` (default), continue
+            reading threads as long as the frame number does not increase.
+        edv : int or None, optional
+            The expected extended data version for the VDIF Header.  If `None`
+            (default), use that of the first frame.  (Passing it in slightly
             improves file integrity checking.)
-        verify : bool
+        verify : bool, optional
             Whether to do (light) sanity checks on the header. Default: True.
 
         Returns
         -------
-        frameset : VDIFFrameSet instance
+        frameset : `~baseband.vdif.VDIFFrameSet`
             Its ``frames`` property holds a list of frames (in order of either
             their ``thread_id`` or following the input ``thread_ids`` list).
-            Use the ''data'' attribute to convert to an array.
+            Use the ``data`` attribute to convert to an array.
         """
         header0 = VDIFHeader.fromfile(fh, edv, verify)
         edv = header0.edv
@@ -270,17 +278,19 @@ class VDIFFrameSet(object):
 
         Parameters
         ----------
-        data : ndarray
+        data : `~numpy.ndarray`
             Array holding complex or real data to be encoded.  Dimensions
             should be (samples_per_frame, nthread, nchan).
-        headers : list of VDIFHeader instances, VDIFHeader or None
+        headers : `~baseband.vdif.VDIFHeader`, list of same, or None
             If a single header, a list with increasing ``thread_id`` is
-            generated. If `None`, it is attempted to generate a header from
+            generated.  If not given, will attempt to generate a header from
             the keyword arguments.
         verify : bool
             Whether or not to do basic assertions that check the integrety
             (e.g., that channel information and whether or not data are complex
-            are consistent between header and data).
+            are consistent between header and data).  Default: `True`.
+        **kwargs
+            If `header` is not given, these are used to initialize one.
 
         Returns
         -------
@@ -338,9 +348,9 @@ class VDIFFrameSet(object):
         Parameters
         ----------
         item : int, slice, or tuple
-            Sample indices.  Int represents a single sample, slice
-            a sample range, and tuple of ints/slices a range for
-            multi-frame and multi-channel data.
+            Sample indices.  An int represents a single sample, a slice a
+            sample range, and a tuple of ints/slices a range for multi-frame
+            and multi-channel data.
 
         Returns
         -------
@@ -357,7 +367,7 @@ class VDIFFrameSet(object):
         Notes
         -----
         The sample part of ``item`` is restricted to (tuples of) ints or slices,
-        so one cannot access non-contiguous samples using fancy indexing.
+        so one cannot access non-contiguous samples using advanced indexing.
         Futhermore, if ``item`` is a slice, a negative increment cannot be used.
         The function is unable to parse payloads whose words have unused space
         (eg. VDIF files with 20 bits/sample).

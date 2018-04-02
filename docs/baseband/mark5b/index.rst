@@ -58,7 +58,7 @@ MJD) and number of bits per sample must all be passed when using
 `~baseband.mark5b.base.Mark5BFileReader.read_frame`::
 
     >>> fb = mark5b.open(SAMPLE_MARK5B, 'rb')
-    >>> frame = fb.read_frame(nchan=8, kday=56000)
+    >>> frame = fb.read_frame(kday=56000, nchan=8)
     >>> frame.shape
     (5000, 8)
     >>> fb.close()
@@ -72,7 +72,7 @@ Opening as a stream wraps the low-level routines such that reading and writing
 is in units of samples.  It also provides access to header information.  Here,
 we also must provide ``nchan``, ``sample_rate``, and ``ref_time`` or ``kday``::
 
-    >>> fh = mark5b.open(SAMPLE_MARK5B, 'rs', nchan=8, sample_rate=32*u.MHz,
+    >>> fh = mark5b.open(SAMPLE_MARK5B, 'rs', sample_rate=32*u.MHz, nchan=8,
     ...                  ref_time=Time('2014-06-13 12:00:00'))
     >>> fh
     <Mark5BStreamReader name=... offset=0
@@ -91,12 +91,12 @@ When writing to file, we again need to pass in ``sample_rate`` and ``nchan``,
 though time can either be passed explicitly or inferred from the header::
 
 
-    >>> fw = mark5b.open('test.m5b', 'ws', header=header0, nchan=8,
-    ...                  sample_rate=32*u.MHz)
+    >>> fw = mark5b.open('test.m5b', 'ws', header0=header0,
+    ...                  sample_rate=32*u.MHz, nchan=8)
     >>> fw.write(d)
     >>> fw.close()
-    >>> fh = mark5b.open('test.m5b', 'rs', nchan=8, sample_rate=32*u.MHz,
-    ...                  kday=57000)
+    >>> fh = mark5b.open('test.m5b', 'rs', sample_rate=32*u.MHz,
+    ...                  kday=57000, nchan=8)
     >>> np.all(fh.read() == d)
     True
     >>> fh.close()

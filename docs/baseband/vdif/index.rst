@@ -77,7 +77,7 @@ information::
     <VDIFStreamReader name=... offset=0
         sample_rate=32.0 MHz, samples_per_frame=20000,
         sample_shape=SampleShape(nthread=8),
-        complex_data=False, bps=2, edv=3, station=65532,
+        bps=2, complex_data=False, edv=3, station=65532,
         start_time=2014-06-16T05:56:07.000000000>
     >>> d = fh.read(12)
     >>> d.shape
@@ -91,10 +91,10 @@ coincidentally, what is given by the reader above suffices::
 
 
     >>> from astropy.time import Time
-    >>> fw = vdif.open('try.vdif', 'ws',
-    ...                nthread=2, samples_per_frame=20000, nchan=1,
-    ...                sample_rate=32*u.MHz, complex_data=False, bps=2, edv=3,
-    ...                station=65532, time=Time('2014-06-16T05:56:07.000000000'))
+    >>> fw = vdif.open('try.vdif', 'ws', sample_rate=32*u.MHz,
+    ...                samples_per_frame=20000, nchan=1, nthread=2,
+    ...                complex_data=False, bps=2, edv=3, station=65532,
+    ...                time=Time('2014-06-16T05:56:07.000000000'))
     >>> with vdif.open(SAMPLE_VDIF, 'rs', subset=[1, 3]) as fh:
     ...    d = fh.read(20000)  # Get some data to write
     >>> fw.write(d)
@@ -119,7 +119,7 @@ be identical::
 For small files, one could just do::
 
     >>> with vdif.open(SAMPLE_VDIF, 'rs') as fr, \
-    ...         vdif.open('try.vdif', 'ws', header=fr.header0,
+    ...         vdif.open('try.vdif', 'ws', header0=fr.header0,
     ...                   sample_rate=fr.sample_rate,
     ...                   nthread=fr.sample_shape.nthread) as fw:
     ...     fw.write(fr.read())

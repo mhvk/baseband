@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 #
 # __      __  _____    _   _____
 # \ \    / / | ___ \  | | |   __|

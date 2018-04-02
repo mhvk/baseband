@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import pytest
@@ -180,7 +180,7 @@ class TestMark4(object):
             header[65]
         with pytest.raises(ValueError):
             header[np.array([[0, 1], [2, 3]])]
-        # check that one can construct crazy headers, even if not much works.
+        # Check that one can construct crazy headers, even if not much works.
         header13 = mark4.Mark4Header(None, ntrack=53, decade=2010,
                                      verify=False)
         header13.time = header.time
@@ -239,7 +239,7 @@ class TestMark4(object):
         assert payload.size == (20000 - 160) * 64 // 8
         assert len(payload) == (20000 - 160) * 4
         assert payload.shape == ((20000 - 160) * 4, 8)
-        # Check sample shape validity
+        # Check sample shape validity.
         assert payload.sample_shape == (8,)
         assert payload.sample_shape.nchan == 8
         assert payload.dtype == np.float32
@@ -583,8 +583,8 @@ class TestMark4(object):
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
 
-        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
-                        sample_rate=32*u.MHz) as fh:
+        with mark4.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010) as fh:
             assert header == fh.header0
             assert fh.samples_per_frame == 80000
             assert fh.size == 2 * fh.samples_per_frame
@@ -647,8 +647,8 @@ class TestMark4(object):
 
         assert np.all(record4 == record2)
 
-        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
-                        sample_rate=32*u.MHz) as fh:
+        with mark4.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010) as fh:
             start_time = fh.time
             record = fh.read()
             fh_raw_tell1 = fh.fh_raw.tell()
@@ -664,8 +664,8 @@ class TestMark4(object):
             fw.write(record[80000:], invalid_data=True)
             assert fw.tell(unit='time') == stop_time
 
-        with mark4.open(rewritten_file, 'rs', ntrack=64, decade=2010,
-                        sample_rate=32*u.MHz, subset=[3, 4]) as fh:
+        with mark4.open(rewritten_file, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010, subset=[3, 4]) as fh:
             assert fh.time == start_time
             assert fh.time == fh.tell(unit='time')
             assert fh.sample_rate == 32 * u.MHz
@@ -678,7 +678,8 @@ class TestMark4(object):
         # Check files can be made byte-for-byte identical.  Here, we use the
         # original header so we set stuff like head_stack, etc.
         with open(str(tmpdir.join('test.m4')), 'w+b') as s, \
-                mark4.open(s, 'ws', header=header, sample_rate=32*u.MHz) as fw:
+                mark4.open(s, 'ws', header0=header,
+                           sample_rate=32*u.MHz) as fw:
             fw.write(record)
             number_of_bytes = s.tell()
             assert number_of_bytes == fh_raw_tell1 - 0xa88
@@ -691,8 +692,8 @@ class TestMark4(object):
                 assert conv_bytes == orig_bytes
 
         # Test that squeeze attribute works on read (including in-place read).
-        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64,
-                        subset=0, decade=2010) as fh:
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
+                        subset=0) as fh:
             assert fh.sample_shape == ()
             assert fh.read(1).shape == (1,)
             fh.seek(0)
@@ -721,8 +722,8 @@ class TestMark4(object):
             # write in bits and pieces and with some invalid data as well.
             fw.write(record)
 
-        with mark4.open(decadal_file, 'rs', ntrack=64, decade=2010,
-                        sample_rate=32*u.MHz) as fh:
+        with mark4.open(decadal_file, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010) as fh:
             assert abs(fh.start_time - start_time) < 1. * u.ns
             assert fh.header0.decade == 2010
             record6 = fh.read()
@@ -739,14 +740,14 @@ class TestMark4(object):
         with catch_warnings(UserWarning) as w:
             with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fr:
                 record = fr.read(10)
-                with mark4.open(m4_incomplete, 'ws', header=fr.header0,
-                                ntrack=64, decade=2010,
-                                sample_rate=32*u.MHz) as fw:
+                with mark4.open(m4_incomplete, 'ws', header0=fr.header0,
+                                sample_rate=32*u.MHz,
+                                ntrack=64, decade=2010) as fw:
                     fw.write(record)
         assert len(w) == 1
         assert 'partial buffer' in str(w[0].message)
-        with mark4.open(m4_incomplete, 'rs', ntrack=64, decade=2010,
-                        sample_rate=32*u.MHz, fill_value=fill_value) as fwr:
+        with mark4.open(m4_incomplete, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010, fill_value=fill_value) as fwr:
             assert np.all(fwr.read() == fill_value)
             assert fwr.fill_value == fill_value
 
@@ -764,8 +765,8 @@ class TestMark4(object):
             # With too many payload samples for one frame, f2.find_frame
             # will fail.
             with pytest.raises(AssertionError):
-                f2 = mark4.open(s, 'rs', ntrack=64, decade=2010,
-                                sample_rate=32*u.MHz)
+                f2 = mark4.open(s, 'rs', sample_rate=32*u.MHz,
+                                ntrack=64, decade=2010)
 
         with mark4.open(SAMPLE_FILE, 'rb') as fh, \
                 open(str(tmpdir.join('test.m4')), 'w+b') as s:
@@ -778,8 +779,8 @@ class TestMark4(object):
             for i in range(15):
                 frame1.payload.tofile(s)
             s.seek(0)
-            with mark4.open(s, 'rs', ntrack=64, decade=2010,
-                            sample_rate=32*u.MHz) as f2:
+            with mark4.open(s, 'rs', sample_rate=32*u.MHz,
+                            ntrack=64, decade=2010) as f2:
                 assert f2.header0 == frame0.header
                 with pytest.raises(ValueError):
                     f2._last_header
@@ -816,8 +817,8 @@ class Test32TrackFanout4():
         assert header1 == header
 
     def test_file_streamer(self, tmpdir):
-        with mark4.open(SAMPLE_32TRACK, 'rs', ntrack=32, decade=2010,
-                        sample_rate=32*u.MHz) as fh:
+        with mark4.open(SAMPLE_32TRACK, 'rs', sample_rate=32*u.MHz,
+                        ntrack=32, decade=2010) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 80000
             assert fh.sample_rate == 32 * u.MHz
@@ -836,14 +837,14 @@ class Test32TrackFanout4():
              [1, 3, 1, 3]]))
 
         fl = str(tmpdir.join('test.m4'))
-        with mark4.open(fl, 'ws', header=header0, sample_rate=32*u.MHz) as fw:
+        with mark4.open(fl, 'ws', header0=header0, sample_rate=32*u.MHz) as fw:
             fw.write(record)
             number_of_bytes = fw.fh_raw.tell()
             assert number_of_bytes == fh_raw_tell1 - 9656
 
         # Note: this test would not work if we wrote only a single record.
-        with mark4.open(fl, 'rs', ntrack=32, decade=2010,
-                        sample_rate=32*u.MHz) as fh:
+        with mark4.open(fl, 'rs', sample_rate=32*u.MHz,
+                        ntrack=32, decade=2010) as fh:
             assert fh.start_time == start_time
             record2 = fh.read(1000)
             assert np.all(record2 == record[:1000])
@@ -878,8 +879,8 @@ class Test32TrackFanout2():
         assert header1 == header
 
     def test_file_streamer(self, tmpdir):
-        with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rs', ntrack=32, decade=2010,
-                        sample_rate=16*u.MHz) as fh:
+        with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rs', sample_rate=16*u.MHz,
+                        ntrack=32, decade=2010) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 40000
             assert fh.sample_rate == 16 * u.MHz
@@ -898,7 +899,7 @@ class Test32TrackFanout2():
              [-1, -3, -1, 1, -1, 1, -1, 1]]))
 
         fl = str(tmpdir.join('test.m4'))
-        with mark4.open(fl, 'ws', header=header0, sample_rate=16*u.MHz) as fw:
+        with mark4.open(fl, 'ws', header0=header0, sample_rate=16*u.MHz) as fw:
             fw.write(record)
             number_of_bytes = fw.fh_raw.tell()
             assert number_of_bytes == fh_raw_tell1 - 17436
@@ -939,8 +940,8 @@ class Test16TrackFanout4():
         assert header1 == header
 
     def test_file_streamer(self, tmpdir):
-        with mark4.open(SAMPLE_16TRACK, 'rs', ntrack=16, decade=2010,
-                        sample_rate=32*u.MHz) as fh:
+        with mark4.open(SAMPLE_16TRACK, 'rs', sample_rate=32*u.MHz,
+                        ntrack=16, decade=2010) as fh:
             header0 = fh.header0
             assert fh.samples_per_frame == 80000
             assert fh.sample_rate == 32 * u.MHz
@@ -963,15 +964,15 @@ class Test16TrackFanout4():
         assert np.all(record[640:668].astype(int) == m5access_data.T)
 
         fl = str(tmpdir.join('test.m4'))
-        with mark4.open(fl, 'ws', header=header0, sample_rate=32*u.MHz) as fw:
+        with mark4.open(fl, 'ws', header0=header0, sample_rate=32*u.MHz) as fw:
             fw.fh_raw.write(preheader_junk)
             fw.write(record)
             number_of_bytes = fw.fh_raw.tell()
             assert number_of_bytes == fh_raw_tell1
 
         # Note: this test would not work if we wrote only a single record.
-        with mark4.open(fl, 'rs', ntrack=16, decade=2010,
-                        sample_rate=32*u.MHz) as fh:
+        with mark4.open(fl, 'rs', sample_rate=32*u.MHz,
+                        ntrack=16, decade=2010) as fh:
             assert fh.start_time == start_time
             record2 = fh.read()
             assert np.all(record2 == record)

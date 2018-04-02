@@ -59,8 +59,9 @@ frameset.
 
 To write the data, we pass ``fwr`` to `vdif.open <baseband.vdif.open>`::
 
-    >>> fw = vdif.open(fwr, 'ws', nthread=fh.sample_shape.nthread,
-    ...                sample_rate=fh.sample_rate, header=fh.header0)
+    >>> fw = vdif.open(fwr, 'ws', header0=fh.header0,
+    ...                sample_rate=fh.sample_rate,
+    ...                nthread=fh.sample_shape.nthread)
     >>> fw.write(d)
     >>> fw.close()    # This implicitly closes fwr.
 

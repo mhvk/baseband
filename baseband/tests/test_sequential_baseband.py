@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import os
@@ -12,7 +12,7 @@ from ..helpers.tests.test_sequentialfile import Sequencer
 
 def test_sequentialfile_vdif_stream(tmpdir):
     vdif_sequencer = Sequencer(str(tmpdir.join('{:07d}.vdif')))
-    # try writing a very simple file, using edv=0
+    # Try writing a very simple file, using edv=0.
     data = np.ones((16, 16, 2, 2))
     for i, dat in enumerate(data):
         dat[i, 0, 0] = -1.
@@ -25,7 +25,7 @@ def test_sequentialfile_vdif_stream(tmpdir):
         station='me')
     with sequentialfile.open(vdif_sequencer, 'wb',
                              file_size=4*header.framesize) as sfh, vdif.open(
-            sfh, 'ws', header=header, nthread=2, sample_rate=256*u.Hz) as fw:
+            sfh, 'ws', header0=header, nthread=2, sample_rate=256*u.Hz) as fw:
         fw.write(data)
     # check that this wrote 8 frames
     files = [vdif_sequencer[i] for i in range(8)]

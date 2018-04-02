@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for VLBI Mark 4 payloads.
 
@@ -26,22 +27,21 @@ class Mark4Frame(VLBIFrameBase):
 
     Parameters
     ----------
-    header : Mark4Header
+    header : `~baseband.mark4.Mark4Header`
         Wrapper around the encoded header words, providing access to the
         header information.
-    payload : Mark4Payload
+    payload : `~baseband.mark4.Mark4Payload`
         Wrapper around the payload, provding mechanisms to decode it.
-    valid : bool or `None`
+    valid : bool or None, optional
         Whether the data is valid.  If `None` (default), inferred from header.
         Note that the header is updated in-place if `True` or `False`.
-    verify : bool
+    verify : bool, optional
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and number of tracks are consistent
         between header and data).  Default: `True`.
 
     Notes
     -----
-
     The Frame can also be read instantiated using class methods:
 
       fromfile : read header and payload from a filehandle
@@ -107,14 +107,13 @@ class Mark4Frame(VLBIFrameBase):
             To read header from.
         ntrack : int
             Number of Mark 4 bitstreams.
-        decade : int, or None, optional
+        decade : int or None
             Decade in which the observations were taken.  Can instead pass an
             approximate `ref_time`.
-        ref_time : `~astropy.time.Time`, or None, optional
+        ref_time : `~astropy.time.Time` or None
             Reference time within 4 years of the observation time.  Used only
-            if `decade` is ``None``.
-
-        verify : bool
+            if `decade` is not given.
+        verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
         """
         header = cls._header_class.fromfile(fh, ntrack, decade=decade,
@@ -128,14 +127,14 @@ class Mark4Frame(VLBIFrameBase):
 
         Parameters
         ----------
-        data : ndarray
+        data : `~numpy.ndarray`
             Array holding complex or real data to be encoded.  This should have
             the full size of a data frame, even though the part covered by the
             header will be ignored.
-        header : Mark4Header or None
-            If `None`, it will be attemtped to create one using the keywords.
-        verify : bool
-            Whether or not to do basic assertions that check the integrity.
+        header : `~baseband.mark4.Mark4Header` or None
+            If not given, will attempt to generate one using the keywords.
+        verify : bool, optional
+            Whether to do basic checks of frame integrity (default: `True`).
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)
@@ -160,8 +159,8 @@ class Mark4Frame(VLBIFrameBase):
         Parameters
         ----------
         item : int, slice, or tuple
-            Sample indices.  Int represents a single sample, slice
-            a sample range, and tuple of ints/slices a range for
+            Sample indices.  An int represents a single sample, a slice
+            a sample range, and a tuple of ints/slices a range for
             multi-channel data.
 
         Returns
@@ -181,7 +180,7 @@ class Mark4Frame(VLBIFrameBase):
         Notes
         -----
         ``item`` is restricted to (tuples of) ints or slices, so one cannot
-        access non-contiguous samples using fancy indexing.  If ``item``
+        access non-contiguous samples using advanced indexing.  If ``item``
         is a slice, a negative increment cannot be used.
         """
         nsample = len(self)

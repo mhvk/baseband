@@ -218,7 +218,7 @@ filehandles::
     ...                  mode='ws', raw=test_phased_bin,
     ...                  sample_rate=phased_sample_rate,
     ...                  samples_per_frame=phased_samples_per_frame,
-    ...                  header=header0)
+    ...                  header0=header0)
     >>> fw_ph.write(dp)
     >>> fw_ph.close()
     >>> fh_ph = gsb.open('test_phased.timestamp', mode='rs',

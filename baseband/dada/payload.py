@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 """Payload for DADA format."""
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -24,19 +24,19 @@ class DADAPayload(VLBIPayloadBase):
 
     Parameters
     ----------
-    words : ndarray
+    words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    header : `~baseband.dada.DADAHeader`, optional
+    header : `~baseband.dada.DADAHeader`
         Header that provides information about how the payload is encoded.
-        If not give, the following arguments have to be passed in.
-    bps : int
+        If not given, the following arguments have to be passed in.
+    bps : int, optional
         Number of bits per sample part (i.e., per channel and per real or
         imaginary component).  Default: 8.
-    sample_shape : tuple
+    sample_shape : tuple, optional
         Shape of the samples; e.g., (nchan,).  Default: ().
-    complex_data : bool
-        Whether data is complex or float.  Default: False.
+    complex_data : bool, optional
+        Whether data is complex.  Default: `False`.
     """
     _decoders = {
         8: decode_8bit}
@@ -45,11 +45,11 @@ class DADAPayload(VLBIPayloadBase):
 
     _sample_shape_maker = namedtuple('SampleShape', 'npol, nchan')
 
-    def __init__(self, words, header=None, bps=8, sample_shape=(),
+    def __init__(self, words, header=None, sample_shape=(), bps=8,
                  complex_data=False):
         if header is not None:
-            bps = header.bps
             sample_shape = header.sample_shape
+            bps = header.bps
             complex_data = header.complex_data
         super(DADAPayload, self).__init__(words, sample_shape=sample_shape,
                                           bps=bps, complex_data=complex_data)

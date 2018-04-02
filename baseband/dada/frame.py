@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -19,14 +19,13 @@ class DADAFrame(VLBIFrameBase):
         Wrapper around the header lines, providing access to the values.
     payload : `~baseband.dada.DADAPayload`
         Wrapper around the payload, provding mechanisms to decode it.
-    valid : bool
+    valid : bool, optional
         Whether this frame contains valid data (default: True).
-    verify : bool
+    verify : bool, optional
         Whether to do basic verification of integrity (default: True)
 
     Notes
     -----
-
     DADA files do not support storing whether data are valid or not on disk.
     Hence, this has to be determined independently.  If ``valid=False``, any
     decoded data is set to ``cls.invalid_data_value`` (by default, 0).
@@ -86,17 +85,18 @@ class DADAFrame(VLBIFrameBase):
 
         Parameters
         ----------
-        data : ndarray
+        data : `~numpy.ndarray`
             Array holding complex or real data to be encoded.
-        header : `~baseband.dada.DADAHeader` or None, optional
-            If `None`, it will be attemtped to create one using the keywords.
+        header : `~baseband.dada.DADAHeader` or None
+            If not given, will attempt to generate one using the keywords.
         valid : bool, optional
-            Whether the data is valid. Note that this information cannot be
-            written to disk.
+            Whether the data is valid (default: `True`). Note that this
+            information cannot be written to disk.
         verify : bool
             Whether or not to do basic assertions that check the integrity.
+            Default: `True`.
         **kwargs
-            Used to construct a header if it was not explicitly passed in.
+            If `header` is not given, these are used to initialize one.
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)

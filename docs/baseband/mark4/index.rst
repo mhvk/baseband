@@ -126,12 +126,12 @@ reader includes these overwritten samples as invalid data (zeros, by default)::
 When writing to file, we need to pass in the sample rate in addition
 to ``decade``.  The number of tracks can be inferred from the header::
 
-    >>> fw = mark4.open('sample_mark4_segment.m4', 'ws', header=frame.header,
-    ...                 decade=2010, sample_rate=32*u.MHz)
+    >>> fw = mark4.open('sample_mark4_segment.m4', 'ws', header0=frame.header,
+    ...                 sample_rate=32*u.MHz, decade=2010)
     >>> fw.write(frame.data)
     >>> fw.close()
-    >>> fh = mark4.open('sample_mark4_segment.m4', 'rs', decade=2010,
-    ...                 sample_rate=32.*u.MHz)
+    >>> fh = mark4.open('sample_mark4_segment.m4', 'rs',
+    ...                 sample_rate=32.*u.MHz, decade=2010)
     >>> np.all(fh.read(80000) == frame.data)
     True
     >>> fh.close()

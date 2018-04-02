@@ -110,7 +110,7 @@ We can access information about the file by printing ``fh``::
     <VDIFStreamReader name=... offset=12
         sample_rate=32.0 MHz, samples_per_frame=20000,
         sample_shape=SampleShape(nthread=8),
-        complex_data=False, bps=2, edv=3, station=65532,
+        bps=2, complex_data=False, edv=3, station=65532,
         start_time=2014-06-16T05:56:07.000000000>
 
 The ``offset`` gives the current location of the sample file pointer - it's at
@@ -282,7 +282,7 @@ Since by default data are squeezed, one obtains a data stream with just a
 single dimension.  If one would like to keep all information, one has to pass
 ``squeeze=False`` and also make ``subset`` a list (or slice)::
 
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False, subset=[3])
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=[3], squeeze=False)
     >>> fh.sample_shape
     SampleShape(nthread=1, nchan=1)
     >>> d = fh.read(20000)
@@ -296,7 +296,7 @@ sample shape; in the case of the sample VDIF with ``squeeze=False``, this is
 threads, then channels. For example, if we wished to select threads 1 and 3,
 and channel 0::
 
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False, subset=([1, 3], 0))
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs', subset=([1, 3], 0), squeeze=False)
     >>> fh.sample_shape
     SampleShape(nthread=2)
     >>> fh.close()
@@ -331,9 +331,9 @@ be necessary for compatibility with `DSPSR
     >>> from baseband.data import SAMPLE_VDIF
     >>> fr = vdif.open(SAMPLE_VDIF, 'rs')
     >>> fw = vdif.open('test_vdif.vdif', 'ws',
-    ...                nthread=1, nchan=fr.sample_shape.nthread,
     ...                sample_rate=fr.sample_rate,
     ...                samples_per_frame=fr.samples_per_frame // 8,
+    ...                nthread=1, nchan=fr.sample_shape.nthread,
     ...                complex_data=fr.complex_data, bps=fr.bps,
     ...                edv=fr.header0.edv, station=fr.header0.station,
     ...                time=fr.start_time)
@@ -400,10 +400,11 @@ values into `vdif.open <baseband.vdif.open>` to create one.
     >>> from baseband.data import SAMPLE_MARK4
     >>> fr = mark4.open(SAMPLE_MARK4, 'rs', ntrack=64, decade=2010)
     >>> spf = 640       # fanout * 160 = 640 invalid samples per Mark 4 frame
-    >>> fw = vdif.open('m4convert.vdif', 'ws', edv=1, nthread=1,
-    ...                samples_per_frame=spf, nchan=fr.sample_shape.nchan,
-    ...                sample_rate=fr.sample_rate, complex_data=fr.complex_data,
-    ...                bps=fr.bps, time=fr.start_time)
+    >>> fw = vdif.open('m4convert.vdif', 'ws', sample_rate=fr.sample_rate,
+    ...                samples_per_frame=spf, nthread=1,
+    ...                nchan=fr.sample_shape.nchan,
+    ...                complex_data=fr.complex_data, bps=fr.bps,
+    ...                edv=1, time=fr.start_time)
 
 We choose ``edv = 1`` since it's the simplest VDIF EDV whose header includes a
 sampling rate. The concept of threads does not exist in Mark 4, so the file

@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for VLBI Mark 5B frames.
 
@@ -25,18 +26,20 @@ class Mark5BFrame(VLBIFrameBase):
 
     Parameters
     ----------
-    header : Mark5BHeader
+    header : `~baseband.mark5b.Mark5BHeader`
         Wrapper around the encoded header words, providing access to the
         header information.
-    payload : Mark5BPayload
+    payload : `~baseband.mark5b.Mark5BPayload`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool or None
-        Whether this frame contains valid data.  If `None` (default), the
-        validity will be determined by checking whether the payload consists
-        of the fill pattern 0x11223344.
+        Whether the data is valid.  If `None` (default), the validity will be
+        determined by checking whether the payload consists of the fill pattern
+        0x11223344.
     verify : bool
         Whether to do basic verification of integrity (default: True)
 
+    Notes
+    -----
     The Frame can also be read instantiated using class methods:
 
       fromfile : read header and payload from a filehandle
@@ -71,7 +74,7 @@ class Mark5BFrame(VLBIFrameBase):
         super(Mark5BFrame, self).__init__(header, payload, valid, verify)
 
     @classmethod
-    def fromfile(cls, fh, nchan, bps=3, kday=None, ref_time=None, valid=None,
+    def fromfile(cls, fh, kday=None, ref_time=None, nchan=1, bps=3, valid=None,
                  verify=True):
         """Read a frame from a filehandle.
 
@@ -79,16 +82,16 @@ class Mark5BFrame(VLBIFrameBase):
         ----------
         fh : filehandle
             To read the header and payload from.
-        nchan : int
-            Number of channels encoded in the payload.
-        bps : int
-            Number of bits per sample used in payload encoding (default: 2).
-        kday : int, or None, optional
+        kday : int or None
             Explicit thousands of MJD of the observation time.  Can instead
             pass an approximate `ref_time`.
-        ref_time : `~astropy.time.Time`, or None, optional
+        ref_time : `~astropy.time.Time` or None
             Reference time within 500 days of the observation time, used to
-            infer the full MJD.  Used only if `kday` is ``None``.
+            infer the full MJD.  Used only if `kday` is not given.
+        nchan : int, optional
+            Number of channels.   Default: 1.
+        bps : int, optional
+            Bits per elementary sample.  Default: 2.
         verify : bool
             Whether to do basic checks of frame integrity (default: `True`).
         """
@@ -104,14 +107,14 @@ class Mark5BFrame(VLBIFrameBase):
 
         Parameters
         ----------
-        data : ndarray
+        data : `~numpy.ndarray`
             Array holding data to be encoded.
-        header : Mark5BHeader or None
-            If `None`, it will be attemtped to create one using the keywords.
+        header : `~baseband.mark5b.Mark5BHeader` or None
+            If not given, will attempt to generate one using the keywords.
         bps : int
-            Number of bits per sample to use in payload encoding (default: 2).
+            Bits per elementary sample.  Default: 2.
         valid : bool
-            Whether the data are valid (default: `True`).  If not, the payload
+            Whether the data is valid (default: `True`).  If not, the payload
             will be set to a fill pattern.
         verify : bool
             Whether to do basic checks of frame integrity (default: `True`).

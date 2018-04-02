@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -49,12 +49,12 @@ class TestDADA(object):
             assert s.tell() == header.size
 
         with open(str(tmpdir.join('test.dada')), 'w+b') as s:
-            # now create header with wrong HDR_SIZE in file
+            # Now create header with wrong HDR_SIZE in file.
             bad_header = header.copy()
             bad_header['HDR_SIZE'] = 1000
             with pytest.raises(ValueError):
                 bad_header.tofile(s)
-            # now write header explicitly, skipping the check in tofile,
+            # Now write header explicitly, skipping the check in tofile,
             # so we create a bad header.
             for line in bad_header._tolines():
                 s.write((line + '\n').encode('ascii'))
@@ -68,12 +68,12 @@ class TestDADA(object):
         header3 = dada.DADAHeader.fromkeys(**header)
         assert header3 == header
         assert header3.mutable is True
-        # check attribute setting.
+        # Check attribute setting.
         header3.start_time = header.start_time - 0.5 * u.day
         assert np.abs(header3.start_time -
                       (header.start_time - 0.5 * u.day)) < 1 * u.ns
         assert np.abs(header3.time - (header.time - 0.5 * u.day)) < 1 * u.ns
-        # check against rounding.
+        # Check against rounding.
         just_below_int = Time(55000, -1e-15, format='mjd')
         header3.start_time = just_below_int
         assert header3['MJD_START'] == '54999.999999999999999'
@@ -81,7 +81,7 @@ class TestDADA(object):
         assert header3['NCHAN'] == 2
         header3.framesize = 9096
         assert header3.payloadsize == 5000
-        # # Try initialising with properties instead of keywords.
+        # Try initialising with properties instead of keywords.
         # Here, we first just try the start time.
         header4 = dada.DADAHeader.fromvalues(
             start_time=header.start_time,
@@ -134,7 +134,7 @@ class TestDADA(object):
         payload = self.payload
         assert payload.size == 64000
         assert payload.shape == (16000, 2, 1)
-        # Check sample shape validity
+        # Check sample shape validity.
         assert payload.sample_shape == (2, 1)
         assert payload.sample_shape.npol == 2
         assert payload.sample_shape.nchan == 1
@@ -147,9 +147,9 @@ class TestDADA(object):
         with open(str(tmpdir.join('test.dada')), 'w+b') as s:
             payload.tofile(s)
             s.seek(0)
-            payload2 = dada.DADAPayload.fromfile(s, payloadsize=64000, bps=8,
-                                                 complex_data=True,
-                                                 sample_shape=(2, 1))
+            payload2 = dada.DADAPayload.fromfile(s, payloadsize=64000,
+                                                 sample_shape=(2, 1), bps=8,
+                                                 complex_data=True)
             assert payload2 == payload
             with pytest.raises(EOFError):
                 # Too few bytes.
@@ -241,14 +241,14 @@ class TestDADA(object):
             frame6 = fw.read_frame()
 
         assert frame6 == frame
-        # some further tests for completeness
-        # initiate frame using data and header keywords
+        # Some further tests for completeness;
+        # initiate frame using data and header keywords.
         with dada.open(filename, 'wb') as fw:
             fw.write_frame(self.payload.data, **self.header)
         with dada.open(filename, 'rb') as fh:
             frame7 = fh.read_frame()
         assert frame7 == frame
-        # memmap frame using header keywords
+        # memmap frame using header keywords.
         with dada.open(filename, 'wb') as fw:
             frame8 = fw.memmap_frame(**self.header)
             frame8[:] = self.payload.data
@@ -279,7 +279,7 @@ class TestDADA(object):
             assert fh._last_header == fh.header0
             assert np.abs(fh.stop_time -
                           (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
-            # Test seeker works with both int and str values for whence
+            # Test seeker works with both int and str values for whence.
             assert fh.seek(13, 0) == fh.seek(13, 'start')
             assert fh.seek(-13, 2) == fh.seek(-13, 'end')
             fhseek_int = fh.seek(17, 1)
@@ -303,7 +303,7 @@ class TestDADA(object):
         assert np.all(record2 == self.payload[10000:10002].squeeze())
 
         filename = str(tmpdir.join('a.dada'))
-        with dada.open(filename, 'ws', header=self.header,
+        with dada.open(filename, 'ws', header0=self.header,
                        squeeze=False) as fw:
             assert fw.sample_rate == 16 * u.MHz
             fw.write(self.payload.data)
@@ -360,7 +360,7 @@ class TestDADA(object):
             data_all = fh.read()
             assert np.all(data_all == data2d)
 
-        # Then read right polarization, but read channels in reverse order
+        # Then read right polarization, but read channels in reverse order.
         with dada.open(filename, 'rs', subset=(1, [1, 0])) as fh:
             assert fh.sample_shape == (2,)
             data_sub = fh.read()
@@ -382,12 +382,12 @@ class TestDADA(object):
 
         # Test that squeeze attribute works on write.
         dada_test_squeeze = str(tmpdir.join('test_squeeze.dada'))
-        with dada.open(dada_test_squeeze, 'ws', header=self.header) as fw:
+        with dada.open(dada_test_squeeze, 'ws', header0=self.header) as fw:
             assert fw.sample_shape == (2,)
             assert fw.sample_shape.npol == 2
             fw.write(self.payload.data.squeeze())
         dada_test_nosqueeze = str(tmpdir.join('test_nosqueeze.dada'))
-        with dada.open(dada_test_nosqueeze, 'ws', header=self.header,
+        with dada.open(dada_test_nosqueeze, 'ws', header0=self.header,
                        squeeze=False) as fw:
             assert fw.sample_shape == (2, 1)
             assert fw.sample_shape.npol == 2
@@ -404,7 +404,7 @@ class TestDADA(object):
     def test_incomplete_stream(self, tmpdir):
         filename = str(tmpdir.join('a.dada'))
         with catch_warnings(UserWarning) as w:
-            with dada.open(filename, 'ws', header=self.header,
+            with dada.open(filename, 'ws', header0=self.header,
                            squeeze=False) as fw:
                 fw.write(self.payload[:10])
         assert len(w) == 1
@@ -421,7 +421,7 @@ class TestDADA(object):
         header.payloadsize = self.header.payloadsize // 2
         filenames = (str(tmpdir.join('a.dada')),
                      str(tmpdir.join('b.dada')))
-        with dada.open(filenames, 'ws', header=header) as fw:
+        with dada.open(filenames, 'ws', header0=header) as fw:
             start_time = fw.start_time
             fw.write(data[:1000])
             time1000 = fw.time
@@ -449,7 +449,7 @@ class TestDADA(object):
         # Pass sequentialfile objects to reader.
         with sf.open(filenames, 'w+b',
                      file_size=(header.payloadsize + 4096)) as fraw, \
-                dada.open(fraw, 'ws', header=header) as fw:
+                dada.open(fraw, 'ws', header0=header) as fw:
             fw.write(data)
 
         with sf.open(filenames, 'rb') as fraw, \
@@ -463,7 +463,7 @@ class TestDADA(object):
         header = self.header.copy()
         header.payloadsize = self.header.payloadsize // 4
         template = str(tmpdir.join('a{frame_nr}.dada'))
-        with dada.open(template, 'ws', header=header) as fw:
+        with dada.open(template, 'ws', header0=header) as fw:
             fw.write(data[:1000])
             time1000 = fw.time
             fw.write(data[1000:])
@@ -493,7 +493,7 @@ class TestDADA(object):
         header.payloadsize = self.header.payloadsize // 8
         template = str(tmpdir
                        .join('{utc_start}_{obs_offset:016d}.000000.dada'))
-        with dada.open(template, 'ws', header=header) as fw:
+        with dada.open(template, 'ws', header0=header) as fw:
             fw.write(data[:7000])
             assert fw.start_time == header.time
             assert (np.abs(fw.time - (start_time + 7000 / (16. * u.MHz))) <
@@ -514,7 +514,7 @@ class TestDADA(object):
             assert fr.stop_time == fr.time
         assert np.all(data1 == data[6000:8000])
 
-        # we cannot just open using the same template, since UTC_START is
+        # We cannot just open using the same template, since UTC_START is
         # not available.
         with pytest.raises(KeyError):
             dada.open(template, 'rs')
@@ -532,11 +532,11 @@ class TestDADA(object):
                           (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data2 == data[6000:])
 
-        # just to check internal checks are OK.
+        # Just to check internal checks are OK.
         with pytest.raises(ValueError):
             dada.open(name3, 's')
         with pytest.raises(TypeError):
-            # extraneous argument
+            # Extraneous argument.
             dada.open(name3, 'rs', files=(name3,))
 
 

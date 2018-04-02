@@ -1,4 +1,4 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for GSB Headers, using the timestamp files.
 
@@ -105,15 +105,15 @@ class GSBHeader(VLBIHeaderBase):
     Parameters
     ----------
     words : list of str, or None
-        If ``None``, set to a list of empty strings for later initialisation.
-    mode : str, or None
-        Mode in which data was taken: 'phased' or 'rawdump'. If not given, it
+        If `None`, set to a list of empty strings for later initialisation.
+    mode : str or None, optional
+        Mode in which data was taken: 'phased' or 'rawdump'. If `None`, it
         is determined from the words.
-    size : int, or None
+    size : int or None, optional
         Number of characters in the header, including trailing blank spaces and
-        carriage returns.  If not given, is determined from the words assuming
+        carriage returns.  If `None`, is determined from the words assuming
         one trailing blank space and one CR.
-    verify : bool
+    verify : bool, optional
         Whether to do basic verification of integrity.  Default: `True`.
 
     Returns
@@ -129,7 +129,7 @@ class GSBHeader(VLBIHeaderBase):
 
         if mode is None:
             if words is None:
-                raise TypeError("Cannot construct an empty GSB header without "
+                raise TypeError("cannot construct an empty GSB header without "
                                 "knowing the mode.")
             mode = 'rawdump' if len(words) == 7 else 'phased'
 
@@ -197,7 +197,7 @@ class GSBHeader(VLBIHeaderBase):
                                          'seq_nr', 'mem_block'}:
                     mode = 'phased'
                 else:
-                    raise TypeError("Cannot construct a GSB header from "
+                    raise TypeError("cannot construct a GSB header from "
                                     "values without knowing the mode.")
         return super(GSBHeader, cls).fromvalues(mode, size, *args, **kwargs)
 
@@ -283,8 +283,8 @@ class GSBPhasedHeader(GSBRawdumpHeader):
     _header_parser = HeaderParser(
         (('pc', (0, 7, ' '.join, str_split)),
          ('gps', (7, 7, ' '.join, str_split)),
-         ('seq_nr', (14, 1, int, str, 1)),
-         ('mem_block', (15, 1, int, str, 1))),
+         ('seq_nr', (14, 1, int, str, 0)),
+         ('mem_block', (15, 1, int, str, 0))),
         make_parser=make_parser,
         make_setter=make_setter,
         get_default=get_default)

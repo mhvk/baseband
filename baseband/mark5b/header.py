@@ -1,3 +1,4 @@
+# Licensed under the GPLv3 - see LICENSE
 """
 Definitions for VLBI Mark5B Headers.
 
@@ -42,21 +43,21 @@ class Mark5BHeader(VLBIHeaderBase):
     Parameters
     ----------
     words : tuple of int, or None
-        Eight (or four for legacy VDIF) 32-bit unsigned int header words.
-        If ``None``, set to a tuple of zeros for later initialisation.
-    kday : int, or None, optional
+        Four 32-bit unsigned int header words.  If `None`, set to a tuple of
+        zeros for later initialisation.
+    kday : int or None
         Explicit thousands of MJD of the observation time (needed to remove
         ambiguity in the Mark 5B time stamp).  Can instead pass an approximate
         `ref_time`.
-    ref_time : `~astropy.time.Time`, or None, optional
+    ref_time : `~astropy.time.Time` or None
         Reference time within 500 days of the observation time, used to infer
-        the full MJD.  Used only if `kday` is ``None``.
+        the full MJD.  Used only if ``kday`` is not given.
     verify : bool
         Whether to do basic verification of integrity.  Default: `True`.
 
     Returns
     -------
-    header : Mark5BHeader instance.
+    header : `Mark5BHeader`
     """
 
     _header_parser = HeaderParser(
@@ -118,8 +119,8 @@ class Mark5BHeader(VLBIHeaderBase):
 
         bcd_jday : from ``jday`` or ``time``
         bcd_seconds : from ``seconds`` or ``time``
-        bcd_fraction : from ``ns`` or ``time``
-        frame_nr : from ``time``
+        bcd_fraction : from ``ns`` or ``time`` (may need ``framerate``)
+        frame_nr : from ``time`` (may need ``framerate``)
         """
         time = kwargs.pop('time', None)
         framerate = kwargs.pop('framerate', None)
@@ -143,7 +144,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
         Parameters
         ----------
-        crc : int or `None`, optional
+        crc : int or None, optional
             If `None` (default), recalculate the CRC after updating.
         verify : bool, optional
             If `True` (default), verify integrity after updating.
@@ -187,7 +188,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @payloadsize.setter
     def payloadsize(self, payloadsize):
-        if payloadsize != self._payloadsize:  # 2500 words
+        if payloadsize != self._payloadsize:  # 2500 words.
             raise ValueError("Mark 5B payload has a fixed size of 10000 bytes "
                              "(2500 words).")
 
@@ -299,7 +300,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
         Parameters
         ----------
-        time : Time instance
+        time : `~astropy.time.Time`
             The time to use for this header.
         framerate : `~astropy.units.Quantity`, optional
             For calculating the ``frame_nr`` from the fractional seconds.
