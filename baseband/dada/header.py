@@ -53,7 +53,7 @@ class DADAHeader(OrderedDict):
                    for key in header))
     """
 
-    _properties = ('payloadsize', 'framesize', 'bps', 'complex_data',
+    _properties = ('payload_nbytes', 'frame_nbytes', 'bps', 'complex_data',
                    'sample_shape', 'sample_rate', 'sideband',
                    'tsamp', 'samples_per_frame', 'offset', 'start_time',
                    'time')
@@ -204,15 +204,15 @@ class DADAHeader(OrderedDict):
             for line in self._tolines():
                 s.write((line + '\n').encode('ascii'))
             s.write('# end of header\n'.encode('ascii'))
-            extra = self.size - s.tell()
+            extra = self.nbytes - s.tell()
             if extra < 0:
                 raise ValueError("cannot write header in allocated size of "
-                                 "{0}".format(self.size))
+                                 "{0}".format(self.nbytes))
             s.seek(0)
             fh.write(s.read())
             if extra:
                 fh.write(b'\00' * extra)
-            assert fh.tell() - start_pos == self.size
+            assert fh.tell() - start_pos == self.nbytes
 
     @classmethod
     def fromkeys(cls, *args, **kwargs):
@@ -278,27 +278,27 @@ class DADAHeader(OrderedDict):
         super(DADAHeader, self).__setitem__(key.upper(), value)
 
     @property
-    def size(self):
+    def nbytes(self):
         """Size in bytes of the header."""
         return self['HDR_SIZE']
 
     @property
-    def payloadsize(self):
+    def payload_nbytes(self):
         """Size in bytes of the payload part of the file."""
         return self['FILE_SIZE']
 
-    @payloadsize.setter
-    def payloadsize(self, payloadsize):
-        self['FILE_SIZE'] = payloadsize
+    @payload_nbytes.setter
+    def payload_nbytes(self, payload_nbytes):
+        self['FILE_SIZE'] = payload_nbytes
 
     @property
-    def framesize(self):
+    def frame_nbytes(self):
         """Size in bytes of the full file, header plus payload."""
-        return self.size + self.payloadsize
+        return self.nbytes + self.payload_nbytes
 
-    @framesize.setter
-    def framesize(self, framesize):
-        self.payloadsize = framesize - self.size
+    @frame_nbytes.setter
+    def frame_nbytes(self, frame_nbytes):
+        self.payload_nbytes = frame_nbytes - self.nbytes
 
     @property
     def bps(self):
@@ -353,13 +353,13 @@ class DADAHeader(OrderedDict):
     @property
     def samples_per_frame(self):
         """Complete samples per frame (i.e., each having ``sample_shape``)."""
-        return (self.payloadsize * 8 //
+        return (self.payload_nbytes * 8 //
                 self.bps // (2 if self.complex_data else 1) // self['NPOL'] //
                 self['NCHAN'])
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
-        self.payloadsize = (
+        self.payload_nbytes = (
             (samples_per_frame * self['NCHAN'] * self['NPOL'] *
              self.bps * (2 if self.complex_data else 1) + 7) // 8)
 

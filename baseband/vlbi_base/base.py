@@ -360,12 +360,12 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         header = header_template.fromfile(fh)
         frame_nr0 = header['frame_nr']
         while header['frame_nr'] == frame_nr0:
-            fh.seek(header.payloadsize, 1)
+            fh.seek(header.payload_nbytes, 1)
             header = header_template.fromfile(fh)
         max_frame = frame_nr0
         while header['frame_nr'] > 0:
             max_frame = max(header['frame_nr'], max_frame)
-            fh.seek(header.payloadsize, 1)
+            fh.seek(header.payload_nbytes, 1)
             header = header_template.fromfile(fh)
 
         fh.seek(oldpos)
@@ -375,12 +375,12 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     def _last_header(self):
         """Last header of the file."""
         raw_offset = self.fh_raw.tell()
-        self.fh_raw.seek(-self.header0.framesize, 2)
+        self.fh_raw.seek(-self.header0.frame_nbytes, 2)
         last_header = self.fh_raw.find_header(forward=False)
         self.fh_raw.seek(raw_offset)
         if last_header is None:
             raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
-                             .format(10 * self.header0.framesize))
+                             .format(10 * self.header0.frame_nbytes))
         return last_header
 
     @lazyproperty

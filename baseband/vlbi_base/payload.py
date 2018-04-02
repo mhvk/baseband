@@ -36,8 +36,8 @@ class VLBIPayloadBase(object):
     complex_data : bool
         Whether the data are complex.  Default: False.
     """
-    # Possible fixed payload size.
-    _size = None
+    # Possible fixed payload size in bytes.
+    _nbytes = None
     # Default type for encoded data.
     _dtype_word = np.dtype('<u4')
     """Default for words: 32-bit unsigned integers, with lsb first."""
@@ -58,9 +58,9 @@ class VLBIPayloadBase(object):
         self._bpfs = (bps * (2 if complex_data else 1) *
                       reduce(operator.mul, sample_shape, 1))
         self._coder = bps
-        if self._size is not None and self._size != self.size:
+        if self._nbytes is not None and self._nbytes != self.nbytes:
             raise ValueError("encoded data should have length {0}"
-                             .format(self._size))
+                             .format(self._nbytes))
         if words.dtype != self._dtype_word:
             raise ValueError("encoded data should have dtype {0}"
                              .format(self._dtype_word))
@@ -73,17 +73,17 @@ class VLBIPayloadBase(object):
         ----------
         fh : filehandle
             From which data is read.
-        payloadsize : int
-            Number of bytes to read (default: as given in ``cls._size``).
+        payload_nbytes : int
+            Number of bytes to read (default: as given in ``cls._nbytes``).
 
         Any other (keyword) arguments are passed on to the class initialiser.
         """
-        payloadsize = kwargs.pop('payloadsize', cls._size)
-        if payloadsize is None:
-            raise ValueError("payloadsize should be given as an argument "
+        payload_nbytes = kwargs.pop('payload_nbytes', cls._nbytes)
+        if payload_nbytes is None:
+            raise ValueError("payload_nbytes should be given as an argument "
                              "if no default is defined on the class.")
-        s = fh.read(payloadsize)
-        if len(s) < payloadsize:
+        s = fh.read(payload_nbytes)
+        if len(s) < payload_nbytes:
             raise EOFError("could not read full payload.")
         return cls(np.frombuffer(s, dtype=cls._dtype_word), *args, **kwargs)
 
@@ -125,13 +125,13 @@ class VLBIPayloadBase(object):
             return self.data.astype(dtype)
 
     @property
-    def size(self):
+    def nbytes(self):
         """Size in bytes of payload."""
         return self.words.size * self.words.dtype.itemsize
 
     def __len__(self):
         """Number of samples in the payload."""
-        return self.size * 8 // self._bpfs
+        return self.nbytes * 8 // self._bpfs
 
     @property
     def shape(self):

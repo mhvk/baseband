@@ -44,9 +44,9 @@ class TestVDIFMark5B(object):
             assert header.nchan == 8
             assert header.bps == 2
             assert not header['complex_data']
-            assert header.framesize == 10032
-            assert header.size == 32
-            assert header.payloadsize == m5h.payloadsize
+            assert header.frame_nbytes == 10032
+            assert header.nbytes == 32
+            assert header.payload_nbytes == m5h.payload_nbytes
             assert (header.samples_per_frame ==
                     10000 * 8 // m5pl.bps // m5pl.sample_shape.nchan)
 
@@ -108,7 +108,7 @@ class TestVDIFMark5B(object):
 
         assert m5f['frame_nr'] == 1
         frame = vdif.VDIFFrame.from_mark5b_frame(m5f)
-        assert frame.size == 10032
+        assert frame.nbytes == 10032
         assert frame.shape == (5000, 8)
         assert np.all(frame.data == m5f.data)
         assert frame.time == m5f.time
@@ -253,7 +253,7 @@ class TestMark4ToVDIF1(object):
         # Check that we have enough information to create VDIF EDV 1 header.
         header = vdif.VDIFHeader.fromvalues(
             edv=1, bps=m4h.bps, nchan=1, station='Ar', time=m4h.time,
-            sample_rate=32.*u.MHz, payloadsize=640*2//8, complex_data=False)
+            sample_rate=32.*u.MHz, payload_nbytes=640*2//8, complex_data=False)
         assert abs(header.time - m4h.time) < 2. * u.ns
 
     def test_stream(self, tmpdir):
@@ -264,7 +264,7 @@ class TestMark4ToVDIF1(object):
             vheader0 = vdif.VDIFHeader.fromvalues(
                 edv=1, bps=m4header0.bps, nchan=1, station='Ar',
                 time=start_time, sample_rate=32.*u.MHz,
-                payloadsize=640*2//8, complex_data=False)
+                payload_nbytes=640*2//8, complex_data=False)
             assert abs(vheader0.time - start_time) < 2. * u.ns
             data = fr.read(80000)  # full Mark 4 frame
             offset1 = fr.tell()
@@ -320,7 +320,7 @@ class TestDADAToVDIF1(object):
             edv=1, time=header.time, sample_rate=header.sample_rate,
             bps=header.bps, nchan=header['NCHAN'],
             complex_data=header.complex_data,
-            payloadsize=header.payloadsize // 2,
+            payload_nbytes=header.payload_nbytes // 2,
             station=header['TELESCOPE'][:2])
 
     def get_vdif_data(self, dada_data):
@@ -335,12 +335,12 @@ class TestDADAToVDIF1(object):
         # Check that we have enough information to create VDIF EDV 1 header.
         header = self.get_vdif_header(ddh)
         assert abs(header.time - ddh.time) < 2. * u.ns
-        assert header.payloadsize == ddh.payloadsize // 2
+        assert header.payload_nbytes == ddh.payload_nbytes // 2
 
     def test_payload(self):
         with open(SAMPLE_DADA, 'rb') as fh:
             fh.seek(4096)
-            ddp = dada.DADAPayload.fromfile(fh, payloadsize=64000,
+            ddp = dada.DADAPayload.fromfile(fh, payload_nbytes=64000,
                                             sample_shape=(2, 1),
                                             complex_data=True, bps=8)
         dada_data = ddp.data
@@ -394,7 +394,7 @@ class TestDADAToVDIF1(object):
         assert np.allclose(dv_data, dada_data)
         with dada.open(dada_file, 'ws', sample_rate=vh.sample_rate,
                        time=vh.time, npol=vnthread, bps=vh.bps,
-                       payloadsize=vh.payloadsize*2, nchan=vh.nchan,
+                       payload_nbytes=vh.payload_nbytes*2, nchan=vh.nchan,
                        telescope=vh.station,
                        complex_data=vh['complex_data']) as fw:
             new_header = fw.header0

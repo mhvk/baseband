@@ -224,15 +224,15 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Header of the last file for this stream."""
-        self.fh_raw.seek(-self.header0.framesize, 2)
+        self.fh_raw.seek(-self.header0.frame_nbytes, 2)
         last_frame = self.fh_raw.read_frame(memmap=True)
         return last_frame.header
 
     def _read_frame(self, index):
-        self.fh_raw.seek(index * self.header0.framesize)
+        self.fh_raw.seek(index * self.header0.frame_nbytes)
         frame = self.fh_raw.read_frame(memmap=True)
         assert (frame.header['OBS_OFFSET'] - self.header0['OBS_OFFSET'] ==
-                index * self.header0.payloadsize)
+                index * self.header0.payload_nbytes)
         return frame
 
 
@@ -260,7 +260,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     def _make_frame(self, index):
         header = self.header0.copy()
         header.update(obs_offset=self.header0['OBS_OFFSET'] +
-                      index * self.header0.payloadsize)
+                      index * self.header0.payload_nbytes)
         return self.fh_raw.memmap_frame(header)
 
     def _write_frame(self, frame, valid=True):
@@ -373,7 +373,7 @@ def open(name, mode='rs', **kwargs):
             if 'r' in mode:
                 name = sf.open(name, 'rb')
             else:
-                name = sf.open(name, 'w+b', file_size=header0.framesize)
+                name = sf.open(name, 'w+b', file_size=header0.frame_nbytes)
 
         if header0 and 'w' in mode:
             kwargs['header0'] = header0

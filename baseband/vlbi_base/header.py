@@ -258,9 +258,9 @@ class VLBIHeaderBase(object):
 
     It also should define properties (getters *and* setters):
 
-      payloadsize: number of bytes used by payload
+      payload_nbytes: number of bytes used by payload
 
-      framesize: total number of bytes for header + payload
+      frame_nbytes: total number of bytes for header + payload
 
       get_time, set_time, and a corresponding time property:
            time at start of payload
@@ -276,7 +276,7 @@ class VLBIHeaderBase(object):
         checks that the number of words is consistent with the struct size.
     """
 
-    _properties = ('payloadsize', 'framesize', 'time')
+    _properties = ('payload_nbytes', 'frame_nbytes', 'time')
     """Properties accessible/usable in initialisation for all headers."""
 
     def __init__(self, words, verify=True):
@@ -308,7 +308,7 @@ class VLBIHeaderBase(object):
         return self.copy()
 
     @property
-    def size(self):
+    def nbytes(self):
         """Size of the header in bytes."""
         return self._struct.size
 

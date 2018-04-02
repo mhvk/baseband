@@ -67,37 +67,37 @@ class Mark5BFileReader(VLBIFileBase):
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
             Maximum number of bytes to search through.  Default: twice the
-            framesize of 10016 bytes.
+            frame size of 10016 bytes.
 
         Returns
         -------
         header : :class:`~baseband.mark5b.Mark5BHeader` or None
             Retrieved Mark 5B header, or `None` if nothing found.
         """
-        framesize = 10016  # This is fixed for Mark 5B.
+        frame_nbytes = 10016  # This is fixed for Mark 5B.
         fh = self.fh_raw
         kday = self.kday
         ref_time = self.ref_time
         if maximum is None:
-            maximum = 2 * framesize
+            maximum = 2 * frame_nbytes
         # Loop over chunks to try to find the frame marker.
         file_pos = fh.tell()
         # First check whether we are right at a frame marker (usually true).
         try:
             header = Mark5BHeader.fromfile(fh, kday=kday, ref_time=ref_time,
                                            verify=True)
-            fh.seek(-header.size, 1)
+            fh.seek(-header.nbytes, 1)
             return header
         except AssertionError:
             pass
 
         fh.seek(0, 2)
-        size = fh.tell()
+        nbytes = fh.tell()
         if forward:
             iterate = range(file_pos, min(file_pos + maximum - 16,
-                                          size - framesize))
+                                          nbytes - frame_nbytes))
         else:
-            iterate = range(min(file_pos, size - framesize),
+            iterate = range(min(file_pos, nbytes - frame_nbytes),
                             max(file_pos - maximum, -1), -1)
 
         for frame in iterate:
@@ -110,11 +110,11 @@ class Mark5BFileReader(VLBIFileBase):
 
             # Get header from a frame up and check it is consistent (we always
             # check up since this checks that the payload has the right length)
-            next_frame = frame + framesize
-            if next_frame > size - 16:
+            next_frame = frame + frame_nbytes
+            if next_frame > nbytes - 16:
                 # If we're too far ahead for there to be another header,
                 # at least the one below should be OK.
-                next_frame = frame - framesize
+                next_frame = frame - frame_nbytes
                 # Except if there is only one frame in the first place.
                 if next_frame < 0:
                     fh.seek(frame)
@@ -179,7 +179,7 @@ class Mark5BStreamBase(VLBIStreamBase):
                  bps=2, squeeze=True, subset=(), fill_value=0.):
         super(Mark5BStreamBase, self).__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
-            samples_per_frame=header0.payloadsize * 8 // bps // nchan,
+            samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
             unsliced_shape=(nchan,), bps=bps, complex_data=False,
             squeeze=squeeze, subset=subset, fill_value=fill_value)
         self._frame_rate = int(round((self.sample_rate /
@@ -250,7 +250,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         return last_header
 
     def _read_frame(self, index):
-        self.fh_raw.seek(index * self.header0.framesize)
+        self.fh_raw.seek(index * self.header0.frame_nbytes)
         frame = self.fh_raw.read_frame()
         # Set decoded value for invalid data.
         frame.fill_value = self.fill_value
@@ -300,7 +300,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
 
     def __init__(self, fh_raw, header0=None, sample_rate=None, nchan=1, bps=2,
                  squeeze=True, **kwargs):
-        samples_per_frame = Mark5BHeader._payloadsize * 8 // bps // nchan
+        samples_per_frame = Mark5BHeader._payload_nbytes * 8 // bps // nchan
         if header0 is None:
             if 'time' in kwargs:
                 kwargs['frame_rate'] = sample_rate / samples_per_frame

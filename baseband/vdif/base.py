@@ -105,13 +105,32 @@ class VDIFFileReader(VLBIFileBase):
         return VDIFFrameSet.fromfile(self.fh_raw, thread_ids, edv=edv,
                                      verify=verify)
 
-    def find_header(self, template_header=None, framesize=None, edv=None,
+    def find_header(self, template_header=None, frame_nbytes=None, edv=None,
                     maximum=None, forward=True):
         """Look for the first occurrence of a header, from the current position.
 
         Search for a valid header at a given position which is consistent with
-        ``template_header`` or with a header a framesize ahead.   Note that the
-        latter turns out to be an unexpectedly weak check on real data!
+        ``template_header`` or with a header a frame size ahead.   Note that
+        the latter turns out to be an unexpectedly weak check on real data!
+
+        Parameters
+        ----------
+        template_header : `~baseband.vdif.VDIFHeader`
+            If given, used to infer the frame size and EDV.
+        frame_nbytes : int
+            Frame size in bytes, used if ``template_header`` is not given.
+        edv : int
+            EDV of the header, used if ``template_header`` is not given.
+        maximum : int, optional
+            Maximum number of bytes forward to search through.
+            Default: twice the frame size.
+        forward : bool, optional
+            Seek forward if `True` (default), backward if `False`.
+
+        Returns
+        -------
+        header : :class:`~baseband.vdif.VDIFHeader` or None
+            Retrieved VDIF header, or `None` if nothing found.
         """
         fh = self.fh_raw
         # Obtain current pointer position.
@@ -127,22 +146,23 @@ class VDIFFileReader(VLBIFileBase):
                 if template_header.same_stream(header):
                     fh.seek(file_pos)
                     return header
-            # If we're not at frame marker, obtain framesize and get searching.
-            framesize = template_header.framesize
+            # If we're not at frame marker, obtain frame size and get
+            # searching.
+            frame_nbytes = template_header.frame_nbytes
 
         if maximum is None:
-            maximum = 2 * framesize
+            maximum = 2 * frame_nbytes
 
         # Determine file size.
         file_pos = fh.tell()
         fh.seek(0, 2)
-        size = fh.tell()
+        nbytes = fh.tell()
         # Generate file pointer positions to test.
         if forward:
             iterate = range(file_pos, min(file_pos + maximum - 31,
-                                          size - framesize + 1))
+                                          nbytes - frame_nbytes + 1))
         else:
-            iterate = range(min(file_pos, size - framesize),
+            iterate = range(min(file_pos, nbytes - frame_nbytes),
                             max(file_pos - maximum, -1), -1)
         # Loop over chunks to try to find the frame marker.
         for frame in iterate:
@@ -152,7 +172,7 @@ class VDIFFileReader(VLBIFileBase):
             except AssertionError:
                 continue
 
-            if(header.framesize != framesize or
+            if(header.frame_nbytes != frame_nbytes or
                template_header and not template_header.same_stream(header)):
                 # CPython optimizations will make this as uncovered, even
                 # though it is. See
@@ -160,11 +180,11 @@ class VDIFFileReader(VLBIFileBase):
                 continue  # pragma: no cover
 
             # Always also check header from a frame up.
-            next_frame = frame + framesize
-            if next_frame > size - 32:
+            next_frame = frame + frame_nbytes
+            if next_frame > nbytes - 32:
                 # if we're too far ahead for there to be another header,
                 # check consistency with a frame below.
-                next_frame = frame - framesize
+                next_frame = frame - frame_nbytes
                 # But don't bother if we already checked with a template,
                 # or if there is only one frame in the first place.
                 if template_header is not None or next_frame < 0:
@@ -312,7 +332,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         frameset = fh_raw.read_frameset()
         header0 = frameset.header0
         thread_ids = [fr['thread_id'] for fr in frameset.frames]
-        self._framesetsize = fh_raw.tell()
+        self._frameset_nbytes = fh_raw.tell()
         super(VDIFStreamReader, self).__init__(
             fh_raw, header0, sample_rate=sample_rate,
             nthread=len(frameset.frames), squeeze=squeeze, subset=subset,
@@ -383,7 +403,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         except Exception:
             if 'sample_rate' in header._properties:
                 return np.round((header.sample_rate /
-                                header.samples_per_frame).to(u.Hz))
+                                 header.samples_per_frame).to(u.Hz))
             else:
                 raise
 
@@ -397,9 +417,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         # Find first header with same thread_id going backward.
         found = False
         # Set maximum as twice number of frames in frameset.
-        maximum = 2 * self._framesetsize
+        maximum = 2 * self._frameset_nbytes
         while not found:
-            self.fh_raw.seek(-self.header0.framesize, 1)
+            self.fh_raw.seek(-self.header0.frame_nbytes, 1)
             last_header = self.fh_raw.find_header(
                 template_header=self.header0,
                 maximum=maximum, forward=False)
@@ -425,7 +445,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         return data
 
     def _read_frame(self, index):
-        self.fh_raw.seek(index * self._framesetsize)
+        self.fh_raw.seek(index * self._frameset_nbytes)
         frameset = self.fh_raw.read_frameset(self._thread_ids,
                                              edv=self.header0.edv)
         frameset.fill_value = self.fill_value

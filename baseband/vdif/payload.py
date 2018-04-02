@@ -137,7 +137,7 @@ class VDIFPayload(VLBIPayloadBase):
             nchan = header.nchan
             bps = header.bps
             complex_data = header['complex_data']
-            self._size = header.payloadsize
+            self._nbytes = header.payload_nbytes
             if header.edv == 0xab:  # Mark5B payload
                 from ..mark5b import Mark5BPayload
                 self._decoders = Mark5BPayload._decoders
@@ -156,11 +156,11 @@ class VDIFPayload(VLBIPayloadBase):
         fh : filehandle
             To read data from.
         header : `~baseband.vdif.VDIFHeader`
-            Used to infer the payloadsize, number of channels, bits per sample,
-            and whether the data are complex.
+            Used to infer the payload size, number of channels, bits per
+            sample, and whether the data are complex.
         """
-        s = fh.read(header.payloadsize)
-        if len(s) < header.payloadsize:
+        s = fh.read(header.payload_nbytes)
+        if len(s) < header.payload_nbytes:
             raise EOFError("could not read full payload.")
         return cls(np.frombuffer(s, dtype=cls._dtype_word), header)
 

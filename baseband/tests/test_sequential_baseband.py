@@ -24,8 +24,9 @@ def test_sequentialfile_vdif_stream(tmpdir):
         complex_data=False, frame_nr=0, thread_id=0, samples_per_frame=16,
         station='me')
     with sequentialfile.open(vdif_sequencer, 'wb',
-                             file_size=4*header.framesize) as sfh, vdif.open(
-            sfh, 'ws', header0=header, nthread=2, sample_rate=256*u.Hz) as fw:
+                             file_size=4*header.frame_nbytes) as sfh, \
+            vdif.open(sfh, 'ws', header0=header, nthread=2,
+                      sample_rate=256*u.Hz) as fw:
         fw.write(data)
     # check that this wrote 8 frames
     files = [vdif_sequencer[i] for i in range(8)]

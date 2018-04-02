@@ -99,7 +99,7 @@ class VDIFHeader(VLBIHeaderBase):
         As appropriate for the extended data version.
     """
 
-    _properties = ('framesize', 'payloadsize', 'bps', 'nchan',
+    _properties = ('frame_nbytes', 'payload_nbytes', 'bps', 'nchan',
                    'samples_per_frame', 'station', 'time')
     """Properties accessible/usable in initialisation for all VDIF headers."""
 
@@ -193,7 +193,7 @@ class VDIFHeader(VLBIHeaderBase):
         Values set by other keyword arguments (if present):
 
         bits_per_sample : from ``bps``
-        frame_length : from ``samples_per_frame`` or ``framesize``
+        frame_length : from ``samples_per_frame`` or ``frame_nbytes``
         lg2_nchan : from ``nchan``
         ref_epoch, seconds, frame_nr : from ``time`` (may need ``sample_rate``)
 
@@ -287,23 +287,23 @@ class VDIFHeader(VLBIHeaderBase):
         return self._edv
 
     @property
-    def framesize(self):
+    def frame_nbytes(self):
         """Size of a frame, in bytes."""
         return self['frame_length'] * 8
 
-    @framesize.setter
-    def framesize(self, size):
-        assert size % 8 == 0
-        self['frame_length'] = int(size) // 8
+    @frame_nbytes.setter
+    def frame_nbytes(self, nbytes):
+        assert nbytes % 8 == 0
+        self['frame_length'] = int(nbytes) // 8
 
     @property
-    def payloadsize(self):
+    def payload_nbytes(self):
         """Size of the payload, in bytes."""
-        return self.framesize - self.size
+        return self.frame_nbytes - self.nbytes
 
-    @payloadsize.setter
-    def payloadsize(self, size):
-        self.framesize = size + self.size
+    @payload_nbytes.setter
+    def payload_nbytes(self, nbytes):
+        self.frame_nbytes = nbytes + self.nbytes
 
     @property
     def bps(self):
@@ -332,7 +332,7 @@ class VDIFHeader(VLBIHeaderBase):
         # Values are not split over word boundaries.
         values_per_word = 32 // self.bps // (2 if self['complex_data'] else 1)
         # samples are not split over payload boundaries.
-        return self.payloadsize // 4 * values_per_word // self.nchan
+        return self.payload_nbytes // 4 * values_per_word // self.nchan
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
@@ -340,7 +340,7 @@ class VDIFHeader(VLBIHeaderBase):
         # units of frame length are 8 bytes, i.e., 2 words.
         values_per_long = values_per_word * 2
         longs = (samples_per_frame * self.nchan - 1) // values_per_long + 1
-        self['frame_length'] = int(longs) + self.size // 8
+        self['frame_length'] = int(longs) + self.nbytes // 8
 
     @property
     def station(self):

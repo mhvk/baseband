@@ -49,7 +49,7 @@ class VLBIFrameBase(object):
     to ``self.fill_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, and ``size`` the frame size in bytes.
+    and type of the data array, and ``nbytes`` the frame size in bytes.
     Furthermore, the frame acts as a dictionary, with keys those of the header.
     Any attribute that is not defined on the frame itself, such as ``.time``
     will be looked up on the header as well.
@@ -71,10 +71,10 @@ class VLBIFrameBase(object):
         """Simple verification.  To be added to by subclasses."""
         assert isinstance(self.header, self._header_class)
         assert isinstance(self.payload, self._payload_class)
-        assert (self.payload.size ==
+        assert (self.payload.nbytes ==
                 self.payload.words.size * self.payload.words.dtype.itemsize)
-        assert (self.payload.size == getattr(self.header, 'payloadsize',
-                                             self.payload.size))
+        assert (self.payload.nbytes == getattr(self.header, 'payload_nbytes',
+                                               self.payload.nbytes))
 
     @property
     def valid(self):
@@ -144,9 +144,9 @@ class VLBIFrameBase(object):
         return self.payload.dtype
 
     @property
-    def size(self):
+    def nbytes(self):
         """Size of the encoded frame in bytes."""
-        return self.header.size + self.payload.size
+        return self.header.nbytes + self.payload.nbytes
 
     def __array__(self, dtype=None):
         """Interface to arrays."""

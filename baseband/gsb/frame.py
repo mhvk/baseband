@@ -49,17 +49,18 @@ class GSBFrame(VLBIFrameBase):
 
       data : property that yields full decoded payload
 
-    A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, and ``size`` the frame size in bytes.
-    Furthermore, the frame acts as a dictionary, with keys those of the header.
-    Any attribute that is not defined on the frame itself, such as ``.time``
-    will be looked up on the header as well.
+    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    the shape, type and number of complete samples of the data array, and
+    ``nbytes`` the frame size in bytes.  Furthermore, the frame acts as a
+    dictionary, with keys those of the header.  Any attribute that is not
+    defined on the frame itself, such as ``.time`` will be looked up on the
+    header as well.
     """
     _header_class = GSBHeader
     _payload_class = GSBPayload
 
     @classmethod
-    def fromfile(cls, fh_ts, fh_raw, payloadsize=1 << 24, nchan=1, bps=4,
+    def fromfile(cls, fh_ts, fh_raw, payload_nbytes=1 << 24, nchan=1, bps=4,
                  complex_data=False, valid=True, verify=True):
         """Read a frame from timestamp and raw data filehandles.
 
@@ -75,8 +76,8 @@ class GSBFrame(VLBIFrameBase):
             Should be a single handle for a rawdump data frame, or a tuple
             containing tuples with pairs of handles for a phased one.  E.g.,
             ``((L1, L2), (R1, R2))`` for left and right polarisations.
-        payloadsize : int, optional
-            Size of the individual payloads.  Default: 4 MiB.
+        payload_nbytes : int, optional
+            Size of the individual payloads in bytes.  Default: 2**24 (16 MB).
         nchan : int, optional
             Number of channels.  Default: 1.
         bps : int, optional
@@ -91,7 +92,8 @@ class GSBFrame(VLBIFrameBase):
             Whether to verify consistency of the frame parts.  Default: `True`.
         """
         header = cls._header_class.fromfile(fh_ts, verify=verify)
-        payload = cls._payload_class.fromfile(fh_raw, payloadsize=payloadsize,
+        payload = cls._payload_class.fromfile(fh_raw,
+                                              payload_nbytes=payload_nbytes,
                                               nchan=nchan, bps=bps,
                                               complex_data=complex_data)
         return cls(header, payload, valid=valid, verify=verify)
@@ -112,6 +114,6 @@ class GSBFrame(VLBIFrameBase):
         self.payload.tofile(fh_raw)
 
     @property
-    def size(self):
+    def nbytes(self):
         """Size of the encoded frame in the raw data file in bytes."""
-        return self.payload.size
+        return self.payload.nbytes
