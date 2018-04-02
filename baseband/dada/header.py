@@ -420,6 +420,10 @@ class DADAHeader(OrderedDict):
         """
         self.start_time = time - self.offset
 
+    def _ipython_key_completions_(self):
+        # Enables tab-completion of header keys in IPython.
+        return self.keys()
+
     def __eq__(self, other):
         """Whether headers have the same keys with the same values."""
         # We do a float conversion for MJD_START, since headers often give
