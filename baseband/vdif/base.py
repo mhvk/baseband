@@ -516,26 +516,20 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase, VDIFFileWriter):
             if header_sample_rate == 0:
                 self.header0.sample_rate = self.sample_rate
             assert self.header0.sample_rate == self.sample_rate
-        # TODO: once frameset allows slicing when writing, can replace this
-        # with a frameset.
-        self._data = np.zeros(
-            (self.samples_per_frame,) + self._unsliced_shape,
-            np.complex64 if self.complex_data else np.float32)
+
+        self._frameset = VDIFFrameSet.fromdata(
+            np.zeros((self.samples_per_frame,) + self._unsliced_shape,
+                     dtype=np.complex64 if self.complex_data else np.float32),
+            self.header0)
 
     def _make_frame(self, index):
-        self._header = self.header0.copy()
         dt, frame_nr = divmod(index + self.header0['frame_nr'],
                               self._framerate)
-        self._header['seconds'] = self.header0['seconds'] + dt
-        self._header['frame_nr'] = frame_nr
-        return self._data
-
-    def _write_frame(self, frame, valid=True):
-        assert frame is self._data
-        frameset = VDIFFrameSet.fromdata(frame, self._header)
-        for frame in frameset.frames:
-            frame.valid = valid
-        self.write_frameset(frameset)
+        seconds = self.header0['seconds'] + dt
+        # Reuse frameset.
+        self._frameset['seconds'] = seconds
+        self._frameset['frame_nr'] = frame_nr
+        return self._frameset
 
 
 open = make_opener('VDIF', globals(), doc="""

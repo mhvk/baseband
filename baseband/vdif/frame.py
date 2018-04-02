@@ -15,7 +15,7 @@ import numpy as np
 from astropy.extern import six
 
 from ..vlbi_base.frame import VLBIFrameBase
-from .header import VDIFHeader
+from .header import VDIFHeader, VDIFBaseHeader
 from .payload import VDIFPayload
 
 
@@ -199,8 +199,6 @@ class VDIFFrameSet(object):
     """
     def __init__(self, frames, header0=None):
         self.frames = frames
-        # Used in .data below to decode data only once.
-        self._data = None
         if header0 is None:
             self.header0 = self.frames[0].header
         else:
@@ -334,6 +332,17 @@ class VDIFFrameSet(object):
         return self.frames[0].dtype
 
     @property
+    def valid(self):
+        valid = np.array([frame.valid for frame in self.frames])
+        return valid[0] if len(np.unique(valid)) == 1 else valid
+
+    @valid.setter
+    def valid(self, valid):
+        valid = np.broadcast_to(valid, (len(self.frames),))
+        for f, v in zip(self.frames, valid):
+            f.valid = v
+
+    @property
     def invalid_data_value(self):
         return self.frames[0].invalid_data_value
 
@@ -395,8 +404,17 @@ class VDIFFrameSet(object):
     # Let frameset behave appropriately.
     def __getitem__(self, item=()):
         if isinstance(item, six.string_types):
-            # Header behaves as a dictionary.
-            return self.header0.__getitem__(item)
+            # Header behaves as a dictionary.  Assume base keywords are the
+            # same for every frame, except for thread_id (must be different)
+            # and invalid_data (can be different).
+            if item == 'thread_id':
+                return np.array([f.header[item] for f in self.frames])
+            elif (item != 'invalid_data' and
+                  item in VDIFBaseHeader._header_parser.keys()):
+                return self.header0[item]
+
+            values = np.array([f.header[item] for f in self.frames])
+            return values[0] if len(np.unique(values)) == 1 else values
 
         (frames, frame_item,
          single_sample, single_frame, single_channel) = self._get_frames(item)
@@ -419,6 +437,22 @@ class VDIFFrameSet(object):
         return data
 
     def __setitem__(self, item, data):
+        if isinstance(item, six.string_types):
+            # Headers behave as dictionaries; except for thread_id and
+            # invalid_data, assume set base properties all to the same value.
+            data = np.broadcast_to(data, (len(self.frames),))
+            if item == 'thread_id':
+                if len(np.unique(data)) != len(self.frames):
+                    raise ValueError("all thread ids should be unique.")
+            elif (item != 'invalid_data' and
+                  item in VDIFBaseHeader._header_parser.keys()):
+                if data.strides != (0,) and len(np.unique(data)) > 1:
+                    raise ValueError("base header keys should be identical.")
+
+            for f, value in zip(self.frames, data):
+                f.header[item] = value
+            return
+
         (frames, frame_item,
          single_sample, single_frame, single_channel) = self._get_frames(item)
 
@@ -454,7 +488,10 @@ class VDIFFrameSet(object):
 
     def __getattr__(self, attr):
         if attr in self.header0._properties:
-            return getattr(self.header0, attr)
+            if attr in VDIFBaseHeader._properties:
+                return getattr(self.header0, attr)
+            values = np.array([getattr(f.header, attr) for f in self.frames])
+            return values[0] if len(np.unique(values)) == 1 else values
         else:
             return self.__getattribute__(attr)
 
