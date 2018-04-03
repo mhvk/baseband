@@ -119,17 +119,17 @@ class Mark5BHeader(VLBIHeaderBase):
 
         bcd_jday : from ``jday`` or ``time``
         bcd_seconds : from ``seconds`` or ``time``
-        bcd_fraction : from ``fraction`` or ``time`` (may need ``framerate``)
-        frame_nr : from ``time`` (may need ``framerate``)
+        bcd_fraction : from ``fraction`` or ``time`` (may need ``frame_rate``)
+        frame_nr : from ``time`` (may need ``frame_rate``)
         """
         time = kwargs.pop('time', None)
-        framerate = kwargs.pop('framerate', None)
+        frame_rate = kwargs.pop('frame_rate', None)
         # Pop verify and pass on False so verify happens after time is set.
         verify = kwargs.pop('verify', True)
         kwargs['verify'] = False
         self = super(Mark5BHeader, cls).fromvalues(**kwargs)
         if time is not None:
-            self.set_time(time, framerate=framerate)
+            self.set_time(time, frame_rate=frame_rate)
             self.update()    # Recalculate CRC.
         if verify:
             self.verify()
@@ -246,7 +246,7 @@ class Mark5BHeader(VLBIHeaderBase):
         fraction = int(ns / 100000)
         self['bcd_fraction'] = bcd_encode(fraction)
 
-    def get_time(self, framerate=None):
+    def get_time(self, frame_rate=None):
         """Convert year, BCD time code to Time object.
 
         Calculate time using ``jday``, ``seconds``, and ``fraction`` properties
@@ -266,7 +266,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
         Parameters
         ----------
-        framerate : `~astropy.units.Quantity`, optional
+        frame_rate : `~astropy.units.Quantity`, optional
             Used to calculate the fractional second from the frame number
             instead of from the header's ``fraction``.
 
@@ -275,19 +275,19 @@ class Mark5BHeader(VLBIHeaderBase):
         `~astropy.time.Time`
 
         """
-        if framerate is None:
+        if frame_rate is None:
             fraction = self.fraction
         else:
             frame_nr = self['frame_nr']
             if frame_nr == 0:
                 fraction = 0.
             else:
-                fraction = (frame_nr / framerate).to(u.s).value
+                fraction = (frame_nr / frame_rate).to(u.s).value
 
         return Time(self.kday + self.jday, (self.seconds + fraction) / 86400,
                     format='mjd', scale='utc', precision=9)
 
-    def set_time(self, time, framerate=None):
+    def set_time(self, time, frame_rate=None):
         """
         Convert Time object to BCD timestamp elements and frame_nr.
 
@@ -298,7 +298,7 @@ class Mark5BHeader(VLBIHeaderBase):
         ----------
         time : `~astropy.time.Time`
             The time to use for this header.
-        framerate : `~astropy.units.Quantity`, optional
+        frame_rate : `~astropy.units.Quantity`, optional
             For calculating the ``frame_nr`` from the fractional seconds.
         """
         self.kday = int(time.mjd // 1000) * 1000
@@ -316,11 +316,11 @@ class Mark5BHeader(VLBIHeaderBase):
             frame_nr = 0
             frac_sec = 0.
         else:
-            if framerate is None:
-                raise ValueError("cannot calculate framerate. Pass it "
+            if frame_rate is None:
+                raise ValueError("cannot calculate frame rate. Pass it "
                                  "in explicitly.")
-            frame_nr = int(round((fraction * framerate).to(u.one).value))
-            fraction = frame_nr / framerate
+            frame_nr = int(round((fraction * frame_rate).to(u.one).value))
+            fraction = frame_nr / frame_rate
             if abs(fraction - 1. * u.s) < 1. * u.ns:
                 int_sec += 1
                 frame_nr = 0

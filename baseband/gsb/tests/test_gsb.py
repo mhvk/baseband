@@ -22,7 +22,7 @@ class TestGSB(object):
 
     def setup(self):
         # For all sample files, each frame spans 0.25165824 sec.
-        self.framerate = (1e8 / 3) / 2**23 * u.Hz
+        self.frame_rate = (1e8 / 3) / 2**23 * u.Hz
         # Payload size for all sample files is 2**12 bytes.
         self.payloadsize = 2**12
 
@@ -436,7 +436,7 @@ class TestGSB(object):
 
     def test_raw_stream(self, tmpdir):
         bps = 4
-        sample_rate = self.framerate * self.payloadsize * (8 // bps)
+        sample_rate = self.frame_rate * self.payloadsize * (8 // bps)
         # Open here with payloadsize given, below with samples_per_frame.
         with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP,
                       sample_rate=sample_rate, payloadsize=self.payloadsize,
@@ -585,7 +585,7 @@ class TestGSB(object):
     def test_phased_stream(self, tmpdir):
         bps = 8
         nchan = 512
-        sample_rate = self.framerate * self.payloadsize * (8 // bps) / nchan
+        sample_rate = self.frame_rate * self.payloadsize * (8 // bps) / nchan
         # Open here with payloadsize given, below with samples_per_frame.
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
                       sample_rate=sample_rate, payloadsize=self.payloadsize,

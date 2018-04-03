@@ -438,9 +438,9 @@ class VDIFHeader(VLBIHeaderBase):
                 except (AttributeError, AssertionError):
                     raise ValueError("cannot calculate sample rate for "
                                      "this header. Pass it in explicitly.")
-            framerate = sample_rate / self.samples_per_frame
-            frame_nr = int(round((frac_sec * framerate).to_value(u.one)))
-            if abs(frame_nr / framerate - 1. * u.s) < 1. * u.ns:
+            frame_rate = sample_rate / self.samples_per_frame
+            frame_nr = int(round((frac_sec * frame_rate).to_value(u.one)))
+            if abs(frame_nr / frame_rate - 1. * u.s) < 1. * u.ns:
                 frame_nr = 0
                 int_sec += 1
 
@@ -694,9 +694,9 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                           format='sec', scale='tai'))
 
     def set_time(self, time, sample_rate=None):
-        framerate = None if sample_rate is None else (sample_rate /
-                                                      self.samples_per_frame)
-        Mark5BHeader.set_time(self, time, framerate)
+        frame_rate = None if sample_rate is None else (sample_rate /
+                                                       self.samples_per_frame)
+        Mark5BHeader.set_time(self, time, frame_rate)
         super(VDIFMark5BHeader, self).set_time(time, sample_rate)
 
     time = property(get_time, set_time)

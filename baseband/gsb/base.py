@@ -202,7 +202,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second, i.e. the rate at which each
         channel of each polarization is sampled.  If `None`, will be
-        inferred assuming the framerate is exactly 0.25165824 s.
+        inferred assuming the frame rate is exactly 0.25165824 s.
     samples_per_frame : int, optional
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.
@@ -318,7 +318,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second, i.e. the rate at which each
         channel of each polarization is sampled.  If not given, will be
-        inferred assuming the framerate is exactly 0.25165824 s.
+        inferred assuming the frame rate is exactly 0.25165824 s.
     samples_per_frame : int, optional
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.
@@ -432,7 +432,7 @@ def open(name, mode='rs', **kwargs):
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second, i.e. the rate at which each
         channel of each polarization is sampled.  If `None`, will be
-        inferred assuming the framerate is exactly 251.658240 ms.
+        inferred assuming the frame rate is exactly 251.658240 ms.
     samples_per_frame : int, optional
         Number of complete samples per frame.  Can give ``payloadsize``
         instead.

@@ -116,15 +116,15 @@ class TestVDIF(object):
             header['thread_id'] = 0
         # Also test time setting.
         header5.time = header.time + 1.*u.s
-        framerate = header.sample_rate / header.samples_per_frame
+        frame_rate = header.sample_rate / header.samples_per_frame
         assert abs(header5.time - header.time - 1.*u.s) < 1.*u.ns
         assert header5['frame_nr'] == header['frame_nr']
-        header5.time = header.time + 1.*u.s + 1.1/framerate
+        header5.time = header.time + 1.*u.s + 1.1/frame_rate
         assert abs(header5.time - header.time - 1.*u.s -
-                   1./framerate) < 1.*u.ns
+                   1./frame_rate) < 1.*u.ns
         assert header5['frame_nr'] == header['frame_nr'] + 1
         # Check rounding in corner case.
-        header5.time = header.time + 1.*u.s - 0.01/framerate
+        header5.time = header.time + 1.*u.s - 0.01/frame_rate
         assert abs(header5.time - header.time - 1.*u.s) < 1.*u.ns
         assert header5['frame_nr'] == header['frame_nr']
         # Check requesting non-existent EDV returns VDIFBaseHeader instance
@@ -134,7 +134,7 @@ class TestVDIF(object):
 
         # Make a new header to test passing time/sample rate.
         headerT = header.copy()
-        headerT.time = header.time + 1. / framerate
+        headerT.time = header.time + 1. / frame_rate
 
         # Test initializing EDV 0 with properties, but off of 1 second mark so
         # frame_nr is used.
