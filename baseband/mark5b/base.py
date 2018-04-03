@@ -182,8 +182,8 @@ class Mark5BStreamBase(VLBIStreamBase):
             samples_per_frame=header0.payloadsize * 8 // bps // nchan,
             unsliced_shape=(nchan,), bps=bps, complex_data=False,
             squeeze=squeeze, subset=subset, fill_value=fill_value)
-        self._framerate = int(round((self.sample_rate /
-                                     self.samples_per_frame).to_value(u.Hz)))
+        self._frame_rate = int(round((self.sample_rate /
+                                      self.samples_per_frame).to_value(u.Hz)))
 
 
 class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
@@ -255,7 +255,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         # Set decoded value for invalid data.
         frame.fill_value = self.fill_value
         # TODO: OK to ignore leap seconds? Not sure what writer does.
-        assert (self._framerate *
+        assert (self._frame_rate *
                 (frame.seconds - self.header0.seconds +
                  86400 * (frame.kday + frame.jday -
                           self.header0.kday - self.header0.jday)) +
@@ -303,7 +303,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
         samples_per_frame = Mark5BHeader._payloadsize * 8 // bps // nchan
         if header0 is None:
             if 'time' in kwargs:
-                kwargs['framerate'] = sample_rate / samples_per_frame
+                kwargs['frame_rate'] = sample_rate / samples_per_frame
             header0 = Mark5BHeader.fromvalues(**kwargs)
 
         fh_raw = Mark5BFileWriter(fh_raw)
@@ -319,9 +319,9 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
         # Set up header for new frame.
         header = self.header0.copy()
         # Update time and frame_nr in one go.
-        framerate = self._framerate * u.Hz
-        header.set_time(time=self.start_time + index / framerate,
-                        framerate=framerate)
+        frame_rate = self._frame_rate * u.Hz
+        header.set_time(time=self.start_time + index / frame_rate,
+                        frame_rate=frame_rate)
         # Recalculate CRC.
         header.update()
         # Reuse payload.

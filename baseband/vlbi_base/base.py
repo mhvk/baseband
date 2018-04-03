@@ -340,7 +340,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         Returns
         -------
-        framerate : `~astropy.units.Quantity`
+        frame_rate : `~astropy.units.Quantity`
             Frames per second.
 
         Notes

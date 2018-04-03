@@ -271,8 +271,8 @@ class Mark4StreamBase(VLBIStreamBase):
             unsliced_shape=(header0.nchan,),
             bps=header0.bps, complex_data=False, squeeze=squeeze,
             subset=subset, fill_value=fill_value)
-        self._framerate = int(round((self.sample_rate /
-                                     self.samples_per_frame).to_value(u.Hz)))
+        self._frame_rate = int(round((self.sample_rate /
+                                      self.samples_per_frame).to_value(u.Hz)))
 
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
@@ -348,7 +348,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
 
         Returns
         -------
-        framerate : `~astropy.units.Quantity`
+        frame_rate : `~astropy.units.Quantity`
             Frames per second.
 
         Notes
@@ -444,7 +444,7 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
     def _make_frame(self, frame_index):
         header = self.header0.copy()
         header.update(time=self.start_time + frame_index /
-                      self._framerate * u.s)
+                      self._frame_rate * u.s)
         # Reuse payload.
         return Mark4Frame(header, self._payload)
 

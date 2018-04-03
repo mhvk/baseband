@@ -283,38 +283,38 @@ class TestMark5B(object):
         header['bcd_fraction'] = 0
         # So, now recover first header time, which started on the second.
         assert header.time == header0.time
-        # But if we pass in the correct framerate, it uses the frame_nr.
+        # But if we pass in the correct frame rate, it uses the frame_nr.
         assert abs(header.get_time(frame_rate) - frame.header.time) < 1. * u.ns
 
-        # Check setting time using framerate.
+        # Check setting time using frame rate.
         sample_rate = 128. * u.MHz
         samples_per_frame = 5000
         # Max frame_nr is 2**15; this sets it to 25600.
         frame_rate = sample_rate / samples_per_frame
         header.set_time(time=(start_time + 1. / frame_rate),
-                        framerate=frame_rate)
+                        frame_rate=frame_rate)
         header.get_time(frame_rate)
         assert abs(header.get_time(frame_rate) -
                    start_time - 1. / frame_rate) < 1. * u.ns
         header.set_time(time=(start_time + 3921. / frame_rate),
-                        framerate=frame_rate)
+                        frame_rate=frame_rate)
         assert abs(header.get_time(frame_rate) -
                    start_time - 3921. / frame_rate) < 1. * u.ns
         # Test using bcd_fraction gives us within 0.1 ms accuracy.
         assert abs(header.time - start_time - 3921. / frame_rate) < 0.1 * u.ms
         header.set_time(time=(start_time + 25599. / frame_rate),
-                        framerate=frame_rate)
+                        frame_rate=frame_rate)
         assert abs(header.get_time(frame_rate) -
                    start_time - 25599. / frame_rate) < 1. * u.ns
         # Check rounding when using passing fractional frametimes.
         header.set_time(time=(start_time + 25598.53 / frame_rate),
-                        framerate=frame_rate)
+                        frame_rate=frame_rate)
         assert abs(header.get_time(frame_rate) -
                    start_time - 25599. / frame_rate) < 1. * u.ns
         # Check rounding to the nearest second when less than 2 ns away.
-        header.set_time(time=(start_time + 0.9 * u.ns), framerate=frame_rate)
+        header.set_time(time=(start_time + 0.9 * u.ns), frame_rate=frame_rate)
         assert header.seconds == header0.seconds
-        header.set_time(time=(start_time - 0.9 * u.ns), framerate=frame_rate)
+        header.set_time(time=(start_time - 0.9 * u.ns), frame_rate=frame_rate)
         assert header.seconds == header0.seconds
 
     def test_find_header(self, tmpdir):

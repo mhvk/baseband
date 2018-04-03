@@ -252,8 +252,8 @@ class VDIFStreamBase(VLBIStreamBase):
             complex_data=header0['complex_data'], squeeze=squeeze,
             subset=subset, fill_value=fill_value)
 
-        self._framerate = int(round((self.sample_rate /
-                                     self.samples_per_frame).to_value(u.Hz)))
+        self._frame_rate = int(round((self.sample_rate /
+                                      self.samples_per_frame).to_value(u.Hz)))
 
     def _get_time(self, header):
         """Get time from a header.
@@ -368,7 +368,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
         Returns
         -------
-        framerate : `~astropy.units.Quantity`
+        frame_rate : `~astropy.units.Quantity`
             Frames per second.
 
         Notes
@@ -430,7 +430,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                                              edv=self.header0.edv)
         frameset.fill_value = self.fill_value
         assert ((frameset['seconds'] - self.header0['seconds']) *
-                self._framerate +
+                self._frame_rate +
                 frameset['frame_nr'] - self.header0['frame_nr']) == index
         return frameset
 
@@ -521,7 +521,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
 
     def _make_frame(self, index):
         dt, frame_nr = divmod(index + self.header0['frame_nr'],
-                              self._framerate)
+                              self._frame_rate)
         seconds = self.header0['seconds'] + dt
         # Reuse frameset.
         self._frameset['seconds'] = seconds

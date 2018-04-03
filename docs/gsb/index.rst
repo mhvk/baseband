@@ -108,7 +108,7 @@ of Fourier channels.  The samples per frame for both rawdump and phased is::
     ``timespan_of_frame`` with ``sample_rate`` in order to avoid rounding
     issues.
 
-Alternatively, if the size of the frame buffer and the framerate are known, the
+Alternatively, if the size of the frame buffer and the frame rate are known, the
 former can be used to determine ``samples_per_frame``, and the latter used to
 determine ``sample_rate`` by inverting the above equation.
 
