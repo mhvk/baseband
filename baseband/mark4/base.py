@@ -320,8 +320,8 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
                  ref_time=None, squeeze=True, subset=(), fill_value=0.):
 
         if decade is None and ref_time is None:
-            raise ValueError("Mark 4 stream reader requires decade or "
-                             "ref_time. Please pass either explicitly.")
+            raise TypeError("Mark 4 stream reader requires either decade or "
+                            "ref_time to be passed in.")
 
         # Get binary file reader.
         fh_raw = Mark4FileReader(fh_raw, ntrack=ntrack, decade=decade,

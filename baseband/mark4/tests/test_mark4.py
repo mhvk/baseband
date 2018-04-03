@@ -795,7 +795,7 @@ class TestMark4(object):
             mark4.open('ts.dat', 's')
 
     def test_stream_missing_decade(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             mark4.open(SAMPLE_FILE, 'rs', ntrack=64)
 
 

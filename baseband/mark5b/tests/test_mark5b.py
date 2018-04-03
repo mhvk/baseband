@@ -606,7 +606,11 @@ class TestMark5B(object):
         with pytest.raises(ValueError):
             mark5b.open('ts.dat', 's')
 
+    def test_stream_missing_nchan(self):
+        with pytest.raises(TypeError):
+            mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz, kday=56000)
+
     def test_stream_missing_kday(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
                         nchan=8, bps=2)

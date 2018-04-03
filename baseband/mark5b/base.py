@@ -211,8 +211,8 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
     ref_time : `~astropy.time.Time` or None
         Reference time within 500 days of the observation start time, used
         to infer the full MJD.  Only used if `kday` is not given.
-    nchan : int, optional
-        Number of channels.  Default: 1.
+    nchan : int
+        Number of channels.  Needs to be explicitly passed in.
     bps : int, optional
         Bits per elementary sample.  Default: 2.
     squeeze : bool, optional
@@ -228,11 +228,15 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, kday=None, ref_time=None,
-                 nchan=1, bps=2, squeeze=True, subset=(), fill_value=0.):
+                 nchan=None, bps=2, squeeze=True, subset=(), fill_value=0.):
+
+        if nchan is None:
+            raise TypeError("Mark 5B stream reader requires nchan to be "
+                            "explicity passed in.")
 
         if kday is None and ref_time is None:
-            raise ValueError("Mark5B stream reader requires kday or ref_time. "
-                             "Please pass either explicitly.")
+            raise TypeError("Mark 5B stream reader requires either kday or "
+                            "ref_time to be passed in.")
 
         fh_raw = Mark5BFileReader(fh_raw, nchan=nchan, bps=bps,
                                   ref_time=ref_time, kday=kday)
