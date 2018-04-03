@@ -262,19 +262,22 @@ class VDIFHeader(VLBIHeaderBase):
             valid VDIF header, but this can be used to pass on, e.g.,
             ``invalid_data``.
         """
-        # We need to treat the time separately since the Mark 5B time may miss
-        # fractional seconds.  However, with the frame number and sample rate
-        # it is uniquely defined.
         assert 'time' not in kwargs, "Time is inferred from Mark 5B Header."
-        sample_rate = kwargs.pop('sample_rate', None)
-        verify = kwargs.pop('verify', True)
+        # We need to treat the time carefully since the Mark 5B time may miss
+        # fractional seconds, or they may be incorrect for rates above 512Mbps.
+        # Integer seconds and frame_nr define everything uniquely, so we get
+        # the time for frame number 0 and then set the frame number after.
         kwargs.update(mark5b_header)
+        # Get time to integer seconds from mark5b header.
+        time_frame0 = Time(mark5b_header.kday + mark5b_header.jday,
+                           mark5b_header.seconds / 86400,
+                           format='mjd', scale='utc')
         self = cls.fromvalues(edv=0xab, bps=bps, nchan=nchan,
-                              complex_data=False, verify=False, **kwargs)
-        self.set_time(mark5b_header.time, sample_rate=sample_rate,
-                      frame_nr=mark5b_header['frame_nr'])
-        if verify:
-            self.verify()
+                              complex_data=False, time=time_frame0, **kwargs)
+        # Time setting will set frame_nr and bcd_fraction to 0; reset these
+        # to the correct values.
+        self['frame_nr'] = mark5b_header['frame_nr']
+        self['bcd_fraction'] = mark5b_header['bcd_fraction']
         return self
 
     # Properties common to all VDIF headers.
@@ -357,7 +360,7 @@ class VDIFHeader(VLBIHeaderBase):
         assert int(station_id) == station_id
         self['station_id'] = station_id
 
-    def get_time(self, sample_rate=None, frame_nr=None):
+    def get_time(self, sample_rate=None):
         """
         Converts ref_epoch, seconds, and frame_nr to Time object.
 
@@ -368,8 +371,6 @@ class VDIFHeader(VLBIHeaderBase):
         The latter can be passed on if it is not available (e.g., for a legacy
         VDIF header).
 
-        Set frame_nr=0 to just get the header time from ref_epoch and seconds.
-
         Parameters
         ----------
         sample_rate : `~astropy.units.Quantity`, optional
@@ -377,17 +378,12 @@ class VDIFHeader(VLBIHeaderBase):
             corresponding offset.  If not given, an attempt will be made to
             calculate it from the sampling rate given in the header (but not
             all EDV contain this).
-        frame_nr : int, optional
-            Can be used to override the ``frame_nr`` from the header.  If 0,
-            the routine simply returns the time in the header.
 
         Returns
         -------
         time : `~astropy.time.Time`
         """
-        if frame_nr is None:
-            frame_nr = self['frame_nr']
-
+        frame_nr = self['frame_nr']
         if frame_nr == 0:
             offset = 0.
         else:
@@ -403,7 +399,7 @@ class VDIFHeader(VLBIHeaderBase):
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
-    def set_time(self, time, sample_rate=None, frame_nr=None):
+    def set_time(self, time, sample_rate=None):
         """
         Converts Time object to ref_epoch, seconds, and frame_nr.
 
@@ -420,8 +416,6 @@ class VDIFHeader(VLBIHeaderBase):
             For calculating the ``frame_nr`` from the fractional seconds.
             If not given, will try to calculate it from the sampling rate
             given in the header (but not all EDV contain this).
-        frame_nr : int, optional
-            An explicit frame number associated with the fractions of seconds.
         """
         assert time > ref_epochs[0]
         ref_index = np.searchsorted((ref_epochs - time).sec, 0) - 1
@@ -437,19 +431,18 @@ class VDIFHeader(VLBIHeaderBase):
             int_sec += 1
             frame_nr = 0
         else:
-            if frame_nr is None:
-                if sample_rate is None:
-                    try:
-                        sample_rate = self.sample_rate
-                        assert sample_rate.value != 0.
-                    except (AttributeError, AssertionError):
-                        raise ValueError("cannot calculate sample rate for "
-                                         "this header. Pass it in explicitly.")
-                framerate = sample_rate / self.samples_per_frame
-                frame_nr = int(round((frac_sec * framerate).to_value(u.one)))
-                if abs(frame_nr / framerate - 1. * u.s) < 1. * u.ns:
-                    frame_nr = 0
-                    int_sec += 1
+            if sample_rate is None:
+                try:
+                    sample_rate = self.sample_rate
+                    assert sample_rate.value != 0.
+                except (AttributeError, AssertionError):
+                    raise ValueError("cannot calculate sample rate for "
+                                     "this header. Pass it in explicitly.")
+            framerate = sample_rate / self.samples_per_frame
+            frame_nr = int(round((frac_sec * framerate).to_value(u.one)))
+            if abs(frame_nr / framerate - 1. * u.s) < 1. * u.ns:
+                frame_nr = 0
+                int_sec += 1
 
         self['seconds'] = int_sec
         self['frame_nr'] = frame_nr
@@ -653,7 +646,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         if item == 'frame_nr':
             super(VDIFMark5BHeader, self).__setitem__('mark5b_frame_nr', value)
 
-    def get_time(self, sample_rate=None, frame_nr=None):
+    def get_time(self, sample_rate=None):
         """
         Convert ref_epoch, seconds, and fractional seconds to Time object.
 
@@ -671,28 +664,21 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         this value, it is no longer guaranteed that subsequent frames have
         unique rates, and one should pass in an explicit sample rate instead.
 
-        Set frame_nr=0 to just get the header time from ref_epoch and seconds.
-
         Parameters
         ----------
         sample_rate : `~astropy.units.Quantity`, optional
             For non-zero `frame_nr`, this is used to calculate the
             corresponding offset.
-        frame_nr : int, optional
-            Can be used to override the ``frame_nr`` from the header.  If 0,
-            the routine simply returns the time to the integer second.
 
         Returns
         -------
         time : `~astropy.time.Time`
         """
-        if sample_rate is None and frame_nr is None:
+        if sample_rate is None:
             # Get fractional second from the Mark 5B part of the header.
             offset = self.ns * 1.e-9
         else:
-            if frame_nr is None:
-                frame_nr = self['frame_nr']
-
+            frame_nr = self['frame_nr']
             if frame_nr == 0:
                 offset = 0.
             else:
@@ -706,10 +692,10 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
 
-    def set_time(self, time, sample_rate=None, frame_nr=None):
+    def set_time(self, time, sample_rate=None):
         framerate = None if sample_rate is None else (sample_rate /
                                                       self.samples_per_frame)
-        Mark5BHeader.set_time(self, time, framerate, frame_nr)
-        super(VDIFMark5BHeader, self).set_time(time, sample_rate, frame_nr)
+        Mark5BHeader.set_time(self, time, framerate)
+        super(VDIFMark5BHeader, self).set_time(time, sample_rate)
 
     time = property(get_time, set_time)
