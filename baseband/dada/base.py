@@ -314,7 +314,7 @@ npol : int, optional
 nchan : int, optional
     Number of channels (default: 1).
 complex_data : bool, optional
-    Whether data is complex (default: False).
+    Whether data are complex (default: False).
 bps : int, optional
     Bits per elementary sample, i.e. per real or imaginary component for
     complex data (default: 8).

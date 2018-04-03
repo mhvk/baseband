@@ -32,11 +32,11 @@ class Mark5BFrame(VLBIFrameBase):
     payload : `~baseband.mark5b.Mark5BPayload`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool or None
-        Whether the data is valid.  If `None` (default), the validity will be
+        Whether the data are valid.  If `None` (default), the validity will be
         determined by checking whether the payload consists of the fill pattern
         0x11223344.
     verify : bool
-        Whether to do basic verification of integrity (default: True)
+        Whether to do basic verification of integrity (default: `True`)
 
     Notes
     -----
@@ -53,10 +53,10 @@ class Mark5BFrame(VLBIFrameBase):
       data : property that yields full decoded payload
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, ``words`` the full encoded frame, and ``size``
-    the frame size in bytes.  Furthermore, the frame acts as a dictionary, with
-    keys those of the header. Any attribute that is not defined on the frame
-    itself, such as ``.time`` will be looked up on the header as well.
+    and type of the data array, and ``size`` the frame size in bytes.
+    Furthermore, the frame acts as a dictionary, with keys those of the header.
+    Any attribute that is not defined on the frame itself, such as ``.time``
+    will be looked up on the header as well.
     """
 
     _header_class = Mark5BHeader
@@ -114,7 +114,7 @@ class Mark5BFrame(VLBIFrameBase):
         bps : int
             Bits per elementary sample.  Default: 2.
         valid : bool
-            Whether the data is valid (default: `True`).  If not, the payload
+            Whether the data are valid (default: `True`).  If not, the payload
             will be set to a fill pattern.
         verify : bool
             Whether to do basic checks of frame integrity (default: `True`).

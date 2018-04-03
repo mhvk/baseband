@@ -428,7 +428,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         self.fh_raw.seek(index * self._framesetsize)
         frameset = self.fh_raw.read_frameset(self._thread_ids,
                                              edv=self.header0.edv)
-        frameset.invalid_data_value = self.fill_value
+        frameset.fill_value = self.fill_value
         assert ((frameset['seconds'] - self.header0['seconds']) *
                 self._framerate +
                 frameset['frame_nr'] - self.header0['frame_nr']) == index
@@ -469,7 +469,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
         Number of channels (default: 1).  Note: different numbers of channels
         per thread is not supported.
     complex_data : bool, optional
-        Whether data is complex.  Default: `False`.
+        Whether data are complex.  Default: `False`.
     bps : int, optional
         Bits per elementary sample, i.e. per real or imaginary component for
         complex data.  Default: 1.

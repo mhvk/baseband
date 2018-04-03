@@ -284,7 +284,7 @@ class TestMark4ToVDIF1(object):
                        nthread=data.shape[1]) as fw:
             assert (fw.tell(unit='time') - start_time) < 2. * u.ns
             # Write first VDIF frame, matching Mark 4 Header, hence invalid.
-            fw.write(data[:160], invalid_data=True)
+            fw.write(data[:160], valid=False)
             # Write remaining VDIF frames, with valid data.
             fw.write(data[160:])
             assert (fw.tell(unit='time') - time1) < 2. * u.ns

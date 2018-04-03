@@ -418,7 +418,7 @@ We now write the data to file, manually flagging each invalid data frame::
 
     >>> while fr.tell() < fr.size:
     ...     d = fr.read(fr.samples_per_frame)
-    ...     fw.write(d[:640], invalid_data=True)
+    ...     fw.write(d[:640], valid=False)
     ...     fw.write(d[640:])
     >>> fr.close()
     >>> fw.close()

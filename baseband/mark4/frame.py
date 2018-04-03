@@ -33,8 +33,8 @@ class Mark4Frame(VLBIFrameBase):
     payload : `~baseband.mark4.Mark4Payload`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool or None, optional
-        Whether the data is valid.  If `None` (default), inferred from header.
-        Note that the header is updated in-place if `True` or `False`.
+        Whether the data are valid.  If `None` (default), inferred from header.
+        Note that `header` is updated in-place if `True` or `False`.
     verify : bool, optional
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and number of tracks are consistent
@@ -56,13 +56,13 @@ class Mark4Frame(VLBIFrameBase):
 
     One can decode part of the payload by indexing or slicing the frame.
     If the frame does not contain valid data, all values returned are set
-    to ``self.invalid_data_value``.
+    to ``self.fill_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, ``words`` the full encoded frame, and ``size``
-    the frame size in bytes.  Furthermore, the frame acts as a dictionary, with
-    keys those of the header. Any attribute that is not defined on the frame
-    itself, such as ``.time`` will be looked up on the header as well.
+    and type of the data array, and ``size`` the frame size in bytes.
+    Furthermore, the frame acts as a dictionary, with keys those of the header.
+    Any attribute that is not defined on the frame itself, such as ``.time``
+    will be looked up on the header as well.
     """
 
     _header_class = Mark4Header
@@ -246,7 +246,7 @@ class Mark4Frame(VLBIFrameBase):
         (payload_item, sample_index, data_shape,
          ninvalid) = self._get_payload_item(item)
         if not self.valid or payload_item is None:
-            data = np.full(data_shape, self.invalid_data_value, self.dtype)
+            data = np.full(data_shape, self.fill_value, self.dtype)
 
         elif ninvalid == 0:
             data = self.payload[payload_item]
@@ -255,7 +255,7 @@ class Mark4Frame(VLBIFrameBase):
             # Note: Creating an empty array and setting part to invalid
             # is much faster than creating one pre-filled with invalid.
             data = np.empty(data_shape, self.dtype)
-            data[:ninvalid] = self.invalid_data_value
+            data[:ninvalid] = self.fill_value
             data[ninvalid:] = self.payload[payload_item]
 
         if sample_index is ():

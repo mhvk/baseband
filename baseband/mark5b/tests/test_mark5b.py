@@ -459,7 +459,7 @@ class TestMark5B(object):
             # And add in an invalid frame for good measure.
             fw.write(record[:11])
             fw.write(record[11:5000])
-            fw.write(record[5000:10000], invalid_data=True)
+            fw.write(record[5000:10000], valid=False)
             fw.write(record[10000:])
             assert fw.time == stop_time
 

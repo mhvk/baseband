@@ -26,9 +26,9 @@ class VLBIFrameBase(object):
     payload : `~baseband.vlbi_base.payload.VLBIPayloadBase`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool
-        Whether this frame contains valid data (default: True).
+        Whether the data are valid.  Default: `True`.
     verify : bool
-        Whether to do basic verification of integrity (default: True)
+        Whether to do basic verification of integrity.  Default: `True`.
 
     Notes
     -----
@@ -46,7 +46,7 @@ class VLBIFrameBase(object):
 
     One can decode part of the payload by indexing or slicing the frame.
     If the frame does not contain valid data, all values returned are set
-    to ``self.invalid_data_value``.
+    to ``self.fill_value``.
 
     A number of properties are defined: ``shape`` and ``dtype`` are the shape
     and type of the data array, and ``size`` the frame size in bytes.
@@ -57,7 +57,7 @@ class VLBIFrameBase(object):
 
     _header_class = None
     _payload_class = None
-    invalid_data_value = 0.
+    fill_value = 0.
     """Value used to replace data if the frame does not contain valid data."""
 
     def __init__(self, header, payload, valid=True, verify=True):
@@ -164,7 +164,7 @@ class VLBIFrameBase(object):
             return self.payload.__getitem__(item)
         else:
             data_shape = np.empty(self.shape, dtype=bool)[item].shape
-            return np.full(data_shape, self.invalid_data_value,
+            return np.full(data_shape, self.fill_value,
                            dtype=self.dtype)
 
     data = property(__getitem__, doc="Full decoded frame.")

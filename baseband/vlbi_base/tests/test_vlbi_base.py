@@ -362,7 +362,7 @@ class TestVLBIBase(object):
         assert self.frame.valid is True
         frame = self.Frame(self.header, self.payload, valid=False)
         assert np.all(frame.data == 0.)
-        frame.invalid_data_value = 1.
+        frame.fill_value = 1.
         assert np.all(frame.data == 1.)
 
         assert 'x2_0_64' in self.frame

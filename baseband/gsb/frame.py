@@ -26,9 +26,34 @@ class GSBFrame(VLBIFrameBase):
         Based on a single block of rawdump data, or the combined blocks for
         phased data.
     valid : bool, optional
-        Whether the frame contains valid data.  Default: `True`.
+        Whether the data are valid.  Default: `True`.
     verify : bool, optional
         Whether to verify consistency of the frame parts.  Default: `True`.
+
+    Notes
+    -----
+    GSB files do not support storing whether data are valid or not on disk.
+    Hence, this has to be determined independently.  If ``valid=False``, any
+    decoded data are set to ``cls.fill_value`` (by default, 0).
+
+    The Frame can also be read instantiated using class methods:
+
+      fromfile : read header and payload from their respective filehandles
+
+      fromdata : encode data as payload
+
+    Of course, one can also do the opposite:
+
+      tofile : method to write header and payload to filehandles (splitting
+               payload in the appropriate files).
+
+      data : property that yields full decoded payload
+
+    A number of properties are defined: ``shape`` and ``dtype`` are the shape
+    and type of the data array, and ``size`` the frame size in bytes.
+    Furthermore, the frame acts as a dictionary, with keys those of the header.
+    Any attribute that is not defined on the frame itself, such as ``.time``
+    will be looked up on the header as well.
     """
     _header_class = GSBHeader
     _payload_class = GSBPayload
@@ -57,9 +82,11 @@ class GSBFrame(VLBIFrameBase):
         bps : int, optional
             Bits per elementary sample.  Default: 4.
         complex_data : bool, optional
-            Whether data is complex.  Default: `False`.
+            Whether data are complex.  Default: `False`.
         valid : bool, optional
-            Whether the frame contains valid data.  Default: `True`.
+            Whether the data are valid (default: `True`). Note that this cannot
+            be inferred from the header or payload itself.  If `False`, any
+            data read will be set to ``cls.fill_value``.
         verify : bool, optional
             Whether to verify consistency of the frame parts.  Default: `True`.
         """
