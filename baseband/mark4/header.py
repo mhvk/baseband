@@ -29,7 +29,7 @@ MARK4_DTYPES = {8: '<u1',  # this needs to start with '<' for words2stream.
                 64: '<u8'}
 """Integer dtype used to encode a given number of tracks."""
 
-PAYLOADSIZE = 20000
+PAYLOAD_NBITS = 20000
 """Number of bits per track per frame."""
 
 CRC12 = 0x180f
@@ -390,10 +390,10 @@ class Mark4Header(Mark4TrackHeader):
             Whether to do basic verification of integrity.  Default: `True`.
         """
         dtype = cls._stream_dtype(ntrack)
-        size = ntrack * 5 * 32 // 8
+        header_nbytes = ntrack * 160 // 8
         try:
-            stream = np.frombuffer(fh.read(size), dtype=dtype)
-            assert len(stream) * dtype.itemsize == size
+            stream = np.frombuffer(fh.read(header_nbytes), dtype=dtype)
+            assert len(stream) * dtype.itemsize == header_nbytes
         except (ValueError, AssertionError):
             raise EOFError("could not read full Mark 4 Header.")
 
@@ -488,22 +488,22 @@ class Mark4Header(Mark4TrackHeader):
         return self.words.shape[1]
 
     @property
-    def size(self):
+    def nbytes(self):
         """Size of the header in bytes."""
         return self.ntrack * 160 // 8
 
     @property
-    def framesize(self):
+    def frame_nbytes(self):
         """Size of the whole frame (header + payload) in bytes."""
-        return self.ntrack * PAYLOADSIZE // 8
+        return self.ntrack * PAYLOAD_NBITS // 8
 
     @property
-    def payloadsize(self):
+    def payload_nbytes(self):
         """Size of the payload in bytes.
 
         Note that the payloads miss pieces overwritten by the header.
         """
-        return self.framesize - self.size
+        return self.frame_nbytes - self.nbytes
 
     @property
     def fanout(self):
@@ -536,14 +536,14 @@ class Mark4Header(Mark4TrackHeader):
 
         If set, this uses the number of tracks to infer and set ``fanout``.
         """
-        # Header overwrites part of payload, so we need framesize.
-        # framesize * 8 // bps // nchan, but use ntrack and fanout, as these
+        # Header overwrites part of payload, so we need
+        # frame_nbytes * 8 // bps // nchan, but use ntrack and fanout, as these
         # are more basic; ntrack / fanout by definition equals bps * nchan.
-        return self.framesize * 8 // (self.ntrack // self.fanout)
+        return self.frame_nbytes * 8 // (self.ntrack // self.fanout)
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
-        self.fanout = samples_per_frame * self.ntrack // 8 // self.framesize
+        self.fanout = samples_per_frame * self.ntrack // 8 // self.frame_nbytes
 
     @property
     def bps(self):

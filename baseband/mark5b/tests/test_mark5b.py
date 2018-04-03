@@ -57,14 +57,14 @@ class TestMark5B(object):
     def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
-        assert header.size == 16
+        assert header.nbytes == 16
         assert header.kday == 56000.
         assert header.jday == 821
         mjd, frac = divmod(header.time.mjd, 1)
         assert mjd == 56821
         assert round(frac * 86400) == 19801
-        assert header.payloadsize == 10000
-        assert header.framesize == 10016
+        assert header.payload_nbytes == 10000
+        assert header.frame_nbytes == 10016
         assert header['frame_nr'] == 0
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             header.tofile(s)
@@ -87,15 +87,15 @@ class TestMark5B(object):
             header5 = mark5b.Mark5BHeader.fromfile(
                 fh, ref_time=Time(57200, format='mjd'))
         assert header5 == header
-        # check payload and framesize setters
+        # Check payload and frame size setters.
         header6 = mark5b.Mark5BHeader(header.words, kday=56000)
         header6.time == header.time
         header6.payload = 10000
-        header6.framesize = 10016
+        header6.frame_nbytes = 10016
         with pytest.raises(ValueError):
-            header6.payloadsize = 9999
+            header6.payload_nbytes = 9999
         with pytest.raises(ValueError):
-            header6.framesize = 20
+            header6.frame_nbytes = 20
         # Regression tests
         header7 = header.copy()
         assert header7 == header  # This checks header.words
@@ -148,8 +148,8 @@ class TestMark5B(object):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(16)  # Skip header.
             payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
-        assert payload._size == 10000
-        assert payload.size == 10000
+        assert payload._nbytes == 10000
+        assert payload.nbytes == 10000
         assert payload.shape == (5000, 8)
         # Check sample shape validity.
         assert payload.sample_shape == (8,)
@@ -263,7 +263,7 @@ class TestMark5B(object):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
             header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             start_time = header0.time
-            samples_per_frame = header0.payloadsize * 8 // 2 // 8
+            samples_per_frame = header0.payload_nbytes * 8 // 2 // 8
             frame_rate = 32. * u.MHz / samples_per_frame
             frame_duration = 1. / frame_rate
             fh.seek(0)
@@ -328,13 +328,13 @@ class TestMark5B(object):
             assert fh.tell() == 0
             fh.seek(10000)
             header_10000f = fh.find_header(forward=True)
-            assert fh.tell() == header0.framesize
+            assert fh.tell() == header0.frame_nbytes
             fh.seek(16)
             header_16b = fh.find_header(forward=False)
             assert fh.tell() == 0
             fh.seek(-10000, 2)
             header_m10000b = fh.find_header(forward=False)
-            assert fh.tell() == 3 * header0.framesize
+            assert fh.tell() == 3 * header0.frame_nbytes
             fh.seek(-30, 2)
             header_end = fh.find_header(forward=True)
             assert header_end is None
@@ -352,7 +352,7 @@ class TestMark5B(object):
             assert fh.tell() == 0
             fh.seek(10000)
             header_10000f = fh.find_header(forward=True)
-            assert fh.tell() == header0.framesize * 2 - 9960
+            assert fh.tell() == header0.frame_nbytes * 2 - 9960
         # For completeness, also check a really short file...
         with open(m5_test, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
             s.write(f.read(10018))
@@ -378,7 +378,7 @@ class TestMark5B(object):
             fh.seek(10000)
             record2 = fh.read(2)
             assert fh.tell() == 10002
-            assert fh.fh_raw.tell() == 3. * header.framesize
+            assert fh.fh_raw.tell() == 3. * header.frame_nbytes
             assert fh.time == fh.tell(unit='time')
             assert (np.abs(fh.time - (fh.start_time + 10002 / (32 * u.MHz))) <
                     1. * u.ns)

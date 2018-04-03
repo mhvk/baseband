@@ -72,12 +72,12 @@ class Mark5BHeader(VLBIHeaderBase):
 
     _struct = four_word_struct
 
-    _properties = ('payloadsize', 'framesize', 'kday', 'jday', 'seconds',
+    _properties = ('payload_nbytes', 'frame_nbytes', 'kday', 'jday', 'seconds',
                    'fraction', 'time')
     """Properties accessible/usable in initialisation."""
 
     kday = None
-    _payloadsize = 10000  # 2500 words
+    _payload_nbytes = 10000  # 2500 words
 
     def __init__(self, words, kday=None, ref_time=None, verify=True, **kwargs):
         super(Mark5BHeader, self).__init__(words, verify=False, **kwargs)
@@ -182,24 +182,24 @@ class Mark5BHeader(VLBIHeaderBase):
         self.kday = np.round(ref_time.mjd - self.jday, decimals=-3).astype(int)
 
     @property
-    def payloadsize(self):
+    def payload_nbytes(self):
         """Size of the payload, in bytes."""
-        return self._payloadsize    # Hardcoded in class definition.
+        return self._payload_nbytes    # Hardcoded in class definition.
 
-    @payloadsize.setter
-    def payloadsize(self, payloadsize):
-        if payloadsize != self._payloadsize:  # 2500 words.
+    @payload_nbytes.setter
+    def payload_nbytes(self, payload_nbytes):
+        if payload_nbytes != self._payload_nbytes:  # 2500 words.
             raise ValueError("Mark 5B payload has a fixed size of 10000 bytes "
                              "(2500 words).")
 
     @property
-    def framesize(self):
+    def frame_nbytes(self):
         """Size of a frame, in bytes."""
-        return self.size + self.payloadsize
+        return self.nbytes + self.payload_nbytes
 
-    @framesize.setter
-    def framesize(self, framesize):
-        if framesize != self.size + self.payloadsize:
+    @frame_nbytes.setter
+    def frame_nbytes(self, frame_nbytes):
+        if frame_nbytes != self.nbytes + self.payload_nbytes:
             raise ValueError("Mark 5B frame has a fixed size of 10016 bytes "
                              "(4 header words plus 2500 payload words).")
 

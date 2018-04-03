@@ -260,7 +260,7 @@ class Mark4Payload(VLBIPayloadBase):
             nchan = header.nchan
             bps = header.bps
             fanout = header.fanout
-            self._size = header.payloadsize
+            self._nbytes = header.payload_nbytes
         self._dtype_word = MARK4_DTYPES[nchan * bps * fanout]
         self.fanout = fanout
         super(Mark4Payload, self).__init__(words, sample_shape=(nchan,),
@@ -271,11 +271,11 @@ class Mark4Payload(VLBIPayloadBase):
     def fromfile(cls, fh, header):
         """Read payload from filehandle and decode it into data.
 
-        The payloadsize, number of channels, bits per sample, and fanout ratio
-        are all taken from the header.
+        The payload_nbytes, number of channels, bits per sample, and fanout
+        ratio are all taken from the header.
         """
-        s = fh.read(header.payloadsize)
-        if len(s) < header.payloadsize:
+        s = fh.read(header.payload_nbytes)
+        if len(s) < header.payload_nbytes:
             raise EOFError("could not read full payload.")
         return cls(np.frombuffer(s, dtype=header.stream_dtype), header)
 

@@ -58,11 +58,12 @@ class VDIFFrame(VLBIFrameBase):
     If the frame does not contain valid data, all values returned are set
     to ``self.fill_value``.
 
-    A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, and ``size`` the frame size in bytes.
-    Furthermore, the frame acts as a dictionary, with keys those of the header.
-    Any attribute that is not defined on the frame itself, such as ``.time``
-    will be looked up on the header as well.
+    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    the shape, type and number of complete samples of the data array, and
+    ``nbytes`` the frame size in bytes.  Furthermore, the frame acts as a
+    dictionary, with keys those of the header.  Any attribute that is not
+    defined on the frame itself, such as ``.time`` will be looked up on the
+    header as well.
     """
 
     _header_class = VDIFHeader
@@ -190,12 +191,12 @@ class VDIFFrameSet(object):
     If the frame does not contain valid data, all values returned are set
     to ``self.fill_value``.
 
-    A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, and ``size`` the total size in bytes.  Like a
-    VDIFFrame, the frame set acts as a dictionary, with keys those of the
-    header of the first frame (available via ``.header0``).  Any attribute that
-    is not defined on the frame set itself, such as ``.time`` will also be
-    looked up on the header.
+    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    the shape, type and number of complete samples of the data array, and
+    ``nbytes`` the frame size in bytes.  Like a VDIFFrame, the frame set acts
+    as a dictionary, with keys those of the header of the first frame
+    (available via ``.header0``).  Any attribute that is not defined on the
+    frame set itself, such as ``.time`` will also be looked up on the header.
     """
     def __init__(self, frames, header0=None):
         self.frames = frames
@@ -242,7 +243,7 @@ class VDIFFrameSet(object):
                 payload = VDIFPayload.fromfile(fh, header=header)
                 frames[thread_id] = VDIFFrame(header, payload, verify=verify)
             else:
-                fh.seek(header.payloadsize, 1)
+                fh.seek(header.payload_nbytes, 1)
 
             try:
                 header = VDIFHeader.fromfile(fh, edv, verify)
@@ -252,7 +253,7 @@ class VDIFFrameSet(object):
                 else:
                     raise
         else:  # Move back to before header that had incorrect frame_nr.
-            fh.seek(-header.size, 1)
+            fh.seek(-header.nbytes, 1)
 
         if thread_ids and len(frames) < len(thread_ids):
             raise IOError("could not find all requested frames.")
@@ -313,14 +314,15 @@ class VDIFFrameSet(object):
         return cls(frames)
 
     @property
-    def size(self):
-        return len(self.frames) * self.frames[0].size
+    def nbytes(self):
+        return len(self.frames) * self.frames[0].nbytes
 
     @property
     def sample_shape(self):
         return (len(self.frames),) + self.frames[0].sample_shape
 
     def __len__(self):
+        """Number of samples in the frameset."""
         return len(self.frames[0])
 
     @property
@@ -375,11 +377,11 @@ class VDIFFrameSet(object):
 
         Notes
         -----
-        The sample part of ``item`` is restricted to (tuples of) ints or slices,
-        so one cannot access non-contiguous samples using advanced indexing.
-        Futhermore, if ``item`` is a slice, a negative increment cannot be used.
-        The function is unable to parse payloads whose words have unused space
-        (eg. VDIF files with 20 bits/sample).
+        The sample part of ``item`` is restricted to (tuples of) ints or
+        slices, so one cannot access non-contiguous samples using advanced
+        indexing.  Futhermore, if ``item`` is a slice, a negative increment
+        cannot be used.  The function is unable to parse payloads whose words
+        have unused space (eg. VDIF files with 20 bits/sample).
         """
         if item is ():
             return self.frames, (), False, False, False

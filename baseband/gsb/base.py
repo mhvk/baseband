@@ -60,7 +60,7 @@ class GSBFileReader(VLBIFileBase):
 
     Parameters
     ----------
-    payloadsize : int
+    payload_nbytes : int
         Number of bytes to read.
     nchan : int, optional
         Number of channels.  Default: 1.
@@ -70,9 +70,9 @@ class GSBFileReader(VLBIFileBase):
     complex_data : bool, optional
         Whether data are complex.  Default: False.
     """
-    def __init__(self, fh_raw, payloadsize, nchan=1, bps=4,
+    def __init__(self, fh_raw, payload_nbytes, nchan=1, bps=4,
                  complex_data=False):
-        self.payloadsize = payloadsize
+        self.payload_nbytes = payload_nbytes
         self.nchan = nchan
         self.bps = bps
         self.complex_data = complex_data
@@ -86,7 +86,8 @@ class GSBFileReader(VLBIFileBase):
         frame : `~baseband.gsb.GSBPayload`
             With a ``.data`` property that returns the data encoded.
         """
-        return GSBPayload.fromfile(self.fh_raw, payloadsize=self.payloadsize,
+        return GSBPayload.fromfile(self.fh_raw,
+                                   payload_nbytes=self.payload_nbytes,
                                    nchan=self.nchan, bps=self.bps,
                                    complex_data=self.complex_data)
 
@@ -119,7 +120,7 @@ class GSBStreamBase(VLBIStreamBase):
     _sample_shape_maker = GSBPayload._sample_shape_maker
 
     def __init__(self, fh_ts, fh_raw, header0, sample_rate=None,
-                 samples_per_frame=None, payloadsize=None, nchan=None,
+                 samples_per_frame=None, payload_nbytes=None, nchan=None,
                  bps=None, complex_data=None, squeeze=True, subset=()):
 
         self.fh_ts = fh_ts
@@ -130,15 +131,15 @@ class GSBStreamBase(VLBIStreamBase):
         nchan = nchan if nchan is not None else (1 if rawdump else 512)
 
         # By default, GSB frames span 4 MB for rawdump and 8 MB for phased.
-        if payloadsize is None and samples_per_frame is None:
-            payloadsize = 2**22 if rawdump else 2**23 // len(fh_raw[0])
+        if payload_nbytes is None and samples_per_frame is None:
+            payload_nbytes = 2**22 if rawdump else 2**23 // len(fh_raw[0])
 
-        if payloadsize is None:
-            payloadsize = (samples_per_frame * nchan *
-                           (2 if complex_data else 1) * bps // 8 //
-                           (1 if rawdump else len(fh_raw[0])))
+        if payload_nbytes is None:
+            payload_nbytes = (samples_per_frame * nchan *
+                              (2 if complex_data else 1) * bps // 8 //
+                              (1 if rawdump else len(fh_raw[0])))
         elif samples_per_frame is None:
-            samples_per_frame = (payloadsize * 8 // bps *
+            samples_per_frame = (payload_nbytes * 8 // bps *
                                  (1 if rawdump else len(fh_raw[0])) //
                                  (nchan * (2 if complex_data else 1)))
 
@@ -154,7 +155,7 @@ class GSBStreamBase(VLBIStreamBase):
             bps=bps, complex_data=complex_data, squeeze=squeeze, subset=subset,
             fill_value=0.)
 
-        self._payloadsize = payloadsize
+        self._payload_nbytes = payload_nbytes
 
     def close(self):
         self.fh_ts.close()
@@ -204,12 +205,12 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         channel of each polarization is sampled.  If `None`, will be
         inferred assuming the frame rate is exactly 0.25165824 s.
     samples_per_frame : int, optional
-        Number of complete samples per frame.  Can give ``payloadsize``
+        Number of complete samples per frame.  Can give `payload_nbytes`
         instead.
-    payloadsize : int, optional
+    payload_nbytes : int, optional
         Number of bytes per payload, divided by the number of raw files.
-        If both ``samples_per_frame`` and ``payloadsize`` are `None`,
-        ``payloadsize`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
+        If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
+        ``payload_nbytes`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
         divided by the number of streams per polarization for phased.
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.
@@ -235,12 +236,12 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     # multiple blocks, combining these into a frame?
 
     def __init__(self, fh_ts, fh_raw, sample_rate=None, samples_per_frame=None,
-                 payloadsize=None, nchan=None, bps=None, complex_data=None,
+                 payload_nbytes=None, nchan=None, bps=None, complex_data=None,
                  squeeze=True, subset=()):
         header0 = fh_ts.read_timestamp()
         super(GSBStreamReader, self).__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
-            samples_per_frame=samples_per_frame, payloadsize=payloadsize,
+            samples_per_frame=samples_per_frame, payload_nbytes=payload_nbytes,
             nchan=nchan, bps=bps, complex_data=complex_data,
             squeeze=squeeze, subset=subset)
         self.fh_ts.seek(0)
@@ -251,13 +252,13 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         fh_ts_offset = self.fh_ts.tell()
         self.fh_ts.seek(0, 2)
         fh_ts_len = self.fh_ts.tell()
-        if fh_ts_len == self.header0.size:
+        if fh_ts_len == self.header0.nbytes:
             # Only one line in file
             return self.header0
 
         # Read last bytes in binary, since cannot seek back from end in
         # text files.
-        from_end = min(5 * self.header0.size // 2, fh_ts_len)
+        from_end = min(5 * self.header0.nbytes // 2, fh_ts_len)
         self.fh_ts.buffer.seek(-from_end, 2)
         last_lines = self.fh_ts.buffer.read(from_end).strip().split(b'\n')
         self.fh_ts.seek(fh_ts_offset)
@@ -281,13 +282,13 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     def _read_frame(self, index):
         self.fh_ts.seek(self.header0.seek_offset(index))
         if self.header0.mode == 'rawdump':
-            self.fh_raw.seek(index * self._payloadsize)
+            self.fh_raw.seek(index * self._payload_nbytes)
         else:
             for fh_pair in self.fh_raw:
                 for fh in fh_pair:
-                    fh.seek(index * self._payloadsize)
+                    fh.seek(index * self._payload_nbytes)
         frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
-                                  payloadsize=self._payloadsize,
+                                  payload_nbytes=self._payload_nbytes,
                                   nchan=self._unsliced_shape.nchan,
                                   bps=self.bps, complex_data=self.complex_data)
         assert int(round(((frame.header.time - self.start_time) *
@@ -320,12 +321,12 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         channel of each polarization is sampled.  If not given, will be
         inferred assuming the frame rate is exactly 0.25165824 s.
     samples_per_frame : int, optional
-        Number of complete samples per frame.  Can give ``payloadsize``
+        Number of complete samples per frame.  Can give ``payload_nbytes``
         instead.
-    payloadsize : int, optional
+    payload_nbytes : int, optional
         Number of bytes per payload, divided by the number of raw files.
-        If both ``samples_per_frame`` and ``payloadsize`` are `None`,
-        ``payloadsize`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
+        If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
+        ``payload_nbytes`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
         divided by the number of streams per polarization for phased.
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.
@@ -354,7 +355,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
     """
 
     def __init__(self, fh_ts, fh_raw, header0=None, sample_rate=None,
-                 samples_per_frame=None, payloadsize=None, nchan=None,
+                 samples_per_frame=None, payload_nbytes=None, nchan=None,
                  bps=None, complex_data=None, squeeze=True, **kwargs):
         if header0 is None:
             mode = kwargs.pop('header_mode',
@@ -363,7 +364,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
             header0 = GSBHeader.fromvalues(mode=mode, **kwargs)
         super(GSBStreamWriter, self).__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
-            samples_per_frame=samples_per_frame, payloadsize=payloadsize,
+            samples_per_frame=samples_per_frame, payload_nbytes=payload_nbytes,
             nchan=nchan, bps=bps, complex_data=complex_data, squeeze=squeeze)
         self._payload = GSBPayload.fromdata(
             np.zeros((self.samples_per_frame,) + self._unsliced_shape,
@@ -381,7 +382,8 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
                 seq_nr=(index + self.header0['seq_nr']),
                 mem_block=((self.header0['mem_block'] + index) % 8))
         else:
-            header = self.header0.fromvalues(time=self.start_time + time_offset)
+            header = self.header0.fromvalues(time=self.start_time +
+                                             time_offset)
 
         return GSBFrame(header, self._payload, valid=True, verify=False)
 
@@ -434,12 +436,12 @@ def open(name, mode='rs', **kwargs):
         channel of each polarization is sampled.  If `None`, will be
         inferred assuming the frame rate is exactly 251.658240 ms.
     samples_per_frame : int, optional
-        Number of complete samples per frame.  Can give ``payloadsize``
+        Number of complete samples per frame.  Can give ``payload_nbytes``
         instead.
-    payloadsize : int, optional
+    payload_nbytes : int, optional
         Number of bytes per payload, divided by the number of raw files.
-        If both ``samples_per_frame`` and ``payloadsize`` are `None`,
-        ``payloadsize`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
+        If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
+        ``payload_nbytes`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
         divided by the number of streams per polarization for phased.
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.

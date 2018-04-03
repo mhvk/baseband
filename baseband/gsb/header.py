@@ -34,7 +34,7 @@ class TimeGSB(TimeString):
     def set_jds(self, val1, val2):
         """Parse the time strings contained in val1 and set jd1, jd2"""
         iterator = np.nditer([val1, None, None, None, None, None, None],
-                             op_dtypes=([val1.dtype] + 5*[np.intc] +
+                             op_dtypes=([val1.dtype] + 5 * [np.intc] +
                                         [np.double]))
         try:
             for val, iy, im, id, ihr, imin, dsec in iterator:
@@ -74,7 +74,7 @@ class TimeGSB(TimeString):
 
 def make_parser(index, length, forward=None, backward=None, default=None):
     if length > 1:
-        index = slice(index, index+length)
+        index = slice(index, index + length)
 
     def parser(items):
         return forward(items[index])
@@ -109,7 +109,7 @@ class GSBHeader(VLBIHeaderBase):
     mode : str or None, optional
         Mode in which data was taken: 'phased' or 'rawdump'. If `None`, it
         is determined from the words.
-    size : int or None, optional
+    nbytes : int or None, optional
         Number of characters in the header, including trailing blank spaces and
         carriage returns.  If `None`, is determined from the words assuming
         one trailing blank space and one CR.
@@ -124,7 +124,7 @@ class GSBHeader(VLBIHeaderBase):
     _mode = None
     _gsb_header_classes = {}
 
-    def __new__(cls, words, mode=None, size=None, utc_offset=5.5*u.hr,
+    def __new__(cls, words, mode=None, nbytes=None, utc_offset=5.5*u.hr,
                 verify=True):
 
         if mode is None:
@@ -138,14 +138,14 @@ class GSBHeader(VLBIHeaderBase):
         # We intialise VDIFHeader subclasses, so their __init__ will be called.
         return self
 
-    def __init__(self, words, mode=None, size=None, utc_offset=5.5*u.hr,
+    def __init__(self, words, mode=None, nbytes=None, utc_offset=5.5*u.hr,
                  verify=True):
         if words is None:
             self.words = [''] * self._number_of_words
         else:
             self.words = words
-        if size is not None:
-            self._size = size
+        if nbytes is not None:
+            self._nbytes = nbytes
         if mode is not None:
             self._mode = mode
         self.utc_offset = utc_offset
@@ -161,15 +161,15 @@ class GSBHeader(VLBIHeaderBase):
         return self._mode
 
     @property
-    def size(self):
+    def nbytes(self):
         """Size of the header in characters.
 
         Assumes the string terminates in one blank space and one carriage
         return.
         """
-        if self._size is None:
-            self._size = len(' '.join(self.words)) + 2
-        return self._size
+        if self._nbytes is None:
+            self._nbytes = len(' '.join(self.words)) + 2
+        return self._nbytes
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
@@ -180,15 +180,15 @@ class GSBHeader(VLBIHeaderBase):
         """
         start_pos = fh.tell()
         s = fh.readline()
-        size = fh.tell() - start_pos
-        return cls(tuple(s.split()), mode=None, size=size, *args, **kwargs)
+        nbytes = fh.tell() - start_pos
+        return cls(tuple(s.split()), mode=None, nbytes=nbytes, *args, **kwargs)
 
     def tofile(self, fh):
         """Write GSB header as a line to the filehandle."""
         return fh.write(' '.join(self.words) + '\n')
 
     @classmethod
-    def fromvalues(cls, mode=None, size=None, *args, **kwargs):
+    def fromvalues(cls, mode=None, nbytes=None, *args, **kwargs):
         if mode is None:
             if cls._mode is not None:
                 mode = cls._mode
@@ -199,10 +199,10 @@ class GSBHeader(VLBIHeaderBase):
                 else:
                     raise TypeError("cannot construct a GSB header from "
                                     "values without knowing the mode.")
-        return super(GSBHeader, cls).fromvalues(mode, size, *args, **kwargs)
+        return super(GSBHeader, cls).fromvalues(mode, nbytes, *args, **kwargs)
 
     @classmethod
-    def fromkeys(cls, mode=None, size=None, *args, **kwargs):
+    def fromkeys(cls, mode=None, nbytes=None, *args, **kwargs):
         if mode is None:
             if cls._mode is not None:
                 mode = cls._mode
@@ -211,9 +211,9 @@ class GSBHeader(VLBIHeaderBase):
                     mode = 'phased'
                 else:
                     mode = 'rawdump'
-        return super(GSBHeader, cls).fromkeys(mode, size, *args, **kwargs)
+        return super(GSBHeader, cls).fromkeys(mode, nbytes, *args, **kwargs)
 
-    def seek_offset(self, n, size=None):
+    def seek_offset(self, n, nbytes=None):
         """Offset in bytes needed to move a file pointer to another header.
 
         Some GSB headers have variable size and hence one cannot trivially jump
@@ -224,13 +224,13 @@ class GSBHeader(VLBIHeaderBase):
         ----------
         n : int
             The number of headers to move to, relative to the present header.
-        size : int, optional
+        nbytes : int, optional
             The size in bytes of the present header (if not given, will use
-            the header's `size` property).
+            the header's `nbytes` property).
         """
-        if size is None:
-            size = self.size
-        return n * size
+        if nbytes is None:
+            nbytes = self.nbytes
+        return n * nbytes
 
     def __eq__(self, other):
         return (type(self) is type(other) and
@@ -309,7 +309,7 @@ class GSBPhasedHeader(GSBRawdumpHeader):
         self.gps_time = time
         self.pc_time = time
 
-    def seek_offset(self, n, size=None):
+    def seek_offset(self, n, nbytes=None):
         """Offset in bytes needed to move a file pointer to another header.
 
         GSB headers for phased data differ in size depending on the sequence
@@ -321,14 +321,14 @@ class GSBPhasedHeader(GSBRawdumpHeader):
         ----------
         n : int
             The number of headers to move to, relative to the present header.
-        size : int, optional
+        nbytes : int, optional
             The size in bytes of the present header (if not given, will use
-            the header's `size` property).
+            the header's `nbytes` property).
         """
-        if size is None:
-            size = self.size
-        # Initial guess assuming all headers have same size.
-        guess = n * size
+        if nbytes is None:
+            nbytes = self.nbytes
+        # Initial guess assuming all headers have same nbytes.
+        guess = n * nbytes
         # Get number of digits of current sequence number.
         seq = self['seq_nr']
         ndseq = len(str(seq))

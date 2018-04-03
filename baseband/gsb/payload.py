@@ -88,7 +88,7 @@ class GSBPayload(VLBIPayloadBase):
             return cls._sample_shape_maker_nthread(*args)
 
     @classmethod
-    def fromfile(cls, fh, payloadsize=None, nchan=1, bps=4,
+    def fromfile(cls, fh, payload_nbytes=None, nchan=1, bps=4,
                  complex_data=False):
         """Read payloads from several threads.
 
@@ -99,7 +99,7 @@ class GSBPayload(VLBIPayloadBase):
             tuple holds distinct threads, while the inner ones holds parts of
             those threads.  Typically, these are the two polarisations and the
             two parts of each in which phased baseband data are stored.
-        payloadsize : int
+        payload_nbytes : int
             Number of bytes to read from each part.
         nchan : int, optional
             Number of channels.  Default: 1.
@@ -110,13 +110,13 @@ class GSBPayload(VLBIPayloadBase):
         """
         if hasattr(fh, 'read'):
             return super(GSBPayload,
-                         cls).fromfile(fh, payloadsize=payloadsize,
+                         cls).fromfile(fh, payload_nbytes=payload_nbytes,
                                        sample_shape=(nchan,), bps=bps,
                                        complex_data=complex_data)
 
         nthread = len(fh)
         payloads = [[super(GSBPayload,
-                           cls).fromfile(fh1, payloadsize=payloadsize,
+                           cls).fromfile(fh1, payload_nbytes=payload_nbytes,
                                          sample_shape=(nchan,), bps=bps,
                                          complex_data=complex_data)
                      for fh1 in fh_set] for fh_set in fh]

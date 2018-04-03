@@ -35,7 +35,7 @@ from ...data import (SAMPLE_MARK4 as SAMPLE_FILE,
 #   data window size = 1048576 bytes
 #   ...
 # data at 17, nonzero at line 657 -> item 640.
-# Initially this seemed strange, since PAYLOADSIZE=20000 leads to 80000
+# Initially this seemed strange, since PAYLOAD_NBITS=20000 leads to 80000
 # elements, so one would have expected VALIDSTART*4=96*4=384.
 # But the mark5 code has PAYLOAD_OFFSET=(VALIDEND-20000)*f->ntrack/8 = 64*8
 # Since each sample takes 2 bytes, one thus expects 384+64*8/2=640. OK.
@@ -67,7 +67,7 @@ class TestMark4(object):
 
         assert len(header) == 64
         assert header.track_id[0] == 2 and header.track_id[-1] == 33
-        assert header.size == 160 * 64 // 8
+        assert header.nbytes == 160 * 64 // 8
         assert header.fanout == 4
         assert header.bps == 2
         assert not np.all(~header['magnitude_bit'])
@@ -75,8 +75,8 @@ class TestMark4(object):
         assert int(header.time.mjd) == 56824
         assert header.time.isot == '2014-06-16T07:38:12.47500'
         assert header.samples_per_frame == 20000 * 4
-        assert header.framesize == 20000 * 64 // 8
-        assert header.payloadsize == header.framesize - header.size
+        assert header.frame_nbytes == 20000 * 64 // 8
+        assert header.payload_nbytes == header.frame_nbytes - header.nbytes
         assert header.mutable is False
         assert header.nsb == 1
         assert np.all(header.converters['converter'] ==
@@ -144,9 +144,9 @@ class TestMark4(object):
         with pytest.raises(AttributeError):
             header7.ntrack = 51
         with pytest.raises(AttributeError):
-            header7.framesize = header.framesize
+            header7.frame_nbytes = header.frame_nbytes
         with pytest.raises(AttributeError):
-            header7.payloadsize = header.payloadsize
+            header7.payload_nbytes = header.payload_nbytes
         header7.nchan = 16
         assert header7.nchan == 16 and header7.bps == 1
         # OK, this is silly, but why not...
@@ -236,7 +236,7 @@ class TestMark4(object):
             fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
             payload = mark4.Mark4Payload.fromfile(fh, header)
-        assert payload.size == (20000 - 160) * 64 // 8
+        assert payload.nbytes == (20000 - 160) * 64 // 8
         assert len(payload) == (20000 - 160) * 4
         assert payload.shape == ((20000 - 160) * 4, 8)
         # Check sample shape validity.
@@ -450,8 +450,8 @@ class TestMark4(object):
             fh.seek(0xa88)
             header0 = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
             start_time = header0.time
-            # use framesize, since header adds to payload.
-            samples_per_frame = header0.framesize * 8 // 2 // 8
+            # Use frame size, since header adds to payload.
+            samples_per_frame = header0.frame_nbytes * 8 // 2 // 8
             frame_rate = 32. * u.MHz / samples_per_frame
             frame_duration = 1. / frame_rate
             fh.seek(0xa88)
@@ -478,10 +478,10 @@ class TestMark4(object):
             assert header_0 == header0
             fh.seek(0xa89)
             header_0xa89 = fh.find_header()
-            assert fh.tell() == 0xa88 + header0.framesize
+            assert fh.tell() == 0xa88 + header0.frame_nbytes
             fh.seek(160000)
             header_160000f = fh.find_header(forward=True)
-            assert fh.tell() == 0xa88 + header0.framesize
+            assert fh.tell() == 0xa88 + header0.frame_nbytes
             fh.seek(0xa87)
             header_0xa87b = fh.find_header(forward=False)
             assert header_0xa87b is None
@@ -497,7 +497,7 @@ class TestMark4(object):
             assert fh.tell() == 0xa88
             fh.seek(-10000, 2)
             header_m10000b = fh.find_header(forward=False)
-            assert fh.tell() == 0xa88 + 2*header0.framesize
+            assert fh.tell() == 0xa88 + 2*header0.frame_nbytes
             fh.seek(-300, 2)
             header_end = fh.find_header(forward=True)
             assert header_end is None
@@ -594,7 +594,7 @@ class TestMark4(object):
             record2 = fh.read(2)
             assert fh.tell() == 80641
             # Raw file should be just after frame 1.
-            assert fh.fh_raw.tell() == 0xa88 + 2 * fh.header0.framesize
+            assert fh.fh_raw.tell() == 0xa88 + 2 * fh.header0.frame_nbytes
             # Test seeker works with both int and str values for whence
             assert fh.seek(13, 0) == fh.seek(13, 'start')
             assert fh.seek(-13, 2) == fh.seek(-13, 'end')

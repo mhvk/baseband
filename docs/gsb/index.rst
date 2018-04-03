@@ -122,13 +122,13 @@ A single payload file can be opened with `~baseband.gsb.open` in binary mode.
 Here, for our sample file, we have to take into account that in order to keep
 these files small, their sample size has been reduced to only **4 or 8
 kilobytes** worth of samples per frame (for the default timespan).  So, we
-define their sample rate here, and use that to calculate ``payloadsize``,
+define their sample rate here, and use that to calculate ``payload_nbytes``,
 the size of one frame in bytes.  Since rawdump samples are 4 bits,
-``payloadsize`` is just ``samples_per_frame / 2``::
+``payload_nbytes`` is just ``samples_per_frame / 2``::
 
     >>> rawdump_samples_per_frame = 2**13
-    >>> payloadsize = rawdump_samples_per_frame // 2
-    >>> fb = gsb.open(SAMPLE_GSB_RAWDUMP, 'rb', payloadsize=payloadsize,
+    >>> payload_nbytes = rawdump_samples_per_frame // 2
+    >>> fb = gsb.open(SAMPLE_GSB_RAWDUMP, 'rb', payload_nbytes=payload_nbytes,
     ...               nchan=1, bps=4, complex_data=False)
     >>> payload = fb.read_payload()
     >>> payload[:4]
@@ -138,7 +138,7 @@ the size of one frame in bytes.  Since rawdump samples are 4 bits,
            [ 0.]], dtype=float32)
     >>> fb.close()
 
-(``payloadsize`` for phased data is the size of one frame *divided by the
+(``payload_nbytes`` for phased data is the size of one frame *divided by the
 number of binary files*.)
 
 Opening in stream mode allows timestamp and binary files to be read in

@@ -107,7 +107,7 @@ class Mark5BPayload(VLBIPayloadBase):
         Bits per elementary sample.  Default: 2.
     """
 
-    _size = 2500 * 4
+    _nbytes = 2500 * 4
     _encoders = {2: encode_2bit}
     _decoders = {2: decode_2bit}
 

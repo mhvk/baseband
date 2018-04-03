@@ -55,7 +55,7 @@ class DADAPayload(VLBIPayloadBase):
                                           bps=bps, complex_data=complex_data)
 
     @classmethod
-    def fromfile(cls, fh, header=None, memmap=False, payloadsize=None,
+    def fromfile(cls, fh, header=None, memmap=False, payload_nbytes=None,
                  **kwargs):
         """Read or map encoded data in file.
 
@@ -64,35 +64,37 @@ class DADAPayload(VLBIPayloadBase):
         fh : filehandle
             Handle to the file which will be read or mapped.
         header : `~baseband.dada.DADAHeader`, optional
-            If given, used to infer ``payloadsize``, ``bps``, ``sample_shape``,
-            and ``complex_data``.  If not given, those have to be passed in.
+            If given, used to infer ``payload_nbytes``, ``bps``,
+            ``sample_shape``, and ``complex_data``.  If not given, those have
+            to be passed in.
         memmap : bool, optional
             If `False` (default), read from file.  Otherwise, map the file in
             memory (see `~numpy.memmap`).
-        payloadsize : int, optional
+        payload_nbytes : int, optional
             Number of bytes to read (default: as given in ``header``,
-            ``cls._size``, or, for mapping, to the end of the file).
+            ``cls._nbytes``, or, for mapping, to the end of the file).
         **kwargs
             Additional arguments are passed on to the class initializer. These
             are only needed if ``header`` is not given.
         """
-        if payloadsize is None:
-            payloadsize = cls._size if header is None else header.payloadsize
+        if payload_nbytes is None:
+            payload_nbytes = (cls._nbytes if header is None
+                              else header.payload_nbytes)
 
         if not memmap:
-            return super(DADAPayload, cls).fromfile(fh, header=header,
-                                                    payloadsize=payloadsize,
-                                                    **kwargs)
+            return super(DADAPayload, cls).fromfile(
+                fh, header=header, payload_nbytes=payload_nbytes, **kwargs)
 
         if hasattr(fh, 'memmap'):
             words = fh.memmap(dtype=cls._dtype_word,
-                              shape=None if payloadsize is None else
-                              (payloadsize // cls._dtype_word.itemsize,))
+                              shape=None if payload_nbytes is None else
+                              (payload_nbytes // cls._dtype_word.itemsize,))
         else:
             mode = fh.mode.replace('b', '')
             offset = fh.tell()
-            words = np.memmap(fh, mode=mode, dtype=cls._dtype_word,
-                              offset=offset, shape=None if payloadsize is None
-                              else (payloadsize // cls._dtype_word.itemsize,))
+            words = np.memmap(
+                fh, mode=mode, dtype=cls._dtype_word, offset=offset,
+                shape=(None if payload_nbytes is None
+                       else (payload_nbytes // cls._dtype_word.itemsize,)))
             fh.seek(offset + words.size * words.dtype.itemsize)
         return cls(words, header=header, **kwargs)

@@ -77,7 +77,7 @@ class Mark4FileReader(VLBIFileBase):
             Whether to search forwards or backwards.  Default: `True`.
         maximum : int, optional
             Maximum number of bytes forward to search through.
-            Default: twice the framesize (of 20000 * ntrack // 8).
+            Default: twice the frame size (of 20000 * ntrack // 8).
 
         Returns
         -------
@@ -102,17 +102,17 @@ class Mark4FileReader(VLBIFileBase):
 
         nset = np.ones(32 * ntrack // 8, dtype=np.int16)
         nunset = np.ones(ntrack // 8, dtype=np.int16)
-        framesize = ntrack * 2500
+        frame_nbytes = ntrack * 2500
         fh.seek(0, 2)
         filesize = fh.tell()
-        if filesize < framesize:
+        if filesize < frame_nbytes:
             fh.seek(file_pos)
             return None
 
         if maximum is None:
-            maximum = 2 * framesize
+            maximum = 2 * frame_nbytes
         # Loop over chunks to try to find the frame marker.
-        step = framesize // 2
+        step = frame_nbytes // 2
         # Read a bit more at every step to ensure we don't miss a "split"
         # header.
         block = step + 160 * ntrack // 8
@@ -138,7 +138,7 @@ class Mark4FileReader(VLBIFileBase):
             wrong = nosync + nolow
             possibilities = np.where(wrong == 0)[0]
             # Check candidates by seeing whether there is a sync word
-            # a framesize ahead. (Note: loop can be empty.)
+            # a frame size ahead. (Note: loop can be empty.)
             for possibility in possibilities[::1 if forward else -1]:
                 # Real start of possible header.
                 frame_start = frame + possibility - 63 * ntrack // 8
@@ -146,12 +146,12 @@ class Mark4FileReader(VLBIFileBase):
                         not forward and frame_start > file_pos):
                     continue
                 # Check there is a header following this.
-                check = frame_start + framesize
+                check = frame_start + frame_nbytes
                 if check >= filesize - 32 * 2 * ntrack // 8 - len(nunset):
                     # But do before this one if we're beyond end of file.
-                    check = frame_start - framesize
+                    check = frame_start - frame_nbytes
                     if check < 0:  # Assume OK if only one frame fits in file.
-                        if frame_start + framesize > filesize:
+                        if frame_start + frame_nbytes > filesize:
                             continue
                         else:
                             break
@@ -185,7 +185,7 @@ class Mark4FileReader(VLBIFileBase):
         ----------
         maximum : int, optional
             Maximum number of bytes forward to search through.
-            Default: twice the framesize (of 20000 * ntrack // 8).
+            Default: twice the frame size (of 20000 * ntrack // 8).
 
         Returns
         -------
@@ -217,7 +217,7 @@ class Mark4FileReader(VLBIFileBase):
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
             Maximum number of bytes forward to search through.
-            Default: twice the framesize (of 20000 * ntrack // 8).
+            Default: twice the frame size (of 20000 * ntrack // 8).
 
         Returns
         -------
@@ -361,7 +361,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         oldpos = fh.tell()
         header0 = header_template.fromfile(fh, header_template.ntrack,
                                            ref_time=header_template.time)
-        fh.seek(header0.payloadsize, 1)
+        fh.seek(header0.payload_nbytes, 1)
         header1 = header_template.fromfile(fh, header_template.ntrack,
                                            ref_time=header_template.time)
         fh.seek(oldpos)
@@ -380,7 +380,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         return last_header
 
     def _read_frame(self, index):
-        self.fh_raw.seek(self._offset0 + index * self.header0.framesize)
+        self.fh_raw.seek(self._offset0 + index * self.header0.frame_nbytes)
         frame = self.fh_raw.read_frame()
         # Set decoded value for invalid data.
         frame.fill_value = self.fill_value
@@ -435,8 +435,8 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
             squeeze=squeeze)
         # Set up initial payload with right shape.
         samples_per_payload = (
-            header0.samples_per_frame * header0.payloadsize //
-            header0.framesize)
+            header0.samples_per_frame * header0.payload_nbytes //
+            header0.frame_nbytes)
         self._payload = Mark4Payload.fromdata(
             np.zeros((samples_per_payload, header0.nchan), np.float32),
             header0)

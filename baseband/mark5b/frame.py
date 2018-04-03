@@ -52,11 +52,12 @@ class Mark5BFrame(VLBIFrameBase):
 
       data : property that yields full decoded payload
 
-    A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, and ``size`` the frame size in bytes.
-    Furthermore, the frame acts as a dictionary, with keys those of the header.
-    Any attribute that is not defined on the frame itself, such as ``.time``
-    will be looked up on the header as well.
+    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    the shape, type and number of complete samples of the data array, and
+    ``nbytes`` the frame size in bytes.  Furthermore, the frame acts as a
+    dictionary, with keys those of the header.  Any attribute that is not
+    defined on the frame itself, such as ``.time`` will be looked up on the
+    header as well.
     """
 
     _header_class = Mark5BHeader

@@ -78,7 +78,7 @@ class TestVLBIBase(object):
         class Header(VLBIHeaderBase):
             _struct = four_word_struct
             _header_parser = self.header_parser
-            payloadsize = 8
+            payload_nbytes = 8
 
         self.Header = Header
         self.header = self.Header([0x12345678, 0xffff0000, 0x0, 0xffffffff])
@@ -206,7 +206,7 @@ class TestVLBIBase(object):
         assert self.payload.sample_shape == (2,)
         assert self.payload.bps == 8
         assert self.payload.shape == (4, 2)
-        assert self.payload.size == 8
+        assert self.payload.nbytes == 8
         assert np.all(self.payload.data.ravel() ==
                       self.payload.words.view(np.int8))
         assert np.all(np.array(self.payload).ravel() ==
@@ -226,7 +226,7 @@ class TestVLBIBase(object):
         assert self.payload1bit.sample_shape == (5,)
         assert self.payload1bit.bps == 1
         assert self.payload1bit.shape == (16, 5)
-        assert self.payload1bit.size == 20
+        assert self.payload1bit.nbytes == 20
         assert np.all(self.payload1bit.data.ravel() ==
                       np.unpackbits(self.payload1bit.words.view(np.uint8))
                       .astype(np.float32).view(np.complex64))
@@ -315,10 +315,10 @@ class TestVLBIBase(object):
             self.payload.tofile(s)
             s.seek(0)
             with pytest.raises(ValueError):
-                self.Payload.fromfile(s)  # no size given
+                self.Payload.fromfile(s)  # No size given.
             s.seek(0)
             payload = self.Payload.fromfile(
-                s, payloadsize=len(self.payload.words) * 4,
+                s, payload_nbytes=len(self.payload.words) * 4,
                 sample_shape=(2,), bps=8)
         assert payload == self.payload
 
@@ -331,7 +331,7 @@ class TestVLBIBase(object):
         assert payload.words.dtype is self.Payload._dtype_word
         assert len(payload.words) == 4
         assert len(payload) == len(data)
-        assert payload.size == 16
+        assert payload.nbytes == 16
         payload2 = self.Payload.fromdata(self.payload.data, self.payload.bps)
         assert payload2 == self.payload
         payload3 = self.Payload.fromdata(data.ravel(), bps=8)
@@ -388,7 +388,7 @@ class TestVLBIBase(object):
         with open(str(tmpdir.join('test.dat')), 'w+b') as s:
             self.frame.tofile(s)
             s.seek(0)
-            frame = self.Frame.fromfile(s, payloadsize=self.payload.size,
+            frame = self.Frame.fromfile(s, payload_nbytes=self.payload.nbytes,
                                         sample_shape=(2,), bps=8)
         assert frame == self.frame
 

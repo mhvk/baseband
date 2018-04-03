@@ -23,15 +23,15 @@ class TestDADA(object):
     def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = dada.DADAHeader.fromfile(fh)
-            assert header.size == 4096
+            assert header.nbytes == 4096
             assert fh.tell() == 4096
         assert header['NDIM'] == 2
         assert header['NCHAN'] == 1
         assert header['UTC_START'] == '2013-07-02-01:37:40'
         assert header['OBS_OFFSET'] == 6400000000  # 100 s
         assert header.time.isot == '2013-07-02T01:39:20.000'
-        assert header.framesize == 64000 + 4096
-        assert header.payloadsize == 64000
+        assert header.frame_nbytes == 64000 + 4096
+        assert header.payload_nbytes == 64000
         assert header.mutable is False
         with pytest.raises(TypeError):
             header['NCHAN'] = 2
@@ -41,12 +41,12 @@ class TestDADA(object):
 
         with open(str(tmpdir.join('test.dada')), 'w+b') as s:
             header.tofile(s)
-            assert s.tell() == header.size
+            assert s.tell() == header.nbytes
             s.seek(0)
             header2 = dada.DADAHeader.fromfile(s)
             assert header2 == header
             assert header2.mutable is False
-            assert s.tell() == header.size
+            assert s.tell() == header.nbytes
 
         with open(str(tmpdir.join('test.dada')), 'w+b') as s:
             # Now create header with wrong HDR_SIZE in file.
@@ -79,8 +79,8 @@ class TestDADA(object):
         assert header3['MJD_START'] == '54999.999999999999999'
         header3['NCHAN'] = 2
         assert header3['NCHAN'] == 2
-        header3.framesize = 9096
-        assert header3.payloadsize == 5000
+        header3.frame_nbytes = 9096
+        assert header3.payload_nbytes == 5000
         # Try initialising with properties instead of keywords.
         # Here, we first just try the start time.
         header4 = dada.DADAHeader.fromvalues(
@@ -132,7 +132,7 @@ class TestDADA(object):
 
     def test_payload(self, tmpdir):
         payload = self.payload
-        assert payload.size == 64000
+        assert payload.nbytes == 64000
         assert payload.shape == (16000, 2, 1)
         # Check sample shape validity.
         assert payload.sample_shape == (2, 1)
@@ -147,7 +147,7 @@ class TestDADA(object):
         with open(str(tmpdir.join('test.dada')), 'w+b') as s:
             payload.tofile(s)
             s.seek(0)
-            payload2 = dada.DADAPayload.fromfile(s, payloadsize=64000,
+            payload2 = dada.DADAPayload.fromfile(s, payload_nbytes=64000,
                                                  sample_shape=(2, 1), bps=8,
                                                  complex_data=True)
             assert payload2 == payload
@@ -324,7 +324,7 @@ class TestDADA(object):
         h = self.header
         with dada.open(filename, 'ws', time=h.time, bps=h.bps,
                        complex_data=h.complex_data, sample_rate=h.sample_rate,
-                       payloadsize=32000, npol=1, nchan=1) as fw:
+                       payload_nbytes=32000, npol=1, nchan=1) as fw:
             fw.write(self.payload.data[:, 0, 0])
             assert np.abs(fw.start_time - start_time) < 1.*u.ns
             assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
@@ -348,7 +348,7 @@ class TestDADA(object):
         data2d = np.array([data, -data]).transpose(1, 2, 0)
         with dada.open(filename, 'ws', time=h.time, bps=h.bps,
                        complex_data=h.complex_data, sample_rate=h.sample_rate,
-                       payloadsize=32000, npol=2, nchan=2) as fw:
+                       payload_nbytes=32000, npol=2, nchan=2) as fw:
             fw.write(data2d)
             assert np.abs(fw.start_time - start_time) < 1.*u.ns
             assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
@@ -418,7 +418,7 @@ class TestDADA(object):
         start_time = self.header.time
         data = self.payload.data.squeeze()
         header = self.header.copy()
-        header.payloadsize = self.header.payloadsize // 2
+        header.payload_nbytes = self.header.payload_nbytes // 2
         filenames = (str(tmpdir.join('a.dada')),
                      str(tmpdir.join('b.dada')))
         with dada.open(filenames, 'ws', header0=header) as fw:
@@ -448,7 +448,7 @@ class TestDADA(object):
 
         # Pass sequentialfile objects to reader.
         with sf.open(filenames, 'w+b',
-                     file_size=(header.payloadsize + 4096)) as fraw, \
+                     file_size=(header.payload_nbytes + 4096)) as fraw, \
                 dada.open(fraw, 'ws', header0=header) as fw:
             fw.write(data)
 
@@ -461,7 +461,7 @@ class TestDADA(object):
         start_time = self.header.time
         data = self.payload.data.squeeze()
         header = self.header.copy()
-        header.payloadsize = self.header.payloadsize // 4
+        header.payload_nbytes = self.header.payload_nbytes // 4
         template = str(tmpdir.join('a{frame_nr}.dada'))
         with dada.open(template, 'ws', header0=header) as fw:
             fw.write(data[:1000])
@@ -490,7 +490,7 @@ class TestDADA(object):
         assert np.all(data2 == data)
 
         # More complicated template, 8 files.
-        header.payloadsize = self.header.payloadsize // 8
+        header.payload_nbytes = self.header.payload_nbytes // 8
         template = str(tmpdir
                        .join('{utc_start}_{obs_offset:016d}.000000.dada'))
         with dada.open(template, 'ws', header0=header) as fw:
@@ -504,7 +504,7 @@ class TestDADA(object):
 
         name3 = template.format(utc_start=header['UTC_START'],
                                 obs_offset=header['OBS_OFFSET'] +
-                                3 * header.payloadsize)
+                                3 * header.payload_nbytes)
         with dada.open(name3, 'rs') as fr:
             assert np.abs(fr.start_time -
                           (start_time + 6000 / (16.*u.MHz))) < 1.*u.ns
@@ -521,7 +521,7 @@ class TestDADA(object):
 
         kwargs = dict(UTC_START=header['UTC_START'],
                       OBS_OFFSET=header['OBS_OFFSET'] +
-                      3 * header.payloadsize,
+                      3 * header.payload_nbytes,
                       FILE_SIZE=header['FILE_SIZE'])
         with dada.open(template, 'rs', **kwargs) as fr:
             assert (np.abs(fr.time - (start_time + 6000 / (16. * u.MHz))) <

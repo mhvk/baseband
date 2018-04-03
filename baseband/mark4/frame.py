@@ -58,11 +58,12 @@ class Mark4Frame(VLBIFrameBase):
     If the frame does not contain valid data, all values returned are set
     to ``self.fill_value``.
 
-    A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, and ``size`` the frame size in bytes.
-    Furthermore, the frame acts as a dictionary, with keys those of the header.
-    Any attribute that is not defined on the frame itself, such as ``.time``
-    will be looked up on the header as well.
+    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    the shape, type and number of complete samples of the data array, and
+    ``nbytes`` the frame size in bytes.  Furthermore, the frame acts as a
+    dictionary, with keys those of the header.  Any attribute that is not
+    defined on the frame itself, such as ``.time`` will be looked up on the
+    header as well.
     """
 
     _header_class = Mark4Header
@@ -141,7 +142,7 @@ class Mark4Frame(VLBIFrameBase):
         assert data.shape[0] == header.samples_per_frame
         # Start of part not overwritten by header
         # (see calculation of header.samples_per_frame)
-        start = header.size * 8 // (header.ntrack // header.fanout)
+        start = header.nbytes * 8 // (header.ntrack // header.fanout)
         payload = cls._payload_class.fromdata(data[start:], header=header)
 
         return cls(header, payload, verify=verify)
