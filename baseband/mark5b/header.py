@@ -73,7 +73,7 @@ class Mark5BHeader(VLBIHeaderBase):
     _struct = four_word_struct
 
     _properties = ('payloadsize', 'framesize', 'kday', 'jday', 'seconds',
-                   'ns', 'time')
+                   'fraction', 'time')
     """Properties accessible/usable in initialisation."""
 
     kday = None
@@ -119,7 +119,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
         bcd_jday : from ``jday`` or ``time``
         bcd_seconds : from ``seconds`` or ``time``
-        bcd_fraction : from ``ns`` or ``time`` (may need ``framerate``)
+        bcd_fraction : from ``fraction`` or ``time`` (may need ``framerate``)
         frame_nr : from ``time`` (may need ``framerate``)
         """
         time = kwargs.pop('time', None)
@@ -222,8 +222,8 @@ class Mark5BHeader(VLBIHeaderBase):
         self['bcd_seconds'] = bcd_encode(seconds)
 
     @property
-    def ns(self):
-        """Fractional seconds (in ns; decoded from 'bcd_fraction').
+    def fraction(self):
+        """Fractional seconds (decoded from 'bcd_fraction').
 
         The fraction is stored to 0.1 ms accuracy.  Following mark5access, this
         is "unrounded" to give the exact time of the start of the frame for any
@@ -235,11 +235,12 @@ class Mark5BHeader(VLBIHeaderBase):
         However, standard VLBI only uses bit rates that are powers of 2 in MHz.
         """
         ns = bcd_decode(self['bcd_fraction']) * 100000
-        # "unround" the nanoseconds
-        return 156250 * ((ns + 156249) // 156250)
+        # "Unround" the nanoseconds, and turn into fractional seconds.
+        return (156250 * ((ns + 156249) // 156250)) / 1e9
 
-    @ns.setter
-    def ns(self, ns):
+    @fraction.setter
+    def fraction(self, fraction):
+        ns = round(fraction * 1.e9)
         # From inspecting sample files, the fraction appears to be truncated,
         # not rounded.
         fraction = int(ns / 100000)
@@ -248,39 +249,42 @@ class Mark5BHeader(VLBIHeaderBase):
     def get_time(self, framerate=None):
         """Convert year, BCD time code to Time object.
 
-        Uses bcd-encoded 'jday', 'seconds', and 'frac_sec', plus ``kday``
-        from the initialisation to calculate the time.  See
+        Calculate time using ``jday``, ``seconds``, and ``fraction`` properties
+        (which reflect the bcd-encoded 'bcd_jday', 'bcd_seconds' and
+        'bcd_frac_sec' header items), plus `kday` from the initialisation.  See
         http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 
-        Note that some non-compliant files have 'frac_sec' not set.  For those,
-        the time can still be retrieved using 'frame_nr' given a frame rate.
+        Note that some non-compliant files do not have 'bcd_frac_sec` set.
+        For those, the time can still be retrieved using 'frame_nr' given a
+        frame rate.
 
         Furthermore, fractional seconds are stored only to 0.1 ms accuracy.
         In the code, this is "unrounded" to give the exact time of the start
-        of the frame for any total bit rate below 512 Mbps.  For rates above
-        this value, it is no longer guaranteed that subsequent frames have
-        unique frac_sec, and one should pass in an explicit frame rate instead.
+        of the frame for any total bit rate below 512 Mbps.  For higher rates,
+        it is no longer guaranteed that subsequent frames have unique
+        `fraction`, and one should pass in an explicit frame rate instead.
 
         Parameters
         ----------
         framerate : `~astropy.units.Quantity`, optional
             Used to calculate the fractional second from the frame number
-            instead of from 'frac_sec'.
+            instead of from the header's ``fraction``.
 
         Returns
         -------
         `~astropy.time.Time`
+
         """
         if framerate is None:
-            offset = self.ns * 1.e-9
+            fraction = self.fraction
         else:
             frame_nr = self['frame_nr']
             if frame_nr == 0:
-                offset = 0.
+                fraction = 0.
             else:
-                offset = (frame_nr / framerate).to(u.s).value
+                fraction = (frame_nr / framerate).to(u.s).value
 
-        return Time(self.kday + self.jday, (self.seconds + offset) / 86400,
+        return Time(self.kday + self.jday, (self.seconds + fraction) / 86400,
                     format='mjd', scale='utc', precision=9)
 
     def set_time(self, time, framerate=None):
@@ -301,31 +305,31 @@ class Mark5BHeader(VLBIHeaderBase):
         self.jday = int(time.mjd - self.kday)
         seconds = time - Time(self.kday + self.jday, format='mjd')
         int_sec = int(seconds.sec)
-        frac_sec = seconds - int_sec * u.s
+        fraction = seconds - int_sec * u.s
 
         # Round to nearest ns to handle timestamp difference errors.
-        if abs(frac_sec) < 1. * u.ns:
+        if abs(fraction) < 1. * u.ns:
             frame_nr = 0
-            ns = 0.
-        elif abs(1. * u.s - frac_sec) < 1. * u.ns:
+            frac_sec = 0.
+        elif abs(1. * u.s - fraction) < 1. * u.ns:
             int_sec += 1
             frame_nr = 0
-            ns = 0.
+            frac_sec = 0.
         else:
             if framerate is None:
                 raise ValueError("cannot calculate framerate. Pass it "
                                  "in explicitly.")
-            frame_nr = int(round((frac_sec * framerate).to(u.one).value))
-            frac_sec_framestart = frame_nr / framerate
-            if abs(frac_sec_framestart - 1. * u.s) < 1. * u.ns:
+            frame_nr = int(round((fraction * framerate).to(u.one).value))
+            fraction = frame_nr / framerate
+            if abs(fraction - 1. * u.s) < 1. * u.ns:
                 int_sec += 1
                 frame_nr = 0
-                ns = 0.
+                frac_sec = 0.
             else:
-                ns = frac_sec_framestart.to(u.ns).value
+                frac_sec = fraction.to(u.s).value
 
         self.seconds = int_sec
-        self.ns = int(round(ns))
+        self.fraction = frac_sec
         self['frame_nr'] = frame_nr
 
     time = property(get_time, set_time)

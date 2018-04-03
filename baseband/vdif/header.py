@@ -676,21 +676,22 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         """
         if sample_rate is None:
             # Get fractional second from the Mark 5B part of the header.
-            offset = self.ns * 1.e-9
+            fraction = self.fraction
         else:
             frame_nr = self['frame_nr']
             if frame_nr == 0:
-                offset = 0.
+                fraction = 0.
             else:
                 if sample_rate is None:
                     raise ValueError("calculating the time for a non-zero "
                                      "frame number requires a sample rate. "
                                      "Pass it in explicitly.")
-                offset = (frame_nr * self.samples_per_frame /
-                          sample_rate).to_value(u.s)
+                fraction = (frame_nr * self.samples_per_frame /
+                            sample_rate).to_value(u.s)
 
         return (ref_epochs[self['ref_epoch']] +
-                TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
+                TimeDelta(self['seconds'], fraction,
+                          format='sec', scale='tai'))
 
     def set_time(self, time, sample_rate=None):
         framerate = None if sample_rate is None else (sample_rate /
