@@ -79,6 +79,12 @@ format extensions such as VDIF EDV.
 Project details
 ===============
 
+.. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master
+
+.. image:: https://coveralls.io/repos/github/mhvk/baseband/badge.svg?branch=master
+    :target: https://coveralls.io/github/mhvk/baseband?branch=master
+    :alt: Baseband's Coveralls Status
+
 .. toctree::
    :maxdepth: 1
 

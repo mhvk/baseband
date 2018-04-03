@@ -19,8 +19,8 @@ Project Status
 .. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master
 
 .. image:: https://coveralls.io/repos/github/mhvk/baseband/badge.svg?branch=master
-    :target: https://coveralls.io/github/mhvk/baseband?branch=master
-    :alt: Baseband's Coveralls Status
+   :target: https://coveralls.io/github/mhvk/baseband?branch=master
+
 
 Contributing
 ------------
@@ -34,11 +34,6 @@ to contact `@mhvk`_ or `@cczhu`_.
 
 For more information on how to make code contributions, please see the `Astropy
 developer documentation <http://docs.astropy.org/en/stable/index.html#developer-documentation)>`_.
-
-Citation
---------
-
-ASCL for ADS link?  Zenodo?
 
 License
 -------
