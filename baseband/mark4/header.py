@@ -139,7 +139,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
          ('bcd_fraction', (4, 12, 12)),
          ('crc', (4, 0, 12))))
 
-    _properties = ('decade', 'track_id', 'ms', 'time')
+    _properties = ('decade', 'track_id', 'fraction', 'time')
     """Properties accessible/usable in initialisation."""
 
     decade = None
@@ -186,8 +186,8 @@ class Mark4TrackHeader(VLBIHeaderBase):
         self['bcd_track_id'] = bcd_encode(track_id)
 
     @property
-    def ms(self):
-        """Fractional seconds (in ms; decoded from 'bcd_fraction')."""
+    def fraction(self):
+        """Fractional seconds (decoded from 'bcd_fraction')."""
         ms = bcd_decode(self['bcd_fraction'])
         # The last digit encodes a fraction -- see table 2 in
         # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
@@ -197,10 +197,11 @@ class Mark4TrackHeader(VLBIHeaderBase):
         # 3: 3.75      8: 8.75
         # 4: invalid   9: invalid
         last_digit = ms % 5
-        return ms + last_digit * 0.25
+        return (ms + last_digit * 0.25) / 1000.
 
-    @ms.setter
-    def ms(self, ms):
+    @fraction.setter
+    def fraction(self, fraction):
+        ms = fraction * 1000.
         if np.any(np.abs((ms / 1.25) - np.round(ms / 1.25)) > 1e-6):
             raise ValueError("{0} ms is not a multiple of 1.25 ms"
                              .format(ms))
@@ -210,15 +211,17 @@ class Mark4TrackHeader(VLBIHeaderBase):
     def get_time(self):
         """Convert BCD time code to Time object.
 
-        Uses bcd-encoded 'unit_year', 'day', 'hour', 'minute', 'second' and
-        'frac_sec', plus ``decade`` from the initialisation to calculate the
-        time.  See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        Calculate time using bcd-encoded 'bcd_unit_year', 'bcd_day',
+        'bcd_hour', 'bcd_minute', 'bcd_second' header items, as well as
+        the ``fraction`` property (inferred from 'bcd_frac_sec') and
+        ``decade`` from the initialisation.  See
+        See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         """
         return Time('{decade:03d}{uy:1x}:{d:03x}:{h:02x}:{m:02x}:{s:08.5f}'
                     .format(decade=self.decade//10, uy=self['bcd_unit_year'],
                             d=self['bcd_day'], h=self['bcd_hour'],
                             m=self['bcd_minute'],
-                            s=bcd_decode(self['bcd_second']) + self.ms / 1000),
+                            s=bcd_decode(self['bcd_second']) + self.fraction),
                     format='yday', scale='utc', precision=5)
 
     def set_time(self, time):
@@ -228,8 +231,8 @@ class Mark4TrackHeader(VLBIHeaderBase):
             yday = time.yday.split(':')
         finally:
             time.precision = old_precision
-        # ms first since that checks precision.
-        self.ms = (float(yday[4]) % 1) * 1000
+        # Set fraction first since that checks precision.
+        self.fraction = float(yday[4]) % 1
         self.decade = int(yday[0][:3]) * 10
         self['bcd_unit_year'] = int(yday[0][3], base=16)
         self['bcd_day'] = int(yday[1], base=16)

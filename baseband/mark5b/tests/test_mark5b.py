@@ -103,7 +103,7 @@ class TestMark5B(object):
         assert header7.kday == header.kday
         # Check ns rounding works correctly.
         header7.time = Time('2016-09-10T12:26:40.000000000')
-        assert header7.ns == 0
+        assert header7.fraction == 0.
         # Check that passing exact MJD to kday gives an error.
         with pytest.raises(AssertionError):
             mark5b.Mark5BHeader.fromkeys(56821, **header)

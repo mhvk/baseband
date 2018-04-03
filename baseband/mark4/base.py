@@ -367,8 +367,8 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         fh.seek(oldpos)
         # Mark 4 specification states frames-lengths range from 1.25 ms
         # to 160 ms.
-        tdelta = header1.ms[0] - header0.ms[0]
-        return np.round(1000. / tdelta) * u.Hz
+        tdelta = header1.fraction[0] - header0.fraction[0]
+        return np.round(1 / tdelta) * u.Hz
 
     @lazyproperty
     def _last_header(self):
