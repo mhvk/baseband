@@ -306,6 +306,13 @@ class TestMark4(object):
         assert np.all(payload2[item] == sel_data)
         assert payload2 == payload
 
+    def test_binary_file_repr(self):
+        with mark4.open(SAMPLE_FILE, 'rb', decade=2010, ntrack=64) as fh:
+            repr_fh = repr(fh)
+
+        assert repr_fh.startswith('Mark4FileReader')
+        assert 'ntrack=64, decade=2010, ref_time=None' in repr_fh
+
     def test_frame(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb', decade=2010, ntrack=64) as fh:
             fh.seek(0xa88)

@@ -43,6 +43,11 @@ class Mark4FileReader(VLBIFileBase):
         self.ref_time = ref_time
         super(Mark4FileReader, self).__init__(fh_raw)
 
+    def __repr__(self):
+        return ("{name}(fh_raw={s.fh_raw}, ntrack={s.ntrack}, "
+                "decade={s.decade}, ref_time={s.ref_time})"
+                .format(name=self.__class__.__name__, s=self))
+
     def read_frame(self):
         """Read a single frame (header plus payload).
 
