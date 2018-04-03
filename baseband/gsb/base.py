@@ -78,6 +78,11 @@ class GSBFileReader(VLBIFileBase):
         self.complex_data = complex_data
         super(GSBFileReader, self).__init__(fh_raw)
 
+    def __repr__(self):
+        return ("{name}(fh_raw={s.fh_raw}, payload_nbytes={s.payload_nbytes}, "
+                "nchan={s.nchan}, bps={s.bps}, complex_data={s.complex_data})"
+                .format(name=self.__class__.__name__, s=self))
+
     def read_payload(self):
         """Read a single block.
 

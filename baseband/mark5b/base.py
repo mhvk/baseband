@@ -42,6 +42,11 @@ class Mark5BFileReader(VLBIFileBase):
         self.bps = bps
         super(Mark5BFileReader, self).__init__(fh_raw)
 
+    def __repr__(self):
+        return ("{name}(fh_raw={s.fh_raw}, kday={s.kday}, "
+                "ref_time={s.ref_time}, nchan={s.nchan}, bps={s.bps})"
+                .format(name=self.__class__.__name__, s=self))
+
     def read_frame(self):
         """Read a single frame (header plus payload).
 

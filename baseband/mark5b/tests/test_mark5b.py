@@ -202,6 +202,13 @@ class TestMark5B(object):
         assert np.all(payload2[item] == sel_data)
         assert payload2 == payload
 
+    def test_binary_file_repr(self):
+        with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
+            repr_fh = repr(fh)
+
+        assert repr_fh.startswith('Mark5BFileReader')
+        assert 'kday=56000, ref_time=None, nchan=8, bps=2' in repr_fh
+
     def test_frame(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)

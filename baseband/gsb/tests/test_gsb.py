@@ -435,6 +435,14 @@ class TestGSB(object):
             payload2 = fh.read_payload()
             assert payload2 == payload1
 
+    def test_rawfile_repr(self):
+        with gsb.open(SAMPLE_RAWDUMP, 'rb', payload_nbytes=2**12, nchan=1,
+                      bps=4, complex_data=False) as fh:
+            repr_fh = repr(fh)
+        assert repr_fh.startswith('GSBFileReader')
+        assert ('payload_nbytes=4096, nchan=1, bps=4, complex_data=False' in
+                repr_fh)
+
     def test_raw_stream(self, tmpdir):
         bps = 4
         sample_rate = self.frame_rate * self.payload_nbytes * (8 // bps)
