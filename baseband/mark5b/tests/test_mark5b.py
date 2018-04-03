@@ -285,14 +285,6 @@ class TestMark5B(object):
         assert header.time == header0.time
         # But if we pass in the correct framerate, it uses the frame_nr.
         assert abs(header.get_time(frame_rate) - frame.header.time) < 1. * u.ns
-        assert abs(header.get_time(frame_rate, frame_nr=header['frame_nr']) -
-                   frame.header.time) < 1. * u.ns
-        # And if we pass in a frame_nr of zero, we get the integer second.
-        assert header.get_time(frame_rate, frame_nr=0) == header0.time
-        # Finally, without a frame rate we can only do it for frame_nr=0.
-        assert header.get_time(frame_nr=0) == header0.time
-        with pytest.raises(ValueError):
-            header.get_time(frame_nr=1)
 
         # Check setting time using framerate.
         sample_rate = 128. * u.MHz
@@ -320,9 +312,9 @@ class TestMark5B(object):
         assert abs(header.get_time(frame_rate) -
                    start_time - 25599. / frame_rate) < 1. * u.ns
         # Check rounding to the nearest second when less than 2 ns away.
-        header.set_time(time=(start_time + 0.9 * u.ns), frame_nr=0)
+        header.set_time(time=(start_time + 0.9 * u.ns), framerate=frame_rate)
         assert header.seconds == header0.seconds
-        header.set_time(time=(start_time - 0.9 * u.ns), frame_nr=0)
+        header.set_time(time=(start_time - 0.9 * u.ns), framerate=frame_rate)
         assert header.seconds == header0.seconds
 
     def test_find_header(self, tmpdir):

@@ -319,10 +319,9 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
         # Set up header for new frame.
         header = self.header0.copy()
         # Update time and frame_nr in one go.
-        # (Note: could also pass on frame rate instead of explicit frame)
-        header.set_time(time=self.start_time + index / self._framerate * u.s,
-                        frame_nr=((self.header0['frame_nr'] + index) %
-                                  self._framerate))
+        framerate = self._framerate * u.Hz
+        header.set_time(time=self.start_time + index / framerate,
+                        framerate=framerate)
         # Recalculate CRC.
         header.update()
         # Reuse payload.

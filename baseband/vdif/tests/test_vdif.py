@@ -169,10 +169,10 @@ class TestVDIF(object):
                 bps=headerT.bps, complex_data=headerT['complex_data'],
                 thread_id=headerT['thread_id'])
 
-        # Check rounding in corner case when passing explicit frame_nr.
+        # Check rounding in corner case.
         header9 = headerT.copy()
         header9.set_time(Time('2018-01-01T00:34:07.999999999996'),
-                         frame_nr=0)
+                         sample_rate=32*u.MHz)
         assert header9['seconds'] == 2048
         assert header9['frame_nr'] == 0
 

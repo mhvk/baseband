@@ -245,7 +245,7 @@ class Mark5BHeader(VLBIHeaderBase):
         fraction = int(ns / 100000)
         self['bcd_fraction'] = bcd_encode(fraction)
 
-    def get_time(self, framerate=None, frame_nr=None):
+    def get_time(self, framerate=None):
         """Convert year, BCD time code to Time object.
 
         Uses bcd-encoded 'jday', 'seconds', and 'frac_sec', plus ``kday``
@@ -259,39 +259,31 @@ class Mark5BHeader(VLBIHeaderBase):
         In the code, this is "unrounded" to give the exact time of the start
         of the frame for any total bit rate below 512 Mbps.  For rates above
         this value, it is no longer guaranteed that subsequent frames have
-        unique rates, and one should pass in an explicit frame rate instead.
+        unique frac_sec, and one should pass in an explicit frame rate instead.
 
         Parameters
         ----------
         framerate : `~astropy.units.Quantity`, optional
-            For non-zero `frame_nr`, this is used to calculate the
-            corresponding offset.
-        frame_nr : int, optional
-            Can be used to override the ``frame_nr`` from the header.  If 0,
-            the routine returns the time to integer seconds.
+            Used to calculate the fractional second from the frame number
+            instead of from 'frac_sec'.
 
         Returns
         -------
         `~astropy.time.Time`
         """
-        if framerate is None and frame_nr is None:
+        if framerate is None:
             offset = self.ns * 1.e-9
         else:
-            if frame_nr is None:
-                frame_nr = self['frame_nr']
-
+            frame_nr = self['frame_nr']
             if frame_nr == 0:
                 offset = 0.
             else:
-                if framerate is None:
-                    raise ValueError("calculating the time for a non-zero "
-                                     "frame number requires a frame rate. "
-                                     "Pass it in explicitly.")
                 offset = (frame_nr / framerate).to(u.s).value
+
         return Time(self.kday + self.jday, (self.seconds + offset) / 86400,
                     format='mjd', scale='utc', precision=9)
 
-    def set_time(self, time, framerate=None, frame_nr=None):
+    def set_time(self, time, framerate=None):
         """
         Convert Time object to BCD timestamp elements and frame_nr.
 
@@ -304,8 +296,6 @@ class Mark5BHeader(VLBIHeaderBase):
             The time to use for this header.
         framerate : `~astropy.units.Quantity`, optional
             For calculating the ``frame_nr`` from the fractional seconds.
-        frame_nr : int, optional
-            An explicit frame number associated with the fractions of seconds.
         """
         self.kday = int(time.mjd // 1000) * 1000
         self.jday = int(time.mjd - self.kday)
@@ -322,20 +312,17 @@ class Mark5BHeader(VLBIHeaderBase):
             frame_nr = 0
             ns = 0.
         else:
-            if frame_nr is None:
-                if framerate is None:
-                    raise ValueError("cannot calculate framerate. Pass it "
-                                     "in explicitly.")
-                frame_nr = int(round((frac_sec * framerate).to(u.one).value))
-                frac_sec_framestart = frame_nr / framerate
-                if abs(frac_sec_framestart - 1. * u.s) < 1. * u.ns:
-                    int_sec += 1
-                    frame_nr = 0
-                    ns = 0.
-                else:
-                    ns = frac_sec_framestart.to(u.ns).value
+            if framerate is None:
+                raise ValueError("cannot calculate framerate. Pass it "
+                                 "in explicitly.")
+            frame_nr = int(round((frac_sec * framerate).to(u.one).value))
+            frac_sec_framestart = frame_nr / framerate
+            if abs(frac_sec_framestart - 1. * u.s) < 1. * u.ns:
+                int_sec += 1
+                frame_nr = 0
+                ns = 0.
             else:
-                ns = frac_sec.to(u.ns).value
+                ns = frac_sec_framestart.to(u.ns).value
 
         self.seconds = int_sec
         self.ns = int(round(ns))
