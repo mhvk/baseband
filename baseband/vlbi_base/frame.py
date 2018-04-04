@@ -48,8 +48,8 @@ class VLBIFrameBase(object):
     If the frame does not contain valid data, all values returned are set
     to ``self.fill_value``.
 
-    A number of properties are defined: ``shape`` and ``dtype`` are the shape
-    and type of the data array, and ``nbytes`` the frame size in bytes.
+    A number of properties are defined: `shape` and `dtype` are the shape
+    and type of the data array, and `nbytes` the frame size in bytes.
     Furthermore, the frame acts as a dictionary, with keys those of the header.
     Any attribute that is not defined on the frame itself, such as ``.time``
     will be looked up on the header as well.
@@ -57,8 +57,7 @@ class VLBIFrameBase(object):
 
     _header_class = None
     _payload_class = None
-    fill_value = 0.
-    """Value used to replace data if the frame does not contain valid data."""
+    _fill_value = 0.
 
     def __init__(self, header, payload, valid=True, verify=True):
         self.header = header
@@ -126,7 +125,7 @@ class VLBIFrameBase(object):
 
     @property
     def sample_shape(self):
-        """Shape of the samples held in the frame (nchan,)."""
+        """Shape of a sample in the frame (nchan,)."""
         return self.payload.sample_shape
 
     def __len__(self):
@@ -153,13 +152,22 @@ class VLBIFrameBase(object):
 
     @property
     def dtype(self):
-        """Numeric type of the payload."""
+        """Numeric type of the frame data."""
         return self.payload.dtype
 
     @property
     def nbytes(self):
         """Size of the encoded frame in bytes."""
         return self.header.nbytes + self.payload.nbytes
+
+    @property
+    def fill_value(self):
+        """Value to replace invalid data in the frame."""
+        return self._fill_value
+
+    @fill_value.setter
+    def fill_value(self, fill_value):
+        self._fill_value = fill_value
 
     def __array__(self, dtype=None):
         """Interface to arrays."""

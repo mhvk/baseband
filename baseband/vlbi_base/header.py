@@ -295,7 +295,7 @@ class VLBIHeaderBase(object):
         assert len(self.words) == (self._struct.size // 4)
 
     def copy(self, **kwargs):
-        """Return a mutable copy of the header.
+        """Create a mutable and independent copy of the header.
 
         Keyword arguments can be passed on as needed by possible subclasses.
         """
@@ -363,8 +363,8 @@ class VLBIHeaderBase(object):
         Here, the parsed values must be given as keyword arguments, i.e., for
         any ``header = cls(<words>)``, ``cls.fromvalues(**header) == header``.
 
-        However, unlike for the ``fromkeys`` class method, data can also be set
-        using arguments named after header methods such as ``time``.
+        However, unlike for the `fromkeys` class method, data can also be set
+        using arguments named after header methods, such as ``time``.
 
         Parameters
         ----------

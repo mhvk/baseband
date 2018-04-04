@@ -230,16 +230,17 @@ class Mark4Payload(VLBIPayloadBase):
     header : `~baseband.mark4.Mark4Header`, optional
         If given, used to infer the number of channels, bps, and fanout.
     nchan : int, optional
-        Number of channels, used if header is not given.  Default: 1.
+        Number of channels, used if ``header`` is not given.  Default: 1.
     bps : int, optional
-        Number of bits per sample, used if header is not given.  Default: 2.
+        Number of bits per sample, used if ``header`` is not given.
+        Default: 2.
     fanout : int, optional
-        Number of tracks every bit stream is spread over, used if header is
+        Number of tracks every bit stream is spread over, used if ``header`` is
         not given.  Default: 1.
 
     Notes
     -----
-    The total number of tracks is `nchan` * `bps` * `fanout`.
+    The total number of tracks is ``nchan * bps * fanout``.
     """
 
     _dtype_word = None

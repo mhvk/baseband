@@ -34,7 +34,7 @@ class VLBIPayloadBase(object):
         Bits per elementary sample, i.e., per channel and per real or
         imaginary component.  Default: 2.
     complex_data : bool
-        Whether the data are complex.  Default: False.
+        Whether the data are complex.  Default: `False`.
     """
     # Possible fixed payload size in bytes.
     _nbytes = None
@@ -126,7 +126,7 @@ class VLBIPayloadBase(object):
 
     @property
     def nbytes(self):
-        """Size in bytes of payload."""
+        """Size of the payload in bytes."""
         return self.words.size * self.words.dtype.itemsize
 
     def __len__(self):
@@ -153,7 +153,7 @@ class VLBIPayloadBase(object):
 
     @property
     def dtype(self):
-        """Type of the decoded data array."""
+        """Numeric type of the decoded data array."""
         return np.dtype(np.complex64 if self.complex_data else np.float32)
 
     def _item_to_slices(self, item):

@@ -20,16 +20,16 @@ __all__ = ['Mark5BFileReader', 'Mark5BFileWriter', 'Mark5BStreamReader',
 class Mark5BFileReader(VLBIFileBase):
     """Simple reader for Mark 5B files.
 
-    Adds ``read_frame`` and ``find_header`` methods to the VLBI file wrapper.
+    Adds `read_frame` and `find_header` methods to the VLBI file wrapper.
 
     Parameters
     ----------
     kday : int or None
         Explicit thousands of MJD of the observation time.  Can instead
-        pass an approximate `ref_time`.
+        pass an approximate ``ref_time``.
     ref_time : `~astropy.time.Time` or None
         Reference time within 500 days of the observation time, used to
-        infer the full MJD.  Used only if `kday` is not given.
+        infer the full MJD.  Used only if ``kday`` is not given.
     nchan : int, optional
         Number of channels.   Default: 1.
     bps : int, optional
@@ -65,9 +65,9 @@ class Mark5BFileReader(VLBIFileBase):
                                     bps=self.bps)
 
     def find_header(self, forward=True, maximum=None):
-        """Look for the first occurrence of a frame.
+        """Find the nearest header from the current position.
 
-        Search is from the current position.
+        If successful, the file pointer is left at the start of the header.
 
         Parameters
         ----------
@@ -149,7 +149,7 @@ class Mark5BFileReader(VLBIFileBase):
 class Mark5BFileWriter(VLBIFileBase):
     """Simple writer for Mark 5B files.
 
-    Adds ``write_frame`` method to the VLBI binary file wrapper.
+    Adds `write_frame` method to the VLBI binary file wrapper.
     """
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
@@ -157,22 +157,22 @@ class Mark5BFileWriter(VLBIFileBase):
         Parameters
         ----------
         data : `~numpy.ndarray` or :`~baseband.mark5b.Mark5BFrame`
-            If an array, a `header` should be given, which will be used to
+            If an array, ``header`` should be given, which will be used to
             get the information needed to encode the array, and to construct
             the Mark 5B frame.
         header : `~baseband.mark5b.Mark5BHeader`
             Can instead give keyword arguments to construct a header.  Ignored
-            if `data` is a `~baseband.mark5b.Mark5BFrame` instance.
+            if ``data`` is a `~baseband.mark5b.Mark5BFrame` instance.
         bps : int, optional
             Bits per elementary sample, to use when encoding the payload.
-            Ignored if `data` is a `~baseband.mark5b.Mark5BFrame` instance.
+            Ignored if ``data`` is a `~baseband.mark5b.Mark5BFrame` instance.
             Default: 2.
         valid : bool, optional
             Whether the data are valid; if `False`, a payload filled with an
-            appropriate pattern will be crated.  Ignored if `data` is a
+            appropriate pattern will be crated.  Ignored if ``data`` is a
             `~baseband.mark5b.Mark5BFrame` instance.  Default: `True`.
         **kwargs
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
         """
         if not isinstance(data, Mark5BFrame):
             data = Mark5BFrame.fromdata(data, header, bps=bps, valid=valid,
@@ -210,10 +210,10 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
     kday : int or None
         Explicit thousands of MJD of the observation start time (eg. ``57000``
         for MJD 57999), used to infer the full MJD from the header's time
-        information.  Can instead pass an approximate `ref_time`.
+        information.  Can instead pass an approximate ``ref_time``.
     ref_time : `~astropy.time.Time` or None
         Reference time within 500 days of the observation start time, used
-        to infer the full MJD.  Only used if `kday` is not given.
+        to infer the full MJD.  Only used if ``kday`` is not given.
     nchan : int
         Number of channels.  Needs to be explicitly passed in.
     bps : int, optional
@@ -295,7 +295,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
     bps : int, optional
         Bits per elementary sample.  Default: 2.
     squeeze : bool, optional
-        If `True` (default), ``write`` accepts squeezed arrays as input, and
+        If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
     **kwargs
         If no header is given, an attempt is made to construct one from these.
@@ -303,7 +303,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
 
     --- Header kwargs : (see :meth:`~baseband.mark5b.Mark5BHeader.fromvalues`)
 
-    time : `~astropy.time.Time` instance
+    time : `~astropy.time.Time`
         Start time of the file.  Sets bcd-encoded unit day, hour, minute,
         second, and fraction, as well as the frame number, in the header.
     """
@@ -350,10 +350,10 @@ sample_rate : `~astropy.units.Quantity`, optional
 kday : int or None
     Explicit thousands of MJD of the observation start time (eg. ``57000`` for
     MJD 57999), used to infer the full MJD from the header's time information.
-    Can instead pass an approximate `ref_time`.
+    Can instead pass an approximate ``ref_time``.
 ref_time : `~astropy.time.Time` or None
     Reference time within 500 days of the observation start time, used to infer
-    the full MJD.  Only used if `kday` is not given.
+    the full MJD.  Only used if ``kday`` is not given.
 nchan : int, optional
     Number of channels.  Default: 1.
 bps : int, optional
@@ -380,7 +380,7 @@ nchan : int, optional
 bps : int, optional
     Bits per elementary sample.  Default: 2.
 squeeze : bool, optional
-    If `True` (default), ``write`` accepts squeezed arrays as input,
+    If `True` (default), writer accepts squeezed arrays as input,
     and adds channel and thread dimensions if they have length unity.
 **kwargs
     If no header is given, an attempt is made to construct one with any further

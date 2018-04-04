@@ -88,10 +88,11 @@ class VLBIStreamBase(object):
 
     @property
     def subset(self):
-        """Specific components (e.g. threads, channels) of the sample to read.
+        """Specific components (e.g. threads, channels) of the complete sample
+        to decode.
 
-        The order of dimensions is the same as for `sample_shape`.  Set by the
-        class initializer.
+        The order of dimensions is the same as for `sample_shape`.  Set by
+        the class initializer.
         """
         return self._subset
 
@@ -350,7 +351,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         current position, to find the next frame whose frame number is zero
         while keeping track of the largest frame number yet found.
 
-        ``_get_frame_rate`` is called when the sample rate is not user-provided
+        This method is called when the sample rate is not user-provided
         or deducible from header information.  If less than one second of data
         exists in the file, the function will raise an EOFError.  It also
         returns an error if any header cannot be read or does not verify as
@@ -415,12 +416,12 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         offset : int, `~astropy.units.Quantity`, or `~astropy.time.Time`
             Offset to move to.  Can be an (integer) number of samples,
             an offset in time units, or an absolute time.
-        whence : int
+        whence : {0, 1, 2, 'start', 'current', or 'end'}, optional
             Like regular seek, the offset is taken to be from the start if
-            ``whence=0`` (default), from the current position if ``1``,
-            and from the end if ``2``.  One can use ``'start'``, ``'current'``,
-            or ``'end'`` for ``0``, ``1``, or ``2``, respectively.  Ignored if
-            ``offset`` is a time.`
+            ``whence=0`` (default), from the current position if 1,
+            and from the end if 2.  One can alternativey use 'start',
+            'current', or 'end' for 0, 1, or 2, respectively.  Ignored if
+            ``offset`` is a time.
         """
         try:
             offset = offset.__index__()
@@ -463,13 +464,13 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         out : None or array, optional
             Array to store the data in. If given, ``count`` will be inferred
             from the first dimension; the other dimension should equal
-            ``sample_shape``.
+            `sample_shape`.
 
         Returns
         -------
         out : `~numpy.ndarray` of float or complex
             The first dimension is sample-time, and the remainder given by
-            ``sample_shape``.
+            `sample_shape`.
         """
         if out is None:
             if count is None or count < 0:
@@ -534,7 +535,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         ----------
         data : `~numpy.ndarray`
             Piece of data to be written, with sample dimensions as given by
-            ``sample_shape``. This should be properly scaled to make best use
+            `sample_shape`. This should be properly scaled to make best use
             of the dynamic range delivered by the encoding.
         valid : bool, optional
             Whether the current data are valid.  Default: `True`.
@@ -604,7 +605,7 @@ name : str or filehandle
     File name or handle.
 mode : {'rb', 'wb', 'rs', or 'ws'}, optional
     Whether to open for reading or writing, and as a regular binary
-    file or as a stream. Default: ``rs``, for reading a stream.
+    file or as a stream. Default: 'rs', for reading a stream.
 **kwargs
     Additional arguments when opening the file as a stream.
 """

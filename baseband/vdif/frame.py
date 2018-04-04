@@ -38,7 +38,7 @@ class VDIFFrame(VLBIFrameBase):
     verify : bool
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and whether or not data are complex
-        are consistent between header and data).  Default: `True`
+        are consistent between header and data).  Default: `True`.
 
     Notes
     -----
@@ -58,9 +58,9 @@ class VDIFFrame(VLBIFrameBase):
     If the frame does not contain valid data, all values returned are set
     to ``self.fill_value``.
 
-    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    A number of properties are defined: `shape`, `dtype` and `size` are
     the shape, type and number of complete samples of the data array, and
-    ``nbytes`` the frame size in bytes.  Furthermore, the frame acts as a
+    `nbytes` the frame size in bytes.  Furthermore, the frame acts as a
     dictionary, with keys those of the header.  Any attribute that is not
     defined on the frame itself, such as ``.time`` will be looked up on the
     header as well.
@@ -136,7 +136,7 @@ class VDIFFrame(VLBIFrameBase):
             (e.g., that channel information and whether or not data are complex
             are consistent between header and data). Default: `True`.
         **kwargs
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)
@@ -171,7 +171,7 @@ class VDIFFrameSet(object):
         Should all cover the same time span.
     header0 : `~baseband.vdif.VDIFHeader`
         First header of the frame set.  If `None` (default), is extracted from
-        `frames[0]`.
+        ``frames[0]``.
 
     Notes
     -----
@@ -191,9 +191,9 @@ class VDIFFrameSet(object):
     If the frame does not contain valid data, all values returned are set
     to ``self.fill_value``.
 
-    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    A number of properties are defined: `shape`, `dtype` and `size` are
     the shape, type and number of complete samples of the data array, and
-    ``nbytes`` the frame size in bytes.  Like a VDIFFrame, the frame set acts
+    `nbytes` the frame size in bytes.  Like a VDIFFrame, the frame set acts
     as a dictionary, with keys those of the header of the first frame
     (available via ``.header0``).  Any attribute that is not defined on the
     frame set itself, such as ``.time`` will also be looked up on the header.
@@ -222,14 +222,14 @@ class VDIFFrameSet(object):
             (default), use that of the first frame.  (Passing it in slightly
             improves file integrity checking.)
         verify : bool, optional
-            Whether to do (light) sanity checks on the header. Default: True.
+            Whether to do (light) sanity checks on the header. Default: `True`.
 
         Returns
         -------
         frameset : `~baseband.vdif.VDIFFrameSet`
             Its ``frames`` property holds a list of frames (in order of either
             their ``thread_id`` or following the input ``thread_ids`` list).
-            Use the ``data`` attribute to convert to an array.
+            Use the `data` attribute to convert to an array.
         """
         header0 = VDIFHeader.fromfile(fh, edv, verify)
         edv = header0.edv
@@ -289,11 +289,11 @@ class VDIFFrameSet(object):
             (e.g., that channel information and whether or not data are complex
             are consistent between header and data).  Default: `True`.
         **kwargs
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
 
         Returns
         -------
-        frameset : VDIFFrameSet instance.
+        frameset : `~baseband.vdif.VDIFFrameSet`
         """
         assert data.ndim == 3
         if not isinstance(headers, (list, tuple)):
@@ -315,10 +315,12 @@ class VDIFFrameSet(object):
 
     @property
     def nbytes(self):
+        """Size of the encoded frame in bytes."""
         return len(self.frames) * self.frames[0].nbytes
 
     @property
     def sample_shape(self):
+        """Shape of a sample in the frameset (nthread, nchan)."""
         return (len(self.frames),) + self.frames[0].sample_shape
 
     def __len__(self):
@@ -345,10 +347,12 @@ class VDIFFrameSet(object):
 
     @property
     def dtype(self):
+        """Numeric type of the frameset data."""
         return self.frames[0].dtype
 
     @property
     def valid(self):
+        """Whether frameset contains valid data."""
         valid = np.array([frame.valid for frame in self.frames])
         return valid[0] if len(np.unique(valid)) == 1 else valid
 
@@ -360,6 +364,7 @@ class VDIFFrameSet(object):
 
     @property
     def fill_value(self):
+        """Value to replace invalid data in the frameset."""
         return self.frames[0].fill_value
 
     @fill_value.setter

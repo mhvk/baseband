@@ -23,7 +23,7 @@ nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
 class Mark4FileReader(VLBIFileBase):
     """Simple reader for Mark 4 files.
 
-    Adds ``read_frame`` and ``locate_frame`` methods to the VLBI file wrapper.
+    Adds `read_frame` and `locate_frame` methods to the VLBI file wrapper.
 
     Parameters
     ----------
@@ -32,10 +32,10 @@ class Mark4FileReader(VLBIFileBase):
         part of locating the first frame.
     decade : int or None
         Decade in which the observations were taken.  Can instead pass an
-        approximate `ref_time`.
+        approximate ``ref_time``.
     ref_time : `~astropy.time.Time` or None
         Reference time within 4 years of the observation time.  Used only
-        if `decade` is not given.
+        if ``decade`` is not given.
     """
     def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None):
         self.ntrack = ntrack
@@ -82,7 +82,7 @@ class Mark4FileReader(VLBIFileBase):
             Whether to search forwards or backwards.  Default: `True`.
         maximum : int, optional
             Maximum number of bytes forward to search through.
-            Default: twice the frame size (of 20000 * ntrack // 8).
+            Default: twice the frame size (``20000 * ntrack // 8``).
 
         Returns
         -------
@@ -180,9 +180,9 @@ class Mark4FileReader(VLBIFileBase):
     def determine_ntrack(self, maximum=None):
         """Determines the number of tracks, by seeking the next frame.
 
-        Uses ``find_frame`` to look for the first occurrence of a frame from
+        Uses `find_frame` to look for the first occurrence of a frame from
         the current position for all supported ``ntrack`` values.  Returns the
-        first ``ntrack`` for which ``find_frame`` is successful, setting
+        first ``ntrack`` for which `find_frame` is successful, setting
         the file's ``ntrack`` property appropriately, and leaving the
         file pointer at the start of the frame.
 
@@ -190,7 +190,7 @@ class Mark4FileReader(VLBIFileBase):
         ----------
         maximum : int, optional
             Maximum number of bytes forward to search through.
-            Default: twice the frame size (of 20000 * ntrack // 8).
+            Default: twice the frame size (``20000 * ntrack // 8``).
 
         Returns
         -------
@@ -212,9 +212,9 @@ class Mark4FileReader(VLBIFileBase):
         return None
 
     def find_header(self, forward=True, maximum=None):
-        """Read header at the frame nearest the current position.
+        """Find the nearest header from the current position.
 
-        The file pointer is left at the start of the header.
+        If successful, the file pointer is left at the start of the header.
 
         Parameters
         ----------
@@ -222,7 +222,7 @@ class Mark4FileReader(VLBIFileBase):
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
             Maximum number of bytes forward to search through.
-            Default: twice the frame size (of 20000 * ntrack // 8).
+            Default: twice the frame size (``20000 * ntrack // 8``).
 
         Returns
         -------
@@ -242,7 +242,7 @@ class Mark4FileReader(VLBIFileBase):
 class Mark4FileWriter(VLBIFileBase):
     """Simple writer for Mark 4 files.
 
-    Adds ``write_frame`` method to the VLBI binary file wrapper.
+    Adds `write_frame` method to the VLBI binary file wrapper.
     """
 
     def write_frame(self, data, header=None, **kwargs):
@@ -258,7 +258,7 @@ class Mark4FileWriter(VLBIFileBase):
             Can instead give keyword arguments to construct a header.  Ignored
             if payload is a :class:`~baseband.mark4.Mark4Frame` instance.
         **kwargs :
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
         """
         if not isinstance(data, Mark4Frame):
             data = Mark4Frame.fromdata(data, header, **kwargs)
@@ -300,10 +300,10 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
     decade : int or None
         Decade of the observation start time (eg. ``2010`` for 2018), needed to
         remove ambiguity in the Mark 4 time stamp.  Can instead pass an
-        approximate `ref_time`.
+        approximate ``ref_time``.
     ref_time : `~astropy.time.Time` or None
         Reference time within 4 years of the start time of the observations.
-        Used only if `decade` is not given.
+        Used only if ``decade`` is not given.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
@@ -358,7 +358,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
 
         Notes
         -----
-        Unlike `VLBIStreamReaderBase._get_frame_rate`, this function reads
+        Unlike `VLBIStreamReaderBase._get_frame_rate`, this method reads
         only two consecutive frames, extracting their timestamps to determine
         how much time has elapsed.  It will return an `EOFError` if there is
         only one frame.
@@ -409,7 +409,7 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
         Number of complete samples per second, i.e. the rate at which each
         channel is sampled.  Needed to calculate header timestamps.
     squeeze : bool, optional
-        If `True` (default), ``write`` accepts squeezed arrays as input, and
+        If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
     **kwargs
         If no header is given, an attempt is made to construct one from these.
@@ -467,10 +467,10 @@ ntrack : int, optional
 decade : int or None
     Decade of the observation start time (eg. ``2010`` for 2018), needed to
     remove ambiguity in the Mark 4 time stamp (default: `None`).  Can instead
-    pass an approximate `ref_time`.
+    pass an approximate ``ref_time``.
 ref_time : `~astropy.time.Time` or None
     Reference time within 4 years of the start time of the observations.  Used
-    only if `decade` is not given.
+    only if ``decade`` is not given.
 squeeze : bool, optional
     If `True` (default), remove any dimensions of length unity from
     decoded data.
@@ -489,7 +489,7 @@ sample_rate : `~astropy.units.Quantity`
     Number of complete samples per second, i.e. the rate at which each channel
     is sampled.  Needed to calculate header timestamps.
 squeeze : bool, optional
-    If `True` (default), ``write`` accepts squeezed arrays as input, and adds
+    If `True` (default), writer accepts squeezed arrays as input, and adds
     any dimensions of length unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one

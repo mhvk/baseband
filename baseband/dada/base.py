@@ -106,7 +106,7 @@ class DADAFileNameSequencer:
 class DADAFileReader(VLBIFileBase):
     """Simple reader for DADA files.
 
-    Adds a ``read_frame`` method to the basic VLBI binary file wrapper. By
+    Adds a `read_frame` method to the basic VLBI binary file wrapper. By
     default, the payload is mapped rather than fully read into physical memory.
     """
     def read_frame(self, memmap=True):
@@ -132,7 +132,7 @@ class DADAFileReader(VLBIFileBase):
 class DADAFileWriter(VLBIFileBase):
     """Simple writer/mapper for DADA files.
 
-    Adds ``write_frame`` and ``memmap_frame`` methods to the VLBI binary file
+    Adds `write_frame` and `memmap_frame` methods to the VLBI binary file
     wrapper.  The latter allows one to encode data in pieces, writing to disk
     as needed.
     """
@@ -149,7 +149,7 @@ class DADAFileWriter(VLBIFileBase):
             Can instead give keyword arguments to construct a header.  Ignored
             if ``data`` is a `~baseband.dada.DADAFrame` instance.
         **kwargs
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
         """
         if not isinstance(data, DADAFrame):
             data = DADAFrame.fromdata(data, header, **kwargs)
@@ -167,7 +167,7 @@ class DADAFileWriter(VLBIFileBase):
             Written to disk immediately.  Can instead give keyword arguments to
             construct a header.
         **kwargs
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
 
         Returns
         -------
@@ -248,7 +248,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     header0 : :class:`~baseband.dada.DADAHeader`
         Header for the first frame, holding time information, etc.
     squeeze : bool, optional
-        If `True` (default), ``write`` accepts squeezed arrays as input,
+        If `True` (default), `write` accepts squeezed arrays as input,
         and adds any dimensions of length unity.
     """
     def __init__(self, fh_raw, header0, squeeze=True):
@@ -292,7 +292,7 @@ header0 : `~baseband.dada.DADAHeader`
     Header for the first frame, holding time information, etc.  Can instead
     give keyword arguments to construct a header (see ``**kwargs``).
 squeeze : bool, optional
-    If `True` (default), ``write`` accepts squeezed arrays as input, and adds
+    If `True` (default), writer accepts squeezed arrays as input, and adds
     any dimensions of length unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
@@ -314,7 +314,7 @@ npol : int, optional
 nchan : int, optional
     Number of channels (default: 1).
 complex_data : bool, optional
-    Whether data are complex (default: False).
+    Whether data are complex (default: `False`).
 bps : int, optional
     Bits per elementary sample, i.e. per real or imaginary component for
     complex data (default: 8).
