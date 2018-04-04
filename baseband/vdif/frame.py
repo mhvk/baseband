@@ -327,7 +327,21 @@ class VDIFFrameSet(object):
 
     @property
     def shape(self):
+        """Shape of the frameset data."""
         return (len(self),) + self.sample_shape
+
+    @property
+    def size(self):
+        """Total number of component samples in the frameset data."""
+        prod = 1
+        for dim in self.shape:
+            prod *= dim
+        return prod
+
+    @property
+    def ndim(self):
+        """Number of dimensions of the frameset data."""
+        return len(self.shape)
 
     @property
     def dtype(self):

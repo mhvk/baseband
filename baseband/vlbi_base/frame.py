@@ -135,8 +135,21 @@ class VLBIFrameBase(object):
 
     @property
     def shape(self):
-        """Shape of the data held in the frame (samples_per_frame, nchan)."""
+        """Shape of the frame data."""
         return (len(self),) + self.sample_shape
+
+    @property
+    def size(self):
+        """Total number of component samples in the frame data."""
+        prod = 1
+        for dim in self.shape:
+            prod *= dim
+        return prod
+
+    @property
+    def ndim(self):
+        """Number of dimensions of the frame data."""
+        return len(self.shape)
 
     @property
     def dtype(self):

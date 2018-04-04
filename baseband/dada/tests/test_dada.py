@@ -138,6 +138,8 @@ class TestDADA(object):
         assert payload.sample_shape == (2, 1)
         assert payload.sample_shape.npol == 2
         assert payload.sample_shape.nchan == 1
+        assert payload.size == 32000
+        assert payload.ndim == 3
         assert payload.dtype == np.complex64
         assert np.all(payload[:3] == np.array(
             [[[-38.-38.j], [-38.-38.j]],
@@ -171,6 +173,9 @@ class TestDADA(object):
         assert header == self.header
         assert payload == self.payload
         assert frame == dada.DADAFrame(header, payload)
+        assert frame.shape == payload.shape
+        assert frame.size == payload.size
+        assert frame.ndim == payload.ndim
         assert np.all(frame[:3] == np.array(
             [[[-38.-38.j], [-38.-38.j]],
              [[-38.-38.j], [-40.+0.j]],

@@ -239,6 +239,8 @@ class TestMark4(object):
         assert payload.nbytes == (20000 - 160) * 64 // 8
         assert len(payload) == (20000 - 160) * 4
         assert payload.shape == ((20000 - 160) * 4, 8)
+        assert payload.size == 634880
+        assert payload.ndim == 2
         # Check sample shape validity.
         assert payload.sample_shape == (8,)
         assert payload.sample_shape.nchan == 8
@@ -327,6 +329,8 @@ class TestMark4(object):
         assert len(frame) == len(payload) + 640
         assert frame.sample_shape == payload.sample_shape
         assert frame.shape == (len(frame),) + frame.sample_shape
+        assert frame.size == len(frame) * np.prod(frame.sample_shape)
+        assert frame.ndim == payload.ndim
         assert frame == mark4.Mark4Frame(header, payload)
         data = frame.data
         assert np.all(data[:640] == 0.)
