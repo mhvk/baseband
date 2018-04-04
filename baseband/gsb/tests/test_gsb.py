@@ -416,10 +416,21 @@ class TestGSB(object):
                                            nchan=512, bps=8, complex_data=True)
         assert frame4 == frame1
 
-    def test_timestamp_io(self, tmpdir):
+    @pytest.mark.parametrize('sample', (SAMPLE_RAWDUMP_HEADER,
+                                        SAMPLE_PHASED_HEADER))
+    def test_timestamp_io(self, tmpdir, sample):
         """Tests GSBTimeStampIO in base.py."""
-        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh:
-            header1 = gsb.GSBHeader.fromfile(fh, verify=True)
+        with open(sample, 'rt') as fh:
+            header0 = gsb.GSBHeader.fromfile(fh, verify=True)
+
+        with gsb.open(sample, 'rt') as fh:
+            header1 = fh.read_timestamp()
+            assert header1 == header0
+            current_pos = fh.tell()
+            frame_rate = fh.get_frame_rate()
+            assert abs(frame_rate - u.Hz / 0.251658240) < 1. * u.nHz
+            assert fh.tell() == current_pos
+
         testfile = str(tmpdir.join('test.timestamp'))
         with gsb.open(testfile, 'wt') as fw:
             fw.write_timestamp(header=header1)

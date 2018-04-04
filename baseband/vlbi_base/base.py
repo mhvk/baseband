@@ -9,15 +9,20 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 
-__all__ = ['VLBIStreamBase', 'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
-           'make_opener']
+__all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
+           'VLBIStreamReaderBase', 'VLBIStreamWriterBase', 'make_opener']
 
 
 class VLBIFileBase(object):
     """VLBI file wrapper, used to add frame methods to a binary data file.
 
-    The underlying file is stored in ``fh`` and all attributes that do not
+    The underlying file is stored in ``fh_raw`` and all attributes that do not
     exist on the class itself are looked up on it.
+
+    Parameters
+    ----------
+    fh_raw : filehandle
+        Filehandle of the raw binary data file.
     """
 
     def __init__(self, fh_raw):
@@ -44,6 +49,58 @@ class VLBIFileBase(object):
 
     def __repr__(self):
         return "{0}(fh_raw={1})".format(self.__class__.__name__, self.fh_raw)
+
+
+class VLBIFileReaderBase(VLBIFileBase):
+    """VLBI wrapped file reader base class.
+
+    Typically, a subclass will define ``read_header``, ``read_frame``,
+    and ``find_header`` methods.  This baseclass includes a `get_frame_rate`
+    method which determines the frame rate by scanning the file for headers,
+    looking for the maximum frame number that occurs before the jump down
+    for the next second. This method requires the subclass to define a
+    ``read_header`` method and assumes headers have a 'frame_nr' item, and
+    define a ``payload_nbytes`` property (as do all standard VLBI formats).
+
+    Parameters
+    ----------
+    fh_raw : filehandle
+        Filehandle of the raw binary data file.
+    """
+
+    def get_frame_rate(self):
+        """Determine the number of frames per second.
+
+        The method cycles through headers, starting from the start of the file,
+        finding the largest frame number before it jumps back to 0 for a new
+        second.
+
+        Returns
+        -------
+        frame_rate : `~astropy.units.Quantity`
+            Frames per second.
+
+        Raises
+        ------
+        `EOFError`
+            If the file contains less than one second of data.
+        """
+        oldpos = self.tell()
+        self.seek(0)
+        try:
+            header = header0 = self.read_header()
+            frame_nr0 = header0['frame_nr']
+            while header['frame_nr'] == frame_nr0:
+                self.seek(header.payload_nbytes, 1)
+                header = self.read_header()
+                max_frame = frame_nr0
+            while header['frame_nr'] > 0:
+                max_frame = max(header['frame_nr'], max_frame)
+                self.seek(header.payload_nbytes, 1)
+                header = self.read_header()
+        finally:
+            self.seek(oldpos)
+        return (max_frame + 1) * u.Hz
 
 
 class VLBIStreamBase(object):
@@ -242,7 +299,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         if sample_rate is None:
             try:
                 sample_rate = (samples_per_frame *
-                               self._get_frame_rate(fh_raw, header0)).to(u.MHz)
+                               fh_raw.get_frame_rate()).to(u.MHz)
 
             except Exception as exc:
                 exc.args += ("the sample rate could not be auto-detected. "
@@ -326,50 +383,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         shape_cls = namedtuple('SampleShape', ','.join(fields))
         return shape_cls(*subset_shape)
-
-    @staticmethod
-    def _get_frame_rate(fh, header_template):
-        """Returns the number of frames per second.
-
-        Parameters
-        ----------
-        fh : filehandle
-            Filehandle of the raw stream.
-        header_template : header class or instance
-            Definition or instance of file format's header class.
-
-        Returns
-        -------
-        frame_rate : `~astropy.units.Quantity`
-            Frames per second.
-
-        Notes
-        -----
-
-        The function cycles through headers, starting from the file pointer's
-        current position, to find the next frame whose frame number is zero
-        while keeping track of the largest frame number yet found.
-
-        This method is called when the sample rate is not user-provided
-        or deducible from header information.  If less than one second of data
-        exists in the file, the function will raise an EOFError.  It also
-        returns an error if any header cannot be read or does not verify as
-        correct.
-        """
-        oldpos = fh.tell()
-        header = header_template.fromfile(fh)
-        frame_nr0 = header['frame_nr']
-        while header['frame_nr'] == frame_nr0:
-            fh.seek(header.payload_nbytes, 1)
-            header = header_template.fromfile(fh)
-        max_frame = frame_nr0
-        while header['frame_nr'] > 0:
-            max_frame = max(header['frame_nr'], max_frame)
-            fh.seek(header.payload_nbytes, 1)
-            header = header_template.fromfile(fh)
-
-        fh.seek(oldpos)
-        return (max_frame + 1) * u.Hz
 
     @lazyproperty
     def _last_header(self):

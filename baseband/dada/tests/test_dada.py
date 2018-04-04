@@ -166,6 +166,16 @@ class TestDADA(object):
         assert not isinstance(payload.words, np.memmap)
         assert payload == payload4
 
+    def test_file_reader(self):
+        with dada.open(SAMPLE_FILE, 'rb') as fh:
+            header = fh.read_header()
+            assert header == self.header
+            current_pos = fh.tell()
+            frame_rate = fh.get_frame_rate()
+            assert frame_rate == header.sample_rate / header.samples_per_frame
+            assert fh.tell() == current_pos
+            # Frame is done below, as is writing in binary.
+
     def test_frame(self, tmpdir):
         with dada.open(SAMPLE_FILE, 'rb') as fh:
             frame = fh.read_frame(memmap=False)

@@ -308,8 +308,19 @@ class TestMark4(object):
         assert np.all(payload2[item] == sel_data)
         assert payload2 == payload
 
-    def test_binary_file_repr(self):
+    def test_binary_file_reader(self):
         with mark4.open(SAMPLE_FILE, 'rb', decade=2010, ntrack=64) as fh:
+            fh.locate_frame()
+            assert fh.tell() == 0xa88
+            header = mark4.Mark4Header.fromfile(fh, decade=2010, ntrack=64)
+            fh.seek(0xa88)
+            header2 = fh.read_header()
+            current_pos = fh.tell()
+            assert header2 == header
+            frame_rate = fh.get_frame_rate()
+            assert abs(frame_rate -
+                       32 * u.MHz / header.samples_per_frame) < 1 * u.nHz
+            assert fh.tell() == current_pos
             repr_fh = repr(fh)
 
         assert repr_fh.startswith('Mark4FileReader')

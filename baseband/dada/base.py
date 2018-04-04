@@ -106,9 +106,24 @@ class DADAFileNameSequencer:
 class DADAFileReader(VLBIFileBase):
     """Simple reader for DADA files.
 
-    Adds a `read_frame` method to the basic VLBI binary file wrapper. By
-    default, the payload is mapped rather than fully read into physical memory.
+    Wraps a binary filehandle, providing methods to help interpret the data,
+    such as `read_frame` and `get_frame_rate`. By default, frame payloads
+    are mapped rather than fully read into physical memory.
+
+    Parameters
+    ----------
+    fh_raw : filehandle
+        Filehandle of the raw binary data file.
     """
+    def read_header(self):
+        """Read a single header from the file.
+
+        Returns
+        -------
+        header : `~baseband.dada.DADAHeader`
+        """
+        return DADAHeader.fromfile(self.fh_raw)
+
     def read_frame(self, memmap=True):
         """Read the frame header and read or map the corresponding payload.
 
@@ -127,6 +142,25 @@ class DADAFileReader(VLBIFileBase):
             parts of interest by slicing the frame.
         """
         return DADAFrame.fromfile(self.fh_raw, memmap=memmap)
+
+    def get_frame_rate(self):
+        """Determine the number of frames per second.
+
+        The routine uses the sample rate and number of samples per frame
+        from the first header in the file.
+
+        Returns
+        -------
+        frame_rate : `~astropy.units.Quantity`
+            Frames per second.
+        """
+        oldpos = self.tell()
+        self.seek(0)
+        try:
+            header = self.read_frame()
+            return header.sample_rate / header.samples_per_frame
+        finally:
+            self.seek(oldpos)
 
 
 class DADAFileWriter(VLBIFileBase):
