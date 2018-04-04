@@ -151,6 +151,8 @@ class TestMark5B(object):
         assert payload._nbytes == 10000
         assert payload.nbytes == 10000
         assert payload.shape == (5000, 8)
+        assert payload.size == 40000
+        assert payload.ndim == 2
         # Check sample shape validity.
         assert payload.sample_shape == (8,)
         assert payload.sample_shape.nchan == 8
@@ -218,6 +220,9 @@ class TestMark5B(object):
 
         assert frame.header == header
         assert frame.payload == payload
+        assert frame.shape == payload.shape
+        assert frame.size == payload.size
+        assert frame.ndim == payload.ndim
         assert frame == mark5b.Mark5BFrame(header, payload)
         assert np.all(frame.data[:3].astype(int) ==
                       np.array([[-3, -1, +1, -1, +3, -3, -3, +3],

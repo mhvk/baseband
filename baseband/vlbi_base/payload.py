@@ -135,8 +135,21 @@ class VLBIPayloadBase(object):
 
     @property
     def shape(self):
-        """Shape of the decoded data array (nsample, sample_shape)."""
+        """Shape of the decoded data array."""
         return (len(self),) + self.sample_shape
+
+    @property
+    def size(self):
+        """Total number of component samples in the decoded data array."""
+        prod = 1
+        for dim in self.shape:
+            prod *= dim
+        return prod
+
+    @property
+    def ndim(self):
+        """Number of dimensions of the decoded data array."""
+        return len(self.shape)
 
     @property
     def dtype(self):

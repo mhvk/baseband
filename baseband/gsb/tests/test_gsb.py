@@ -229,6 +229,9 @@ class TestGSB(object):
             assert payload1.data.shape == (8192, 1)
             assert payload1.sample_shape == (1,)
             assert payload1.sample_shape.nchan == 1
+            assert payload1.shape == (8192, 1)
+            assert payload1.size == 8192
+            assert payload1.ndim == 2
             with pytest.raises(ValueError):
                 gsb.GSBPayload.fromfile(fh, payload_nbytes=None)
             payload2 = gsb.GSBPayload.fromdata(payload1.data, bps=4)
@@ -323,6 +326,9 @@ class TestGSB(object):
         # Compare the two.
         assert header1 == frame1.header
         assert np.all(payload1.data == frame1.payload.data)
+        assert frame1.shape == payload1.shape
+        assert frame1.size == payload1.size
+        assert frame1.ndim == payload1.ndim
 
         frame2 = gsb.GSBFrame(frame1.header, frame1.payload)
         assert frame2 == frame1
@@ -364,6 +370,8 @@ class TestGSB(object):
         assert frame1.dtype.kind == 'c'
         assert header1 == frame1.header
         assert frame1.shape == payload1.shape
+        assert frame1.size == payload1.size
+        assert frame1.ndim == payload1.ndim
         assert np.all(frame1.payload.data == payload1.data)
         assert frame1.valid is True
         frame1.valid = False

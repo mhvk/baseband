@@ -205,8 +205,10 @@ class TestVLBIBase(object):
         assert self.payload.complex_data is False
         assert self.payload.sample_shape == (2,)
         assert self.payload.bps == 8
-        assert self.payload.shape == (4, 2)
         assert self.payload.nbytes == 8
+        assert self.payload.shape == (4, 2)
+        assert self.payload.size == 8
+        assert self.payload.ndim == 2
         assert np.all(self.payload.data.ravel() ==
                       self.payload.words.view(np.int8))
         assert np.all(np.array(self.payload).ravel() ==
@@ -355,6 +357,8 @@ class TestVLBIBase(object):
         assert len(self.frame) == len(self.payload)
         assert self.frame.sample_shape == self.payload.sample_shape
         assert self.frame.shape == self.payload.shape
+        assert self.frame.size == self.payload.size
+        assert self.frame.ndim == self.payload.ndim
         assert np.all(self.frame.data == self.payload.data)
         assert np.all(np.array(self.frame) == np.array(self.payload))
         assert np.all(np.array(self.frame, dtype=np.float64) ==

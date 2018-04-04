@@ -295,6 +295,8 @@ class TestVDIF(object):
             payload = vdif.VDIFPayload.fromfile(fh, header)
         assert payload.nbytes == 5000
         assert payload.shape == (20000, 1)
+        assert payload.size == 20000
+        assert payload.ndim == 2
         # Check sample shape validity
         assert payload.sample_shape == (1,)
         assert payload.sample_shape.nchan == 1
@@ -363,6 +365,9 @@ class TestVDIF(object):
 
         assert frame.header == header
         assert frame.payload == payload
+        assert frame.shape == payload.shape
+        assert frame.size == payload.size
+        assert frame.ndim == payload.ndim
         assert frame == vdif.VDIFFrame(header, payload)
         assert np.all(frame.data[:12, 0].astype(int) ==
                       np.array([1, 1, 1, -3, 1, 1, -3, -3, -3, 3, 3, -1]))
@@ -404,6 +409,8 @@ class TestVDIF(object):
         assert frameset.samples_per_frame == 20000
         assert frameset.nchan == 1
         assert frameset.shape == (20000, 8, 1)
+        assert frameset.size == 160000
+        assert frameset.ndim == 3
         assert frameset.nbytes == 8 * frameset.frames[0].nbytes
         assert 'edv' in frameset
         assert 'edv' in frameset.keys()
