@@ -35,7 +35,7 @@ class Mark5BFileReader(VLBIFileBase):
     bps : int, optional
         Bits per elementary sample.  Default: 2.
     """
-    def __init__(self, fh_raw, kday=None, ref_time=None, nchan=1, bps=2):
+    def __init__(self, fh_raw, kday=None, ref_time=None, nchan=None, bps=2):
         self.kday = kday
         self.ref_time = ref_time
         self.nchan = nchan
@@ -57,6 +57,9 @@ class Mark5BFileReader(VLBIFileBase):
             `~baseband.mark5b.Mark5BHeader` and data encoded in the frame,
             respectively.
         """
+        if self.nchan is None:
+            raise TypeError("In order to read frames, the file handle should "
+                            "be initialized with nchan set.")
         return Mark5BFrame.fromfile(self.fh_raw, kday=self.kday,
                                     ref_time=self.ref_time, nchan=self.nchan,
                                     bps=self.bps)
