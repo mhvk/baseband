@@ -49,9 +49,9 @@ class GSBFrame(VLBIFrameBase):
 
       data : property that yields full decoded payload
 
-    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    A number of properties are defined: `shape`, `dtype` and `size` are
     the shape, type and number of complete samples of the data array, and
-    ``nbytes`` the frame size in bytes.  Furthermore, the frame acts as a
+    `nbytes` the frame size in bytes.  Furthermore, the frame acts as a
     dictionary, with keys those of the header.  Any attribute that is not
     defined on the frame itself, such as ``.time`` will be looked up on the
     header as well.
@@ -77,7 +77,8 @@ class GSBFrame(VLBIFrameBase):
             containing tuples with pairs of handles for a phased one.  E.g.,
             ``((L1, L2), (R1, R2))`` for left and right polarisations.
         payload_nbytes : int, optional
-            Size of the individual payloads in bytes.  Default: 2**24 (16 MB).
+            Size of the individual payloads in bytes.  Default: ``2**24``
+            (16 MB).
         nchan : int, optional
             Number of channels.  Default: 1.
         bps : int, optional

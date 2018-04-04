@@ -52,9 +52,9 @@ class Mark5BFrame(VLBIFrameBase):
 
       data : property that yields full decoded payload
 
-    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    A number of properties are defined: `shape`, `dtype` and `size` are
     the shape, type and number of complete samples of the data array, and
-    ``nbytes`` the frame size in bytes.  Furthermore, the frame acts as a
+    `nbytes` the frame size in bytes.  Furthermore, the frame acts as a
     dictionary, with keys those of the header.  Any attribute that is not
     defined on the frame itself, such as ``.time`` will be looked up on the
     header as well.
@@ -85,10 +85,10 @@ class Mark5BFrame(VLBIFrameBase):
             To read the header and payload from.
         kday : int or None
             Explicit thousands of MJD of the observation time.  Can instead
-            pass an approximate `ref_time`.
+            pass an approximate ``ref_time``.
         ref_time : `~astropy.time.Time` or None
             Reference time within 500 days of the observation time, used to
-            infer the full MJD.  Used only if `kday` is not given.
+            infer the full MJD.  Used only if ``kday`` is not given.
         nchan : int, optional
             Number of channels.   Default: 1.
         bps : int, optional

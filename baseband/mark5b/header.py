@@ -48,11 +48,11 @@ class Mark5BHeader(VLBIHeaderBase):
     kday : int or None
         Explicit thousands of MJD of the observation time (needed to remove
         ambiguity in the Mark 5B time stamp).  Can instead pass an approximate
-        `ref_time`.
+        ``ref_time``.
     ref_time : `~astropy.time.Time` or None
         Reference time within 500 days of the observation time, used to infer
         the full MJD.  Used only if ``kday`` is not given.
-    verify : bool
+    verify : bool, optional
         Whether to do basic verification of integrity.  Default: `True`.
 
     Returns
@@ -108,7 +108,7 @@ class Mark5BHeader(VLBIHeaderBase):
         any ``header = cls(<data>)``, ``cls.fromvalues(**header) == header``.
 
         However, unlike for the :meth:`Mark5BHeader.fromkeys` class method,
-        data can also be set using arguments named after methods such as
+        data can also be set using arguments named after methods, such as
         ``jday`` and ``seconds``.
 
         Given defaults:
@@ -183,7 +183,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @property
     def payload_nbytes(self):
-        """Size of the payload, in bytes."""
+        """Size of the payload in bytes."""
         return self._payload_nbytes    # Hardcoded in class definition.
 
     @payload_nbytes.setter
@@ -194,7 +194,7 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @property
     def frame_nbytes(self):
-        """Size of a frame, in bytes."""
+        """Size of the frame in bytes."""
         return self.nbytes + self.payload_nbytes
 
     @frame_nbytes.setter
@@ -249,12 +249,12 @@ class Mark5BHeader(VLBIHeaderBase):
     def get_time(self, frame_rate=None):
         """Convert year, BCD time code to Time object.
 
-        Calculate time using ``jday``, ``seconds``, and ``fraction`` properties
+        Calculate time using `jday`, `seconds`, and `fraction` properties
         (which reflect the bcd-encoded 'bcd_jday', 'bcd_seconds' and
-        'bcd_frac_sec' header items), plus `kday` from the initialisation.  See
+        'bcd_fraction' header items), plus `kday` from the initialisation.  See
         http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 
-        Note that some non-compliant files do not have 'bcd_frac_sec` set.
+        Note that some non-compliant files do not have 'bcd_fraction' set.
         For those, the time can still be retrieved using 'frame_nr' given a
         frame rate.
 
@@ -268,7 +268,7 @@ class Mark5BHeader(VLBIHeaderBase):
         ----------
         frame_rate : `~astropy.units.Quantity`, optional
             Used to calculate the fractional second from the frame number
-            instead of from the header's ``fraction``.
+            instead of from the header's `fraction`.
 
         Returns
         -------
@@ -289,17 +289,17 @@ class Mark5BHeader(VLBIHeaderBase):
 
     def set_time(self, time, frame_rate=None):
         """
-        Convert Time object to BCD timestamp elements and frame_nr.
+        Convert Time object to BCD timestamp elements and 'frame_nr'.
 
-        For non-integer seconds, the frame_nr will be calculated if not given
-        explicitly. Doing so requires the frame rate.
+        For non-integer seconds, the frame number will be calculated if not
+        given explicitly. Doing so requires the frame rate.
 
         Parameters
         ----------
         time : `~astropy.time.Time`
             The time to use for this header.
         frame_rate : `~astropy.units.Quantity`, optional
-            For calculating the ``frame_nr`` from the fractional seconds.
+            For calculating 'frame_nr' from the fractional seconds.
         """
         self.kday = int(time.mjd // 1000) * 1000
         self.jday = int(time.mjd - self.kday)

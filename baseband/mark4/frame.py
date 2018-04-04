@@ -58,9 +58,9 @@ class Mark4Frame(VLBIFrameBase):
     If the frame does not contain valid data, all values returned are set
     to ``self.fill_value``.
 
-    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    A number of properties are defined: `shape`, `dtype` and `size` are
     the shape, type and number of complete samples of the data array, and
-    ``nbytes`` the frame size in bytes.  Furthermore, the frame acts as a
+    `nbytes` the frame size in bytes.  Furthermore, the frame acts as a
     dictionary, with keys those of the header.  Any attribute that is not
     defined on the frame itself, such as ``.time`` will be looked up on the
     header as well.
@@ -110,10 +110,10 @@ class Mark4Frame(VLBIFrameBase):
             Number of Mark 4 bitstreams.
         decade : int or None
             Decade in which the observations were taken.  Can instead pass an
-            approximate `ref_time`.
+            approximate ``ref_time``.
         ref_time : `~astropy.time.Time` or None
             Reference time within 4 years of the observation time.  Used only
-            if `decade` is not given.
+            if ``decade`` is not given.
         verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
         """

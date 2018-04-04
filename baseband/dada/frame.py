@@ -44,9 +44,9 @@ class DADAFrame(VLBIFrameBase):
 
     One can decode part of the payload by indexing or slicing the frame.
 
-    A number of properties are defined: ``shape``, ``dtype`` and ``size`` are
+    A number of properties are defined: `shape`, `dtype` and `size` are
     the shape, type and number of complete samples of the data array, and
-    ``nbytes`` the frame size in bytes.  Furthermore, the frame acts as a
+    `nbytes` the frame size in bytes.  Furthermore, the frame acts as a
     dictionary, with keys those of the header.  Any attribute that is not
     defined on the frame itself, such as ``.time`` will be looked up on the
     header as well.
@@ -97,7 +97,7 @@ class DADAFrame(VLBIFrameBase):
             Whether or not to do basic assertions that check the integrity.
             Default: `True`.
         **kwargs
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)

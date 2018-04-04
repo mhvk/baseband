@@ -22,9 +22,10 @@ __all__ = ['TimeGSB', 'GSBHeader', 'GSBRawdumpHeader', 'GSBPhasedHeader']
 
 
 class TimeGSB(TimeString):
-    """GSB header date-time format ``'YYYY MM DD HH MM SS 0.SSSSSS'``.
+    """GSB header date-time format ``YYYY MM DD HH MM SS 0.SSSSSSSSS``.
 
-    For example, 2000 01 01 00 00 00 0.000000 is midnight on January 1, 2000.
+    For example, ``2000 01 01 00 00 00 0.000000000`` is midnight on
+    January 1, 2000.
     """
     # Implicitly uses the metaclass astropy.time.formats.TimeFormatMeta to
     # register with astropy.Time.
@@ -100,7 +101,7 @@ def get_default(index, length, forward, backward, default=None):
 
 
 class GSBHeader(VLBIHeaderBase):
-    """GSB Header, based on a line from a time-stamp file.
+    """GSB Header, based on a line from a timestamp file.
 
     Parameters
     ----------
@@ -158,6 +159,7 @@ class GSBHeader(VLBIHeaderBase):
 
     @property
     def mode(self):
+        """Mode in which data was taken: 'phased' or 'rawdump'."""
         return self._mode
 
     @property

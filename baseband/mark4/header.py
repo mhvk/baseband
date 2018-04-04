@@ -96,14 +96,15 @@ class Mark4TrackHeader(VLBIHeaderBase):
     Parameters
     ----------
     words : tuple of int, or None
-        Five 32-bit unsigned int header words.  If `None`, set to a list
-        of zeros for later initialisation.
+        Five 32-bit unsigned int header words.  If `None`, set to a list of
+        zeros for later initialisation.
     decade : int or None
         Decade in which the observations were taken (needed to remove ambiguity
-        in the Mark 4 time stamp).  Can instead pass an approximate `ref_time`.
+        in the Mark 4 time stamp).  Can instead pass an approximate
+        ``ref_time``.
     ref_time : `~astropy.time.Time` or None
         Reference time within 4 years of the observation time, used to infer
-        the full Mark 4 timestamp.  Used only if `decade` is not given.
+        the full Mark 4 timestamp.  Used only if ``decade`` is not given.
     verify : bool, optional
         Whether to do basic verification of integrity.  Default: `True`.
 
@@ -213,7 +214,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
 
         Calculate time using bcd-encoded 'bcd_unit_year', 'bcd_day',
         'bcd_hour', 'bcd_minute', 'bcd_second' header items, as well as
-        the ``fraction`` property (inferred from 'bcd_frac_sec') and
+        the ``fraction`` property (inferred from 'bcd_fraction') and
         ``decade`` from the initialisation.  See
         See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         """
@@ -257,16 +258,17 @@ class Mark4Header(Mark4TrackHeader):
         Number of Mark 4 bitstreams, to help initialize ``words`` if needed.
     decade : int or None
         Decade in which the observations were taken (needed to remove ambiguity
-        in the Mark 4 time stamp).  Can instead pass an approximate `ref_time`.
+        in the Mark 4 time stamp).  Can instead pass an approximate
+        ``ref_time``.
     ref_time : `~astropy.time.Time` or None
         Reference time within 4 years of the observation time, used to infer
-        the full Mark 4 timestamp.  Used only if `decade` is not given.
+        the full Mark 4 timestamp.  Used only if ``decade`` is not given.
     verify : bool, optional
         Whether to do basic verification of integrity.  Default: `True`.
 
     Returns
     -------
-    header : `~baseband.mark4.Mark4Header` instance.
+    header : `~baseband.mark4.Mark4Header`
     """
 
     _track_header = Mark4TrackHeader
@@ -413,8 +415,8 @@ class Mark4Header(Mark4TrackHeader):
         Here, the parsed values must be given as keyword arguments, i.e., for
         any ``header = cls(<words>)``, ``cls.fromvalues(**header) == header``.
 
-        However, unlike for the ``fromkeys`` class method, data can also be set
-        using arguments named after header methods such as ``time``.
+        However, unlike for the `fromkeys` class method, data can also be set
+        using arguments named after header methods, such as ``time``.
 
         Parameters
         ----------
@@ -425,7 +427,7 @@ class Mark4Header(Mark4TrackHeader):
             approximate ``ref_time``.  Not needed if ``time`` is given.
         ref_time : `~astropy.time.Time` or None, optional
             Reference time within 4 years of the observation time.  Used only
-            if `decade` is not given, and not needed if ``time`` is given.
+            if ``decade`` is not given, and not needed if ``time`` is given.
         **kwargs :
             Values used to initialize header keys or methods.
 
@@ -484,7 +486,7 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def ntrack(self):
-        """Number of tracks of the stream described by this header."""
+        """Number of Mark 4 bitstreams."""
         return self.words.shape[1]
 
     @property
@@ -494,7 +496,7 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def frame_nbytes(self):
-        """Size of the whole frame (header + payload) in bytes."""
+        """Size of the frame in bytes."""
         return self.ntrack * PAYLOAD_NBITS // 8
 
     @property
@@ -509,7 +511,7 @@ class Mark4Header(Mark4TrackHeader):
     def fanout(self):
         """Number of samples stored in one payload item of size ntrack.
 
-        If set, will update ``fan_out`` for each track.
+        If set, will update 'fan_out' for each track.
         """
         return np.max(self['fan_out']) + 1
 
@@ -532,9 +534,9 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def samples_per_frame(self):
-        """Number of samples per channel encoded in frame.
+        """Number of complete samples in the frame.
 
-        If set, this uses the number of tracks to infer and set ``fanout``.
+        If set, this uses the number of tracks to infer and set `fanout`.
         """
         # Header overwrites part of payload, so we need
         # frame_nbytes * 8 // bps // nchan, but use ntrack and fanout, as these
@@ -549,8 +551,8 @@ class Mark4Header(Mark4TrackHeader):
     def bps(self):
         """Bits per elementary sample (either 1 or 2).
 
-        If set, combined with ``fanout`` and ``ntrack`` to updates
-        ``magnitude_bit`` for all tracks.
+        If set, combined with `fanout` and `ntrack` to update 'magnitude_bit'
+        for all tracks.
         """
         return 2 if self['magnitude_bit'].any() else 1
 
@@ -570,9 +572,9 @@ class Mark4Header(Mark4TrackHeader):
 
     @property
     def nchan(self):
-        """Number of independent baseband channels.
+        """Number of channels (``ntrack * fanout``) in the frame.
 
-        If set, it is combined with ``ntrack`` and ``fanout`` to infer ``bps``.
+        If set, it is combined with `ntrack` and `fanout` to infer `bps`.
         """
         return self.ntrack // (self.fanout * self.bps)
 
@@ -606,7 +608,7 @@ class Mark4Header(Mark4TrackHeader):
         else:
             raise ValueError("number of sidebands can only be 1 or 2.")
 
-        # set default converters; can be overridden if needed.
+        # Set default converters; can be overridden if needed.
         nconverter = self.ntrack // (self.fanout * self.bps * self.nsb)
         converters = np.arange(nconverter)
         if nconverter > 2:
@@ -623,7 +625,7 @@ class Mark4Header(Mark4TrackHeader):
 
         Can be set with a similar structured array or a `dict`; if just an
         an array is passed in, it will be assumed that the sideband has been
-        set beforehand (e.g., by setting ``nsb``) and that the array holds
+        set beforehand (e.g., by setting `nsb`) and that the array holds
         the converter IDs.
         """
         ta_ch = self.track_assignment[0, :, 0]
@@ -634,7 +636,7 @@ class Mark4Header(Mark4TrackHeader):
 
     @converters.setter
     def converters(self, converters):
-        # set converters, duplicating over fanout, lsb, magnitude bit.
+        # Set converters, duplicating over fanout, lsb, magnitude bit.
         ta = self.track_assignment
         ta_ch = ta[0, :, 0]
         nchan = len(ta_ch)

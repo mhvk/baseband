@@ -42,7 +42,7 @@ Usage
 This section covers reading and writing Mark 5B files with Baseband; general
 usage can be found under the :ref:`Getting Started <getting_started>` section.
 The examples below use the small sample file ``baseband/data/sample.m5b``, and
-the `numpy`, `astropy.units`, `astropy.time.Time`, and `baseband.mark5`
+the `numpy`, `astropy.units`, `astropy.time.Time`, and `baseband.mark5b`
 modules::
 
     >>> import numpy as np

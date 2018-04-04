@@ -102,7 +102,7 @@ class DADAHeader(OrderedDict):
                                            'DADA_VERSION'))
 
     def copy(self):
-        """Create a mutable and independent copy."""
+        """Create a mutable and independent copy of the header."""
         # Cannot do super(DADAHeader, self).copy(), since this first
         # initializes an empty header, which does not pass verification.
         new = self.__class__(self)
@@ -233,7 +233,7 @@ class DADAHeader(OrderedDict):
         any ``header``, ``cls.fromvalues(**header) == header``.
 
         However, unlike for the ``fromkeys`` class method, data can also be set
-        using arguments named after header methods such as ``time``.
+        using arguments named after header methods, such as ``time``.
 
         Furthermore, some header defaults are set in ``DADAHeader._defaults``.
         """
@@ -279,12 +279,12 @@ class DADAHeader(OrderedDict):
 
     @property
     def nbytes(self):
-        """Size in bytes of the header."""
+        """Size of the header in bytes."""
         return self['HDR_SIZE']
 
     @property
     def payload_nbytes(self):
-        """Size in bytes of the payload part of the file."""
+        """Size of the payload in bytes."""
         return self['FILE_SIZE']
 
     @payload_nbytes.setter
@@ -293,7 +293,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def frame_nbytes(self):
-        """Size in bytes of the full file, header plus payload."""
+        """Size of the frame in bytes."""
         return self.nbytes + self.payload_nbytes
 
     @frame_nbytes.setter
@@ -319,7 +319,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def sample_shape(self):
-        """Shape of a single payload sample: (npol, nchan)."""
+        """Shape of a sample in the payload (npol, nchan)."""
         return self['NPOL'], self['NCHAN']
 
     @sample_shape.setter
@@ -352,7 +352,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def samples_per_frame(self):
-        """Complete samples per frame (i.e., each having ``sample_shape``)."""
+        """Number of complete samples in the frame."""
         return (self.payload_nbytes * 8 //
                 self.bps // (2 if self.complex_data else 1) // self['NPOL'] //
                 self['NCHAN'])
@@ -403,7 +403,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def time(self):
-        """Start time the part of the observation covered by this header."""
+        """Start time of the part of the observation covered by this header."""
         return self.start_time + self.offset
 
     @time.setter

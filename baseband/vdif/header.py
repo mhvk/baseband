@@ -179,7 +179,7 @@ class VDIFHeader(VLBIHeaderBase):
         any ``header = cls(<data>)``, ``cls.fromvalues(**header) == header``.
 
         However, unlike for the :meth:`~baseband.vdif.VDIFHeader.fromkeys`
-        class method, data can also be set using arguments named after methods
+        class method, data can also be set using arguments named after methods,
         such as ``bps`` and ``time``.
 
         Given defaults for standard header keywords:
@@ -247,7 +247,7 @@ class VDIFHeader(VLBIHeaderBase):
         Note that the Mark 5B header does not encode the bits-per-sample and
         the number of channels used in the payload, so these need to be given
         separately.  A complete frame can be encapsulated with
-        VDIFFrame.from_mark5b_frame.
+        `~baseband.vdif.VDIFFrame.from_mark5b_frame`.
 
         Parameters
         ----------
@@ -288,7 +288,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     @property
     def frame_nbytes(self):
-        """Size of a frame, in bytes."""
+        """Size of the frame in bytes."""
         return self['frame_length'] * 8
 
     @frame_nbytes.setter
@@ -298,7 +298,7 @@ class VDIFHeader(VLBIHeaderBase):
 
     @property
     def payload_nbytes(self):
-        """Size of the payload, in bytes."""
+        """Size of the payload in bytes."""
         return self.frame_nbytes - self.nbytes
 
     @payload_nbytes.setter
@@ -366,7 +366,7 @@ class VDIFHeader(VLBIHeaderBase):
 
         Uses 'ref_epoch', which stores the number of half-years from 2000,
         and 'seconds'.  By default, it also calculates the offset using
-        the current frame number.  For non-zero frame_nr, this requires the
+        the current frame number.  For non-zero 'frame_nr', this requires the
         frame rate, which is calculated from the sample rate in the header.
         The latter can be passed on if it is not available (e.g., for a legacy
         VDIF header).
@@ -374,7 +374,7 @@ class VDIFHeader(VLBIHeaderBase):
         Parameters
         ----------
         sample_rate : `~astropy.units.Quantity`, optional
-            For non-zero `frame_nr`, this is used to calculate the
+            For non-zero 'frame_nr', this is used to calculate the
             corresponding offset.  If not given, an attempt will be made to
             calculate it from the sampling rate given in the header (but not
             all EDV contain this).
@@ -403,7 +403,7 @@ class VDIFHeader(VLBIHeaderBase):
         """
         Converts Time object to ref_epoch, seconds, and frame_nr.
 
-        For non-integer seconds, the frame_nr will be calculated if not given
+        For non-integer seconds, 'frame_nr' will be calculated if not given
         explicitly. This requires the frame rate, which is calculated from the
         sample rate in the header.  The latter can be passed on if it is not
         available (e.g., for a legacy VDIF header).
@@ -413,9 +413,9 @@ class VDIFHeader(VLBIHeaderBase):
         time : `~astropy.time.Time`
             The time to use for this header.
         sample_rate : `~astropy.units.Quantity`, optional
-            For calculating the ``frame_nr`` from the fractional seconds.
-            If not given, will try to calculate it from the sampling rate
-            given in the header (but not all EDV contain this).
+            For calculating 'frame_nr' from the fractional seconds.  If not
+            given, will try to calculate it from the sampling rate given in the
+            header (but not all EDV contain this).
         """
         assert time > ref_epochs[0]
         ref_index = np.searchsorted((ref_epochs - time).sec, 0) - 1
@@ -597,7 +597,7 @@ class VDIFHeader2(VDIFBaseHeader):
     Notes
     -----
     This header is untested.  It may need to have subclasses, based on possible
-    differentsync values.
+    different sync values.
     """
     _edv = 2
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
@@ -634,7 +634,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         super(VDIFMark5BHeader, self).verify()
         assert self['frame_length'] == 1254  # payload+header=10000+32 bytes/8
         assert self['frame_nr'] == self['mark5b_frame_nr']
-        # check consistency of time down to the second (since some Mark 5B
+        # Check consistency of time down to the second (since some Mark 5B
         # headers do not store 'bcd_fraction').
         day, seconds = divmod(self['seconds'], 86400)
         assert seconds == self.seconds  # Latter decodes 'bcd_seconds'
@@ -667,7 +667,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         Parameters
         ----------
         sample_rate : `~astropy.units.Quantity`, optional
-            For non-zero `frame_nr`, this is used to calculate the
+            For non-zero 'frame_nr', this is used to calculate the
             corresponding offset.
 
         Returns

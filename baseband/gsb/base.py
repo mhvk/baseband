@@ -19,7 +19,7 @@ __all__ = ['GSBFileReader', 'GSBFileWriter', 'GSBStreamReader',
 class GSBTimeStampIO(VLBIFileBase):
     """Simple reader/writer for GSB time stamp files.
 
-    Adds ``read_timestamp`` and ``write_timestamp`` methods to the basic VLBI
+    Adds `read_timestamp` and `write_timestamp` methods to the basic VLBI
     file wrapper. To be used with a text file.
     """
 
@@ -46,7 +46,7 @@ class GSBTimeStampIO(VLBIFileBase):
             Header holding time to be written to disk.  Can instead give
             keyword arguments to construct a header.
         **kwargs :
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
         """
         if header is None:
             header = GSBHeader.fromvalues(**kwargs)
@@ -56,7 +56,7 @@ class GSBTimeStampIO(VLBIFileBase):
 class GSBFileReader(VLBIFileBase):
     """Simple reader for GSB data files.
 
-    Adds ``read_payload`` method to the basic VLBI binary file wrapper.
+    Adds `read_payload` method to the basic VLBI binary file wrapper.
 
     Parameters
     ----------
@@ -68,7 +68,7 @@ class GSBFileReader(VLBIFileBase):
         Bits per elementary sample, i.e. per real or imaginary component
         for complex data.  Default: 4.
     complex_data : bool, optional
-        Whether data are complex.  Default: False.
+        Whether data are complex.  Default: `False`.
     """
     def __init__(self, fh_raw, payload_nbytes, nchan=1, bps=4,
                  complex_data=False):
@@ -100,7 +100,7 @@ class GSBFileReader(VLBIFileBase):
 class GSBFileWriter(VLBIFileBase):
     """Simple writer for GSB data files.
 
-    Adds ``write_payload`` method to the basic VLBI binary file wrapper.
+    Adds `write_payload` method to the basic VLBI binary file wrapper.
     """
 
     def write_payload(self, data, bps=4):
@@ -112,7 +112,7 @@ class GSBFileWriter(VLBIFileBase):
             If an array, ``bps`` needs to be passed in.
         bps : int, optional
             Bits per elementary sample, to use when encoding the payload.
-            Ignored if `data` is a GSB payload.  Default: 4.
+            Ignored if ``data`` is a GSB payload.  Default: 4.
         """
         if not isinstance(data, GSBPayload):
             data = GSBPayload.fromdata(data, bps=bps)
@@ -202,21 +202,22 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         Raw binary data filehandle(s).  A single file is needed for rawdump,
         and a tuple for phased.  For a nested tuple, the outer tuple determines
         the number of polarizations, and the inner tuple(s) the number of
-        streams per polarization.  E.g., ((polL1, polL2), (polR1, polR2)) for
-        two streams per polarization.  A single tuple is interpreted as
+        streams per polarization.  E.g., ``((polL1, polL2), (polR1, polR2))``
+        for two streams per polarization.  A single tuple is interpreted as
         streams of a single polarization.
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second, i.e. the rate at which each
         channel of each polarization is sampled.  If `None`, will be
         inferred assuming the frame rate is exactly 0.25165824 s.
     samples_per_frame : int, optional
-        Number of complete samples per frame.  Can give `payload_nbytes`
+        Number of complete samples per frame.  Can give ``payload_nbytes``
         instead.
     payload_nbytes : int, optional
         Number of bytes per payload, divided by the number of raw files.
         If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
-        ``payload_nbytes`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
-        divided by the number of streams per polarization for phased.
+        ``payload_nbytes`` is set to ``2**22`` (4 MB) for rawdump, and
+        ``2**23`` (8 MB) divided by the number of streams per polarization for
+        phased.
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.
     bps : int, optional
@@ -315,8 +316,8 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         For writing raw binary data to storage.  A single file is needed for
         rawdump, and a tuple for phased.  For a nested tuple, the outer
         tuple determines the number of polarizations, and the inner tuple(s)
-        the number of streams per polarization.  E.g., ((polL1, polL2), (polR1,
-        polR2)) for two streams per polarization.  A single tuple is
+        the number of streams per polarization.  E.g., ``((polL1, polL2),
+        (polR1, polR2))`` for two streams per polarization.  A single tuple is
         interpreted as streams of a single polarization.
     header0 : `~baseband.gsb.GSBHeader`
         Header for the first frame, holding time information, etc.  Can instead
@@ -331,8 +332,9 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
     payload_nbytes : int, optional
         Number of bytes per payload, divided by the number of raw files.
         If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
-        ``payload_nbytes`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
-        divided by the number of streams per polarization for phased.
+        ``payload_nbytes`` is set to ``2**22`` (4 MB) for rawdump, and
+        ``2**23`` (8 MB) divided by the number of streams per polarization for
+        phased.
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.
     bps : int, optional
@@ -342,7 +344,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         Whether data are complex.  Default: `False` for rawdump, `True` for
         phased.
     squeeze : bool, optional
-        If `True` (default), ``write`` accepts squeezed arrays as input, and
+        If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
     **kwargs
         If no header is given, an attempt is made to construct one from these.
@@ -423,7 +425,7 @@ def open(name, mode='rs', **kwargs):
     mode : {'rb', 'wb', 'rt', 'wt', 'rs', or 'ws'}, optional
         Whether to open for reading or writing, and as a regular text or binary
         file (for timestamps and data, respectively) or as a stream.
-        Default: ``rs``, for reading a stream.
+        Default: 'rs', for reading a stream.
     **kwargs
         Additional arguments when opening the file as a stream.
 
@@ -433,8 +435,8 @@ def open(name, mode='rs', **kwargs):
         Name of files holding payload data.  A single file is needed for
         rawdump, and a tuple for phased.  For a nested tuple, the outer tuple
         determines the number of polarizations, and the inner tuple(s) the
-        number of streams per polarization.  E.g.,
-        ((polL1, polL2), (polR1, polR2)) for two streams per polarization.  A
+        number of streams per polarization.  E.g.,  ``((polL1, polL2),
+        (polR1, polR2))`` for two streams per polarization.  A
         single tuple is interpreted as streams of a single polarization.
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second, i.e. the rate at which each
@@ -446,8 +448,9 @@ def open(name, mode='rs', **kwargs):
     payload_nbytes : int, optional
         Number of bytes per payload, divided by the number of raw files.
         If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
-        ``payload_nbytes`` is set to 2**22 (4 MB) for rawdump, and 2**23 (8 MB)
-        divided by the number of streams per polarization for phased.
+        ``payload_nbytes`` is set to ``2**22`` (4 MB) for rawdump, and
+        ``2**23`` (8 MB) divided by the number of streams per polarization for
+        phased.
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.
     bps : int, optional

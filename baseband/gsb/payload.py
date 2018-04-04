@@ -106,7 +106,7 @@ class GSBPayload(VLBIPayloadBase):
         bps : int, optional
             Bits per elementary sample.  Default: 4.
         complex_data : bool, optional
-            Whether data are complex.  Default: False.
+            Whether data are complex.  Default: `False`.
         """
         if hasattr(fh, 'read'):
             return super(GSBPayload,

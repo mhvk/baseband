@@ -65,7 +65,7 @@ __all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
 class VDIFFileReader(VLBIFileBase):
     """Simple reader for VDIF files.
 
-    Adds ``read_frame`` and ``read_frameset`` methods on top of a binary
+    Adds `read_frame` and `read_frameset` methods on top of a binary
     file reader (which is wrapped as ``self.fh_raw``).
     """
     def read_frame(self):
@@ -93,7 +93,7 @@ class VDIFFileReader(VLBIFileBase):
             use that of the first frame.  (Passing it in slightly improves file
             integrity checking.)
         verify : bool, optional
-            Whether to do (light) sanity checks on the header. Default: True.
+            Whether to do (light) sanity checks on the header. Default: `True`.
 
         Returns
         -------
@@ -107,11 +107,13 @@ class VDIFFileReader(VLBIFileBase):
 
     def find_header(self, template_header=None, frame_nbytes=None, edv=None,
                     maximum=None, forward=True):
-        """Look for the first occurrence of a header, from the current position.
+        """Find the nearest header from the current position.
 
         Search for a valid header at a given position which is consistent with
         ``template_header`` or with a header a frame size ahead.   Note that
         the latter turns out to be an unexpectedly weak check on real data!
+
+        If successful, the file pointer is left at the start of the header.
 
         Parameters
         ----------
@@ -210,7 +212,7 @@ class VDIFFileReader(VLBIFileBase):
 class VDIFFileWriter(VLBIFileBase):
     """Simple writer for VDIF files.
 
-    Adds ``write_frame`` and ``write_frameset`` methods to the basic VLBI
+    Adds `write_frame` and `write_frameset` methods to the basic VLBI
     binary file wrapper.
     """
 
@@ -220,21 +222,21 @@ class VDIFFileWriter(VLBIFileBase):
         Parameters
         ----------
         data : `~numpy.ndarray` or `~baseband.vdif.VDIFFrame`
-            If an array, a `header` should be given, which will be used to
+            If an array, a ``header`` should be given, which will be used to
             get the information needed to encode the array, and to construct
             the VDIF frame.
         header : `~baseband.vdif.VDIFHeader`
             Can instead give keyword arguments to construct a header.  Ignored
             if `data` is a `~baseband.vdif.VDIFFrame` instance.
         **kwargs
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
         """
         if not isinstance(data, VDIFFrame):
             data = VDIFFrame.fromdata(data, header, **kwargs)
         return data.tofile(self.fh_raw)
 
     def write_frameset(self, data, header=None, **kwargs):
-        """Write a frame set (headers plus payloads).
+        """Write a single frame set (headers plus payloads).
 
         Parameters
         ----------
@@ -249,7 +251,7 @@ class VDIFFileWriter(VLBIFileBase):
             `data`; if a single header, ``thread_ids`` corresponding
             to the number of threads are generated automatically.
         **kwargs
-            If `header` is not given, these are used to initialize one.
+            If ``header`` is not given, these are used to initialize one.
         """
         if not isinstance(data, VDIFFrameSet):
             data = VDIFFrameSet.fromdata(data, header, **kwargs)
@@ -393,7 +395,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
         Notes
         -----
-        This function defaults to using `VLBIStreamReaderBase._get_frame_rate`.
+        This method defaults to using `VLBIStreamReaderBase._get_frame_rate`.
         If that leads to an Exception, it attempts to extract the sample rate
         from the header, and passes the Exception on if this too is impossible.
         """
@@ -470,11 +472,11 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
     sample_rate : `~astropy.units.Quantity`
         Number of complete samples per second, i.e. the rate at which each
         channel in each thread is sampled.  For EDV 1 and 3, can
-        alternatively set `sample_rate` within the header.
+        alternatively set ``sample_rate`` within the header.
     nthread : int, optional
         Number of threads (e.g., 2 for 2 polarisations).  Default: 1.
     squeeze : bool, optional
-        If `True` (default), ``write`` accepts squeezed arrays as input, and
+        If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
     **kwargs
         If no header is given, an attempt is made to construct one from these.
@@ -579,8 +581,8 @@ sample_rate : `~astropy.units.Quantity`
 nthread : int, optional
     Number of threads (e.g., 2 for 2 polarisations).  Default: 1.
 squeeze : bool, optional
-    If `True` (default), ``write`` accepts squeezed arrays as input, and adds
-    any dimensions of length unity.
+    If `True` (default), writer accepts squeezed arrays as input, and adds any
+    dimensions of length unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.  See
