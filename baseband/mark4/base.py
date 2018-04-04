@@ -52,6 +52,31 @@ class Mark4FileReader(VLBIFileReaderBase):
                 "decade={s.decade}, ref_time={s.ref_time})"
                 .format(name=self.__class__.__name__, s=self))
 
+    def info(self):
+        old_offset = self.tell()
+        info = {}
+        try:
+            self.seek(0)
+            offset0 = self.locate_frame()
+            header0 = self.read_header()
+            info['fmt'] = 'mark4'
+            info['offset0'] = offset0
+            info['bps'] = header0.bps
+            info['complex_data'] = False
+            info['samples_per_frame'] = header0.samples_per_frame
+            info['sample_shape'] = Mark4Payload._sample_shape_maker(
+                header0.nchan)
+            if self.decade is None and self.ref_time is None:
+                info['missing'] = ['decade', 'ref_time']
+            else:
+                info['start_time'] = header0.time
+            info['frame_rate'] = self.get_frame_rate()
+        except Exception:
+            pass
+
+        self.seek(old_offset)
+        return info
+
     def read_header(self):
         """Read a single header from the file.
 

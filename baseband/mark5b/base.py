@@ -50,6 +50,33 @@ class Mark5BFileReader(VLBIFileReaderBase):
                 "ref_time={s.ref_time}, nchan={s.nchan}, bps={s.bps})"
                 .format(name=self.__class__.__name__, s=self))
 
+    def info(self):
+        old_offset = self.tell()
+        info = {}
+        try:
+            self.seek(0)
+            header0 = self.read_header()
+            info['fmt'] = 'mark5b'
+            info['bps'] = self.bps
+            info['complex_data'] = False
+            if self.kday is None and self.ref_time is None:
+                info['missing'] = ['kday', 'ref_time']
+            else:
+                info['start_time'] = header0.time
+            if self.nchan is None:
+                info['missing'] = info.get('missing', []) + ['nchan']
+            else:
+                info['samples_per_frame'] = (header0.payload_nbytes * 8 //
+                                             self.bps // self.nchan)
+                info['sample_shape'] = Mark5BPayload._sample_shape_maker(
+                    self.nchan)
+            info['frame_rate'] = self.get_frame_rate()
+        except Exception:
+            pass
+
+        self.seek(old_offset)
+        return info
+
     def read_header(self):
         """Read a single header from the file.
 

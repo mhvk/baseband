@@ -15,3 +15,6 @@ from ._astropy_init import *
 if not _ASTROPY_SETUP_:
     # from example_mod import *
     pass
+
+
+from .formats import file_info

@@ -32,6 +32,21 @@ class GSBTimeStampIO(VLBIFileBase):
         fh_raw = io.TextIOWrapper(fh_raw)
         super(GSBTimeStampIO, self).__init__(fh_raw)
 
+    def info(self):
+        old_offset = self.tell()
+        info = {}
+        try:
+            self.seek(0)
+            header0 = self.read_timestamp()
+            info['fmt'] = 'gsb'
+            info['subfmt'] = header0.mode
+            info['start_time'] = header0.time
+        except Exception:
+            pass
+
+        self.seek(old_offset)
+        return info
+
     def read_timestamp(self):
         """Read a single timestamp.
 

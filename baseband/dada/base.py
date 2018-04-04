@@ -115,6 +115,26 @@ class DADAFileReader(VLBIFileBase):
     fh_raw : filehandle
         Filehandle of the raw binary data file.
     """
+    def info(self):
+        old_offset = self.tell()
+        info = {}
+        try:
+            self.seek(0)
+            header0 = self.read_header()
+            info['fmt'] = 'dada'
+            info['bps'] = header0.bps
+            info['complex_data'] = header0.complex_data
+            info['samples_per_frame'] = header0.samples_per_frame
+            info['sample_shape'] = DADAPayload._sample_shape_maker(
+                *header0.sample_shape)
+            info['start_time'] = header0.time
+            info['frame_rate'] = self.get_frame_rate()
+        except Exception:
+            pass
+
+        self.seek(old_offset)
+        return info
+
     def read_header(self):
         """Read a single header from the file.
 
