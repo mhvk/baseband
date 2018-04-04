@@ -608,6 +608,10 @@ class TestMark5B(object):
 
     def test_stream_missing_nchan(self):
         with pytest.raises(TypeError):
+            with mark5b.open(SAMPLE_FILE, 'rb') as fh:
+                fh.read_frame()
+
+        with pytest.raises(TypeError):
             mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz, kday=56000)
 
     def test_stream_missing_kday(self):
