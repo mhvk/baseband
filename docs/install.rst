@@ -8,7 +8,7 @@ Requirements
 
 Baseband requires:
 
-    - `Astropy`_ v1.0.4 or later
+    - `Astropy`_ v2.0 or later
     - `Numpy <http://www.numpy.org/>`_ v1.9 or later
 
 .. _installation:
