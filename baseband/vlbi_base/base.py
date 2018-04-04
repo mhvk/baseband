@@ -88,8 +88,7 @@ class VLBIStreamBase(object):
 
     @property
     def subset(self):
-        """Specific components (e.g. threads, channels) of the complete sample
-        to decode.
+        """Specific components of the complete sample to decode.
 
         The order of dimensions is the same as for `sample_shape`.  Set by
         the class initializer.
