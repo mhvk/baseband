@@ -21,7 +21,7 @@ from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
      (SAMPLE_DADA, 'dada', None),
      (SAMPLE_GSB_RAWDUMP_HEADER, 'gsb', 'rawdump'),
      (SAMPLE_GSB_PHASED_HEADER, 'gsb', 'phased')))
-def test_file_info(sample, fmt, subfmt):
+def test_basic_file_info(sample, fmt, subfmt):
     info = file_info(sample)
     assert info['fmt'] == fmt
     if subfmt is None:
@@ -42,3 +42,20 @@ def test_open_missing_args(sample, missing):
     info = file_info(sample)
     assert 'missing' in info
     assert set(info['missing']) == missing
+
+
+@pytest.mark.parametrize(
+    ('sample', 'fmt'),
+    ((SAMPLE_M4, 'mark4'),
+     (SAMPLE_M5B, 'mark5b'),
+     (SAMPLE_VDIF, 'vdif'),
+     (SAMPLE_DADA, 'dada')))
+def test_file_info(sample, fmt):
+    # Pass on extra arguments needed to get Mark4 and Mark5B to pass.
+    # For GSB, we also need raw files, so we omit them.
+    extra_args = {'ref_time': Time('2014-01-01'),
+                  'nchan': 8}
+    info = file_info(sample, **extra_args)
+    assert info['fmt'] == fmt
+    assert 'missing' not in info
+    assert 'stop_time' in info

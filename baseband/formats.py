@@ -34,15 +34,26 @@ def file_info(name, fmt=None, **kwargs):
         return info
 
     # If arguments were missing, see if they were passed in.
+    extra_args = {}
     if 'missing' in info:
-        extra_args = {key: kwargs[key] for key in kwargs
-                      if key in info['missing']}
+        for key in info['missing']:
+            if key in kwargs:
+                extra_args[key] = kwargs[key]
+
         if not extra_args:
             return info
 
         with module.open(name, mode=mode, **extra_args) as fh:
             info = fh.info()
 
-        info['used_kwargs'] = extra_args
+    # Now see if we should be able to use the stream opener to get
+    # even more information.  This is always possible if we have a
+    # frame rate, or if a sample_rate was passed on.
+    if 'frame_rate' not in info:
+        if 'sample_rate' not in kwargs:
+            return info
 
-    return info
+        extra_args['sample_rate'] = kwargs['sample_rate']
+
+    with module.open(name, mode='rs', **extra_args) as fh:
+        return fh.info()
