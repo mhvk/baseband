@@ -6,8 +6,9 @@ import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
 
-from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase)
+from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
+                              VLBIStreamBase, VLBIStreamReaderBase,
+                              VLBIStreamWriterBase)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 
@@ -62,12 +63,27 @@ __all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
 # -> array([-1, -1,  3, -1,  1, -1,  3, -1,  1,  3, -1,  1])
 
 
-class VDIFFileReader(VLBIFileBase):
+class VDIFFileReader(VLBIFileReaderBase):
     """Simple reader for VDIF files.
 
-    Adds `read_frame` and `read_frameset` methods on top of a binary
-    file reader (which is wrapped as ``self.fh_raw``).
+    Wraps a binary filehandle, providing methods to help interpret the data,
+    such as `read_frame`, `read_frameset` and `get_frame_rate`.
+
+    Parameters
+    ----------
+    fh_raw : filehandle
+        Filehandle of the raw binary data file.
+
     """
+    def read_header(self):
+        """Read a single header from the file.
+
+        Returns
+        -------
+        header : `~baseband.vdif.VDIFHeader`
+        """
+        return VDIFHeader.fromfile(self.fh_raw)
+
     def read_frame(self):
         """Read a single frame (header plus payload).
 
@@ -104,6 +120,33 @@ class VDIFFileReader(VLBIFileBase):
         """
         return VDIFFrameSet.fromfile(self.fh_raw, thread_ids, edv=edv,
                                      verify=verify)
+
+    def get_frame_rate(self):
+        """Determine the number of frames per second.
+
+        This method first tries to determine the frame rate by looking for
+        the highest frame number in the first second of data.  If that fails,
+        it attempts to extract the sample rate from the header.
+
+        Returns
+        -------
+        frame_rate : `~astropy.units.Quantity`
+            Frames per second.
+        """
+        try:
+            return super(VDIFFileReader, self).get_frame_rate()
+        except Exception as exc:
+            oldpos = self.tell()
+            self.seek(0)
+            try:
+                header = self.read_header()
+                return np.round((header.sample_rate /
+                                 header.samples_per_frame).to(u.Hz))
+            except Exception:
+                pass
+            finally:
+                self.seek(oldpos)
+            raise exc
 
     def find_header(self, template_header=None, frame_nbytes=None, edv=None,
                     maximum=None, forward=True):
@@ -376,38 +419,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             self._thread_ids = thread_ids
 
         self._frameset = frameset
-
-    @staticmethod
-    def _get_frame_rate(fh, header):
-        """Returns the number of frames per second in a VDIF file.
-
-        Parameters
-        ----------
-        fh : filehandle
-            Filehandle of the raw stream.
-        header_template : header class or instance
-            Definition or instance of file format's header class.
-
-        Returns
-        -------
-        frame_rate : `~astropy.units.Quantity`
-            Frames per second.
-
-        Notes
-        -----
-        This method defaults to using `VLBIStreamReaderBase._get_frame_rate`.
-        If that leads to an Exception, it attempts to extract the sample rate
-        from the header, and passes the Exception on if this too is impossible.
-        """
-        try:
-            return super(VDIFStreamReader, VDIFStreamReader)._get_frame_rate(
-                fh, header)
-        except Exception:
-            if 'sample_rate' in header._properties:
-                return np.round((header.sample_rate /
-                                 header.samples_per_frame).to(u.Hz))
-            else:
-                raise
 
     @lazyproperty
     def _last_header(self):

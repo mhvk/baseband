@@ -356,6 +356,19 @@ class TestVDIF(object):
         assert np.all(payload2[item] == sel_data)
         assert payload2 == payload
 
+    def test_filereader(self):
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
+            header = vdif.VDIFHeader.fromfile(fh)
+            fh.seek(0)
+            header2 = fh.read_header()
+            assert header2 == header
+            current_pos = fh.tell()
+            frame_rate = fh.get_frame_rate()
+            assert abs(frame_rate - 32. * u.MHz /
+                       header.samples_per_frame) < 1. * u.nHz
+            assert fh.tell() == current_pos
+            # The read_frame method is tested below, as is mode='wb'.
+
     def test_frame(self, tmpdir):
         with vdif.open(SAMPLE_FILE, 'rb') as fh:
             header = vdif.VDIFHeader.fromfile(fh)

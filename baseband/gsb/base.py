@@ -19,8 +19,13 @@ __all__ = ['GSBFileReader', 'GSBFileWriter', 'GSBStreamReader',
 class GSBTimeStampIO(VLBIFileBase):
     """Simple reader/writer for GSB time stamp files.
 
-    Adds `read_timestamp` and `write_timestamp` methods to the basic VLBI
-    file wrapper. To be used with a text file.
+    Wraps a binary filehandle, providing methods `read_timestamp`,
+    `write_timestamp`, and `get_frame_rate`.
+
+    Parameters
+    ----------
+    fh_raw : filehandle
+        Filehandle to the timestamp file, opened in binary mode.
     """
 
     def __init__(self, fh_raw):
@@ -52,11 +57,31 @@ class GSBTimeStampIO(VLBIFileBase):
             header = GSBHeader.fromvalues(**kwargs)
         header.tofile(self.fh_raw)
 
+    def get_frame_rate(self):
+        """Determine the number of frames per second.
+
+        The frame rate is inferred from the first two timestamps.
+
+        Returns
+        -------
+        frame_rate : `~astropy.units.Quantity`
+            Frames per second.
+        """
+        oldpos = self.tell()
+        self.seek(0)
+        try:
+            timestamp0 = self.read_timestamp()
+            timestamp1 = self.read_timestamp()
+            return 1. / (timestamp1.time - timestamp0.time)
+        finally:
+            self.seek(oldpos)
+
 
 class GSBFileReader(VLBIFileBase):
     """Simple reader for GSB data files.
 
-    Adds `read_payload` method to the basic VLBI binary file wrapper.
+    Wraps a binary filehandle, providing a `read_payload` method to help
+    interpret the data.
 
     Parameters
     ----------

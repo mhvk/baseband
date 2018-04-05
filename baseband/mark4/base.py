@@ -5,8 +5,9 @@ import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
 
-from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase)
+from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
+                              VLBIStreamBase, VLBIStreamReaderBase,
+                              VLBIStreamWriterBase)
 from .header import Mark4Header
 from .payload import Mark4Payload
 from .frame import Mark4Frame
@@ -20,13 +21,16 @@ nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
          .sum(1).astype(np.int16))
 
 
-class Mark4FileReader(VLBIFileBase):
+class Mark4FileReader(VLBIFileReaderBase):
     """Simple reader for Mark 4 files.
 
-    Adds `read_frame` and `locate_frame` methods to the VLBI file wrapper.
+    Wraps a binary filehandle, providing methods to help interpret the data,
+    such as `locate_frame, `read_frame` and `get_frame_rate`.
 
     Parameters
     ----------
+    fh_raw : filehandle
+        Filehandle of the raw binary data file.
     ntrack : int or None, optional.
         Number of Mark 4 bitstreams.  Can be determined automatically as
         part of locating the first frame.
@@ -48,6 +52,16 @@ class Mark4FileReader(VLBIFileBase):
                 "decade={s.decade}, ref_time={s.ref_time})"
                 .format(name=self.__class__.__name__, s=self))
 
+    def read_header(self):
+        """Read a single header from the file.
+
+        Returns
+        -------
+        header : `~baseband.mark4.Mark4Header`
+        """
+        return Mark4Header.fromfile(self, ntrack=self.ntrack,
+                                    decade=self.decade, ref_time=self.ref_time)
+
     def read_frame(self):
         """Read a single frame (header plus payload).
 
@@ -60,6 +74,32 @@ class Mark4FileReader(VLBIFileBase):
         """
         return Mark4Frame.fromfile(self.fh_raw, self.ntrack,
                                    decade=self.decade, ref_time=self.ref_time)
+
+    def get_frame_rate(self):
+        """Determine the number of frames per second.
+
+        The frame rate is calculated from the time elapsed between the
+        first two frames, as inferred from their time stamps.
+
+        Returns
+        -------
+        frame_rate : `~astropy.units.Quantity`
+            Frames per second.
+        """
+        oldpos = self.tell()
+        self.seek(0)
+        try:
+            self.locate_frame()
+            header0 = self.read_header()
+            self.seek(header0.payload_nbytes, 1)
+            header1 = self.read_header()
+        finally:
+            self.seek(oldpos)
+
+        # Mark 4 specification states frames-lengths range from 1.25 ms
+        # to 160 ms.
+        tdelta = header1.fraction[0] - header0.fraction[0]
+        return np.round(1 / tdelta) * u.Hz
 
     def locate_frame(self, forward=True, maximum=None):
         """Locate the frame nearest the current position.
@@ -232,9 +272,7 @@ class Mark4FileReader(VLBIFileBase):
         offset = self.locate_frame(forward=forward)
         if offset is None:
             return None
-        header = Mark4Header.fromfile(self.fh_raw, ntrack=self.ntrack,
-                                      decade=self.decade,
-                                      ref_time=self.ref_time)
+        header = self.read_header()
         self.fh_raw.seek(offset)
         return header
 
@@ -339,41 +377,6 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         # a decade will work.
         self.fh_raw.decade = None
         self.fh_raw.ref_time = self.start_time
-
-    @staticmethod
-    def _get_frame_rate(fh, header_template):
-        """Returns the number of frames per second in a Mark 4 file.
-
-        Parameters
-        ----------
-        fh : filehandle
-            Filehandle of the raw Mark 4 stream.
-        header_template : header class or instance
-            Definition or instance of file format's header class.
-
-        Returns
-        -------
-        frame_rate : `~astropy.units.Quantity`
-            Frames per second.
-
-        Notes
-        -----
-        Unlike `VLBIStreamReaderBase._get_frame_rate`, this method reads
-        only two consecutive frames, extracting their timestamps to determine
-        how much time has elapsed.  It will return an `EOFError` if there is
-        only one frame.
-        """
-        oldpos = fh.tell()
-        header0 = header_template.fromfile(fh, header_template.ntrack,
-                                           ref_time=header_template.time)
-        fh.seek(header0.payload_nbytes, 1)
-        header1 = header_template.fromfile(fh, header_template.ntrack,
-                                           ref_time=header_template.time)
-        fh.seek(oldpos)
-        # Mark 4 specification states frames-lengths range from 1.25 ms
-        # to 160 ms.
-        tdelta = header1.fraction[0] - header0.fraction[0]
-        return np.round(1 / tdelta) * u.Hz
 
     @lazyproperty
     def _last_header(self):

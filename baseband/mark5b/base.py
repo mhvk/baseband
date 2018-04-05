@@ -5,7 +5,7 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
+from ..vlbi_base.base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase,
                               make_opener)
 from .header import Mark5BHeader
@@ -17,13 +17,16 @@ __all__ = ['Mark5BFileReader', 'Mark5BFileWriter', 'Mark5BStreamReader',
            'Mark5BStreamWriter', 'open']
 
 
-class Mark5BFileReader(VLBIFileBase):
+class Mark5BFileReader(VLBIFileReaderBase):
     """Simple reader for Mark 5B files.
 
-    Adds `read_frame` and `find_header` methods to the VLBI file wrapper.
+    Wraps a binary filehandle, providing methods to help interpret the data,
+    such as `read_frame` and `get_frame_rate`.
 
     Parameters
     ----------
+    fh_raw : filehandle
+        Filehandle of the raw binary data file.
     kday : int or None
         Explicit thousands of MJD of the observation time.  Can instead
         pass an approximate ``ref_time``.
@@ -47,6 +50,16 @@ class Mark5BFileReader(VLBIFileBase):
                 "ref_time={s.ref_time}, nchan={s.nchan}, bps={s.bps})"
                 .format(name=self.__class__.__name__, s=self))
 
+    def read_header(self):
+        """Read a single header from the file.
+
+        Returns
+        -------
+        header : `~baseband.mark5b.Mark5BHeader`
+        """
+        return Mark5BHeader.fromfile(self, kday=self.kday,
+                                     ref_time=self.ref_time)
+
     def read_frame(self):
         """Read a single frame (header plus payload).
 
@@ -63,6 +76,41 @@ class Mark5BFileReader(VLBIFileBase):
         return Mark5BFrame.fromfile(self.fh_raw, kday=self.kday,
                                     ref_time=self.ref_time, nchan=self.nchan,
                                     bps=self.bps)
+
+    def get_frame_rate(self):
+        """Determine the number of frames per second.
+
+        This method first tries to determine the frame rate by looking for
+        the highest frame number in the first second of data.  If that fails,
+        it uses the time difference between two consecutive frames. This can
+        fail if the headers do not store fractional seconds, or if the data
+        rate is above 512 Mbps.
+
+        Returns
+        -------
+        frame_rate : `~astropy.units.Quantity`
+            Frames per second.
+        """
+        try:
+            return super(Mark5BFileReader, self).get_frame_rate()
+        except Exception as exc:
+            oldpos = self.tell()
+            self.seek(0)
+            try:
+                header0 = self.read_header()
+                self.seek(header0.payload_nbytes, 1)
+                header1 = self.read_header()
+                tdelta = header1.fraction - header0.fraction
+                if tdelta == 0.:
+                    exc.args += ("frame rate can also not be determined "
+                                 "from the first two headers, as they have "
+                                 "identical fractional seconds.",)
+                return np.round(1 / tdelta) * u.Hz
+            except Exception:
+                pass
+            finally:
+                self.seek(oldpos)
+            raise exc
 
     def find_header(self, forward=True, maximum=None):
         """Find the nearest header from the current position.
@@ -83,24 +131,20 @@ class Mark5BFileReader(VLBIFileBase):
             Retrieved Mark 5B header, or `None` if nothing found.
         """
         frame_nbytes = 10016  # This is fixed for Mark 5B.
-        fh = self.fh_raw
-        kday = self.kday
-        ref_time = self.ref_time
         if maximum is None:
             maximum = 2 * frame_nbytes
         # Loop over chunks to try to find the frame marker.
-        file_pos = fh.tell()
+        file_pos = self.tell()
         # First check whether we are right at a frame marker (usually true).
         try:
-            header = Mark5BHeader.fromfile(fh, kday=kday, ref_time=ref_time,
-                                           verify=True)
-            fh.seek(-header.nbytes, 1)
+            header = self.read_header()
+            self.seek(-header.nbytes, 1)
             return header
         except AssertionError:
             pass
 
-        fh.seek(0, 2)
-        nbytes = fh.tell()
+        self.seek(0, 2)
+        nbytes = self.tell()
         if forward:
             iterate = range(file_pos, min(file_pos + maximum - 16,
                                           nbytes - frame_nbytes))
@@ -110,9 +154,8 @@ class Mark5BFileReader(VLBIFileBase):
 
         for frame in iterate:
             try:
-                fh.seek(frame)
-                header1 = Mark5BHeader.fromfile(fh, kday=kday,
-                                                ref_time=ref_time, verify=True)
+                self.seek(frame)
+                header1 = self.read_header()
             except AssertionError:
                 continue
 
@@ -125,24 +168,23 @@ class Mark5BFileReader(VLBIFileBase):
                 next_frame = frame - frame_nbytes
                 # Except if there is only one frame in the first place.
                 if next_frame < 0:
-                    fh.seek(frame)
+                    self.seek(frame)
                     return header1
 
-            fh.seek(next_frame)
+            self.seek(next_frame)
             try:
-                header2 = Mark5BHeader.fromfile(fh, kday=kday,
-                                                ref_time=ref_time, verify=True)
+                header2 = self.read_header()
             except AssertionError:
                 continue
 
             if(header2.jday == header1.jday and
                abs(header2.seconds - header1.seconds) <= 1 and
                abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
-                fh.seek(frame)
+                self.seek(frame)
                 return header1
 
         # Didn't find any frame.
-        fh.seek(file_pos)
+        self.seek(file_pos)
         return None
 
 

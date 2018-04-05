@@ -204,10 +204,19 @@ class TestMark5B(object):
         assert np.all(payload2[item] == sel_data)
         assert payload2 == payload
 
-    def test_binary_file_repr(self):
+    def test_binary_file_reader(self):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
+            header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
+            fh.seek(0)
+            header2 = fh.read_header()
+            assert header2 == header
+            current_pos = fh.tell()
+            frame_rate = fh.get_frame_rate()
+            assert fh.tell() == current_pos
             repr_fh = repr(fh)
+            # The read_frame method, and the FileWriter are tested below.
 
+        assert frame_rate == 32 * u.MHz / 5000
         assert repr_fh.startswith('Mark5BFileReader')
         assert 'kday=56000, ref_time=None, nchan=8, bps=2' in repr_fh
 
@@ -516,8 +525,16 @@ class TestMark5B(object):
             assert abs(fh.start_time - time_preturnover) < 1. * u.ns
             record5 = fh.read()     # Read across kday.
             assert np.all(record5 == record)
-            assert (abs(fh.time - Time('2017-09-04T00:00:01', precision=9)) <
-                    1. * u.ns)
+            assert abs(fh.time - Time('2017-09-04T00:00:01')) < 1. * u.ns
+        # Now for this complicated one, check that we can infer the frame rate
+        # and thus the times automatically.
+        with mark5b.open(m5_test, 'rb', kday=57000, nchan=8, bps=2) as fh:
+            frame_rate = fh.get_frame_rate()
+            assert frame_rate == 2. * u.Hz
+
+        with mark5b.open(m5_test, 'rs', kday=57000, nchan=8, bps=2) as fh:
+            assert abs(fh.start_time - time_preturnover) < 1. * u.ns
+            assert abs(fh.stop_time - Time('2017-09-04T00:00:01')) < 1. * u.ns
 
         # Test that squeeze attribute works on read (including in-place read).
         with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz, kday=56000,
