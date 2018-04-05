@@ -16,14 +16,18 @@ Baseband requires:
 Installing Baseband
 ===================
 
-.. Using pip
-   ---------
+Using pip
+---------
 
-   Baseband currently cannot be built with `pip <http://www.pip-installer.org/en/latest/>`_,
-   but eventually...
+To install Baseband with `pip <http://www.pip-installer.org/en/latest/>`_,
+run::
 
-Currently, Baseband can only be installed by getting its source code,
-and either running it directly or installing it.
+    pip3 install baseband
+
+.. note::
+
+    To run without pip potentially updating Numpy and Astropy, run, include the
+    ``--no-deps`` flag.
 
 Obtaining source code
 ---------------------
