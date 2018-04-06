@@ -277,7 +277,10 @@ class TestDADA(object):
         start_time = self.header.time
         with dada.open(SAMPLE_FILE, 'rs') as fh:
             assert fh.header0 == self.header
-            assert fh.size == 16000
+            assert fh.sample_shape == (2,)
+            assert fh.shape == (16000,) + fh.sample_shape
+            assert fh.size == np.prod(fh.shape)
+            assert fh.ndim == len(fh.shape)
             assert fh.start_time == start_time
             assert fh.sample_rate == 16 * u.MHz
             record1 = fh.read(12)

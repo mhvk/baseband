@@ -80,7 +80,7 @@ We can also open the second file on its own and confirm it contains the second
 frameset of the sample file::
 
     >>> fsf = vdif.open(filenames[1], mode='rs', sample_rate=fh.sample_rate)
-    >>> fh.seek(fh.size // 2)    # Seek to start of second frameset.
+    >>> fh.seek(fh.shape[0] // 2)    # Seek to start of second frameset.
     20000
     >>> fsf.header0.time == fh.time
     True

@@ -406,11 +406,31 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return (self._get_time(self._last_header) +
                 (self.samples_per_frame / self.sample_rate).to(u.s))
 
-    @property
-    def size(self):
-        """Number of samples in the file."""
+    @lazyproperty
+    def _nsample(self):
+        """Number of complete samples in the stream data."""
         return int(((self.stop_time - self.start_time) *
                     self.sample_rate).to(u.one).round())
+
+    @property
+    def shape(self):
+        """Shape of the (squeezed/subset) stream data."""
+        return (self._nsample,) + self.sample_shape
+
+    @property
+    def size(self):
+        """Total number of component samples in the (squeezed/subset) stream
+        data.
+        """
+        prod = 1
+        for dim in self.shape:
+            prod *= dim
+        return prod
+
+    @property
+    def ndim(self):
+        """Number of dimensions of the (squeezed/subset) stream data."""
+        return len(self.shape)
 
     @property
     def fill_value(self):
@@ -452,7 +472,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         elif whence == 1 or whence == 'current':
             self.offset += offset
         elif whence == 2 or whence == 'end':
-            self.offset = self.size + offset
+            self.offset = self._nsample + offset
         else:
             raise ValueError("invalid 'whence'; should be 0 or 'start', 1 or"
                              "'current', or 2 or 'end'.")
@@ -486,7 +506,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """
         if out is None:
             if count is None or count < 0:
-                count = self.size - self.offset
+                count = self._nsample - self.offset
                 if count < 0:
                     raise EOFError("cannot read from beyond end of file.")
 

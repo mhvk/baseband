@@ -476,7 +476,11 @@ class TestGSB(object):
                     ft, fraw, bps=4, payload_nbytes=self.payload_nbytes)
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
-            assert fh_r.size == 10 * fh_r.samples_per_frame
+            assert fh_r.sample_shape == (1,)
+            assert fh_r.shape == ((10 * fh_r.samples_per_frame,) +
+                                  fh_r.sample_shape)
+            assert fh_r.size == np.prod(fh_r.shape)
+            assert fh_r.ndim == len(fh_r.shape)
             assert fh_r.sample_rate == sample_rate
             check = fh_r.read(fh_r.samples_per_frame)
             assert np.all(check == frame1.data)
@@ -498,7 +502,7 @@ class TestGSB(object):
             fh_r.seek(0)
             data1 = fh_r.read()
             assert fh_r.tell() == len(data1)
-            assert data1.shape[0] == fh_r.size
+            assert data1.shape == fh_r.shape
             fh_r.seek(0)
             out1 = np.empty_like(data1)
             fh_r.read(out=out1)
@@ -511,7 +515,7 @@ class TestGSB(object):
                       squeeze=True) as fh_r:
             data2 = fh_r.read()
             assert np.all(data2 == data1.squeeze())
-            out2 = np.empty((fh_r.size,) + fh_r.sample_shape)
+            out2 = np.empty(fh_r.shape)
             fh_r.seek(0)
             fh_r.read(out=out2)
             assert np.all(out2 == data1.squeeze())
@@ -544,8 +548,8 @@ class TestGSB(object):
                               self.payload_nbytes * (8 // bps))) as fh_n:
                 assert fh_n.header0 == fh_r.header0
                 assert fh_n._last_header == fh_r._last_header
-                assert fh_n.size == fh_r.size
                 assert fh_n.sample_shape == fh_r.sample_shape
+                assert fh_n.shape == fh_r.shape
                 assert fh_n.start_time == fh_r.start_time
                 assert fh_n.sample_rate == sample_rate
                 check = fh_n.read()
@@ -592,7 +596,7 @@ class TestGSB(object):
                 fh_r._last_header
             assert len(w) == 1
             assert 'second-to-last entry' in str(w[0].message)
-            assert fh_r.size == 9 * fh_r.samples_per_frame
+            assert fh_r.shape[0] == 9 * fh_r.samples_per_frame
         with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
                 open(filename_incompletehead, 'wt') as fw:
             fw.write(fh.read()[:45])
@@ -604,7 +608,7 @@ class TestGSB(object):
                 fh_r._last_header
             assert len(w) == 1
             assert 'second-to-last entry' in str(w[0].message)
-            assert fh_r.size == fh_r.samples_per_frame
+            assert fh_r.shape[0] == fh_r.samples_per_frame
             assert fh_r._last_header == fh_r.header0
 
         # Test not passing a sample rate and samples per frame to reader
@@ -632,7 +636,11 @@ class TestGSB(object):
                     bps=bps, complex_data=True)
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
-            assert fh_r.size == 10 * fh_r.samples_per_frame
+            assert fh_r.sample_shape == (2, 512)
+            assert fh_r.shape == ((10 * fh_r.samples_per_frame,) +
+                                  fh_r.sample_shape)
+            assert fh_r.size == np.prod(fh_r.shape)
+            assert fh_r.ndim == len(fh_r.shape)
             assert fh_r.sample_rate == sample_rate
             assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
             # Seek last offset.
@@ -652,7 +660,7 @@ class TestGSB(object):
             fh_r.seek(0)
             data1 = fh_r.read()
             assert fh_r.tell() == len(data1)
-            assert data1.shape[0] == fh_r.size
+            assert data1.shape == fh_r.shape
             fh_r.seek(0)
             out1 = np.empty_like(data1)
             fh_r.read(out=out1)
@@ -666,8 +674,7 @@ class TestGSB(object):
                       sample_rate=sample_rate,
                       payload_nbytes=self.payload_nbytes,
                       squeeze=True) as fh_r:
-            out2 = np.empty((fh_r.size,) + fh_r.sample_shape,
-                            dtype=np.complex64)
+            out2 = np.empty(fh_r.shape, dtype=np.complex64)
             fh_r.read(out=out2)
             assert np.all(out2 == out1.squeeze())
             # To compare with directly psasing samples_per_frame below.
@@ -746,7 +753,7 @@ class TestGSB(object):
                 # PC time will not be the same.
                 for key in ('gps', 'seq_nr', 'mem_block'):
                     assert fh_n._last_header[key] == fh_r._last_header[key]
-                assert fh_n.size == fh_r.size
+                assert fh_n.shape == fh_r.shape
                 assert fh_n.sample_shape == fh_r.sample_shape
                 assert fh_n.start_time == fh_r.start_time
                 assert fh_n.sample_rate == sample_rate
@@ -775,7 +782,7 @@ class TestGSB(object):
                 fh_r._last_header
             assert len(w) == 1
             assert 'second-to-last entry' in str(w[0].message)
-            assert fh_r.size == 9 * fh_r.samples_per_frame
+            assert fh_r.shape[0] == 9 * fh_r.samples_per_frame
         with open(SAMPLE_PHASED_HEADER, 'rt') as fh, \
                 open(filename_incompletehead, 'wt') as fw:
             fw.write(fh.read()[:97])
@@ -787,7 +794,7 @@ class TestGSB(object):
                 fh_r._last_header
             assert len(w) == 1
             assert 'second-to-last entry' in str(w[0].message)
-            assert fh_r.size == fh_r.samples_per_frame
+            assert fh_r.shape[0] == fh_r.samples_per_frame
             assert fh_r._last_header == fh_r.header0
 
         # Test not passing a sample rate and samples per frame to reader

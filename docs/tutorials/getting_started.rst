@@ -85,9 +85,23 @@ above, ``fh.read`` decoded the first 12 samples from all 8 threads, mapping
 thread number to the second axis of the decoded data array.  Reading files with
 multiple threads and channels will produce 3-dimensional arrays.
 
-If you want to know the shape of a :term:`complete sample` - the set of samples
-from all available threads and channels for one point in time - it is
-accessible through::
+``fh`` includes ``shape``, ``size`` and ``ndim``, which give the shape, total
+number of elements and dimensionality of the file's entire dataset if it was
+decoded into an array.  The number of |complete samples| - the set of samples
+from all available threads and channels for one point in time - in the file is
+given by the first element in ``shape``::
+
+    >>> fh.shape    # Shape of all data from the file in decoded array form.
+    (40000, 8)
+    >>> fh.shape[0] # Number of complete samples.
+    40000
+    >>> fh.size
+    320000
+    >>> fh.ndim
+    2
+
+The shape of a single complete sample, including names indicating the meaning
+of shape dimensions, is retrievable using::
 
     >>> fh.sample_shape
     SampleShape(nthread=8)
@@ -99,6 +113,8 @@ sample shape.  To retain them, we can pass ``squeeze=False`` to
     >>> fhns = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False)
     >>> fhns.sample_shape    # Sample shape now keeps channel dimension.
     SampleShape(nthread=8, nchan=1)
+    >>> fhns.ndim            # fh.shape and fh.ndim also change with squeezing.
+    3
     >>> d2 = fhns.read(12)
     >>> d2.shape             # Decoded data has channel dimension.
     (12, 8, 1)
@@ -362,7 +378,7 @@ as given by ``fw.sample_shape``::
 In this case, the required dimensions are the same as the arrays from
 ``fr.read``.  We can thus write the data to file using::
 
-    >>> while fr.tell() < fr.size:
+    >>> while fr.tell() < fr.shape[0]:
     ...     fw.write(fr.read(fr.samples_per_frame))
     >>> fr.close()
     >>> fw.close()
@@ -416,7 +432,7 @@ invalid data is captured in a single frame.
 
 We now write the data to file, manually flagging each invalid data frame::
 
-    >>> while fr.tell() < fr.size:
+    >>> while fr.tell() < fr.shape[0]:
     ...     d = fr.read(fr.samples_per_frame)
     ...     fw.write(d[:640], valid=False)
     ...     fw.write(d[640:])
