@@ -607,7 +607,10 @@ class TestMark4(object):
                         ntrack=64, decade=2010) as fh:
             assert header == fh.header0
             assert fh.samples_per_frame == 80000
-            assert fh.size == 2 * fh.samples_per_frame
+            assert fh.sample_shape == (8,)
+            assert fh.shape == (2 * fh.samples_per_frame,) + fh.sample_shape
+            assert fh.size == np.prod(fh.shape)
+            assert fh.ndim == len(fh.shape)
             assert fh.sample_rate == 32 * u.MHz
             record = fh.read(642)
             assert fh.tell() == 642

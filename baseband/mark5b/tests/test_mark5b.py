@@ -393,7 +393,10 @@ class TestMark5B(object):
             assert fh.samples_per_frame == 5000
             assert fh.sample_rate == 32 * u.MHz
             last_header = fh._last_header
-            assert fh.size == 20000
+            assert fh.sample_shape == (8,)
+            assert fh.shape == (20000,) + fh.sample_shape
+            assert fh.size == np.prod(fh.shape)
+            assert fh.ndim == len(fh.shape)
             record = fh.read(12)
             assert fh.tell() == 12
             fh.seek(10000)
@@ -406,7 +409,7 @@ class TestMark5B(object):
             fh.seek(fh.start_time + 1000 / (32 * u.MHz))
             assert fh.tell() == 1000
             fh.seek(-10, 2)
-            assert fh.tell() == fh.size - 10
+            assert fh.tell() == fh.shape[0] - 10
             record3 = fh.read()
             # Test seeker works with both int and str values for whence.
             assert fh.seek(13, 0) == fh.seek(13, 'start')

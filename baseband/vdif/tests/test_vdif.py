@@ -688,11 +688,14 @@ class TestVDIF(object):
             assert fhseek_int == fhseek_str
             with pytest.raises(ValueError):
                 fh.seek(0, 'last')
-            assert fh.size == 40000
+            assert fh.sample_shape == (8,)
+            assert fh.shape == (40000,) + fh.sample_shape
+            assert fh.size == np.prod(fh.shape)
+            assert fh.ndim == len(fh.shape)
             assert abs(fh.stop_time - fh._last_header.time - (
                 fh.samples_per_frame / fh.sample_rate)) < 1. * u.ns
             assert abs(fh.stop_time - fh.start_time -
-                       (fh.size / fh.sample_rate)) < 1. * u.ns
+                       (fh.shape[0] / fh.sample_rate)) < 1. * u.ns
             fh.seek(1, 'end')
             with pytest.raises(EOFError):
                 fh.read()
@@ -934,11 +937,11 @@ def test_vlbi_vdif():
         assert fh.sample_rate == 32*u.MHz
         assert fh.start_time == fh.header0.time
         assert fh.start_time == fhc.start_time
-        assert fh.size == 40000
+        assert fh.shape == (40000,) + fh.sample_shape
         assert abs(fh.stop_time - fh._last_header.time - (
             fh.samples_per_frame / fh.sample_rate)) < 1. * u.ns
         assert abs(fh.stop_time - fh.start_time -
-                   (fh.size / fh.sample_rate)) < 1. * u.ns
+                   (fh.shape[0] / fh.sample_rate)) < 1. * u.ns
         assert np.all(fh.read() == fhc.read())
 
 
@@ -979,13 +982,13 @@ def test_arochime_vdif():
         assert abs(t0 - Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
         assert abs(t0 - fh.start_time) < 1. * u.ns
         assert fh.header0.edv == 0
-        assert fh.size == 5
+        assert fh.shape == (5,) + fh.sample_shape
         d = fh.read()
         assert d.shape == (5, 2, 1024)
         assert d.dtype.kind == 'c'
         t1 = fh.time
         assert abs(t1 - fh.stop_time) < 1. * u.ns
-        assert abs(t1 - t0 - fh.size / fh.sample_rate) < 1. * u.ns
+        assert abs(t1 - t0 - fh.shape[0] / fh.sample_rate) < 1. * u.ns
 
     # For this file, we cannot find a frame rate, so opening it without
     # should fail.
