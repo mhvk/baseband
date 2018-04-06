@@ -67,7 +67,8 @@ class Mark4FileReader(VLBIFileReaderBase):
             info['sample_shape'] = Mark4Payload._sample_shape_maker(
                 header0.nchan)
             if self.decade is None and self.ref_time is None:
-                info['missing'] = ['decade', 'ref_time']
+                msg = "need either 'decade' of 'ref_time' to infer full times."
+                info['missing'] = {'decade': msg, 'ref_time': msg}
             else:
                 info['start_time'] = header0.time
             info['frame_rate'] = self.get_frame_rate()

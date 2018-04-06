@@ -36,7 +36,7 @@ def file_info(name, fmt=None, **kwargs):
     # If arguments were missing, see if they were passed in.
     extra_args = {}
     if 'missing' in info:
-        for key in info['missing']:
+        for key in info['missing'].keys():
             if key in kwargs:
                 extra_args[key] = kwargs[key]
 

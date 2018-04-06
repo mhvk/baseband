@@ -60,11 +60,14 @@ class Mark5BFileReader(VLBIFileReaderBase):
             info['bps'] = self.bps
             info['complex_data'] = False
             if self.kday is None and self.ref_time is None:
-                info['missing'] = ['kday', 'ref_time']
+                msg = "need either 'kday' of 'ref_time' to infer full times."
+                info['missing'] = {'kday': msg, 'ref_time': msg}
             else:
                 info['start_time'] = header0.time
             if self.nchan is None:
-                info['missing'] = info.get('missing', []) + ['nchan']
+                info['missing'] = info.get('missing', {})
+                msg = "need 'nchan' to determine payload organization."
+                info['missing']['nchan'] = msg
             else:
                 info['samples_per_frame'] = (header0.payload_nbytes * 8 //
                                              self.bps // self.nchan)
