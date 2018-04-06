@@ -21,6 +21,11 @@ Project Status
 .. image:: https://coveralls.io/repos/github/mhvk/baseband/badge.svg
    :target: https://coveralls.io/github/mhvk/baseband
 
+.. image:: https://readthedocs.org/projects/baseband/badge/?version=latest
+   :target: http://baseband.readthedocs.io/en/latest/?badge=latest
+   :alt: Documentation Status
+
+
 Contributing
 ------------
 
