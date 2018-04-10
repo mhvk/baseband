@@ -1,57 +1,75 @@
-# Licensed under the GPLv3 - see LICENSE.rst
+# Licensed under the GPLv3 - see LICENSE
 """
-Definitions for DADA pulsar baseband headers.
+Definitions for GUPPI headers.
 
-Implements a DADAHeader class used to store header definitions in a FITS
-header, and read & write these from files.
+Implements a GUPPIHeader class that reads & writes FITS-like headers from file.
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-import io
-import warnings
-from collections import OrderedDict
+import numpy as np
 import astropy.units as u
 from astropy.io import fits
 from astropy.time import Time
-from astropy.extern import six
 
 
 __all__ = ['GUPPIHeader']
 
 
 class GUPPIHeader(fits.Header):
-    """GUPPI baseband file format header."""
+    """GUPPI baseband file format header.
 
-    _properties = ('payloadsize', 'framesize', 'bps', 'complex_data',
-                   'sample_shape', 'bandwidth', 'sideband', 'tsamp',
-                   'samples_per_frame', 'offset', 'time0', 'time')
+    Parameters
+    ----------
+    *args : str or iterable
+        If a string, parsed as a GUPPI header from a file, otherwise
+        as for the OrderedDict baseclass.
+    verify : bool, optional
+        Whether to do minimal verification that the header is consistent with
+        the GUPPI standard.  Default: `True`.
+    mutable : bool, optional
+        Whether to allow the header to be changed after initialisation.
+        Default: `True`.
+    **kwargs
+        Any further header keywords to be set.
+
+    Notes
+    -----
+    Like `~astropy.io.fits.Header`, the initialiser does not accept keyword
+    arguments to populate an array - instead, one must pass an iterable. In
+    order to ensure keywords are kept in the right order, one should pass on
+    values as a tuple, not as a dict. E.g., to copy a header, one should not
+    do ``GUPPIHeader({key: header[key] for key in header})``, but rather::
+
+        GUPPIHeader(((key, header[key]) for key in header))
+
+    or, to also keep the comments::
+
+        GUPPIHeader(((key, (header[key], header.comments[key]))
+                      for key in header))
+    """
+
+    _properties = ('payload_nbytes', 'frame_nbytes', 'bps', 'nchan', 'npol',
+                   'sample_shape', 'sample_rate', 'sideband', 'overlap',
+                   'samples_per_frame', 'offset', 'start_time',
+                   'time')
     """Properties accessible/usable in initialisation for all headers."""
 
-    _defaults = [('HEADER', 'DADA'),
-                 ('HDR_VERSION', '1.0'),
-                 ('HDR_SIZE', 4096),
-                 ('DADA_VERSION', '1.0'),
-                 ('OBS_ID', 'unset'),
-                 ('PRIMARY', 'unset'),
-                 ('SECONDARY', 'unset'),
-                 ('FILE_NAME', 'unset'),
-                 ('FILE_NUMBER', 0),
-                 ('OBS_OFFSET', 0),
-                 ('OBS_OVERLAP', 0),
-                 ('SOURCE', 'unset'),
-                 ('TELESCOPE', 'unset'),
-                 ('INSTRUMENT', 'unset'),
-                 ('RECEIVER', 'unset'),
-                 ('NBIT', 8),
-                 ('NDIM', 1),
+    _defaults = [('BACKEND', 'GUPPI'),
+                 ('BLOCSIZE', 0),
+                 ('STT_OFFS', 0),
+                 ('PKTIDX', 0),
+                 ('OVERLAP', 0),
+                 ('SRC_NAME', 'unset'),
+                 ('TELESCOP', 'unset'),
+                 ('PKTFMT', '1SFA'),
+                 ('NBITS', 8),
                  ('NPOL', 1),
-                 ('NCHAN', 1),
-                 ('RESOLUTION', 1),
-                 ('DSB', 1)]
+                 ('OBSNCHAN', 1)]
 
     def __init__(self, *args, **kwargs):
         verify = kwargs.pop('verify', True)
         mutable = kwargs.pop('mutable', True)
+        # Comments handled by fits.Header__init__().
         super(GUPPIHeader, self).__init__(*args, **kwargs)
         self.mutable = mutable
         if verify:
@@ -63,40 +81,50 @@ class GUPPIHeader(fits.Header):
                                            'PKTIDX'))
         assert self['PKTFMT'] == '1SFA'
 
+    def copy(self):
+        """Create a mutable and independent copy of the header."""
+        newfitsheader = super(GUPPIHeader, self).copy()
+        return self.__class__(newfitsheader)
+
+    def __copy__(self):
+        return self.copy()
+
     @classmethod
     def fromfile(cls, fh, verify=True):
         """
         Reads in GUPPI header block from a file.
 
-        The file pointer should be at the start.
-
         Parameters
         ----------
         fh : filehandle
             To read data from.
-        verify: bool
+        verify: bool, optional
             Whether to do basic checks on whether the header is valid.
+            Default: `True`.
         """
         header_start = fh.tell()
+        # Find the size of the header.  GUPPI header entries are 80 char long
+        # with <=8 char keyword names.  "=" is always the 9th char.
         line = '========='
         while line[8] == '=':
             line = fh.read(80).decode('ascii')
             if line[:3] == 'END':
                 break
-        
+
         header_end = fh.tell()
         fh.seek(header_start)
-        hdr = fh.read(header_end-header_start).decode('ascii')
-        fits_header = fits.Header.fromstring(hdr)
+        hdr = fh.read(header_end - header_start).decode('ascii')
+        # Calls fits.Header to read header.
+        fits_header = super(GUPPIHeader, cls).fromstring(hdr)
         return cls(fits_header, verify=verify, mutable=False)
 
     def tofile(self, fh):
         """Write GUPPI file header to filehandle.
 
-        Parts of the header beyond the ascii lines are filled with 0x00.
-        Note that file should be at the start.
+        Uses `~astropy.io.fits.Header.tostring`.
         """
-        raise NotImplementedError
+        fh.write(self.tostring(padding=False).encode())
+        #raise NotImplementedError('GUPPI format does not have write support.')
 
     @classmethod
     def fromkeys(cls, *args, **kwargs):
@@ -104,10 +132,14 @@ class GUPPIHeader(fits.Header):
 
         Like fromvalues, but without any interpretation of keywords.
 
-        This just calls the class initializer; it is present for compatibility
-        with other header classes only.
+        This extracts 'verify' and 'mutable', then passes the remaining kwargs
+        to the class initializer as a dict (for compatibility with
+        fits.Header). It is present for compatibility with other header classes
+        only.
         """
-        return cls(*args, **kwargs)
+        kwargs_special = {'verify': kwargs.pop('verify', True),
+                          'mutable': kwargs.pop('mutable', True)}
+        return cls(kwargs, *args, **kwargs_special)
 
     @classmethod
     def fromvalues(cls, **kwargs):
@@ -117,9 +149,11 @@ class GUPPIHeader(fits.Header):
         any ``header``, ``cls.fromvalues(**header) == header``.
 
         However, unlike for the ``fromkeys`` class method, data can also be set
-        using arguments named after header methods such as ``time``.
+        using arguments named after header methods, such as ``time``.
 
         Furthermore, some header defaults are set in ``GUPPIHeader._defaults``.
+
+
         """
         self = cls(cls._defaults, verify=False)
         self.update(**kwargs)
@@ -140,11 +174,11 @@ class GUPPIHeader(fits.Header):
             Arguments used to set keywords and properties.
         """
         verify = kwargs.pop('verify', True)
-        # remove kwargs that set properties, in correct order.
+        # Remove kwargs that set properties, in correct order.
         extras = [(key, kwargs.pop(key)) for key in self._properties
                   if key in kwargs]
-        # update the normal keywords.
-        super(GUPPIHeader, self).update(**kwargs)
+        # Update the normal keywords.
+        super(GUPPIHeader, self).update(kwargs)
         # Now set the properties.
         for attr, value in extras:
             setattr(self, attr, value)
@@ -161,43 +195,32 @@ class GUPPIHeader(fits.Header):
 
         super(GUPPIHeader, self).__setitem__(key.upper(), value)
 
-    def __getattr__(self, attr):
-        """Get attribute, or, failing that, try to get key from header."""
-        try:
-            # Note that OrderDict does not have __getattr__
-            return super(GUPPIHeader, self).__getattribute__(attr)
-        except AttributeError as exc:
-            try:
-                return self[attr.upper()]
-            except:
-                raise exc
-
     @property
-    def size(self):
-        """Size in bytes of the header."""
+    def nbytes(self):
+        """Size of the header in bytes."""
         return (len(self) + 1) * 80
 
     @property
-    def payloadsize(self):
-        """Size in bytes of the payload part of the file."""
+    def payload_nbytes(self):
+        """Size of the payload in bytes."""
         return self['BLOCSIZE']
 
-    @payloadsize.setter
-    def payloadsize(self, payloadsize):
+    @payload_nbytes.setter
+    def payload_nbytes(self, payloadsize):
         self['BLOCSIZE'] = payloadsize
 
     @property
-    def framesize(self):
-        """Size in bytes of the full file, header plus payload."""
-        return self.payloadsize + self.size
+    def frame_nbytes(self):
+        """Size of the frame in bytes."""
+        return self.nbytes + self.payload_nbytes
 
-    @framesize.setter
-    def framesize(self, framesize):
-        self.payloadsize = framesize - self.size
+    @frame_nbytes.setter
+    def frame_nbytes(self, frame_nbytes):
+        self.payload_nbytes = frame_nbytes - self.nbytes
 
     @property
     def bps(self):
-        """Bits per sample (or real/imaginary part)."""
+        """Bits per elementary sample."""
         return self['NBITS']
 
     @bps.setter
@@ -206,15 +229,12 @@ class GUPPIHeader(fits.Header):
 
     @property
     def complex_data(self):
+        """Whether the data are complex."""
         return self['OBSNCHAN'] != 1
-
-    @complex_data.setter
-    def complex_data(self, complex_data):
-        raise NotImplementedError
-    # self['NDIM'] = 2 if complex_data else 1
 
     @property
     def npol(self):
+        """Number of polarisations."""
         return self['NPOL'] // (2 if self.complex_data else 1)
 
     @npol.setter
@@ -222,33 +242,55 @@ class GUPPIHeader(fits.Header):
         self['NPOL'] = npol * (2 if self.complex_data else 1)
 
     @property
+    def nchan(self):
+        """Number of channels."""
+        return self['OBSNCHAN']
+
+    @nchan.setter
+    def nchan(self, nchan):
+        self['OBSNCHAN'] = nchan.__index__()
+
+    @property
     def sample_shape(self):
-        """Shape of a single payload sample: (nchan, npol)."""
-        return self['OBSNCHAN'], self.npol
+        """Shape of a sample in the payload (npol, nchan)."""
+        return self.npol, self.nchan
 
     @sample_shape.setter
     def sample_shape(self, sample_shape):
-        self['OBSNCHAN'], self.npol = sample_shape
+        # Need to set nchan first to properly set npol, since nchan is
+        # connected to complex_data.
+        self.nchan = sample_shape[1]
+        self.npol = sample_shape[0]
 
     @property
-    def bandwidth(self):
-        """Bandwidth covered by the data."""
-        return abs(self['OBSBW']) * u.MHz
+    def bits_per_complete_sample(self):
+        """Bits per complete sample."""
+        # OBSNCHAN includes factor of 2 for real/complex components.
+        return self['OBSNCHAN'] * self['NPOL'] * self.bps
 
-    @bandwidth.setter
-    def bandwidth(self, bw):
-        bw = bw.to(u.MHz).value
-        self['OBSBW'] = (-1 if self.get('BW', bw) < 0 else 1) * bw
-        self['TBIN'] = self['OBSNCHAN'] / bw
+    @property
+    def sample_rate(self):
+        """Number of complete samples per second.
+
+        Can be set with a negative quantity to set `sideband`.
+        """
+        return (1. / self['TBIN']) * u.Hz
+
+    @sample_rate.setter
+    def sample_rate(self, sample_rate):
+        self['TBIN'] = 1. / abs(sample_rate.to_value(u.Hz))
+        bw = (sample_rate.to_value(u.MHz) * self['OBSNCHAN'] /
+              (1 if self.complex_data else 2))
+        self['OBSBW'] = (-1 if self.get('OBSBW', bw) < 0 else 1) * bw
 
     @property
     def sideband(self):
         """True if upper sideband."""
-        return self['BW'] > 0
+        return self['OBSBW'] > 0
 
     @sideband.setter
     def sideband(self, sideband):
-        self['BW'] = (1 if sideband else -1) * abs(self['BW'])
+        self['OBSBW'] = (1 if sideband else -1) * abs(self['OBSBW'])
 
     @property
     def time_ordered(self):
@@ -256,41 +298,56 @@ class GUPPIHeader(fits.Header):
 
     @property
     def samples_per_frame(self):
-        """Complete samples per frame (i.e., each having ``sample_shape``)."""
-        return (self.payloadsize * 8 //
-                self.bps // self['NPOL'] // self['OBSNCHAN'])
+        """Number of complete samples in the frame, subtracting the overlap."""
+        return (self.payload_nbytes * 8 //
+                self.bits_per_complete_sample) - self.overlap
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
-        self.payloadsize = (
-            (samples_per_frame * self['OBSNCHAN'] * self['NPOL'] *
-             self.bps + 7) // 8)
+        self.payload_nbytes = (
+            (((samples_per_frame + self.overlap) *
+              self.bits_per_complete_sample) + 7) // 8)
+
+    @property
+    def overlap(self):
+        """Number of complete samples that overlap with the next frame."""
+        return self['OVERLAP']
+
+    @overlap.setter
+    def overlap(self, overlap):
+        self['OVERLAP'] = overlap.__index__()
 
     @property
     def offset(self):
         """Offset from start of observation in units of time."""
-        return (self['STT_OFFS'] + (self['PKTIDX'] * self['PKTSIZE'] * 8 //
-                self.bps // self['NPOL'] //
-                self['OBSNCHAN']) * self['TBIN'] * u.s)
+        return self['STT_OFFS'] + ((self['PKTIDX'] * self['PKTSIZE'] * 8 //
+                                    self.bits_per_complete_sample) *
+                                   self['TBIN'] * u.s)
 
     @offset.setter
     def offset(self, offset):
-        raise NotImplementedError
+        self['PKTIDX'] = int(round((offset.to_value(u.s) / self['TBIN'] /
+                                    self['PKTSIZE']) *
+                                   ((self.bits_per_complete_sample + 7) // 8)))
 
     @property
-    def time0(self):
+    def start_time(self):
         """Start time of the observation."""
         return (Time(self['STT_IMJD'], scale='utc', format='mjd') +
                 self['STT_SMJD'] * u.s)
 
-    @time0.setter
-    def time0(self, time0):
-        raise NotImplementedError
+    @start_time.setter
+    def start_time(self, start_time):
+        start_time = Time(start_time, scale='utc', format='isot', precision=9)
+        self['STT_IMJD'] = int(start_time.mjd)
+        self['STT_SMJD'] = int(np.round(
+            (start_time - Time(self['STT_IMJD'], format='mjd',
+                               scale=start_time.scale)).sec))
 
     @property
     def time(self):
-        """Start time the part of the observation covered by this header."""
-        return self.time0 + self.offset
+        """Start time of the part of the observation covered by this header."""
+        return self.start_time + self.offset
 
     @time.setter
     def time(self, time):
@@ -304,11 +361,19 @@ class GUPPIHeader(fits.Header):
         time : `~astropy.time.Time`
             Time for the first sample associated with this header.
         """
-        self.time0 = time - self.offset
+        self.start_time = time - self.offset
+
+    def _ipython_key_completions_(self):
+        # Enables tab-completion of header keys in IPython.
+        return self.keys()
 
     def __eq__(self, other):
         """Whether headers have the same keys with the same values."""
-        # We do a float conversion for MJD_START, since headers often give
-        # more digits than can really be stored.
         return all(self.get(k, None) == other.get(k, None)
                    for k in (set(self.keys()) | set(other.keys())))
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        vals = super(GUPPIHeader, self).__repr__()
+        return('<{0} {1}>'.format(name, ("\n  " + len(name) * " ").join(
+            [v.rstrip() for v in vals.split('\n')])))
