@@ -106,7 +106,7 @@ class GUPPIHeader(fits.Header):
         # Find the size of the header.  GUPPI header entries are 80 char long
         # with <=8 char keyword names.  "=" is always the 9th char.
         line = '========='
-        while line[8] == '=':
+        while line[8] in ('=', ' '):
             line = fh.read(80).decode('ascii')
             if line[:3] == 'END':
                 break
