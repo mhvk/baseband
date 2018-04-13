@@ -417,6 +417,25 @@ class TestDADA(object):
             assert np.all(fhs.read() == self.payload)
             assert np.all(fhns.read() == self.payload)
 
+        # Test passing squeeze=False along with header keywords (otherwise
+        # identical to test above).
+        h = self.header
+
+        with dada.open(filename, 'ws', time=h.time,
+                       payload_nbytes=h.payload_nbytes,
+                       sample_rate=h.sample_rate, complex_data=h.complex_data,
+                       sample_shape=h.sample_shape, bps=h.bps,
+                       squeeze=False) as fw:
+            assert fw.sample_shape == (2, 1)
+            assert fw.sample_shape.npol == 2
+            assert fw.sample_shape.nchan == 1
+            fw.write(self.payload.data)
+
+        with dada.open(dada_test_squeeze, 'rs', squeeze=False) as fhs, \
+                dada.open(dada_test_nosqueeze, 'rs', squeeze=False) as fhns:
+            assert np.all(fhs.read() == self.payload)
+            assert np.all(fhns.read() == self.payload)
+
     # Test that writing an incomplete stream is possible, and that frame set is
     # valid but invalid samples are appropriately marked.
     def test_incomplete_stream(self, tmpdir):
