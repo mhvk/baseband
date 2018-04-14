@@ -256,10 +256,10 @@ class DADAHeader(OrderedDict):
             Arguments used to set keywords and properties.
         """
         verify = kwargs.pop('verify', True)
-        # remove kwargs that set properties, in correct order.
+        # Remove kwargs that set properties, in correct order.
         extras = [(key, kwargs.pop(key)) for key in self._properties
                   if key in kwargs]
-        # update the normal keywords.
+        # Update the normal keywords.
         super(DADAHeader, self).update(**kwargs)
         # Now set the properties.
         for attr, value in extras:
@@ -311,6 +311,7 @@ class DADAHeader(OrderedDict):
 
     @property
     def complex_data(self):
+        """Whether the data are complex."""
         return self['NDIM'] == 2
 
     @complex_data.setter

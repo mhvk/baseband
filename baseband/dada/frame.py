@@ -72,7 +72,7 @@ class DADAFrame(VLBIFrameBase):
         verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
         """
-        header = cls._header_class.fromfile(fh, verify)
+        header = cls._header_class.fromfile(fh, verify=verify)
         payload = cls._payload_class.fromfile(fh, header=header, memmap=memmap)
         return cls(header, payload, valid=valid, verify=verify)
 
@@ -82,7 +82,7 @@ class DADAFrame(VLBIFrameBase):
 
         Note that since DADA files are generally very large, one would normally
         map the file, and then set pieces of it by assigning to slices of the
-        frame.  See `~baseband.base.DADAFileWriter.memmap_frame`.
+        frame.  See `~baseband.dada.base.DADAFileWriter.memmap_frame`.
 
         Parameters
         ----------
@@ -93,7 +93,7 @@ class DADAFrame(VLBIFrameBase):
         valid : bool, optional
             Whether the data are valid (default: `True`). Note that this
             information cannot be written to disk.
-        verify : bool
+        verify : bool, optional
             Whether or not to do basic assertions that check the integrity.
             Default: `True`.
         **kwargs
