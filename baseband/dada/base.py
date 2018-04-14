@@ -367,6 +367,7 @@ Filehandle
 # TODO: move this up to the opener??
 def open(name, mode='rs', **kwargs):
     header0 = kwargs.get('header0', None)
+    squeeze = kwargs.pop('squeeze', None)
     # If sequentialfile object, check that it's opened properly.
     if isinstance(name, sf.SequentialFileBase):
         assert (('r' in mode and name.mode == 'rb') or
@@ -411,6 +412,9 @@ def open(name, mode='rs', **kwargs):
 
         if header0 and 'w' in mode:
             kwargs['header0'] = header0
+
+    if squeeze is not None:
+        kwargs['squeeze'] = squeeze
 
     return opener(name, mode, **kwargs)
 
