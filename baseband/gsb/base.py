@@ -11,6 +11,8 @@ from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
 from .header import GSBHeader
 from .payload import GSBPayload
 from .frame import GSBFrame
+from .file_info import GSBTimeStampInfo, GSBStreamReaderInfo
+
 
 __all__ = ['GSBFileReader', 'GSBFileWriter', 'GSBStreamReader',
            'GSBStreamWriter', 'open']
@@ -32,20 +34,7 @@ class GSBTimeStampIO(VLBIFileBase):
         fh_raw = io.TextIOWrapper(fh_raw)
         super(GSBTimeStampIO, self).__init__(fh_raw)
 
-    def info(self):
-        old_offset = self.tell()
-        info = {}
-        try:
-            self.seek(0)
-            header0 = self.read_timestamp()
-            info['fmt'] = 'gsb'
-            info['subfmt'] = header0.mode
-            info['start_time'] = header0.time
-        except Exception:
-            pass
-
-        self.seek(old_offset)
-        return info
+    info = GSBTimeStampInfo()
 
     def read_timestamp(self):
         """Read a single timestamp.
@@ -291,6 +280,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             nchan=nchan, bps=bps, complex_data=complex_data,
             squeeze=squeeze, subset=subset)
         self.fh_ts.seek(0)
+
+    info = GSBStreamReaderInfo()
 
     @lazyproperty
     def _last_header(self):

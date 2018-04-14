@@ -7,6 +7,7 @@ import numpy as np
 from collections import namedtuple
 import astropy.units as u
 from astropy.utils import lazyproperty
+from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 
 
 __all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
@@ -67,6 +68,8 @@ class VLBIFileReaderBase(VLBIFileBase):
     fh_raw : filehandle
         Filehandle of the raw binary data file.
     """
+
+    info = VLBIFileReaderInfo()
 
     def get_frame_rate(self):
         """Determine the number of frames per second.
@@ -313,13 +316,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
             bps, complex_data, squeeze, subset, fill_value)
 
-    def info(self):
-        info = self.fh_raw.info()
-        info['sample_shape'] = self.sample_shape
-        info['sample_rate'] = self.sample_rate
-        info['size'] = self.size
-        info['stop_time'] = self.stop_time
-        return info
+    info = VLBIStreamReaderInfo()
 
     def _squeeze_and_subset(self, data):
         """Possibly remove unit dimensions and subset the given data.

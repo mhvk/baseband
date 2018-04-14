@@ -11,6 +11,7 @@ from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamWriterBase)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
+from .file_info import VDIFFileReaderInfo
 
 
 __all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
@@ -75,34 +76,7 @@ class VDIFFileReader(VLBIFileReaderBase):
         Filehandle of the raw binary data file.
 
     """
-    def info(self):
-        old_offset = self.tell()
-        info = {}
-        try:
-            self.seek(0)
-            header0 = self.read_header()
-            # Almost all bytes are interpretable as headers,
-            # so we need a basic sanity check.
-            self.seek(header0.frame_nbytes)
-            header1 = self.read_header()
-            assert header1.same_stream(header0)
-            info['fmt'] = 'vdif'
-            info['subfmt'] = ('Legacy' if header0.edv is False else
-                              'edv={}'.format(header0.edv))
-            info['bps'] = header0.bps
-            info['complex_data'] = header0['complex_data']
-            info['start_time'] = header0.time
-            info['samples_per_frame'] = header0.samples_per_frame
-            self.seek(0)
-            frameset = self.read_frameset(edv=header0.edv)
-            info['sample_shape'] = VDIFStreamBase._sample_shape_maker(
-                *frameset.sample_shape)
-            info['frame_rate'] = self.get_frame_rate()
-        except Exception:
-            pass
-
-        self.seek(old_offset)
-        return info
+    info = VDIFFileReaderInfo()
 
     def read_header(self):
         """Read a single header from the file.

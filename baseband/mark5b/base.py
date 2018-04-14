@@ -11,6 +11,7 @@ from ..vlbi_base.base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 from .frame import Mark5BFrame
+from .file_info import Mark5BFileReaderInfo
 
 
 __all__ = ['Mark5BFileReader', 'Mark5BFileWriter', 'Mark5BStreamReader',
@@ -50,35 +51,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
                 "ref_time={s.ref_time}, nchan={s.nchan}, bps={s.bps})"
                 .format(name=self.__class__.__name__, s=self))
 
-    def info(self):
-        old_offset = self.tell()
-        info = {}
-        try:
-            self.seek(0)
-            header0 = self.read_header()
-            info['fmt'] = 'mark5b'
-            info['bps'] = self.bps
-            info['complex_data'] = False
-            if self.kday is None and self.ref_time is None:
-                msg = "need either 'kday' of 'ref_time' to infer full times."
-                info['missing'] = {'kday': msg, 'ref_time': msg}
-            else:
-                info['start_time'] = header0.time
-            if self.nchan is None:
-                info['missing'] = info.get('missing', {})
-                msg = "need 'nchan' to determine payload organization."
-                info['missing']['nchan'] = msg
-            else:
-                info['samples_per_frame'] = (header0.payload_nbytes * 8 //
-                                             self.bps // self.nchan)
-                info['sample_shape'] = Mark5BPayload._sample_shape_maker(
-                    self.nchan)
-            info['frame_rate'] = self.get_frame_rate()
-        except Exception:
-            pass
-
-        self.seek(old_offset)
-        return info
+    info = Mark5BFileReaderInfo()
 
     def read_header(self):
         """Read a single header from the file.
