@@ -31,6 +31,10 @@ class VLBIInfoBase(object):
                    for attr in self._parent_attrs)
 
     def __get__(self, instance, owner_cls):
+        if instance is None:
+            # Unbound descriptor, nothing to do.
+            return self
+
         # Check if we have a stored and up to date copy.
         info = instance.__dict__.get('info')
         if info is None or not info._up_to_date():
@@ -75,6 +79,9 @@ class VLBIInfoBase(object):
 
     def __repr__(self):
         # Use the repr for quick display of file information.
+        if self._parent is None:
+            return super(VLBIInfoBase, self).__repr__()
+
         if not self:
             return 'File not parsable. Wrong format?'
 
