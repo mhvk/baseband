@@ -17,4 +17,4 @@ if not _ASTROPY_SETUP_:
     pass
 
 
-from .formats import file_info
+from .core import file_info

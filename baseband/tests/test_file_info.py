@@ -7,7 +7,7 @@ import pytest
 from astropy.time import Time
 import astropy.units as u
 
-from ..formats import file_info
+from .. import file_info
 from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
                     SAMPLE_VDIF, SAMPLE_MWA_VDIF as SAMPLE_MWA, SAMPLE_DADA,
                     SAMPLE_GSB_RAWDUMP_HEADER, SAMPLE_GSB_RAWDUMP,
