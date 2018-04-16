@@ -47,12 +47,13 @@ def test_open_missing_args(sample, missing):
 
 
 @pytest.mark.parametrize(
-    ('sample', 'format_', 'used_extra_args'),
-    ((SAMPLE_M4, 'mark4', ('ref_time',)),
-     (SAMPLE_M5B, 'mark5b', ('ref_time', 'nchan')),
-     (SAMPLE_VDIF, 'vdif', ()),
-     (SAMPLE_DADA, 'dada', ())))
-def test_file_info(sample, format_, used_extra_args):
+    ('sample', 'format_', 'used', 'consistent', 'inconsistent', 'irrelevant'),
+    ((SAMPLE_M4, 'mark4', ('ref_time',), ('nchan',), (), ()),
+     (SAMPLE_M5B, 'mark5b', ('ref_time', 'nchan'), (), (), ()),
+     (SAMPLE_VDIF, 'vdif', (), ('nchan',), (), ('ref_time',)),
+     (SAMPLE_DADA, 'dada', (), (), ('nchan',), ('ref_time',))))
+def test_file_info(sample, format_, used, consistent, inconsistent,
+                   irrelevant):
     # Pass on extra arguments needed to get Mark4 and Mark5B to pass.
     # For GSB, we also need raw files, so we omit them.
     extra_args = {'ref_time': Time('2014-01-01'),
@@ -64,10 +65,13 @@ def test_file_info(sample, format_, used_extra_args):
     for attr in info.attr_names:
         assert getattr(info, attr) is not None
         assert attr in info_dict
-    assert all(arg in info.kwargs for arg in used_extra_args)
+    assert set(info.used_kwargs.keys()) == set(used)
+    assert set(info.consistent_kwargs.keys()) == set(consistent)
+    assert set(info.inconsistent_kwargs.keys()) == set(inconsistent)
+    assert set(info.irrelevant_kwargs.keys()) == set(irrelevant)
     # Check we can indeed open a file with those extra arguments.
     module = importlib.import_module('.' + info.format, package='baseband')
-    with module.open(sample, mode='rs', **info.kwargs) as fh:
+    with module.open(sample, mode='rs', **info.used_kwargs) as fh:
         info2 = fh.info
     assert info2() == info_dict
 
@@ -82,6 +86,6 @@ def test_gsb_with_raw_files(sample, raw, mode):
     assert not info.missing
     module = importlib.import_module('.' + info.format, package='baseband')
     # Check we can indeed open a file with the extra arguments.
-    with module.open(sample, mode='rs', **info.kwargs) as fh:
+    with module.open(sample, mode='rs', **info.used_kwargs) as fh:
         info2 = fh.info
     assert info2() == info()

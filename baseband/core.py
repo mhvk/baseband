@@ -2,16 +2,30 @@
 """Routines to obtain information on baseband files."""
 import importlib
 
+import numpy as np
 
-FILE_FORMATS = {'dada': 'DADA',
-                'mark4': 'Mark4',
-                'mark5b': 'Mark5B',
-                'vdif': 'VDIF',
-                'gsb': 'GSB'}
+__all__ = ['file_info', 'open']
+
+FILE_FORMATS = ('dada', 'mark4', 'mark5b', 'vdif', 'gsb')
 
 
-def file_info(name, format=None, **kwargs):
+DROPPABLE_KWARGS = ('decade', 'ref_time', 'kday', 'nchan')
+"""Arguments that can be dropped from kwargs if not needed.
+
+Generally, they are needed for some but not all of the formats,
+and thus users should be able to pass them in for an unknown
+file type.
+"""
+
+
+def file_info(name, format=FILE_FORMATS, **kwargs):
     """Get format and other information from a baseband file.
+
+    The keyword arguments will only be used if needed, so if one is unsure
+    what format a file is, but knows it was taken recently and has 8 channels,
+    one would put in ``ref_time=Time('2015-01-01'), nchan=8``. Alternatively,
+    and perhaps easier, one can first call the function without extra arguments
+    in which case the result will describe what is missing.
 
     Parameters
     ----------
@@ -29,20 +43,18 @@ def file_info(name, format=None, **kwargs):
     -------
     info : `~baseband.vlbi_base.file_info.VLBIFileReaderInfo` or `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
         The information on the file. Can be turned info a `dict` by calling it
-        (i.e., ``info()``).  Any extra keywords used in opening the file are
-        attached as an ``kwargs`` attribute.
+        (i.e., ``info()``).
 
     Notes
     -----
-    The keyword arguments will only be used if needed, so if one is unsure
-    what format a file is, but knows it was taken recently and has 8 channels,
-    one would put in ``ref_time=Time('2015-01-01'), nchan=8``. Alternatively,
-    and perhaps easier, one can first call the function without extra arguments
-    in which case the result will describe what is missing.
-    """
-    if format is None:
-        format = tuple(FILE_FORMATS.keys())
+    The passed in keyword arguments are checked internally and end up in one
+    of the following attributes (if the file could be opened as a stream):
 
+      - ``used_kwargs``: used to open the file.
+      - ``consistent_kwargs``: not needed to open the file, but consistent.
+      - ``inconsistent_kwargs``: not needed to open the file, and inconsistent.
+      - ``irrelevant_kwargs``: provide information irrelevant for opening.
+    """
     if isinstance(format, tuple):
         for format_ in format:
             info = file_info(name, format_, **kwargs)
@@ -64,32 +76,116 @@ def file_info(name, format=None, **kwargs):
 
     # If arguments were missing, see if they were passed in.
     if info.missing:
-        extra_args = {key: kwargs[key] for key in info.missing
-                      if key in kwargs}
+        used_kwargs = {key: kwargs[key] for key in info.missing
+                       if key in kwargs}
 
-        if not extra_args:
-            return info
+        if used_kwargs:
+            if format == 'gsb':
+                # 'raw' keyword not useful for opening the timestamp file.
+                # Just remove from info.missing.
+                info.missing.pop('raw')
+            else:
+                with module.open(name, mode=mode, **used_kwargs) as fh:
+                    info = fh.info
 
-        if format != 'gsb':
-            with module.open(name, mode=mode, **extra_args) as fh:
+    else:
+        used_kwargs = {}
+
+    if not info.missing:
+        # Now see if we should be able to use the stream opener to get
+        # even more information.  If there no longer are missing arguments,
+        # then this should always be possible if we have a frame rate, or
+        # if a sample_rate was passed on.
+        frame_rate = info.frame_rate
+        if frame_rate is None and 'sample_rate' in kwargs:
+            used_kwargs['sample_rate'] = kwargs['sample_rate']
+            frame_rate = 'known'
+
+        if frame_rate is not None:
+            with module.open(name, mode='rs', **used_kwargs) as fh:
                 info = fh.info
 
-            if info.missing:
-                return info
-    else:
-        extra_args = {}
+    info.used_kwargs = used_kwargs
+    # Store what happened to the kwargs, so one can decide if there are
+    # inconsistencies or other problems.
+    info.consistent_kwargs = {}
+    info.inconsistent_kwargs = {}
+    info.irrelevant_kwargs = {}
+    info_dict = info()
+    info_dict.update(info_dict.pop('file_info', {}))
+    for key, value in kwargs.items():
+        if key in used_kwargs:
+            continue
+        info_value = info_dict.get(key)
+        if info_value is None and key == 'nchan':
+            # If we passed nchan, and info doesn't have it, check that it is
+            # consistent with the sample shape.  We take the product of all
+            # elements as the one that should be consistent (so that, e.g., a
+            # VDIF file with 8 threads and 1 channel per thread is consistent).
+            info_value = info_dict.get('sample_shape', None)
+            if info_value is not None:
+                info_value = np.prod(info_value)
 
-    # Now see if we should be able to use the stream opener to get
-    # even more information.  This is always possible if we have a
-    # frame rate, or if a sample_rate was passed on.
-    if info.frame_rate is None:
-        if 'sample_rate' not in kwargs:
-            return info
+        if info_value is not None:
+            if info_value == value:
+                info.consistent_kwargs[key] = value
+            else:
+                info.inconsistent_kwargs[key] = value
+        else:
+            info.irrelevant_kwargs[key] = value
 
-        extra_args['sample_rate'] = kwargs['sample_rate']
-
-    with module.open(name, mode='rs', **extra_args) as fh:
-        info = fh.info
-
-    info.kwargs = extra_args
     return info
+
+
+def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
+    """Open a baseband file for reading or writing.
+
+    Opened as a binary file, one gets a wrapped filehandle that adds
+    methods to read/write a frame.  Opened as a stream, the handle is
+    wrapped further, with methods such as reading and writing to the file
+    as if it were a stream of samples.
+
+    Parameters
+    ----------
+    name : str or filehandle
+        File name or handle.
+    mode : {'rb', 'wb', 'rs', or 'ws'}, optional
+        Whether to open for reading or writing, and as a regular binary
+        file or as a stream. Default: 'rs', for reading a stream.
+    format : str or tuple of str
+        The format the file is in. For reading, this can be a tuple of possible
+        formats, all of which will be tried in turn.
+    **kwargs
+        Additional arguments needed for opening the file as a stream.
+        For most formats, trying without these will raise an exception that
+        tells which arguments are needed.
+    """
+    if 'w' in mode:
+        if isinstance(format, tuple):
+            raise ValueError("cannot specify multiple formats for writing.")
+    else:
+        info = file_info(name, format, **kwargs)
+        if not info:
+            raise ValueError("file format does not seem to be any of {}."
+                             .format(format))
+        format = info.format
+
+        if info.missing and 's' in mode:
+            raise TypeError("file format {} is missing required arguments {}."
+                            .format(format, info.missing))
+
+        if info.inconsistent_kwargs:
+            raise ValueError('arguments inconsistent with this file were '
+                             'passed in: {}'.format(info.inconsistent_kwargs))
+
+        if info.irrelevant_kwargs:
+            unexpected = (set(info.irrelevant_kwargs.keys()) -
+                          set(DROPPABLE_KWARGS))
+            if unexpected:
+                raise TypeError('open() got unexpected keyword arguments {}'
+                                .format(unexpected))
+
+        kwargs = info.used_kwargs
+
+    module = importlib.import_module('.' + format, package='baseband')
+    return module.open(name, mode=mode, **kwargs)
