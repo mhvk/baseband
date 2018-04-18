@@ -44,7 +44,7 @@ class GSBStreamReaderInfo(VLBIInfoBase):
         self.attr_names = self._fh_ts_info_attrs + extra_attrs
 
     def _up_to_date(self):
-        # Stream readers cannot after initialization, so the check is easy.
+        # Stream readers cannot get "out of date" after initialization.
         return True
 
     def __getattr__(self, attr):

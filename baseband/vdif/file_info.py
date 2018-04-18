@@ -26,6 +26,12 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
         finally:
             fh.seek(old_offset)
 
+    def _get_start_time(self):
+        try:
+            return self.header0.get_time(sample_rate=self.sample_rate)
+        except Exception:
+            return None
+
     def _collect_info(self):
         super(VDIFFileReaderInfo, self)._collect_info()
         if self:

@@ -534,6 +534,10 @@ class TestMark5B(object):
         with mark5b.open(m5_test, 'rb', kday=57000, nchan=8, bps=2) as fh:
             frame_rate = fh.get_frame_rate()
             assert frame_rate == 2. * u.Hz
+            # A bit random, but this is a good place to check that `info`
+            # does the right thing as well.
+            assert fh.info.frame_rate == 2. * u.Hz
+            assert abs(fh.info.start_time - time_preturnover) < 1. * u.ns
 
         with mark5b.open(m5_test, 'rs', kday=57000, nchan=8, bps=2) as fh:
             assert abs(fh.start_time - time_preturnover) < 1. * u.ns

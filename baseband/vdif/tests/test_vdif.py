@@ -772,7 +772,14 @@ class TestVDIF(object):
             assert np.all(record[24:40] == data)
             assert np.all(record[40:] == data)
 
+        # A bit random, but this is a good place to check that `info`
+        # does the right thing for streams that do not start at frame nr 0.
+        with vdif.open(vdif_file, 'rb') as fh:
+            assert fh.info.frame_rate == 20. * u.Hz
+            assert abs(fh.info.start_time - start_time) < 1. * u.ns
+
         # Test that failing to pass a sample rate returns a ValueError.
+        # TODO: why can this not be determined from the frame rate?
         with pytest.raises(ValueError) as excinfo:
             with vdif.open(vdif_file, 'ws', header0=header,
                            nthread=2) as fw:

@@ -1,7 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 """Provide a base class for "info" properties.
 
-Loosely based on astropy.utils.data_info.DataInfo
+Loosely based on `~astropy.utils.data_info.DataInfo`.
 """
 from __future__ import division, unicode_literals, print_function
 
@@ -38,8 +38,11 @@ class VLBIInfoBase(object):
         # Check if we have a stored and up to date copy.
         info = instance.__dict__.get('info')
         if info is None or not info._up_to_date():
-            # If not, create a new instance and fill it.
-            # Note: cannot change "self", as this was created on the class.
+            # If not, create a new instance and fill it.  Notes:
+            # - We cannot change "self", as this was created on the class.
+            # - We start from scratch rather than determine what is no longer
+            #   up to date, since we cannot know what an update may influence
+            #   (e.g., for Mark 4, a change in ref_time affect start_time).
             info = instance.__dict__['info'] = self.__class__()
             info._parent = instance
             info._collect_info()
@@ -123,15 +126,15 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     def _get_format(self):
         return self._parent.__class__.__name__.split('File')[0].lower()
 
-    def _get_start_time(self):
-        try:
-            return self.header0.time
-        except Exception:
-            return None
-
     def _get_frame_rate(self):
         try:
             return self._parent.get_frame_rate()
+        except Exception:
+            return None
+
+    def _get_start_time(self):
+        try:
+            return self.header0.time
         except Exception:
             return None
 
@@ -140,12 +143,12 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         self.header0 = self._get_header0()
         if self.header0 is not None:
             self.format = self._get_format()
-            self.start_time = self._get_start_time()
             self.frame_rate = self._get_frame_rate()
             if (self.frame_rate is not None and
                     self.samples_per_frame is not None):
                 self.sample_rate = (self.frame_rate *
                                     self.samples_per_frame).to(u.MHz)
+            self.start_time = self._get_start_time()
 
     def __getattr__(self, attr):
         if not attr.startswith('_') and (self.header0 is not None and
@@ -156,7 +159,8 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
 
 class VLBIStreamReaderInfo(VLBIInfoBase):
-    _parent_attrs = ('sample_shape', 'sample_rate', 'stop_time', 'size')
+    _parent_attrs = ('sample_shape', 'sample_rate', 'stop_time',
+                     'shape', 'size')
 
     def _collect_info(self):
         super(VLBIStreamReaderInfo, self)._collect_info()

@@ -9,6 +9,12 @@ class Mark5BFileReaderInfo(VLBIFileReaderInfo):
     _header0_attrs = ()
     _parent_attrs = ('nchan', 'bps', 'kday', 'ref_time')
 
+    def _get_start_time(self):
+        try:
+            return self.header0.get_time(frame_rate=self.frame_rate)
+        except Exception:
+            return None
+
     def _collect_info(self):
         super(Mark5BFileReaderInfo, self)._collect_info()
         if self:
