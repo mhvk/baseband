@@ -11,6 +11,7 @@ from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
 from .header import Mark4Header
 from .payload import Mark4Payload
 from .frame import Mark4Frame
+from .file_info import Mark4FileReaderInfo
 
 
 __all__ = ['Mark4FileReader', 'Mark4FileWriter', 'Mark4StreamReader',
@@ -51,6 +52,8 @@ class Mark4FileReader(VLBIFileReaderBase):
         return ("{name}(fh_raw={s.fh_raw}, ntrack={s.ntrack}, "
                 "decade={s.decade}, ref_time={s.ref_time})"
                 .format(name=self.__class__.__name__, s=self))
+
+    info = Mark4FileReaderInfo()
 
     def read_header(self):
         """Read a single header from the file.

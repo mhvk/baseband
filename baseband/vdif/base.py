@@ -11,6 +11,7 @@ from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamWriterBase)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
+from .file_info import VDIFFileReaderInfo
 
 
 __all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
@@ -75,6 +76,8 @@ class VDIFFileReader(VLBIFileReaderBase):
         Filehandle of the raw binary data file.
 
     """
+    info = VDIFFileReaderInfo()
+
     def read_header(self):
         """Read a single header from the file.
 

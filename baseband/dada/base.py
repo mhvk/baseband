@@ -10,7 +10,8 @@ from astropy.extern import six
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
+from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
+                              VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import DADAHeader
 from .payload import DADAPayload
@@ -103,7 +104,7 @@ class DADAFileNameSequencer:
         return frame_nr
 
 
-class DADAFileReader(VLBIFileBase):
+class DADAFileReader(VLBIFileReaderBase):
     """Simple reader for DADA files.
 
     Wraps a binary filehandle, providing methods to help interpret the data,
@@ -115,6 +116,7 @@ class DADAFileReader(VLBIFileBase):
     fh_raw : filehandle
         Filehandle of the raw binary data file.
     """
+
     def read_header(self):
         """Read a single header from the file.
 
@@ -158,7 +160,7 @@ class DADAFileReader(VLBIFileBase):
         self.seek(0)
         try:
             header = self.read_frame()
-            return header.sample_rate / header.samples_per_frame
+            return (header.sample_rate / header.samples_per_frame).to(u.Hz)
         finally:
             self.seek(oldpos)
 

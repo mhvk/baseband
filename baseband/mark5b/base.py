@@ -11,6 +11,7 @@ from ..vlbi_base.base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 from .frame import Mark5BFrame
+from .file_info import Mark5BFileReaderInfo
 
 
 __all__ = ['Mark5BFileReader', 'Mark5BFileWriter', 'Mark5BStreamReader',
@@ -49,6 +50,8 @@ class Mark5BFileReader(VLBIFileReaderBase):
         return ("{name}(fh_raw={s.fh_raw}, kday={s.kday}, "
                 "ref_time={s.ref_time}, nchan={s.nchan}, bps={s.bps})"
                 .format(name=self.__class__.__name__, s=self))
+
+    info = Mark5BFileReaderInfo()
 
     def read_header(self):
         """Read a single header from the file.
