@@ -66,6 +66,8 @@ class TestMark5B(object):
         assert header.payload_nbytes == 10000
         assert header.frame_nbytes == 10016
         assert header['frame_nr'] == 0
+        assert abs(header.time -
+                   Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             header.tofile(s)
             s.seek(0)
@@ -220,11 +222,14 @@ class TestMark5B(object):
         assert repr_fh.startswith('Mark5BFileReader')
         assert 'kday=56000, ref_time=None, nchan=8, bps=2' in repr_fh
 
+    def test_file_info(self):
         # Check that info gets the same information
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
+            header = fh.read_header()
+            start_time = header.time
+            frame_rate = fh.get_frame_rate()
             info = fh.info
 
-        assert info.header0 == header
         expected = {'format': 'mark5b',
                     'frame_rate': frame_rate,
                     'sample_rate': 32 * u.MHz,
@@ -232,7 +237,7 @@ class TestMark5B(object):
                     'sample_shape': (8,),
                     'bps': 2,
                     'complex_data': False,
-                    'start_time': header.get_time(frame_rate=frame_rate)}
+                    'start_time': start_time}
         for key, value in expected.items():
             assert getattr(info, key) == value
         assert info() == expected
@@ -258,6 +263,30 @@ class TestMark5B(object):
             assert info.missing == {}
             for key, value in expected.items():
                 assert getattr(info, key) == value
+
+        # Finally, also do a brief check of the stream reader info.
+        # Note that the readers properties themselves are tested further below.
+        with mark5b.open(SAMPLE_FILE, 'rs', bps=2, nchan=8, kday=56000) as fh:
+            info = fh.info
+            file_info = fh.fh_raw.info
+            stop_time = fh.stop_time
+
+        stream_expected = {'format': 'mark5b',
+                           'start_time': start_time,
+                           'stop_time': stop_time,
+                           'sample_rate': 32 * u.MHz,
+                           'shape': (20000, 8),
+                           'bps': 2,
+                           'complex_data': False,
+                           'file_info': expected}
+
+        for key, value in stream_expected.items():
+            if key == 'file_info':
+                assert info.file_info == file_info
+            else:
+                assert getattr(info, key) == value
+
+        assert info() == stream_expected
 
     def test_frame(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
@@ -436,6 +465,9 @@ class TestMark5B(object):
             assert fh.shape == (20000,) + fh.sample_shape
             assert fh.size == np.prod(fh.shape)
             assert fh.ndim == len(fh.shape)
+            assert abs(fh.start_time -
+                       Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
+            assert abs(fh.stop_time - fh.start_time - 625 * u.us) < 1. * u.ns
             record = fh.read(12)
             assert fh.tell() == 12
             fh.seek(10000)

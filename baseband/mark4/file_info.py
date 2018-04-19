@@ -38,9 +38,10 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         Offset in bytes from the start of the file to the location of the
         first header.
     missing : dict
-        Entries in the dict are keyed by names of arguments that should be
-        passed to the file reader to obtain full information. The associated
-        entries in the dict explain why these arguments are needed.
+        Entries are keyed by names of arguments that should be passed to
+        the file reader to obtain full information. The associated entries
+        explain why these arguments are needed. For Mark 4, the possible
+        entries are ``decade`` and ``ref_time``.
 
     Examples
     --------

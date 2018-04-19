@@ -7,8 +7,21 @@ from __future__ import division, unicode_literals, print_function
 
 import astropy.units as u
 from astropy.utils.compat.misc import override__dir__
+from astropy.extern import six
 
 
+class VLBIInfoMeta(type):
+    # Ensure all attributes are initialized to None, so that they are
+    # always avaible (do this rather than overwrite __getattr__ so that
+    # we can generate docstrings in sphinx for them).
+    def __init__(cls, name, bases, dct):
+        super(VLBIInfoMeta, cls).__init__(name, bases, dct)
+        attr_names = dct.get('attr_names', ())
+        for attr in attr_names:
+            setattr(cls, attr, None)
+
+
+@six.add_metaclass(VLBIInfoMeta)
 class VLBIInfoBase(object):
     """Container providing a standardized interface to file information."""
 
@@ -55,14 +68,6 @@ class VLBIInfoBase(object):
         # if "info" is present in instance.__dict__; see
         # https://docs.python.org/3/howto/descriptor.html
         raise AttributeError("can't set info attribute.")
-
-    # The standard attributes should always be accessible even if not defined,
-    # so adjust attribute getting and dir'ing accordingly.
-    def __getattr__(self, attr):
-        if attr in self.attr_names:
-            return None
-
-        return self.__getattribute__(attr)
 
     @override__dir__
     def __dir__(self):
@@ -140,9 +145,9 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     start_time : `~astropy.time.Time`
         Time of the first complete sample.
     missing : dict
-        Entries in the dict are keyed by names of arguments that should be
-        passed to the file reader to obtain full information. The associated
-        entries in the dict explain why these arguments are needed.
+        Entries are keyed by names of arguments that should be passed to
+        the file reader to obtain full information. The associated entries
+        explain why these arguments are needed.
 
     Examples
     --------
@@ -209,6 +214,8 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         super(VLBIFileReaderInfo, self)._collect_info()
         self.header0 = self._get_header0()
         if self.header0 is not None:
+            for attr in self._header0_attrs:
+                setattr(self, attr, getattr(self.header0, attr))
             self.format = self._get_format()
             self.frame_rate = self._get_frame_rate()
             if (self.frame_rate is not None and
@@ -216,13 +223,6 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                 self.sample_rate = (self.frame_rate *
                                     self.samples_per_frame).to(u.MHz)
             self.start_time = self._get_start_time()
-
-    def __getattr__(self, attr):
-        if not attr.startswith('_') and (self.header0 is not None and
-                                         attr in self._header0_attrs):
-            return getattr(self.header0, attr)
-
-        return super(VLBIFileReaderInfo, self).__getattr__(attr)
 
 
 class VLBIStreamReaderInfo(VLBIInfoBase):
@@ -254,7 +254,7 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     _parent_attrs = attr_names[1:]
 
     def _raw_file_info(self):
-        # mostly here so GSB can override.
+        # Mostly here so GSB can override.
         return self._parent.fh_raw.info
 
     def _collect_info(self):
@@ -270,5 +270,5 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     def __call__(self):
         """Create a dict with information about the stream and the raw file."""
         info = super(VLBIStreamReaderInfo, self).__call__()
-        info['raw_file_info'] = self.file_info()
+        info['file_info'] = self.file_info()
         return info
