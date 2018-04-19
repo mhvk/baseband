@@ -76,7 +76,7 @@ class GSBTimeStampIO(VLBIFileBase):
         try:
             timestamp0 = self.read_timestamp()
             timestamp1 = self.read_timestamp()
-            return 1. / (timestamp1.time - timestamp0.time)
+            return (1. / (timestamp1.time - timestamp0.time)).to(u.Hz)
         finally:
             self.seek(oldpos)
 

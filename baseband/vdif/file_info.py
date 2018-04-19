@@ -32,7 +32,20 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
         except Exception:
             return None
 
+    def _get_sample_shape(self):
+        # To get the sample shape, need to read a while frameset.
+        fh = self._parent
+        old_offset = fh.tell()
+        try:
+            fh.seek(0)
+            return fh.read_frameset().sample_shape
+        except Exception:
+            return None
+        finally:
+            fh.seek(old_offset)
+
     def _collect_info(self):
         super(VDIFFileReaderInfo, self)._collect_info()
         if self:
             self.complex_data = self.header0['complex_data']
+            self.sample_shape = self._get_sample_shape()

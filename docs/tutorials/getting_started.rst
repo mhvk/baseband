@@ -13,6 +13,67 @@ imported::
     >>> import numpy as np
     >>> import astropy.units as u
 
+.. _getting_started_inspecting:
+
+Inspecting Files
+================
+
+Baseband allows you to quickly determine basic properties of a file, including
+what format it is, using the `baseband.file_info` function. For instance, it
+shows that the sample VDIF file that comes with Baseband is very short (sample
+files can all be found in the `baseband.data` module)::
+
+    >>> from baseband import file_info
+    >>> from baseband.data import SAMPLE_VDIF
+    >>> file_info(SAMPLE_VDIF)
+    Stream information:
+    start_time = 2014-06-16T05:56:07.000000000
+    stop_time = 2014-06-16T05:56:07.001250000
+    sample_rate = 32.0 MHz
+    shape = (40000, 8)
+    format = vdif
+    bps = 2
+    complex_data = False
+    <BLANKLINE>
+    File information:
+    edv = 3
+    frame_rate = 1600.0 Hz
+    samples_per_frame = 20000
+    sample_shape = (8, 1)
+
+The same function will also tell you when more information is needed. For
+instance, for Mark 5B files one needs the number of channels used, as well as
+(roughly) when the data were taken::
+
+    >>> from baseband.data import SAMPLE_MARK5B
+    >>> file_info(SAMPLE_MARK5B)
+    File information:
+    format = mark5b
+    frame_rate = 6400.0 Hz
+    bps = 2
+    complex_data = False
+    <BLANKLINE>
+    missing:  nchan: needed to determine sample shape and rate.
+              kday, ref_time: needed to infer full times.
+    >>> from astropy.time import Time
+    >>> file_info(SAMPLE_MARK5B, nchan=8, ref_time=Time('2014-01-01'))
+    Stream information:
+    start_time = 2014-06-13T05:30:01.000000000
+    stop_time = 2014-06-13T05:30:01.000625000
+    sample_rate = 32.0 MHz
+    shape = (20000, 8)
+    format = mark5b
+    bps = 2
+    complex_data = False
+    <BLANKLINE>
+    File information:
+    frame_rate = 6400.0 Hz
+    samples_per_frame = 5000
+    sample_shape = (8,)
+
+The information is gleaned from ``info`` properties on the various file and
+stream readers (see below).
+
 .. _getting_started_reading:
 
 Reading Files
@@ -22,48 +83,41 @@ Opening Files
 -------------
 
 Each format supported by Baseband has a master input/output function,
-accessible by importing the corresponding format module.  For example, to read
-the sample VDIF file that comes with Baseband (sample files can all be found in
-the `baseband.data` module)::
-
-    >>> import baseband.vdif as vdif
-    >>> from baseband.data import SAMPLE_VDIF
-    >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
-
-To close the file::
-
-    >>> fh.close()
-
-Similar syntax can be used to open a file of any format.  To open Baseband's
-sample DADA file, for example::
+accessible by importing the corresponding format module.  All formats have
+similar syntax. For instance, to open the sample DADA file that comes with
+Baseband::
 
     >>> from baseband import dada
     >>> from baseband.data import SAMPLE_DADA
-    >>> fh_dada = dada.open(SAMPLE_DADA, 'rs')
-    >>> dada_data = fh_dada.read()
-    >>> fh_dada.close()
+    >>> fh = dada.open(SAMPLE_DADA, 'rs')
+    >>> fh.read(3)
+    array([[ -38.-38.j,  -38.-38.j],
+           [ -38.-38.j,  -40. +0.j],
+           [-105.+60.j,   85.-15.j]], dtype=complex64)
+    >>> fh.close()
 
 In general, file I/O and data manipulation use the same syntax across all
-file formats.  When using ``open`` for Mark 4 and Mark 5B files, however, two
-keywords - ``ntrack``, and ``decade`` - may need to be set manually.  For these
-and VDIF, ``sample_rate`` may also need to be passed if it can't be read
-or inferred from the file.  Notes on such features and quirks of individual
+file formats.  When using ``open`` for Mark 4 and Mark 5B files, however, some
+additional arguments may need to be passed (as was the case above for
+inspecting a Mark 5B file).  Notes on such features and quirks of individual
 formats can be found in the API entries of their ``open`` functions, and
 within the :ref:`Specific file format <specific_file_formats_toc>`
 documentation.
 
-For the rest of this section, let's go back to using VDIF files.
+For the rest of this section, we will stick to VDIF files.
 
 Decoding Data and the Sample File Pointer
 -----------------------------------------
 
-We gave `~baseband.vdif.open` the ``'rs'`` flag, which opens the file in
-"stream reader" mode.  The function returns an instance of
-`~baseband.vdif.base.VDIFStreamReader`, a wrapper around `io.BufferedReader`
-that adds methods to decode files as |data frames| and seek to and read data
+By giving the openers a ``'rs'`` flag, we open files in "stream reader" mode,
+where a file is accessed as if it were a stream of samples.
+For VDIF, `~baseband.vdif.open` will then return an instance of
+`~baseband.vdif.base.VDIFStreamReader`, which wraps a raw data file with
+methods to decode the binary |data frames| and seek to and read data
 |samples|.  To decode the first 12 samples into a `~numpy.ndarray`, we would
 use the `~baseband.vdif.base.VDIFStreamReader.read` method::
 
+    >>> from baseband import vdif
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> d = fh.read(12)
     >>> type(d)
@@ -120,7 +174,24 @@ sample shape.  To retain them, we can pass ``squeeze=False`` to
     (12, 8, 1)
     >>> fhns.close()
 
-We can access information about the file by printing ``fh``::
+Basic information about the file is obtained by either by ``fh.info`` or simply
+``fh`` itself::
+
+    >>> fh.info
+    Stream information:
+    start_time = 2014-06-16T05:56:07.000000000
+    stop_time = 2014-06-16T05:56:07.001250000
+    sample_rate = 32.0 MHz
+    shape = (40000, 8)
+    format = vdif
+    bps = 2
+    complex_data = False
+    <BLANKLINE>
+    File information:
+    edv = 3
+    frame_rate = 1600.0 Hz
+    samples_per_frame = 20000
+    sample_shape = (8, 1)
 
     >>> fh
     <VDIFStreamReader name=... offset=12
@@ -129,12 +200,16 @@ We can access information about the file by printing ``fh``::
         bps=2, complex_data=False, edv=3, station=65532,
         start_time=2014-06-16T05:56:07.000000000>
 
-The ``offset`` gives the current location of the sample file pointer - it's at
-``12`` since we have read in 12 (complete) samples.  If we called ``fh.read
-(12)`` again we would get the next 12 samples.  If we instead called
-``fh.read()``, it would read from the pointer's *current* position to the end
-of the file.  If we wanted all the data in one array, we would move the file
-pointer back to the start of file, using ``fh.seek``, before reading::
+Not coincidentally, the first is identical to what we :ref:`found above
+<getting_started_inspecting>` using `~baseband.file_info`.
+
+The filehandle itself also shows the ``offset``, the current location of the
+sample file pointer. Above, it is at ``12`` since we have read in 12 (complete)
+samples.  If we called ``fh.read (12)`` again we would get the next 12 samples.
+If we instead called ``fh.read()``, it would read from the pointer's *current*
+position to the end of the file.  If we wanted all the data in one array, we
+would move the file pointer back to the start of file, using ``fh.seek``,
+before reading::
 
     >>> fh.seek(0)      # Seek to sample 0.  Seek returns its offset in counts.
     0

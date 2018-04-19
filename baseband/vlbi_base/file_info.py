@@ -98,12 +98,17 @@ class VLBIInfoBase(object):
             return super(VLBIInfoBase, self).__repr__()
 
         if not self:
-            return 'File not parsable. Wrong format?'
+            return 'Not parsable. Wrong format?'
 
         result = ''
         for attr in self.attr_names:
             value = getattr(self, attr)
             if value is not None:
+                if hasattr(value, 'isot'):
+                    value.precision = 9
+                    value = value.isot
+                elif attr == 'sample_rate':
+                    value = value.to(u.MHz)
                 result += '{} = {}\n'.format(attr, value)
 
         if self.missing:
@@ -157,6 +162,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         >>> from baseband import mark5b
         >>> fh = mark5b.open(SAMPLE_MARK5B, 'rb')
         >>> fh.info
+        File information:
         format = mark5b
         frame_rate = 6400.0 Hz
         bps = 2
@@ -169,6 +175,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
         >>> fh = mark5b.open(SAMPLE_MARK5B, 'rb', kday=56000, nchan=8)
         >>> fh.info
+        File information:
         format = mark5b
         frame_rate = 6400.0 Hz
         sample_rate = 32.0 MHz
@@ -176,7 +183,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         sample_shape = (8,)
         bps = 2
         complex_data = False
-        start_time = 56821.22917824074
+        start_time = 2014-06-13T05:30:01.000000000
         >>> fh.close()
     """
     attr_names = ('format', 'frame_rate', 'sample_rate', 'samples_per_frame',
@@ -220,9 +227,13 @@ class VLBIFileReaderInfo(VLBIInfoBase):
             self.frame_rate = self._get_frame_rate()
             if (self.frame_rate is not None and
                     self.samples_per_frame is not None):
-                self.sample_rate = (self.frame_rate *
-                                    self.samples_per_frame).to(u.MHz)
+                self.sample_rate = self.frame_rate * self.samples_per_frame
             self.start_time = self._get_start_time()
+
+    def __repr__(self):
+        result = 'File information:\n'
+        result += super(VLBIFileReaderInfo, self).__repr__()
+        return result
 
 
 class VLBIStreamReaderInfo(VLBIInfoBase):
@@ -249,9 +260,9 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     complex_data : bool
         Whether the data are complex.
     """
-    attr_names = ('format', 'start_time', 'stop_time', 'sample_rate',
-                  'shape', 'bps', 'complex_data')
-    _parent_attrs = attr_names[1:]
+    attr_names = ('start_time', 'stop_time', 'sample_rate', 'shape',
+                  'format', 'bps', 'complex_data')
+    _parent_attrs = tuple(attr for attr in attr_names if attr != 'format')
 
     def _raw_file_info(self):
         # Mostly here so GSB can override.
@@ -272,3 +283,20 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         info = super(VLBIStreamReaderInfo, self).__call__()
         info['file_info'] = self.file_info()
         return info
+
+    def __repr__(self):
+        result = 'Stream information:\n'
+        result += super(VLBIStreamReaderInfo, self).__repr__()
+        file_info = getattr(self, 'file_info', None)
+        if file_info is not None:
+            # Add information from the raw file.
+            raw_attrs = file_info.attr_names
+            raw_only_attrs = [attr for attr in raw_attrs
+                              if attr not in self.attr_names]
+            try:
+                file_info.attr_names = raw_only_attrs
+                result += '\n' + repr(file_info)
+            finally:
+                file_info.attr_names = raw_attrs
+
+        return result

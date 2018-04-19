@@ -51,6 +51,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         >>> from baseband import mark4
         >>> fh = mark4.open(SAMPLE_MARK4, 'rb')
         >>> fh.info
+        File information:
         format = mark4
         frame_rate = 400.0 Hz
         sample_rate = 32.0 MHz
@@ -66,6 +67,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
 
         >>> fh = mark4.open(SAMPLE_MARK4, 'rb', decade=2010)
         >>> fh.info
+        File information:
         format = mark4
         frame_rate = 400.0 Hz
         sample_rate = 32.0 MHz
@@ -73,7 +75,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         sample_shape = (8,)
         bps = 2
         complex_data = False
-        start_time = 2014:167:07:38:12.47500
+        start_time = 2014-06-16T07:38:12.475000000
         offset0 = 2696
         >>> fh.close()
     """
