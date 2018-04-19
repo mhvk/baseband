@@ -2,6 +2,8 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import astropy.units as u
+
 from ..vlbi_base.file_info import VLBIFileReaderInfo
 
 
@@ -30,3 +32,5 @@ class Mark5BFileReaderInfo(VLBIFileReaderInfo):
                 self.sample_shape = (self.nchan,)
                 self.samples_per_frame = (self.header0.payload_nbytes * 8 //
                                           (self.bps * self.nchan))
+                self.sample_rate = (self.samples_per_frame *
+                                    self.frame_rate).to(u.MHz)

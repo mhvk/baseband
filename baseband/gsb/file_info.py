@@ -2,7 +2,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from ..vlbi_base.file_info import VLBIFileReaderInfo, VLBIInfoBase
+from ..vlbi_base.file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 
 
 class GSBTimeStampInfo(VLBIFileReaderInfo):
@@ -29,26 +29,12 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
             self.missing['raw'] = 'need raw binary files for the stream reader'
 
 
-class GSBStreamReaderInfo(VLBIInfoBase):
-    _parent_attrs = ('samples_per_frame', 'bps', 'complex_data',
-                     'sample_shape', 'sample_rate', 'stop_time', 'size')
+class GSBStreamReaderInfo(VLBIStreamReaderInfo):
 
-    def _collect_info(self):
-        super(GSBStreamReaderInfo, self)._collect_info()
-        # Part of our information, including the format, comes from the
-        # underlying timestamp file.
-        self._fh_ts_info = self._parent.fh_ts.info
-        self._fh_ts_info_attrs = self._fh_ts_info.attr_names
-        extra_attrs = tuple(attr for attr in self._parent_attrs
-                            if attr not in self._fh_ts_info_attrs)
-        self.attr_names = self._fh_ts_info_attrs + extra_attrs
-
-    def _up_to_date(self):
-        # Stream readers cannot get "out of date" after initialization.
-        return True
-
-    def __getattr__(self, attr):
-        if not attr.startswith('_') and attr in self._fh_ts_info_attrs:
-            return getattr(self._fh_ts_info, attr)
-
-        return super(GSBStreamReaderInfo, self).__getattr__(attr)
+    def _raw_file_info(self):
+        info = self._parent.fh_ts.info
+        # The timestamp reader info has a built-in missing for the
+        # raw file, but this is incorrect if we're in a stream, which
+        # cannot have been opened without one. (Yes, this is a hack.)
+        info.missing = {}
+        return self._parent.fh_ts.info

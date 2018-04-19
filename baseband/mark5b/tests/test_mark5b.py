@@ -220,6 +220,45 @@ class TestMark5B(object):
         assert repr_fh.startswith('Mark5BFileReader')
         assert 'kday=56000, ref_time=None, nchan=8, bps=2' in repr_fh
 
+        # Check that info gets the same information
+        with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
+            info = fh.info
+
+        assert info.header0 == header
+        expected = {'format': 'mark5b',
+                    'frame_rate': frame_rate,
+                    'sample_rate': 32 * u.MHz,
+                    'samples_per_frame': 5000,
+                    'sample_shape': (8,),
+                    'bps': 2,
+                    'complex_data': False,
+                    'start_time': header.get_time(frame_rate=frame_rate)}
+        for key, value in expected.items():
+            assert getattr(info, key) == value
+        assert info() == expected
+
+        # Now check that we can change attributes and info will be updated.
+        with mark5b.open(SAMPLE_FILE, 'rb', bps=2) as fh:
+            info = fh.info
+            assert set(info.missing.keys()) == {'nchan', 'ref_time', 'kday'}
+            for key in 'format', 'frame_rate', 'bps', 'complex_data':
+                assert getattr(info, key) == expected[key]
+            for key in ('sample_rate', 'samples_per_frame', 'sample_shape',
+                        'start_time'):
+                assert getattr(info, key) is None
+            fh.nchan = 8
+            info = fh.info
+            assert set(info.missing.keys()) == {'ref_time', 'kday'}
+            for key in ('format', 'frame_rate', 'bps', 'complex_data',
+                        'sample_rate', 'samples_per_frame', 'sample_shape'):
+                assert getattr(info, key) == expected[key]
+            assert info.start_time is None
+            fh.kday = 56000
+            info = fh.info
+            assert info.missing == {}
+            for key, value in expected.items():
+                assert getattr(info, key) == value
+
     def test_frame(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)

@@ -49,6 +49,13 @@ class VLBIInfoBase(object):
 
         return info
 
+    def __set__(self, info):
+        # We do need to define __set__ since this ensures we are treated as
+        # a "data descriptor", i.e., that our __get__ will get called even
+        # if "info" is present in instance.__dict__; see
+        # https://docs.python.org/3/howto/descriptor.html
+        raise AttributeError("can't set info attribute.")
+
     # The standard attributes should always be accessible even if not defined,
     # so adjust attribute getting and dir'ing accordingly.
     def __getattr__(self, attr):
@@ -97,9 +104,9 @@ class VLBIInfoBase(object):
         if self.missing:
             result += '\n'
             prefix = 'missing: '
-            for msg in set(self.missing.values()):
-                keys = set(key for key in self.missing
-                           if self.missing[key] == msg)
+            for msg in sorted(set(self.missing.values())):
+                keys = sorted(set(key for key in self.missing
+                                  if self.missing[key] == msg))
                 result += "{} {}: {}\n".format(prefix, ', '.join(keys), msg)
                 prefix = ' ' * len(prefix)
 
@@ -107,6 +114,66 @@ class VLBIInfoBase(object):
 
 
 class VLBIFileReaderInfo(VLBIInfoBase):
+    """Standardized information on file readers.
+
+    The ``info`` descriptor has a number of standard attributes, which are
+    determined from arguments passed in opening the file, from the first header
+    (``info.header0``) and from possibly scanning the file to determine the
+    duration of frames.
+
+    Attributes
+    ----------
+    format : str or `None`
+        File format, or `None` if the underlying file cannot be parsed.
+    frame_rate : `~astropy.units.Quantity`
+        Number of data frames per unit of time.
+    sample_rate : `~astropy.units.Quantity`
+        Complete samples per unit of time.
+    samples_per_frame : int
+        Number of complete samples in each frame.
+    sample_shape : tuple
+        Dimensions of each complete sample (e.g., ``(nchan,)``).
+    bps : int
+        Number of bits used to encode each elementary sample.
+    complex_data : bool
+        Whether the data are complex.
+    start_time : `~astropy.time.Time`
+        Time of the first complete sample.
+    missing : dict
+        Entries in the dict are keyed by names of arguments that should be
+        passed to the file reader to obtain full information. The associated
+        entries in the dict explain why these arguments are needed.
+
+    Examples
+    --------
+    The most common use is simply to print information::
+
+        >>> from baseband.data import SAMPLE_MARK5B
+        >>> from baseband import mark5b
+        >>> fh = mark5b.open(SAMPLE_MARK5B, 'rb')
+        >>> fh.info
+        format = mark5b
+        frame_rate = 6400.0 Hz
+        bps = 2
+        complex_data = False
+        <BLANKLINE>
+        missing:  nchan: needed to determine sample shape and rate.
+                  kday, ref_time: needed to infer full times.
+        <BLANKLINE>
+        >>> fh.close()
+
+        >>> fh = mark5b.open(SAMPLE_MARK5B, 'rb', kday=56000, nchan=8)
+        >>> fh.info
+        format = mark5b
+        frame_rate = 6400.0 Hz
+        sample_rate = 32.0 MHz
+        samples_per_frame = 5000
+        sample_shape = (8,)
+        bps = 2
+        complex_data = False
+        start_time = 56821.22917824074
+        >>> fh.close()
+    """
     attr_names = ('format', 'frame_rate', 'sample_rate', 'samples_per_frame',
                   'sample_shape', 'bps', 'complex_data', 'start_time')
     _header0_attrs = ('bps', 'complex_data', 'samples_per_frame',
@@ -159,25 +226,49 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
 
 class VLBIStreamReaderInfo(VLBIInfoBase):
-    _parent_attrs = ('sample_shape', 'sample_rate', 'stop_time',
-                     'shape', 'size')
+    """Standardized information on stream readers.
+
+    The ``info`` descriptor provides a few standard attributes, all of which
+    can also be accessed directly on the stream filehandle. More detailed
+    information on the underlying file is stored in its info, accessible via
+    ``info.file_info``.
+
+    Attributes
+    ----------
+    start_time : `~astropy.time.Time`
+        Time of the first complete sample.
+    stop_time : `~astropy.time.Time`
+        Time of the complete sample just beyond the end of the file.
+    sample_rate : `~astropy.units.Quantity`
+        Complete samples per unit of time.
+    shape : tuple
+        Equivalent shape of the whole file, i.e., combining the number of
+        complete samples and the shape of those samples.
+    bps : int
+        Number of bits used to encode each elementary sample.
+    complex_data : bool
+        Whether the data are complex.
+    """
+    attr_names = ('format', 'start_time', 'stop_time', 'sample_rate',
+                  'shape', 'bps', 'complex_data')
+    _parent_attrs = attr_names[1:]
+
+    def _raw_file_info(self):
+        # mostly here so GSB can override.
+        return self._parent.fh_raw.info
 
     def _collect_info(self):
         super(VLBIStreamReaderInfo, self)._collect_info()
-        # Part of our information, including the format, comes from the
-        # underlying raw file.
-        self._fh_raw_info = self._parent.fh_raw.info
-        self._fh_raw_info_attrs = self._fh_raw_info.attr_names
-        extra_attrs = tuple(attr for attr in self._parent_attrs
-                            if attr not in self._fh_raw_info_attrs)
-        self.attr_names = self._fh_raw_info_attrs + extra_attrs
+        # We also want the raw info.
+        self.file_info = self._raw_file_info()
+        self.format = self.file_info.format
 
     def _up_to_date(self):
         # Stream readers cannot after initialization, so the check is easy.
         return True
 
-    def __getattr__(self, attr):
-        if not attr.startswith('_') and attr in self._fh_raw_info_attrs:
-            return getattr(self._fh_raw_info, attr)
-
-        return super(VLBIStreamReaderInfo, self).__getattr__(attr)
+    def __call__(self):
+        """Create a dict with information about the stream and the raw file."""
+        info = super(VLBIStreamReaderInfo, self).__call__()
+        info['raw_file_info'] = self.file_info()
+        return info

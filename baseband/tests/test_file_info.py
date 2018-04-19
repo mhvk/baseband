@@ -79,7 +79,6 @@ def test_file_info(sample, format_, used_extra_args):
 def test_gsb_with_raw_files(sample, raw, mode):
     info = file_info(sample, raw=raw)
     assert info.format == 'gsb'
-    assert info.mode == mode
     assert not info.missing
     module = importlib.import_module('.' + info.format, package='baseband')
     # Check we can indeed open a file with the extra arguments.

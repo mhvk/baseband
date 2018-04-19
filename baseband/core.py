@@ -16,7 +16,7 @@ def file_info(name, format=None, **kwargs):
     Parameters
     ----------
     name : str or filehandle
-        Raw file for which the information is to be gotten.
+        Raw file for which to obtain information.
     format : str, tuple of str, optional
         Formats to try.  If not given, try all standard formats.
     **kwargs
@@ -90,8 +90,6 @@ def file_info(name, format=None, **kwargs):
 
     with module.open(name, mode='rs', **extra_args) as fh:
         info = fh.info
-        if info.missing:
-            return info
 
-        info.kwargs = extra_args
-        return info
+    info.kwargs = extra_args
+    return info
