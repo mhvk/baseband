@@ -9,15 +9,6 @@ __all__ = ['file_info', 'open']
 FILE_FORMATS = ('dada', 'mark4', 'mark5b', 'vdif', 'gsb')
 
 
-DROPPABLE_KWARGS = ('decade', 'ref_time', 'kday', 'nchan')
-"""Arguments that can be dropped from kwargs if not needed.
-
-Generally, they are needed for some but not all of the formats,
-and thus users should be able to pass them in for an unknown
-file type.
-"""
-
-
 def file_info(name, format=FILE_FORMATS, **kwargs):
     """Get format and other information from a baseband file.
 
@@ -37,7 +28,8 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
         Any arguments that might help to get information.  For instance,
         Mark 4 and Mark 5B do not have complete timestamps, which can be
         addressed by passing in ``ref_time``.  Furthermore, for Mark 5B, it
-        is needed to pass in ``nchan``.
+        is needed to pass in ``nchan``. Arguments are checked for consistency
+        with the file even if not used (see notes below).
 
     Returns
     -------
@@ -47,10 +39,10 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
 
     Notes
     -----
-    The passed in keyword arguments are checked internally and end up in one
-    of the following attributes (if the file could be opened as a stream):
+    All keyword arguments passed in are classified, ending up in one of
+    the following (mostly useful if the file could be opened as a stream):
 
-      - ``used_kwargs``: used to open the file.
+      - ``used_kwargs``: arguments that were needed to open the file.
       - ``consistent_kwargs``: not needed to open the file, but consistent.
       - ``inconsistent_kwargs``: not needed to open the file, and inconsistent.
       - ``irrelevant_kwargs``: provide information irrelevant for opening.
@@ -105,9 +97,9 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
             with module.open(name, mode='rs', **used_kwargs) as fh:
                 info = fh.info
 
-    info.used_kwargs = used_kwargs
     # Store what happened to the kwargs, so one can decide if there are
     # inconsistencies or other problems.
+    info.used_kwargs = used_kwargs
     info.consistent_kwargs = {}
     info.inconsistent_kwargs = {}
     info.irrelevant_kwargs = {}
@@ -117,22 +109,37 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
         if key in used_kwargs:
             continue
         info_value = info_dict.get(key)
-        if info_value is None and key == 'nchan':
-            # If we passed nchan, and info doesn't have it, check that it is
-            # consistent with the sample shape.  We take the product of all
-            # elements as the one that should be consistent (so that, e.g., a
-            # VDIF file with 8 threads and 1 channel per thread is consistent).
-            info_value = info_dict.get('sample_shape', None)
-            if info_value is not None:
-                info_value = np.prod(info_value)
-
+        consistent = None
         if info_value is not None:
-            if info_value == value:
-                info.consistent_kwargs[key] = value
-            else:
-                info.inconsistent_kwargs[key] = value
-        else:
+            consistent = info_value == value
+
+        elif key == 'nchan':
+            sample_shape = info_dict.get('sample_shape')
+            if sample_shape is not None:
+                # If we passed nchan, and info doesn't have it, but does have a
+                # sample shape, check that consistency with that, either in
+                # being equal to `sample_shape.nchan` or equal to the product
+                # of all elements (e.g., a VDIF file with 8 threads and 1
+                # channel per thread is consistent with nchan=8).
+                consistent = (getattr(sample_shape, 'nchan', -1) == value or
+                              np.prod(sample_shape) == value)
+
+        elif key in {'ref_time', 'kday', 'decade'}:
+            start_time = info_dict.get('start_time')
+            if start_time is not None:
+                if key == 'ref_time':
+                    consistent = abs(value - start_time).jd < 500
+                elif key == 'kday':
+                    consistent = int(start_time.mjd / 1000.) * 1000 == value
+                else:  # decade
+                    consistent = int(start_time.isot[:3]) * 10 == value
+
+        if consistent is None:
             info.irrelevant_kwargs[key] = value
+        elif consistent:
+            info.consistent_kwargs[key] = value
+        else:
+            info.inconsistent_kwargs[key] = value
 
     return info
 
@@ -142,8 +149,8 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
 
     Opened as a binary file, one gets a wrapped filehandle that adds
     methods to read/write a frame.  Opened as a stream, the handle is
-    wrapped further, with methods such as reading and writing to the file
-    as if it were a stream of samples.
+    wrapped further, and reading and writing to the file is done as if
+    the file were a stream of samples.
 
     Parameters
     ----------
@@ -154,11 +161,14 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
         file or as a stream. Default: 'rs', for reading a stream.
     format : str or tuple of str
         The format the file is in. For reading, this can be a tuple of possible
-        formats, all of which will be tried in turn.
+        formats, all of which will be tried in turn. By default, all supported
+        formats are tried.
     **kwargs
         Additional arguments needed for opening the file as a stream.
         For most formats, trying without these will raise an exception that
-        tells which arguments are needed.
+        tells which arguments are needed. Opening will not succeed if any
+        arguments are passed in that are inconsistent with the file, or are
+        irrelevant for opening the file.
     """
     if 'w' in mode:
         if isinstance(format, tuple):
@@ -166,8 +176,9 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
     else:
         info = file_info(name, format, **kwargs)
         if not info:
-            raise ValueError("file format does not seem to be any of {}."
-                             .format(format))
+            raise ValueError("file could not be opened as " +
+                             ("any of {}".format(format) if
+                              isinstance(format, tuple) else str(format)))
         format = info.format
 
         if info.missing and 's' in mode:
@@ -175,15 +186,13 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
                             .format(format, info.missing))
 
         if info.inconsistent_kwargs:
-            raise ValueError('arguments inconsistent with this file were '
-                             'passed in: {}'.format(info.inconsistent_kwargs))
+            raise ValueError('arguments inconsistent with this {} file were '
+                             'passed in: {}'
+                             .format(format, info.inconsistent_kwargs))
 
         if info.irrelevant_kwargs:
-            unexpected = (set(info.irrelevant_kwargs.keys()) -
-                          set(DROPPABLE_KWARGS))
-            if unexpected:
-                raise TypeError('open() got unexpected keyword arguments {}'
-                                .format(unexpected))
+            raise TypeError('open() got unexpected keyword arguments {}'
+                            .format(info.irrelevant_kwargs))
 
         kwargs = info.used_kwargs
 

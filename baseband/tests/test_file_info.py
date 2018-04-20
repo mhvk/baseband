@@ -47,13 +47,12 @@ def test_open_missing_args(sample, missing):
 
 
 @pytest.mark.parametrize(
-    ('sample', 'format_', 'used', 'consistent', 'inconsistent', 'irrelevant'),
-    ((SAMPLE_M4, 'mark4', ('ref_time',), ('nchan',), (), ()),
-     (SAMPLE_M5B, 'mark5b', ('ref_time', 'nchan'), (), (), ()),
-     (SAMPLE_VDIF, 'vdif', (), ('nchan',), (), ('ref_time',)),
-     (SAMPLE_DADA, 'dada', (), (), ('nchan',), ('ref_time',))))
-def test_file_info(sample, format_, used, consistent, inconsistent,
-                   irrelevant):
+    ('sample', 'format_', 'used', 'consistent', 'inconsistent'),
+    ((SAMPLE_M4, 'mark4', ('ref_time',), ('nchan',), ()),
+     (SAMPLE_M5B, 'mark5b', ('ref_time', 'nchan'), (), ()),
+     (SAMPLE_VDIF, 'vdif', (), ('nchan', 'ref_time'), ()),
+     (SAMPLE_DADA, 'dada', (), ('ref_time',), ('nchan',))))
+def test_file_info(sample, format_, used, consistent, inconsistent):
     # Pass on extra arguments needed to get Mark4 and Mark5B to pass.
     # For GSB, we also need raw files, so we omit them.
     extra_args = {'ref_time': Time('2014-01-01'),
@@ -68,12 +67,18 @@ def test_file_info(sample, format_, used, consistent, inconsistent,
     assert set(info.used_kwargs.keys()) == set(used)
     assert set(info.consistent_kwargs.keys()) == set(consistent)
     assert set(info.inconsistent_kwargs.keys()) == set(inconsistent)
-    assert set(info.irrelevant_kwargs.keys()) == set(irrelevant)
-    # Check we can indeed open a file with those extra arguments.
+    assert set(info.irrelevant_kwargs.keys()) == set()
+    # Check that extraneous arguments get classified correctly.
+    info2 = file_info(sample, life=42, **extra_args)
+    assert info2.used_kwargs == info.used_kwargs
+    assert info2.consistent_kwargs == info.consistent_kwargs
+    assert info2.inconsistent_kwargs == info.inconsistent_kwargs
+    assert info2.irrelevant_kwargs == {'life': 42}
+    # Check we can indeed open a file with the extra arguments.
     module = importlib.import_module('.' + info.format, package='baseband')
     with module.open(sample, mode='rs', **info.used_kwargs) as fh:
-        info2 = fh.info
-    assert info2() == info_dict
+        info3 = fh.info
+    assert info3() == info_dict
 
 
 @pytest.mark.parametrize(
