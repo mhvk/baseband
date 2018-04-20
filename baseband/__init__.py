@@ -1,9 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
-"""
-Reading and writing VLBI and other radio baseband files.
-
-It relies on numpy and astropy.
-"""
+"""Radio baseband I/O."""
 
 # Affiliated packages may add whatever they like to this file, but
 # should keep this content at the top.

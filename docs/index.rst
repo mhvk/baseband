@@ -26,7 +26,6 @@ Overview
    install
    tutorials/getting_started
    tutorials/glossary
-   authors_for_sphinx
 
 .. _specific_file_formats_toc:
 
@@ -51,15 +50,17 @@ troubleshooting help and APIs for each.
 Core framework and utilities
 ============================
 
-These sections contain APIs and usage notes for the sequential file opener, and
+These sections contain APIs and usage notes for the sequential file opener,
 the API for the set of core utility functions and classes located in
-:mod:`~baseband.vlbi_base`.
+:mod:`~baseband.vlbi_base`, and sample data that come with baseband (mostly
+used for testing).
 
 .. toctree::
    :maxdepth: 1
 
    helpers/index
    vlbi_base/index
+   data/index
 
 .. _dev_docs_toc:
 
@@ -94,3 +95,7 @@ Project details
    authors_for_sphinx
    changelog
    license
+
+Reference/API
+=============
+.. automodapi:: baseband

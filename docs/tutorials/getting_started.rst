@@ -6,10 +6,27 @@
 Getting Started
 ***************
 
-This tutorial covers the basic features of Baseband.  It assumes that
-`NumPy <http://www.numpy.org/>`_ and the `Astropy`_ units module have been
-imported::
+For some file formats, one can simply import baseband and use `baseband.open` to
+access the file.  This gives one a filehandle from which one can read decoded
+samples::
 
+    >>> import baseband
+    >>> from baseband.data import SAMPLE_DADA
+    >>> fh = baseband.open(SAMPLE_DADA)
+    >>> fh.read(3)
+    array([[ -38.-38.j,  -38.-38.j],
+           [ -38.-38.j,  -40. +0.j],
+           [-105.+60.j,   85.-15.j]], dtype=complex64)
+    >>> fh.close()
+
+For other file formats, a bit more information is needed.  Below, we cover the
+basics of :ref:`inspecting files <getting_started_inspecting>`, :ref:`reading
+<getting_started_reading>` from and :ref:`writing <getting_started_writing>`
+to files, and :ref:`converting <getting_started_converting>` from one format
+to another.  We assume that Baseband as well as `NumPy
+<http://www.numpy.org/>`_ and the `Astropy`_ units module have been imported::
+
+    >>> import baseband
     >>> import numpy as np
     >>> import astropy.units as u
 
@@ -23,9 +40,8 @@ what format it is, using the `baseband.file_info` function. For instance, it
 shows that the sample VDIF file that comes with Baseband is very short (sample
 files can all be found in the `baseband.data` module)::
 
-    >>> from baseband import file_info
-    >>> from baseband.data import SAMPLE_VDIF
-    >>> file_info(SAMPLE_VDIF)
+    >>> import baseband.data
+    >>> baseband.file_info(baseband.data.SAMPLE_VDIF)
     Stream information:
     start_time = 2014-06-16T05:56:07.000000000
     stop_time = 2014-06-16T05:56:07.001250000
@@ -45,8 +61,7 @@ The same function will also tell you when more information is needed. For
 instance, for Mark 5B files one needs the number of channels used, as well as
 (roughly) when the data were taken::
 
-    >>> from baseband.data import SAMPLE_MARK5B
-    >>> file_info(SAMPLE_MARK5B)
+    >>> baseband.file_info(baseband.data.SAMPLE_MARK5B)
     File information:
     format = mark5b
     frame_rate = 6400.0 Hz
@@ -56,7 +71,7 @@ instance, for Mark 5B files one needs the number of channels used, as well as
     missing:  nchan: needed to determine sample shape and rate.
               kday, ref_time: needed to infer full times.
     >>> from astropy.time import Time
-    >>> file_info(SAMPLE_MARK5B, nchan=8, ref_time=Time('2014-01-01'))
+    >>> baseband.file_info(baseband.data.SAMPLE_MARK5B, nchan=8, ref_time=Time('2014-01-01'))
     Stream information:
     start_time = 2014-06-13T05:30:01.000000000
     stop_time = 2014-06-13T05:30:01.000625000
@@ -74,6 +89,10 @@ instance, for Mark 5B files one needs the number of channels used, as well as
 The information is gleaned from ``info`` properties on the various file and
 stream readers (see below).
 
+.. note:: The one format for which ``file_info`` works a bit differently is
+   `GSB <gsb>`_, as this format requires separate time-stamp and raw data
+   files. Only the timestamp file can be inspected usefully.
+
 .. _getting_started_reading:
 
 Reading Files
@@ -82,10 +101,15 @@ Reading Files
 Opening Files
 -------------
 
-Each format supported by Baseband has a master input/output function,
-accessible by importing the corresponding format module.  All formats have
-similar syntax. For instance, to open the sample DADA file that comes with
-Baseband::
+As shown at the very start, files can be opened with the general
+`baseband.open` function. This will try to determine the file type using
+`~baseband.file_info`, load the corresponding baseband module, and then open
+the file using that module's master input/output function.
+
+Generally, if one knows the file type, one might as well work with the
+corresponding module directly.  For instance, to explicitly use the DADA
+reader to open the sample DADA file included in Baseband, one can use the DADA
+module's `~baseband.dada.open` function::
 
     >>> from baseband import dada
     >>> from baseband.data import SAMPLE_DADA
@@ -96,28 +120,29 @@ Baseband::
            [-105.+60.j,   85.-15.j]], dtype=complex64)
     >>> fh.close()
 
-In general, file I/O and data manipulation use the same syntax across all
-file formats.  When using ``open`` for Mark 4 and Mark 5B files, however, some
-additional arguments may need to be passed (as was the case above for
-inspecting a Mark 5B file).  Notes on such features and quirks of individual
-formats can be found in the API entries of their ``open`` functions, and
-within the :ref:`Specific file format <specific_file_formats_toc>`
-documentation.
+In general, file I/O and data manipulation use the same syntax across all file
+formats.  When opening Mark 4 and Mark 5B files, however, some additional
+arguments may need to be passed (as was the case above for inspecting a Mark
+5B file, and indeed this is a good way to find out what is needed).
+Notes on such features and quirks of individual formats can be
+found in the API entries of their ``open`` functions, and within the
+:ref:`Specific file format <specific_file_formats_toc>` documentation.
 
 For the rest of this section, we will stick to VDIF files.
 
 Decoding Data and the Sample File Pointer
 -----------------------------------------
 
-By giving the openers a ``'rs'`` flag, we open files in "stream reader" mode,
-where a file is accessed as if it were a stream of samples.
-For VDIF, `~baseband.vdif.open` will then return an instance of
+By giving the openers a ``'rs'`` flag, which is the default, we open files in
+"stream reader" mode, where a file is accessed as if it were a stream of
+samples.  For VDIF, `~baseband.vdif.open` will then return an instance of
 `~baseband.vdif.base.VDIFStreamReader`, which wraps a raw data file with
 methods to decode the binary |data frames| and seek to and read data
 |samples|.  To decode the first 12 samples into a `~numpy.ndarray`, we would
 use the `~baseband.vdif.base.VDIFStreamReader.read` method::
 
     >>> from baseband import vdif
+    >>> from baseband.data import SAMPLE_VDIF
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> d = fh.read(12)
     >>> type(d)
@@ -267,9 +292,7 @@ Passing the string ``'time'`` reports the pointer's location in absolute time::
 We can also pass an absolute `astropy.time.Time`, or a positive or negative time
 difference `~astropy.time.TimeDelta` or `astropy.units.Quantity` to ``seek``.
 If the offset is a `~astropy.time.Time` object, the second argument to seek is
-ignored.
-
-::
+ignored.::
 
     >>> from astropy.time.core import TimeDelta
     >>> from astropy.time import Time
@@ -477,6 +500,11 @@ We can check the validity of our new file by re-opening it::
     >>> fr.close()
     >>> fh.close()
 
+.. note:: One can also use the top-level `~baseband.open` function for writing,
+          with the file format passed in via its ``format`` argument.
+
+.. _getting_started_converting:
+
 File Format Conversion
 ----------------------
 
@@ -541,5 +569,5 @@ The `~baseband.helpers.sequentialfile` module is available for reading in a
 sequence as if it were one contiguous file.  Simple usage examples can be found
 in the :ref:`Sequential File <sequential_file>` section.  DADA data is so
 often stored in a file sequence that reading a time-ordered list of filenames
-is built into `baseband.dada.open`; for details, see the `its API entry
+is built into `~baseband.dada.open`; for details, see the `its API entry
 <baseband.dada.open>`.
