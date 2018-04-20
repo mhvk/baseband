@@ -4,6 +4,9 @@
 New Features
 ------------
 
+- Added a new ``baseband.file_info`` function, which can be used to inpect
+  data files. [#200]
+
 API Changes
 -----------
 
