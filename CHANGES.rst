@@ -10,6 +10,9 @@ New Features
 API Changes
 -----------
 
+- In analogy with Mark 5B, VDIF header time getting and setting now requires
+  a frame rate rather than a sample rate. [#217]
+
 Bug Fixes
 ---------
 

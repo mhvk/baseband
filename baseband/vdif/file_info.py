@@ -28,7 +28,7 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
 
     def _get_start_time(self):
         try:
-            return self.header0.get_time(sample_rate=self.sample_rate)
+            return self.header0.get_time(frame_rate=self.frame_rate)
         except Exception:
             return None
 
