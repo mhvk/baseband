@@ -126,8 +126,7 @@ class Mark5BHeader(VLBIHeaderBase):
         frame_rate = kwargs.pop('frame_rate', None)
         # Pop verify and pass on False so verify happens after time is set.
         verify = kwargs.pop('verify', True)
-        kwargs['verify'] = False
-        self = super(Mark5BHeader, cls).fromvalues(**kwargs)
+        self = super(Mark5BHeader, cls).fromvalues(verify=False, **kwargs)
         if time is not None:
             self.set_time(time, frame_rate=frame_rate)
             self.update()    # Recalculate CRC.
@@ -255,8 +254,8 @@ class Mark5BHeader(VLBIHeaderBase):
         http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 
         Note that some non-compliant files do not have 'bcd_fraction' set.
-        For those, the time can still be retrieved using 'frame_nr' given a
-        frame rate.
+        For those, the time can still be calculated using the header's
+        'frame_nr' by passing in a frame rate.
 
         Furthermore, fractional seconds are stored only to 0.1 ms accuracy.
         In the code, this is "unrounded" to give the exact time of the start
@@ -273,16 +272,18 @@ class Mark5BHeader(VLBIHeaderBase):
         Returns
         -------
         `~astropy.time.Time`
-
         """
-        if frame_rate is None:
+        frame_nr = self['frame_nr']
+        if frame_nr == 0:
+            fraction = 0.
+        elif frame_rate is None:
             fraction = self.fraction
+            if fraction == 0.:
+                raise ValueError('header does not provide correct fractional '
+                                 'second (it is zero for non-zero frame '
+                                 'number). Please pass in a frame_rate.')
         else:
-            frame_nr = self['frame_nr']
-            if frame_nr == 0:
-                fraction = 0.
-            else:
-                fraction = (frame_nr / frame_rate).to(u.s).value
+            fraction = (frame_nr / frame_rate).to_value(u.s)
 
         return Time(self.kday + self.jday, (self.seconds + fraction) / 86400,
                     format='mjd', scale='utc', precision=9)
