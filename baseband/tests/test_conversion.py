@@ -73,7 +73,8 @@ class TestVDIFMark5B(object):
         # unless we pass in a frame rate.
         with pytest.raises(ValueError):
             header_copy.time
-        assert abs(header_copy.get_time(sample_rate=32*u.MHz) -
+        frame_rate = 32. * u.MHz / header.samples_per_frame
+        assert abs(header_copy.get_time(frame_rate=frame_rate) -
                    m5h2.time) < 1.*u.ns
 
     def test_payload(self):

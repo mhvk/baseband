@@ -129,7 +129,7 @@ class TestVDIF(object):
         assert header5['frame_nr'] == header['frame_nr']
         # Check requesting non-existent EDV returns VDIFBaseHeader instance
         header6 = vdif.header.VDIFHeader.fromvalues(edv=100)
-        assert isinstance(header6, vdif.header.VDIFBaseHeader)
+        assert type(header6) is vdif.header.VDIFBaseHeader
         assert header6['edv'] == 100
 
         # Make a new header to test passing time/sample rate.
@@ -171,8 +171,7 @@ class TestVDIF(object):
 
         # Check rounding in corner case.
         header9 = headerT.copy()
-        header9.set_time(Time('2018-01-01T00:34:07.999999999996'),
-                         sample_rate=32*u.MHz)
+        header9.set_time(Time('2018-01-01T00:34:07.999999999996'))
         assert header9['seconds'] == 2048
         assert header9['frame_nr'] == 0
 
@@ -963,7 +962,8 @@ def test_mwa_vdif():
 
 def test_arochime_vdif():
     """Test ARO CHIME format (uses EDV=0)"""
-    sample_rate = 800*u.MHz / 1024. / 2.   # File has 1 sample/frame.
+    # File has 1 sample/frame.
+    frame_rate = sample_rate = 800*u.MHz / 1024. / 2.
     with open(SAMPLE_AROCHIME, 'rb') as fh:
         header0 = vdif.VDIFHeader.fromfile(fh)
     assert header0.edv == 0
@@ -971,16 +971,16 @@ def test_arochime_vdif():
     assert header0['frame_nr'] == 308109
     with pytest.raises(ValueError):
         header0.time
-    assert abs(header0.get_time(sample_rate=sample_rate) -
+    assert abs(header0.get_time(frame_rate=frame_rate) -
                Time('2016-04-22T08:45:31.788759040')) < 1. * u.ns
     # Also check writing Time.
     header1 = header0.copy()
     with pytest.raises(ValueError):
         header1.time = Time('2016-04-22T08:45:31.788759040')
     header1.set_time(Time('2016-04-22T08:45:32.788759040'),
-                     sample_rate=sample_rate)
-    assert abs(header1.get_time(sample_rate=sample_rate) -
-               header0.get_time(sample_rate=sample_rate) - 1. * u.s) < 1.*u.ns
+                     frame_rate=frame_rate)
+    assert abs(header1.get_time(frame_rate=frame_rate) -
+               header0.get_time(frame_rate=frame_rate) - 1. * u.s) < 1.*u.ns
 
     # Now test the actual data stream.
     with vdif.open(SAMPLE_AROCHIME, 'rs', sample_rate=sample_rate) as fh:

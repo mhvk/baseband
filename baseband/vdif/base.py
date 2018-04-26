@@ -329,7 +329,8 @@ class VDIFStreamBase(VLBIStreamBase):
         This passes on sample rate, since not all VDIF headers can calculate
         it.
         """
-        return header.get_time(sample_rate=self.sample_rate)
+        return header.get_time(frame_rate=self.sample_rate /
+                               self.samples_per_frame)
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
