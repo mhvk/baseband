@@ -69,7 +69,10 @@ class TestVDIFMark5B(object):
         header_copy['bcd_fraction'] = 0
         # This is common enough that we should not fail verification.
         header_copy.verify()
-        assert abs(header_copy.time - m5h2.time) > 1.*u.ns
+        # However, it should also cause just getting the time to fail
+        # unless we pass in a frame rate.
+        with pytest.raises(ValueError):
+            header_copy.time
         assert abs(header_copy.get_time(sample_rate=32*u.MHz) -
                    m5h2.time) < 1.*u.ns
 

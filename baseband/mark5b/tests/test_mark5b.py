@@ -366,13 +366,13 @@ class TestMark5B(object):
                             frame.header['frame_nr'] * frame_duration)
                 assert abs(header_time - expected) < 1. * u.ns
 
-        # On the last frame, also check one can recover the time if 'frac_sec'
-        # is not set.
+        # Some files have headers in which the fraction is not set.
+        # Check that those raise an error, but that one can get the right
+        # time still by passing a frame rate.
         header = frame.header.copy()
         header['bcd_fraction'] = 0
-        # So, now recover first header time, which started on the second.
-        assert header.time == header0.time
-        # But if we pass in the correct frame rate, it uses the frame_nr.
+        with pytest.raises(ValueError):
+            header.time
         assert abs(header.get_time(frame_rate) - frame.header.time) < 1. * u.ns
 
         # Check setting time using frame rate.
