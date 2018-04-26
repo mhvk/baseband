@@ -175,6 +175,15 @@ class TestVDIF(object):
         assert header9['seconds'] == 2048
         assert header9['frame_nr'] == 0
 
+        # Check that with a missing sampling rate, we do not return a wrong
+        # time.
+        header10 = headerT.copy()
+        header10['sampling_rate'] = 0
+        with pytest.raises(ValueError):
+            header10.time
+        assert (header10.get_time(frame_rate=headerT.frame_rate) ==
+                headerT.time)
+
     def test_custom_header(self, tmpdir):
         # Custom header with an EDV that already exists
         with pytest.raises(ValueError):
