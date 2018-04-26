@@ -674,20 +674,20 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         -------
         time : `~astropy.time.Time`
         """
-        if sample_rate is None:
-            # Get fractional second from the Mark 5B part of the header.
+        frame_nr = self['frame_nr']
+        if frame_nr == 0:
+            fraction = 0.
+        elif sample_rate is None:
+            # Get fractional second from the Mark 5B part of the header,
+            # but check it is non-zero (it doesn't always seem to be set).
             fraction = self.fraction
+            if fraction == 0.:
+                raise ValueError('header does not provide correct fractional '
+                                 'second (it is zero for non-zero frame '
+                                 'number). Please pass in a frame_rate.')
         else:
-            frame_nr = self['frame_nr']
-            if frame_nr == 0:
-                fraction = 0.
-            else:
-                if sample_rate is None:
-                    raise ValueError("calculating the time for a non-zero "
-                                     "frame number requires a sample rate. "
-                                     "Pass it in explicitly.")
-                fraction = (frame_nr * self.samples_per_frame /
-                            sample_rate).to_value(u.s)
+            fraction = (frame_nr * self.samples_per_frame /
+                        sample_rate).to_value(u.s)
 
         return (ref_epochs[self['ref_epoch']] +
                 TimeDelta(self['seconds'], fraction,
