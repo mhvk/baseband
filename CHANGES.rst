@@ -7,6 +7,10 @@ New Features
 - Added a new ``baseband.file_info`` function, which can be used to inpect
   data files. [#200]
 
+- Added a general file opener, ``baseband.open`` which for a set of formats
+  will check whether the file is of that format, and then load it using the
+  corresponding module. [#198]
+
 API Changes
 -----------
 
@@ -19,6 +23,8 @@ Bug Fixes
 Other Changes and Additions
 ---------------------------
 
+- The ``data`` module with sample data files now has an explicit entry in the
+  documentation. [#198]
 
 1.0.1 (unreleased)
 ==================

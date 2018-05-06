@@ -6,7 +6,6 @@ Loosely based on `~astropy.utils.data_info.DataInfo`.
 from __future__ import division, unicode_literals, print_function
 
 import astropy.units as u
-from astropy.utils.compat.misc import override__dir__
 from astropy.extern import six
 
 
@@ -68,10 +67,6 @@ class VLBIInfoBase(object):
         # if "info" is present in instance.__dict__; see
         # https://docs.python.org/3/howto/descriptor.html
         raise AttributeError("can't set info attribute.")
-
-    @override__dir__
-    def __dir__(self):
-        return self.attr_names
 
     def __bool__(self):
         return self.format is not None
