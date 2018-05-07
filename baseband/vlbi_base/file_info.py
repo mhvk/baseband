@@ -11,7 +11,7 @@ from astropy.extern import six
 
 class VLBIInfoMeta(type):
     # Ensure all attributes are initialized to None, so that they are
-    # always avaible (do this rather than overwrite __getattr__ so that
+    # always available (do this rather than overwrite __getattr__ so that
     # we can generate docstrings in sphinx for them).
     def __init__(cls, name, bases, dct):
         super(VLBIInfoMeta, cls).__init__(name, bases, dct)

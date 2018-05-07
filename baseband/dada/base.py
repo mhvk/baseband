@@ -4,7 +4,6 @@ import io
 import os
 import re
 
-import numpy as np
 import astropy.units as u
 from astropy.extern import six
 from astropy.utils import lazyproperty
