@@ -5,7 +5,7 @@ from __future__ import (absolute_import, division, print_function,
 import numpy as np
 from astropy.extern import six
 
-from ..vlbi_base.frame import VLBIFrameBase
+from ..dada.frame import DADAFrame
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
 
@@ -13,7 +13,7 @@ from .payload import GUPPIPayload
 __all__ = ['GUPPIFrame']
 
 
-class GUPPIFrame(VLBIFrameBase):
+class GUPPIFrame(DADAFrame):
     """Representation of a GUPPI file, consisting of a header and payload.
 
     Parameters
@@ -58,28 +58,6 @@ class GUPPIFrame(VLBIFrameBase):
     _payload_class = GUPPIPayload
 
     @classmethod
-    def fromfile(cls, fh, memmap=True, valid=True, verify=True):
-        """Read a frame from a filehandle, possible mapping the payload.
-
-        Parameters
-        ----------
-        fh : filehandle
-            To read header from.
-        memmap : bool, optional
-            If `True` (default), use `~numpy.memmap` to map the payload.
-            If `False`, just read it from disk.
-        valid : bool, optional
-            Whether the data are valid (default: `True`). Note that this cannot
-            be inferred from the header or payload itself.  If `False`, any
-            data read will be set to ``cls.fill_value``.
-        verify : bool, optional
-            Whether to do basic verification of integrity.  Default: `True`.
-        """
-        header = cls._header_class.fromfile(fh, verify=verify)
-        payload = cls._payload_class.fromfile(fh, header=header, memmap=memmap)
-        return cls(header, payload, valid=valid, verify=verify)
-
-    @classmethod
     def fromdata(cls, data, header=None, valid=True, verify=True, **kwargs):
         """Construct frame from data and header.
 
@@ -106,96 +84,3 @@ class GUPPIFrame(VLBIFrameBase):
             header = cls._header_class.fromvalues(verify=verify, **kwargs)
         payload = cls._payload_class.fromdata(data, header=header)
         return cls(header, payload, valid=valid, verify=verify)
-
-    def __len__(self):
-        """Number of samples, subtracting those in the overlap region."""
-        return self.header.samples_per_frame
-
-    def _get_payload_item(self, item):
-        """Translate frame item to payload item, preventing access to the
-        overlap section at the end of the payload.
-
-        Parameters
-        ----------
-        item : int, slice, or tuple
-            Sample indices.  An int represents a single sample, a slice
-            a sample range, and a tuple of ints/slices a range for
-            multi-channel data.
-
-        Returns
-        -------
-        payload_item : int, slice, or None
-            Part of the payload that should be decoded.
-        sample_index : tuple
-            Any slicing beyond the sample number.
-
-        Notes
-        -----
-        ``item`` is restricted to (tuples of) ints or slices, so one cannot
-        access non-contiguous samples using advanced indexing.  If ``item``
-        is a slice, a negative increment cannot be used.
-        """
-        nsample = len(self)
-        if item is () or item == slice(None):
-            # Short-cut for full payload.
-            return slice(nsample), ()
-
-        if isinstance(item, tuple):
-            sample_index = item[1:]
-            item = item[0]
-        else:
-            sample_index = ()
-
-        if isinstance(item, slice):
-            # Translate slice to an array of nsample length.
-            payload_item = slice(*item.indices(nsample))
-        else:
-            # Not a slice. Maybe an index?
-            try:
-                item = item.__index__()
-            except Exception:
-                raise TypeError("{0} object can only be indexed or sliced."
-                                .format(type(self)))
-            if item < 0:
-                item += nsample
-
-            if item > nsample:
-                raise IndexError("{0} index out of range.".format(type(self)))
-
-        return payload_item, sample_index
-
-    def __getitem__(self, item=()):
-        if isinstance(item, six.string_types):
-            return self.header.__getitem__(item)
-        elif not self.valid:
-            data_shape = np.empty(self.shape, dtype=bool)[item].shape
-            return np.full(data_shape, self.fill_value,
-                           dtype=self.dtype)
-        # Normally, we would just pass on to the payload here, but for
-        # GUPPI, each frame ends with an "overlap section" of samples identical
-        # to the first samples in the next frame.  We do not decode these.
-        payload_item, sample_index = self._get_payload_item(item)
-        data = self.payload[payload_item]
-        if sample_index is ():
-            return data
-        else:
-            return data[(Ellipsis,) + sample_index]
-
-    def __setitem__(self, item, value):
-        if isinstance(item, six.string_types):
-            return self.header.__setitem__(item, value)
-
-        # Normally, we would just pass on to the payload here, but for
-        # GUPPI we must handle the "overlap section".
-        data = np.asanyarray(value)
-        assert data.ndim <= 3
-
-        payload_item, sample_index = self._get_payload_item(item)
-
-        if sample_index is not ():
-            payload_item = (payload_item,) + sample_index
-
-        self.payload[payload_item] = data
-
-    data = property(__getitem__,
-                    doc="Full decoded frame, except for the overlap section.")

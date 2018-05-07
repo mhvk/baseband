@@ -75,7 +75,8 @@ class GUPPIFileReader(VLBIFileBase):
         self.seek(0)
         try:
             header = self.read_frame()
-            return header.sample_rate / header.samples_per_frame
+            return (header.sample_rate /
+                    (header.samples_per_frame - header.overlap))
         finally:
             self.seek(oldpos)
 
@@ -147,12 +148,21 @@ class GUPPIStreamBase(VLBIStreamBase):
              header0.overlap * header0.bits_per_complete_sample // 8) //
             header0['PKTSIZE'])
 
+        # Set samples per frame to valid ones only.
+        samples_per_frame = header0.samples_per_frame - header0.overlap
+
         super(GUPPIStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, sample_rate=header0.sample_rate,
-            samples_per_frame=header0.samples_per_frame,
+            samples_per_frame=samples_per_frame,
             unsliced_shape=header0.sample_shape, bps=header0.bps,
             complex_data=header0.complex_data, squeeze=squeeze, subset=subset,
             fill_value=0.)
+
+    # Overriding so the docstring indicates the exclusion of the overlap.
+    samples_per_frame = property(VLBIStreamBase.samples_per_frame.fget,
+                                 VLBIStreamBase.samples_per_frame.fset,
+                                 doc=("Number of complete samples per frame, "
+                                      "excluding overlap."))
 
 
 class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):

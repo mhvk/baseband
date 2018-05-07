@@ -124,7 +124,6 @@ class GUPPIHeader(fits.Header):
         Uses `~astropy.io.fits.Header.tostring`.
         """
         fh.write(self.tostring(padding=False).encode())
-        #raise NotImplementedError('GUPPI format does not have write support.')
 
     @classmethod
     def fromkeys(cls, *args, **kwargs):
@@ -152,8 +151,6 @@ class GUPPIHeader(fits.Header):
         using arguments named after header methods, such as ``time``.
 
         Furthermore, some header defaults are set in ``GUPPIHeader._defaults``.
-
-
         """
         self = cls(cls._defaults, verify=False)
         self.update(**kwargs)
@@ -298,15 +295,13 @@ class GUPPIHeader(fits.Header):
 
     @property
     def samples_per_frame(self):
-        """Number of complete samples in the frame, subtracting the overlap."""
-        return (self.payload_nbytes * 8 //
-                self.bits_per_complete_sample) - self.overlap
+        """Number of complete samples in the frame, including overlap."""
+        return self.payload_nbytes * 8 // self.bits_per_complete_sample
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
         self.payload_nbytes = (
-            (((samples_per_frame + self.overlap) *
-              self.bits_per_complete_sample) + 7) // 8)
+            (samples_per_frame * self.bits_per_complete_sample + 7) // 8)
 
     @property
     def overlap(self):
@@ -320,6 +315,7 @@ class GUPPIHeader(fits.Header):
     @property
     def offset(self):
         """Offset from start of observation in units of time."""
+        # PKTIDX only counts valid packets, not overlap ones.
         return self['STT_OFFS'] + ((self['PKTIDX'] * self['PKTSIZE'] * 8 //
                                     self.bits_per_complete_sample) *
                                    self['TBIN'] * u.s)
