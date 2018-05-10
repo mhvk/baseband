@@ -193,7 +193,15 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Header of the last file for this stream."""
-        self.fh_raw.seek(-self.header0.frame_nbytes, 2)
+        nframes, fframe = divmod(self.fh_raw.seek(0, 2),
+                                 self.header0.frame_nbytes)
+        # If there is a non-integer number of frames, assume it's the last
+        # frame that's missing bytes, and go to the last full frame.
+        if fframe:
+            self.fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
+        # Otherwise go to the last frame.
+        else:
+            self.fh_raw.seek(-self.header0.frame_nbytes, 2)
         last_frame = self.fh_raw.read_frame(memmap=True)
         return last_frame.header
 
