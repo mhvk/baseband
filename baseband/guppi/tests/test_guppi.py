@@ -22,7 +22,7 @@ class TestGUPPI(object):
         self.header_w = self.header.copy()
         self.header_w.overlap = 0
         self.header_w.payload_nbytes = self.header.payload_nbytes - (
-            self.header.bits_per_complete_sample * self.header.overlap // 8)
+            self.header._bpcs * self.header.overlap // 8)
         # Since it's often used, we make an alias for valid samples per frame.
         self.spf = self.header.samples_per_frame - self.header.overlap
 
@@ -221,13 +221,6 @@ class TestGUPPI(object):
               [17.-27.j, 7.+7.j, -14.+4.j, 6.+5.j]],
              [[-3.+8.j, 13.-25.j, 12.-18.j, 15.+7.j],
               [26.-12.j, 18.-6.j, 6.+6.j, 6.+2.j]]], dtype=np.complex64))
-
-        # Check decoding near overlap region boundary (at 7680).
-        # assert frame[:].shape == frame.shape
-        # assert np.all(frame[-1024:None:2, :, :4] ==
-        #               frame.payload[6656:7680:2, :, :4])
-        # assert np.all(frame[7000:8000] == frame.payload[7000:7680])
-        # assert np.all(frame[8000:] == frame.payload[8192:])
 
         with open(str(tmpdir.join('testguppi.raw')), 'w+b') as s:
             frame.tofile(s)
@@ -514,3 +507,38 @@ class TestGUPPI(object):
                 guppi.open(fraw, 'rs') as fr:
             data3 = fr.read()
         assert np.all(data3 == data)
+
+    # Test encoding and decoding frames and streams that use
+    # (nsample, nchan, npol).
+    def test_sample_ordered_stream(self, tmpdir):
+        filename = str(tmpdir.join('testguppi.raw'))
+
+        # First test single frame.
+        with guppi.open(SAMPLE_FILE, 'rb') as fh:
+            frame = fh.read_frame(memmap=False)
+
+        header = frame.header.copy()
+        header['PKTFMT'] = 'SIMPLE'
+        payload = guppi.GUPPIPayload.fromdata(frame.payload.data,
+                                              header=header)
+        frame_chanorder = guppi.GUPPIFrame(header, payload)
+        assert np.all(frame_chanorder.data == frame.data)
+        item = (slice(11, 37, 2), slice(None), np.array([2, 1]))
+        assert np.all(frame_chanorder[item] == frame[item])
+        with open(filename, 'w+b') as s:
+            frame_chanorder.tofile(s)
+            s.seek(0)
+            frame_readin = guppi.GUPPIFrame.fromfile(s)
+            assert np.all(frame_readin[item] == frame[item])
+
+        # Then check stream writing.
+        header['OVERLAP'] = 0
+        header.samples_per_frame = 7680
+        with guppi.open(SAMPLE_FILE) as fh:
+            data = fh.read()
+        with guppi.open(filename, 'ws', header0=header) as fw:
+            fw.write(data)
+        with guppi.open(filename) as fn:
+            fn.seek(11380)
+            new_data = fn.read(47)
+            assert np.all(new_data == data[11380:11380 + 47])

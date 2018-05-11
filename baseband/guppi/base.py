@@ -1,16 +1,13 @@
 # Licensed under the GPLv3 - see LICENSE
-import os
-import io
-import re
+from __future__ import division, unicode_literals, print_function
 
-import numpy as np
 import astropy.units as u
-from astropy.extern import six
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIStreamBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase)
+from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
+                              VLBIStreamBase, VLBIStreamReaderBase,
+                              VLBIStreamWriterBase)
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
 from .frame import GUPPIFrame
@@ -20,7 +17,7 @@ __all__ = ['GUPPIFileReader', 'GUPPIFileWriter', 'GUPPIStreamBase',
            'GUPPIStreamReader', 'GUPPIStreamWriter', 'open']
 
 
-class GUPPIFileReader(VLBIFileBase):
+class GUPPIFileReader(VLBIFileReaderBase):
     """Simple reader for GUPPI files.
 
     Wraps a binary filehandle, providing methods to help interpret the data,
@@ -32,6 +29,7 @@ class GUPPIFileReader(VLBIFileBase):
     fh_raw : filehandle
         Filehandle of the raw binary data file.
     """
+
     def read_header(self):
         """Read a single header from the file.
 
@@ -76,7 +74,7 @@ class GUPPIFileReader(VLBIFileBase):
         try:
             header = self.read_frame()
             return (header.sample_rate /
-                    (header.samples_per_frame - header.overlap))
+                    (header.samples_per_frame - header.overlap)).to(u.Hz)
         finally:
             self.seek(oldpos)
 
@@ -144,8 +142,7 @@ class GUPPIStreamBase(VLBIStreamBase):
         # GUPPI sample positions are determined by "packets", the bytesize of
         # which are given in the header.
         self._packets_per_frame = (
-            (header0.payload_nbytes -
-             header0.overlap * header0.bits_per_complete_sample // 8) //
+            (header0.payload_nbytes - header0.overlap * header0._bpcs // 8) //
             header0['PKTSIZE'])
 
         # Set samples per frame to valid ones only.
@@ -229,7 +226,8 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
         and adds any dimensions of length unity.
     """
     def __init__(self, fh_raw, header0, squeeze=True):
-        assert header0.get('OVERLAP', 0) == 0
+        assert header0.get('OVERLAP', 0) == 0, ("overlap must be 0 when "
+                                                "writing GUPPI files.")
         fh_raw = GUPPIFileWriter(fh_raw)
         super(GUPPIStreamWriter, self).__init__(fh_raw, header0,
                                                 squeeze=squeeze)
@@ -278,15 +276,21 @@ frames_per_file : int, optional
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.
 
---- Header keywords : (see :meth:`~baseband.dada.DADAHeader.fromvalues`)
+--- Header keywords : (see :meth:`~baseband.dada.GUPPIHeader.fromvalues`)
 
 time : `~astropy.time.Time`
     Start time of the file.  Must have an integer number of seconds.
-samples_per_frame : int,
-    Number of complete samples per frame.
 sample_rate : `~astropy.units.Quantity`
     Number of complete samples per second, i.e. the rate at which each
     channel of each polarization is sampled.
+samples_per_frame : int
+    Number of complete samples per frame.  Can alternatively give
+    ``payload_nbytes``.
+payload_nbytes : int
+    Number of bytes per payload.  Can alternatively give ``samples_per_frame``.
+pktsize : int
+    Number of bytes in one "packet".  There must be an integer number of
+    packets per payload.
 offset : `~astropy.units.Quantity`, optional
     Time offset from the start of the whole observation (default: 0).
 npol : int, optional
@@ -331,7 +335,7 @@ def open(name, mode='rs', **kwargs):
             else:
                 header0 = {}
 
-        if is_sequence:  #is_template or is_sequence:
+        if is_sequence:
             if 'r' in mode:
                 name = sf.open(name, 'rb')
             else:

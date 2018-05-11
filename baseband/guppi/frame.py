@@ -2,9 +2,6 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import numpy as np
-from astropy.extern import six
-
 from ..dada.frame import DADAFrame
 from .header import GUPPIHeader
 from .payload import GUPPIPayload

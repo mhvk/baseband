@@ -79,7 +79,7 @@ class GUPPIHeader(fits.Header):
         """Basic check of integrity."""
         assert all(key in self for key in ('BLOCSIZE',
                                            'PKTIDX'))
-        assert self['PKTFMT'] == '1SFA'
+        assert self['PKTFMT'] in ('1SFA', 'SIMPLE')
 
     def copy(self):
         """Create a mutable and independent copy of the header."""
@@ -99,8 +99,9 @@ class GUPPIHeader(fits.Header):
         fh : filehandle
             To read data from.
         verify: bool, optional
-            Whether to do basic checks on whether the header is valid.
-            Default: `True`.
+            Whether to do basic checks on whether the header is valid. Verify
+            is automatically called by `~astropy.io.fits.Header.fromstring`, so
+            this flag exists only to standardize the API.
         """
         header_start = fh.tell()
         # Find the size of the header.  GUPPI header entries are 80 char long
@@ -114,9 +115,10 @@ class GUPPIHeader(fits.Header):
         header_end = fh.tell()
         fh.seek(header_start)
         hdr = fh.read(header_end - header_start).decode('ascii')
-        # Calls fits.Header to read header.
-        fits_header = super(GUPPIHeader, cls).fromstring(hdr)
-        return cls(fits_header, verify=verify, mutable=False)
+        # This calls cls.__init__, which automatically runs cls.verify().
+        self = cls.fromstring(hdr)
+        self.mutable = False
+        return self
 
     def tofile(self, fh):
         """Write GUPPI file header to filehandle.
@@ -260,7 +262,7 @@ class GUPPIHeader(fits.Header):
         self.npol = sample_shape[0]
 
     @property
-    def bits_per_complete_sample(self):
+    def _bpcs(self):
         """Bits per complete sample."""
         # OBSNCHAN includes factor of 2 for real/complex components.
         return self['OBSNCHAN'] * self['NPOL'] * self.bps
@@ -296,12 +298,11 @@ class GUPPIHeader(fits.Header):
     @property
     def samples_per_frame(self):
         """Number of complete samples in the frame, including overlap."""
-        return self.payload_nbytes * 8 // self.bits_per_complete_sample
+        return self.payload_nbytes * 8 // self._bpcs
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
-        self.payload_nbytes = (
-            (samples_per_frame * self.bits_per_complete_sample + 7) // 8)
+        self.payload_nbytes = (samples_per_frame * self._bpcs + 7) // 8
 
     @property
     def overlap(self):
@@ -317,14 +318,13 @@ class GUPPIHeader(fits.Header):
         """Offset from start of observation in units of time."""
         # PKTIDX only counts valid packets, not overlap ones.
         return self['STT_OFFS'] + ((self['PKTIDX'] * self['PKTSIZE'] * 8 //
-                                    self.bits_per_complete_sample) *
-                                   self['TBIN'] * u.s)
+                                    self._bpcs) * self['TBIN'] * u.s)
 
     @offset.setter
     def offset(self, offset):
         self['PKTIDX'] = int(round((offset.to_value(u.s) / self['TBIN'] /
                                     self['PKTSIZE']) *
-                                   ((self.bits_per_complete_sample + 7) // 8)))
+                                   ((self._bpcs + 7) // 8)))
 
     @property
     def start_time(self):
