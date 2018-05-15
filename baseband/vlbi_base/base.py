@@ -479,7 +479,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         elif whence == 2 or whence == 'end':
             self.offset = self._nsample + offset
         else:
-            raise ValueError("invalid 'whence'; should be 0 or 'start', 1 or"
+            raise ValueError("invalid 'whence'; should be 0 or 'start', 1 or "
                              "'current', or 2 or 'end'.")
 
         return self.offset
