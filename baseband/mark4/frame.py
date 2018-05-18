@@ -12,6 +12,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
+import operator
 from astropy.extern import six
 
 from ..vlbi_base.frame import VLBIFrameBase
@@ -218,7 +219,7 @@ class Mark4Frame(VLBIFrameBase):
         else:
             # Not a slice. Maybe an index?
             try:
-                item = item.__index__()
+                item = operator.index(item)
             except Exception:
                 raise TypeError("{0} object can only be indexed or sliced."
                                 .format(type(self)))
