@@ -6,6 +6,7 @@ Implements a GUPPIHeader class that reads & writes FITS-like headers from file.
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
+import operator
 import numpy as np
 import astropy.units as u
 from astropy.io import fits
@@ -22,7 +23,7 @@ class GUPPIHeader(fits.Header):
     ----------
     *args : str or iterable
         If a string, parsed as a GUPPI header from a file, otherwise
-        as for the OrderedDict baseclass.
+        as for the `astropy.io.fits.Header` baseclass.
     verify : bool, optional
         Whether to do minimal verification that the header is consistent with
         the GUPPI standard.  Default: `True`.
@@ -62,6 +63,7 @@ class GUPPIHeader(fits.Header):
                  ('SRC_NAME', 'unset'),
                  ('TELESCOP', 'unset'),
                  ('PKTFMT', '1SFA'),
+                 ('PKTSIZE', 8192),
                  ('NBITS', 8),
                  ('NPOL', 1),
                  ('OBSNCHAN', 1)]
@@ -79,10 +81,16 @@ class GUPPIHeader(fits.Header):
         """Basic check of integrity."""
         assert all(key in self for key in ('BLOCSIZE',
                                            'PKTIDX'))
+        # '1SFA' is used for all modes other than FAST4K (which is only used
+        # for total intensity).  'SIMPLE' is from DSPSR, and used to support
+        # time-first payloads.  See
+        # https://safe.nrao.edu/wiki/pub/Main/JoeBrandt/guppi_status_shmem.pdf
         assert self['PKTFMT'] in ('1SFA', 'SIMPLE')
 
     def copy(self):
         """Create a mutable and independent copy of the header."""
+        # This method exists because io.fits.Header.copy doesn't properly
+        # return copy of the same class.
         newfitsheader = super(GUPPIHeader, self).copy()
         return self.__class__(newfitsheader)
 
@@ -91,8 +99,7 @@ class GUPPIHeader(fits.Header):
 
     @classmethod
     def fromfile(cls, fh, verify=True):
-        """
-        Reads in GUPPI header block from a file.
+        """Reads in GUPPI header block from a file.
 
         Parameters
         ----------
@@ -125,7 +132,7 @@ class GUPPIHeader(fits.Header):
 
         Uses `~astropy.io.fits.Header.tostring`.
         """
-        fh.write(self.tostring(padding=False).encode())
+        fh.write(self.tostring(padding=False).encode('ascii'))
 
     @classmethod
     def fromkeys(cls, *args, **kwargs):
@@ -247,7 +254,7 @@ class GUPPIHeader(fits.Header):
 
     @nchan.setter
     def nchan(self, nchan):
-        self['OBSNCHAN'] = nchan.__index__()
+        self['OBSNCHAN'] = operator.index(nchan)
 
     @property
     def sample_shape(self):
@@ -264,14 +271,15 @@ class GUPPIHeader(fits.Header):
     @property
     def _bpcs(self):
         """Bits per complete sample."""
-        # OBSNCHAN includes factor of 2 for real/complex components.
+        # NPOL includes factor of 2 for real/complex components.
         return self['OBSNCHAN'] * self['NPOL'] * self.bps
 
     @property
     def sample_rate(self):
         """Number of complete samples per second.
 
-        Can be set with a negative quantity to set `sideband`.
+        Can be set with a negative quantity to set `sideband`.  Overlap samples
+        are not included in the rate.
         """
         return (1. / self['TBIN']) * u.Hz
 
@@ -280,7 +288,7 @@ class GUPPIHeader(fits.Header):
         self['TBIN'] = 1. / abs(sample_rate.to_value(u.Hz))
         bw = (sample_rate.to_value(u.MHz) * self['OBSNCHAN'] /
               (1 if self.complex_data else 2))
-        self['OBSBW'] = (-1 if self.get('OBSBW', bw) < 0 else 1) * bw
+        self['OBSBW'] = bw
 
     @property
     def sideband(self):
@@ -293,7 +301,12 @@ class GUPPIHeader(fits.Header):
 
     @property
     def time_ordered(self):
+        """True if encoded payload ordering is (nchan, nsample, npol)."""
         return self['PKTFMT'] != 'SIMPLE'
+
+    @time_ordered.setter
+    def time_ordered(self, time_ordered):
+        self['PKTFMT'] = '1SFA' if bool(time_ordered) else 'SIMPLE'
 
     @property
     def samples_per_frame(self):
@@ -311,7 +324,7 @@ class GUPPIHeader(fits.Header):
 
     @overlap.setter
     def overlap(self, overlap):
-        self['OVERLAP'] = overlap.__index__()
+        self['OVERLAP'] = operator.index(overlap)
 
     @property
     def offset(self):

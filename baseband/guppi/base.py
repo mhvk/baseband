@@ -50,7 +50,7 @@ class GUPPIFileReader(VLBIFileReaderBase):
 
         Returns
         -------
-        frame : `~baseband.dada.DADAFrame`
+        frame : `~baseband.guppi.GUPPIFrame`
             With ``.header`` and ``.payload`` properties.  The ``.data``
             property returns all data encoded in the frame.  Since this may
             be too large to fit in memory, it may be better to access the
@@ -62,7 +62,7 @@ class GUPPIFileReader(VLBIFileReaderBase):
         """Determine the number of frames per second.
 
         The routine uses the sample rate and number of samples per frame
-        from the first header in the file.
+        (excluding overlap) from the first header in the file.
 
         Returns
         -------
@@ -80,7 +80,7 @@ class GUPPIFileReader(VLBIFileReaderBase):
 
 
 class GUPPIFileWriter(VLBIFileBase):
-    """Simple writer/mapper for DADA files.
+    """Simple writer/mapper for GUPPI files.
 
     Adds `write_frame` and `memmap_frame` methods to the VLBI binary file
     wrapper.  The latter allows one to encode data in pieces, writing to disk
@@ -139,13 +139,15 @@ class GUPPIStreamBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, squeeze=True, subset=()):
 
-        # GUPPI sample positions are determined by "packets", the bytesize of
-        # which are given in the header.
+        # GUPPI headers report their offsets using 'PKTIDX', the number of
+        # unique UDP data packets (i.e. excluding overlap) written since the
+        # start of observation.  'PKTSIZE' is the packet size in bytes.  Here
+        # we calculate the packets per frame.
         self._packets_per_frame = (
             (header0.payload_nbytes - header0.overlap * header0._bpcs // 8) //
             header0['PKTSIZE'])
 
-        # Set samples per frame to valid ones only.
+        # Set samples per frame to unique ones, excluding overlap.
         samples_per_frame = header0.samples_per_frame - header0.overlap
 
         super(GUPPIStreamBase, self).__init__(
@@ -163,14 +165,14 @@ class GUPPIStreamBase(VLBIStreamBase):
 
 
 class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
-    """DADA format reader.
+    """GUPPI format reader.
 
-    Allows access to DADA files as a continuous series of samples.
+    Allows access to GUPPI files as a continuous series of samples.
 
     Parameters
     ----------
     fh_raw : filehandle
-        Filehandle of the raw DADA stream.
+        Filehandle of the raw GUPPI stream.
     squeeze : bool, optional
         If `True` (default), remove any dimensions of length unity from
         decoded data.
@@ -190,17 +192,12 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Header of the last file for this stream."""
+        # Seek forward rather than backward, as last frame often has missing
+        # bytes.
         nframes, fframe = divmod(self.fh_raw.seek(0, 2),
                                  self.header0.frame_nbytes)
-        # If there is a non-integer number of frames, assume it's the last
-        # frame that's missing bytes, and go to the last full frame.
-        if fframe:
-            self.fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
-        # Otherwise go to the last frame.
-        else:
-            self.fh_raw.seek(-self.header0.frame_nbytes, 2)
-        last_frame = self.fh_raw.read_frame(memmap=True)
-        return last_frame.header
+        self.fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
+        return self.fh_raw.read_header()
 
     def _read_frame(self, index):
         self.fh_raw.seek(index * self.header0.frame_nbytes)
@@ -276,7 +273,7 @@ frames_per_file : int, optional
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.
 
---- Header keywords : (see :meth:`~baseband.dada.GUPPIHeader.fromvalues`)
+--- Header keywords : (see :meth:`~baseband.guppi.GUPPIHeader.fromvalues`)
 
 time : `~astropy.time.Time`
     Start time of the file.  Must have an integer number of seconds.
@@ -288,9 +285,6 @@ samples_per_frame : int
     ``payload_nbytes``.
 payload_nbytes : int
     Number of bytes per payload.  Can alternatively give ``samples_per_frame``.
-pktsize : int
-    Number of bytes in one "packet".  There must be an integer number of
-    packets per payload.
 offset : `~astropy.units.Quantity`, optional
     Time offset from the start of the whole observation (default: 0).
 npol : int, optional

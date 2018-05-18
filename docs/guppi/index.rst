@@ -10,7 +10,7 @@ The GUPPI format is the output of the `Green Bank Ultimate Pulsar Processing
 Instrument <https://safe.nrao.edu/wiki/bin/view/CICADA/NGNPP>`_ and any clones
 operating at other telescopes, such as `PUPPI at the Arecibo Observatory
 <http://www.naic.edu/puppi-observing/>`_.  Baseband specifically supports GUPPI
-data **taken in baseband mode**, and is based off of `DSPSR's
+data **taken in baseband mode**, and is based off of `DSPSR's implementation
 <https://github.com/demorest/dspsr>`_.  While general format specifications can
 be found at the `SERA Project
 <http://seraproject.org/mw/index.php?title=GBT_FIle_Formats>`_ and on `Paul
@@ -30,13 +30,15 @@ consisting of an ASCII :term:`header` composed of 80-character entries,
 followed by a binary :term:`payload` (or "block").  The header's length is
 variable, but always ends with "END" followed by 77 spaces.
 
-The payload stores each channel's :term:`stream` in a contiguous data block,
-rather than grouping the components of a :term:`complete sample` together.  For
-each channel, polarization samples from the same point in time are stored
-adjacent to one another.  At the end of each channel's data block is a section
-of **overlap samples** identical to the first samples in the next payload. 
-Baseband retains these redundant samples when reading individual GUPPI frames,
-but removes them when reading files as a stream.
+How samples are stored in the payload depends on whether or not it is
+**time-ordered**.  A time-ordered payload stores each channel's :term:`stream`
+in a contiguous data block, while a non-time-ordered one groups the
+|components| of a :term:`complete sample` together (like with other formats).
+In either case, for each channel polarization samples from the same point in
+time are stored adjacent to one another.  At the end of each channel's
+data is a section of **overlap samples** identical to the first samples in
+the next payload.  Baseband retains these redundant samples when reading
+individual GUPPI frames, but removes them when reading files as a stream.
 
 .. _guppi_usage:
 
@@ -59,9 +61,9 @@ provides a normal file reader, but extended with methods to read a
     >>> fb = guppi.open(SAMPLE_PUPPI, 'rb')
     >>> frame = fb.read_frame()
     >>> frame.shape
-    (8192, 2, 4)
+    (1024, 2, 4)
     >>> frame[:3, 0, 1]    # doctest: +FLOAT_CMP
-    array([14. +3.j, -1. -5.j, 30.-19.j], dtype=complex64)
+    array([-32.-10.j, -15.-14.j,   9.-13.j], dtype=complex64)
     >>> fb.close()
 
 Since the files can be quite large, the payload is mapped (with
@@ -76,14 +78,14 @@ writing is in units of samples, and provides access to header information::
     >>> fh = guppi.open(SAMPLE_PUPPI, 'rs')
     >>> fh
     <GUPPIStreamReader name=... offset=0
-        sample_rate=2500.0 Hz, samples_per_frame=7680,
+        sample_rate=250.0 Hz, samples_per_frame=960,
         sample_shape=SampleShape(npol=2, nchan=4), bps=8,
         start_time=2018-01-14T14:11:33.000>
     >>> d = fh.read()
     >>> d.shape
-    (30720, 2, 4)
+    (3840, 2, 4)
     >>> d[:3, 0, 1]    # doctest: +FLOAT_CMP
-    array([14. +3.j, -1. -5.j, 30.-19.j], dtype=complex64)
+    array([-32.-10.j, -15.-14.j,   9.-13.j], dtype=complex64)
     >>> fh.close()
 
 Note that ``fh.samples_per_frame`` represents the number of samples per frame
@@ -98,8 +100,8 @@ from above)::
 
     >>> from astropy.time import Time
     >>> files = ['puppi_test.000{i}.raw'.format(i=i) for i in range(2)]
-    >>> fw = guppi.open(files, 'ws', frames_per_file=2, sample_rate=2500*u.Hz,
-    ...                 samples_per_frame=7680, pktsize=8192,
+    >>> fw = guppi.open(files, 'ws', frames_per_file=2, sample_rate=250*u.Hz,
+    ...                 samples_per_frame=960, pktsize=1024,
     ...                 time=Time(58132.59135416667, format='mjd'),
     ...                 npol=2, nchan=4)
     >>> fw.write(d)
@@ -114,7 +116,12 @@ Here we show how we can write to a sequence of files.  One may pass a
 time-ordered list or tuple of filenames to `~baseband.guppi.open`, which then
 uses |sequentialfile.open| to read or write to them as a single contiguous
 file.  Unlike when writing DADA files, which have one frame per file, we must
-specify the number of frames in one file.
+specify the number of frames in one file.  Note that typically one does not
+have to pass ``PKTSIZE``, the UDP data packet size (set by the observing mode),
+but the sample file has small enough frames that the default of 8192 bytes is
+too large.  Baseband only uses ``PKTSIZE`` to double-check the sample offset of
+the frame, so ``PKTSIZE`` must be set to a value such each payload, excluding
+overlap samples, contains an integer number of packets.
 
 .. |sequentialfile.open| replace:: `sequentialfile.open <baseband.helpers.sequentialfile.open>`
 

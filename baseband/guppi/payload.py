@@ -58,7 +58,9 @@ class GUPPIPayload(VLBIPayloadBase):
         super(GUPPIPayload, self).__init__(words, sample_shape=sample_shape,
                                            bps=bps, complex_data=complex_data)
         self.time_ordered = time_ordered
-        # If time ordered, _item_to_slices works on per-channel words.
+        # If time ordered, _item_to_slices must act on per-channel words.  By
+        # resetting self._bpfs, we allow _item_to_slices to work unmodified.
+        self._true_bpfs = self._bpfs    # Save the true bpfs regardless.
         if self.time_ordered:
             self._bpfs //= self.sample_shape.nchan
 
@@ -93,17 +95,17 @@ class GUPPIPayload(VLBIPayloadBase):
             return super(GUPPIPayload, cls).fromfile(
                 fh, header=header, payload_nbytes=payload_nbytes, **kwargs)
 
+        words_shape = (payload_nbytes // cls._dtype_word.itemsize,)
         if hasattr(fh, 'memmap'):
             words = fh.memmap(dtype=cls._dtype_word,
-                              shape=None if payload_nbytes is None else
-                              (payload_nbytes // cls._dtype_word.itemsize,))
+                              shape=(None if payload_nbytes is None else
+                                     words_shape))
         else:
             mode = fh.mode.replace('b', '')
             offset = fh.tell()
             words = np.memmap(
                 fh, mode=mode, dtype=cls._dtype_word, offset=offset,
-                shape=(None if payload_nbytes is None
-                       else (payload_nbytes // cls._dtype_word.itemsize,)))
+                shape=(None if payload_nbytes is None else words_shape))
             fh.seek(offset + words.size * words.dtype.itemsize)
         return cls(words, header=header, **kwargs)
 
@@ -136,7 +138,7 @@ class GUPPIPayload(VLBIPayloadBase):
             raise ValueError("{0} cannot encode data with {1} bits"
                              .format(cls.__name__, bps))
         # If time-ordered, switch to (nchan, nsample, npol); otherwise use
-        # (nsample, nchan, npol)
+        # (nsample, nchan, npol).
         if time_ordered:
             data = data.transpose(2, 0, 1)
         else:
@@ -149,12 +151,11 @@ class GUPPIPayload(VLBIPayloadBase):
 
     def __len__(self):
         """Number of samples in the payload."""
-        return self.nbytes * 8 // self._bpfs // (
-            self.sample_shape.nchan if self.time_ordered else 1)
+        return self.nbytes * 8 // self._true_bpfs
 
     def __getitem__(self, item=()):
-        #  GUPPI data may be stored as (nsample, nchan, npol) or, if
-        # "time-ordered", (nchan, nsample, npol), both of which require
+        # GUPPI data may be stored as (nsample, nchan, npol) or, if
+        # time-ordered, (nchan, nsample, npol), both of which require
         # reshaping to get the usual order of (nsample, npol, nchan).
         decoder = self._decoders[self._coder]
 
@@ -165,13 +166,13 @@ class GUPPIPayload(VLBIPayloadBase):
                 data = data.view(self.dtype)
             if self.time_ordered:
                 # Reshape to (nchan, nsample, npol); transpose to usual order.
-                return (data.reshape(self.sample_shape[1], -1,
-                                     self.sample_shape[0])
+                return (data.reshape(self.sample_shape.nchan, -1,
+                                     self.sample_shape.npol)
                         .transpose(1, 2, 0))
             else:
                 # Reshape to (nsample, nchan, npol); transpose to usual order.
-                return (data.reshape(-1, self.sample_shape[1],
-                                     self.sample_shape[0])
+                return (data.reshape(-1, self.sample_shape.nchan,
+                                     self.sample_shape.npol)
                         .transpose(0, 2, 1))
 
         words_slice, data_slice = self._item_to_slices(item)
@@ -179,13 +180,15 @@ class GUPPIPayload(VLBIPayloadBase):
         if self.time_ordered:
             # Reshape words so channels fall along first axis, then decode.
             decoded_words = decoder(
-                self.words.reshape(self.sample_shape[1], -1)[:, words_slice])
+                self.words.reshape(self.sample_shape.nchan, -1)[:, words_slice])
+            # Reshape to (nsample, nchan, npol), then use data_slice.
             return (decoded_words.view(self.dtype).T
                     .reshape(-1, *self.sample_shape)[data_slice])
         else:
             # data_slice assumes (npol, nchan), so transpose before using it.
             return (decoder(self.words[words_slice]).view(self.dtype)
-                    .reshape(-1, self.sample_shape[1], self.sample_shape[0])
+                    .reshape(-1, self.sample_shape.nchan,
+                             self.sample_shape.npol)
                     .transpose(0, 2, 1)[data_slice])
 
     def __setitem__(self, item, data):
@@ -199,37 +202,41 @@ class GUPPIPayload(VLBIPayloadBase):
         # If so, skip decoding.  If not, decode appropriate words and insert
         # new data.
         if not (data_slice == slice(None) and
-                data.shape[-len(self.sample_shape):] == self.sample_shape and
+                data.shape[-2:] == self.sample_shape and
                 data.dtype.kind == self.dtype.kind):
             decoder = self._decoders[self._coder]
             if self.time_ordered:
                 decoded_words = decoder(np.ascontiguousarray(
                     self.words.reshape(
-                        self.sample_shape[1], -1)[:, words_slice]))
+                        self.sample_shape.nchan, -1)[:, words_slice]))
                 current_data = (decoded_words.view(self.dtype)
                                 .T.reshape(-1, *self.sample_shape))
             else:
                 current_data = (decoder(self.words[words_slice])
                                 .view(self.dtype)
-                                .reshape(-1, self.sample_shape[1],
-                                         self.sample_shape[0])
+                                .reshape(-1, self.sample_shape.nchan,
+                                         self.sample_shape.npol)
                                 .transpose(0, 2, 1))
 
             current_data[data_slice] = data
             data = current_data
 
+        # Reshape before separating real and complex components.
         if self.time_ordered:
             data = data.reshape(-1, self.sample_shape.nchan).T
         else:
             data = data.transpose(0, 2, 1)
 
+        # Separate real and complex components.
         if data.dtype.kind == 'c':
             data = data.view((data.real.dtype, (2,)))
 
+        # Select encoder.
         encoder = self._encoders[self._coder]
 
+        # Reshape and encode words.
         if self.time_ordered:
-            self.words.reshape(self.sample_shape[1], -1)[:, words_slice] = (
+            self.words.reshape(self.sample_shape.nchan, -1)[:, words_slice] = (
                 encoder(data).reshape(self.sample_shape.nchan, -1)
                 .view(self._dtype_word))
         else:
