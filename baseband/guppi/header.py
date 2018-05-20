@@ -300,13 +300,13 @@ class GUPPIHeader(fits.Header):
         self['OBSBW'] = (1 if sideband else -1) * abs(self['OBSBW'])
 
     @property
-    def time_ordered(self):
+    def channels_first(self):
         """True if encoded payload ordering is (nchan, nsample, npol)."""
         return self['PKTFMT'] != 'SIMPLE'
 
-    @time_ordered.setter
-    def time_ordered(self, time_ordered):
-        self['PKTFMT'] = '1SFA' if bool(time_ordered) else 'SIMPLE'
+    @channels_first.setter
+    def channels_first(self, channels_first):
+        self['PKTFMT'] = '1SFA' if bool(channels_first) else 'SIMPLE'
 
     @property
     def samples_per_frame(self):

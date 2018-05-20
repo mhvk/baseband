@@ -37,8 +37,9 @@ class GUPPIPayload(VLBIPayloadBase):
         Shape of the samples; e.g., (nchan,).  Default: ().
     complex_data : bool, optional
         Whether data are complex.  Default: `False`.
-    time_ordered : bool, optional
-        Whether data are time-ordered.  Default: `True`.
+    channels_first : bool, optional
+        Whether the encoded payload is stored as (nchan, nsample, npol),
+        rather than (nsample, nchan, npol).  Default: `True`.
     """
     _decoders = {
         8: decode_8bit}
@@ -49,19 +50,19 @@ class GUPPIPayload(VLBIPayloadBase):
     _sample_shape_maker = namedtuple('SampleShape', 'npol, nchan')
 
     def __init__(self, words, header=None, sample_shape=(), bps=8,
-                 complex_data=False, time_ordered=True):
+                 complex_data=False, channels_first=True):
         if header is not None:
             bps = header.bps
             sample_shape = header.sample_shape
             complex_data = header.complex_data
-            time_ordered = header.time_ordered
+            channels_first = header.channels_first
         super(GUPPIPayload, self).__init__(words, sample_shape=sample_shape,
                                            bps=bps, complex_data=complex_data)
-        self.time_ordered = time_ordered
-        # If time ordered, _item_to_slices must act on per-channel words.  By
+        self.channels_first = channels_first
+        # If channels first, _item_to_slices must act on per-channel words.  By
         # resetting self._bpfs, we allow _item_to_slices to work unmodified.
         self._true_bpfs = self._bpfs    # Save the true bpfs regardless.
-        if self.time_ordered:
+        if self.channels_first:
             self._bpfs //= self.sample_shape.nchan
 
     @classmethod
@@ -75,7 +76,7 @@ class GUPPIPayload(VLBIPayloadBase):
             Handle to the file which will be read or mapped.
         header : `~baseband.dada.GUPPIHeader`, optional
             If given, used to infer ``payload_nbytes``, ``bps``,
-            ``sample_shape``, ``complex_data`` and ``time_ordered``.  If not
+            ``sample_shape``, ``complex_data`` and ``channels_first``.  If not
             given, those have to be passed in.
         memmap : bool, optional
             If `False` (default), read from file.  Otherwise, map the file in
@@ -110,7 +111,7 @@ class GUPPIPayload(VLBIPayloadBase):
         return cls(words, header=header, **kwargs)
 
     @classmethod
-    def fromdata(cls, data, header=None, bps=8, time_ordered=True):
+    def fromdata(cls, data, header=None, bps=8, channels_first=True):
         """Encode data as a payload.
 
         Parameters
@@ -119,17 +120,17 @@ class GUPPIPayload(VLBIPayloadBase):
             Data to be encoded. The last dimension is taken as the number of
             channels.
         header : `~baseband.guppi.GUPPIHeader`, optional
-            If given, used to infer the ``bps`` and ``time_ordered``.
+            If given, used to infer the ``bps`` and ``channels_first``.
         bps : int, optional
             Bits per elementary sample, used if ``header`` is `None`.
             Default: 8.
-        time_ordered : bool, optional
-            Whether data are time-ordered, used if ``header`` is `None`.
-            Default: `True`.
+        channels_first : bool, optional
+            Whether encoded data should be ordered as (nchan, nsample, npol),
+            used if ``header`` is `None`.  Default: `True`.
         """
         if header is not None:
             bps = header.bps
-            time_ordered = header.time_ordered
+            channels_first = header.channels_first
         sample_shape = data.shape[1:]
         complex_data = data.dtype.kind == 'c'
         try:
@@ -139,7 +140,7 @@ class GUPPIPayload(VLBIPayloadBase):
                              .format(cls.__name__, bps))
         # If time-ordered, switch to (nchan, nsample, npol); otherwise use
         # (nsample, nchan, npol).
-        if time_ordered:
+        if channels_first:
             data = data.transpose(2, 0, 1)
         else:
             data = data.transpose(0, 2, 1)
@@ -147,7 +148,7 @@ class GUPPIPayload(VLBIPayloadBase):
             data = data.view((data.real.dtype, (2,)))
         words = encoder(data).ravel().view(cls._dtype_word)
         return cls(words, sample_shape=sample_shape, bps=bps,
-                   complex_data=complex_data, time_ordered=time_ordered)
+                   complex_data=complex_data, channels_first=channels_first)
 
     def __len__(self):
         """Number of samples in the payload."""
@@ -164,7 +165,7 @@ class GUPPIPayload(VLBIPayloadBase):
             data = decoder(self.words)
             if self.complex_data:
                 data = data.view(self.dtype)
-            if self.time_ordered:
+            if self.channels_first:
                 # Reshape to (nchan, nsample, npol); transpose to usual order.
                 return (data.reshape(self.sample_shape.nchan, -1,
                                      self.sample_shape.npol)
@@ -177,7 +178,7 @@ class GUPPIPayload(VLBIPayloadBase):
 
         words_slice, data_slice = self._item_to_slices(item)
 
-        if self.time_ordered:
+        if self.channels_first:
             # Reshape words so channels fall along first axis, then decode.
             decoded_words = decoder(
                 self.words.reshape(self.sample_shape.nchan, -1)[:, words_slice])
@@ -205,7 +206,7 @@ class GUPPIPayload(VLBIPayloadBase):
                 data.shape[-2:] == self.sample_shape and
                 data.dtype.kind == self.dtype.kind):
             decoder = self._decoders[self._coder]
-            if self.time_ordered:
+            if self.channels_first:
                 decoded_words = decoder(np.ascontiguousarray(
                     self.words.reshape(
                         self.sample_shape.nchan, -1)[:, words_slice]))
@@ -222,7 +223,7 @@ class GUPPIPayload(VLBIPayloadBase):
             data = current_data
 
         # Reshape before separating real and complex components.
-        if self.time_ordered:
+        if self.channels_first:
             data = data.reshape(-1, self.sample_shape.nchan).T
         else:
             data = data.transpose(0, 2, 1)
@@ -235,7 +236,7 @@ class GUPPIPayload(VLBIPayloadBase):
         encoder = self._encoders[self._coder]
 
         # Reshape and encode words.
-        if self.time_ordered:
+        if self.channels_first:
             self.words.reshape(self.sample_shape.nchan, -1)[:, words_slice] = (
                 encoder(data).reshape(self.sample_shape.nchan, -1)
                 .view(self._dtype_word))

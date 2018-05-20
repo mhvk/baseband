@@ -198,8 +198,8 @@ class TestGUPPI(object):
 
         # Check that we can create and decode (nsample, nchan, npol) payloads.
         payload_tfirst = guppi.GUPPIPayload.fromdata(self.payload.data, bps=8,
-                                                     time_ordered=False)
-        # First check time_ordered makes a difference to payload words.
+                                                     channels_first=False)
+        # First check channels_first makes a difference to payload words.
         assert ~np.all(payload_tfirst.words == payload.words)
         # Now check the data is the same.
         assert np.all(payload_tfirst.data == payload.data)
@@ -525,7 +525,7 @@ class TestGUPPI(object):
             data = fh.read()
 
         header = self.header.copy()
-        header.time_ordered = False
+        header.channels_first = False
         header['OVERLAP'] = 0
         header.samples_per_frame = 960
         with guppi.open(filename, 'ws', header0=header) as fw:
