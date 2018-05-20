@@ -200,7 +200,7 @@ class VLBIPayloadBase(object):
                 step = None
         else:
             try:
-                item = item.__index__()
+                item = operator.index(item)
             except Exception:
                 raise TypeError("{0} object can only be indexed or sliced."
                                 .format(type(self)))

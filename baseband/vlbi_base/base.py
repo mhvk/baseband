@@ -4,6 +4,7 @@ from __future__ import division, unicode_literals, print_function
 import io
 import warnings
 import numpy as np
+import operator
 from collections import namedtuple
 import astropy.units as u
 from astropy.utils import lazyproperty
@@ -222,7 +223,7 @@ class VLBIStreamBase(object):
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
         try:
-            self._samples_per_frame = samples_per_frame.__index__()
+            self._samples_per_frame = operator.index(samples_per_frame)
         except Exception:
             raise TypeError("samples per frame must have an integer value.")
 
@@ -461,7 +462,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             ``offset`` is a time.
         """
         try:
-            offset = offset.__index__()
+            offset = operator.index(offset)
         except Exception:
             try:
                 offset = offset - self.start_time
