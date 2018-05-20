@@ -260,8 +260,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
     def _last_header(self):
         """Header of the last file for this stream."""
         self.fh_raw.seek(-self.header0.frame_nbytes, 2)
-        last_frame = self.fh_raw.read_frame(memmap=True)
-        return last_frame.header
+        return self.fh_raw.read_header()
 
     def _read_frame(self, index):
         self.fh_raw.seek(index * self.header0.frame_nbytes)

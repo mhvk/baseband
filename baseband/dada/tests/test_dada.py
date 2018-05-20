@@ -437,7 +437,7 @@ class TestDADA(object):
             assert np.all(fhns.read() == self.payload)
 
     # Test that writing an incomplete stream is possible, and that frame set is
-    # valid but invalid samples are appropriately marked.
+    # valid but invalid samples use the fill value.
     def test_incomplete_stream(self, tmpdir):
         filename = str(tmpdir.join('a.dada'))
         with catch_warnings(UserWarning) as w:
