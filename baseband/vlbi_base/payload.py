@@ -92,7 +92,7 @@ class VLBIPayloadBase(object):
         return fh.write(self.words.tostring())
 
     @classmethod
-    def fromdata(cls, data, bps=2):
+    def fromdata(cls, data, header=None, bps=2):
         """Encode data as a payload.
 
         Parameters
@@ -100,12 +100,16 @@ class VLBIPayloadBase(object):
         data : `~numpy.ndarray`
             Data to be encoded. The last dimension is taken as the number of
             channels.
+        header : header instance, optional
+            If given, used to infer the bps.
         bps : int, optional
             Bits per elementary sample, i.e., per channel and per real or
-            imaginary component.  Default: 2.
+            imaginary component, used if header is not given.  Default: 2.
         """
         sample_shape = data.shape[1:]
         complex_data = data.dtype.kind == 'c'
+        if header:
+            bps = header.bps
         try:
             encoder = cls._encoders[bps]
         except KeyError:

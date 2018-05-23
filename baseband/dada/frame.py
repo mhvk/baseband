@@ -101,5 +101,5 @@ class DADAFrame(VLBIFrameBase):
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)
-        payload = cls._payload_class.fromdata(data, header.bps)
+        payload = cls._payload_class.fromdata(data, header=header)
         return cls(header, payload, valid=valid, verify=verify)
