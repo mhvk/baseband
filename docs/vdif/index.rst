@@ -43,8 +43,11 @@ Usage Notes
 
 This section covers reading and writing VDIF files with Baseband; general
 usage can be found under the :ref:`Getting Started <getting_started>` section.
-The examples below use the small sample file ``baseband/data/sample.vdif``, and
-the `numpy`, `astropy.units`, and `baseband.vdif` modules::
+For situations in which one is unsure of a file's format, Baseband features the
+general `baseband.open` and `baseband.file_info` functions, which are also
+discussed in :ref:`Getting Started <getting_started>`.  The examples below use
+the small sample file ``baseband/data/sample.vdif``, and the `numpy`,
+`astropy.units`, and `baseband.vdif` modules::
 
     >>> import numpy as np
     >>> from baseband import vdif

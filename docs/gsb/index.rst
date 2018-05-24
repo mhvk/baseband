@@ -72,8 +72,14 @@ Usage Notes
 ===========
 
 This section covers reading and writing GSB files with Baseband; general usage
-is covered in the :ref:`Getting Started <getting_started>` section. The
-examples below use the sample files in the ``baseband/data/gsb/`` directory,
+is covered in the :ref:`Getting Started <getting_started>` section.  While
+Baseband features the general `baseband.open` and `baseband.file_info`
+functions, these cannot read GSB binary files without the accompanying
+timestamp file (at which point it is obvious the files are GSB).
+`baseband.file_info`, however, can be used on the timestamp file to determine
+if it is in rawdump or phased format.
+
+The examples below use the samplefiles in the ``baseband/data/gsb/`` directory,
 and the `numpy`, `astropy.units` and `baseband.gsb` modules::
 
     >>> import numpy as np

@@ -6,9 +6,9 @@
 Getting Started
 ***************
 
-For some file formats, one can simply import baseband and use `baseband.open` to
-access the file.  This gives one a filehandle from which one can read decoded
-samples::
+For most file formats, one can simply import baseband and use `baseband.open`
+to access the file.  This gives one a filehandle from which one can read
+decoded samples::
 
     >>> import baseband
     >>> from baseband.data import SAMPLE_DADA

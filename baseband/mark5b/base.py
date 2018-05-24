@@ -251,7 +251,8 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second, i.e. the rate at which each
         channel is sampled.  If `None` (default), will be inferred from
-        scanning one second of the file.
+        scanning one second of the file or, failing that, using the time
+        difference between two consecutive frames.
     kday : int or None
         Explicit thousands of MJD of the observation start time (eg. ``57000``
         for MJD 57999), used to infer the full MJD from the header's time
@@ -391,7 +392,8 @@ open = make_opener('Mark5B', globals(), doc="""
 sample_rate : `~astropy.units.Quantity`, optional
     Number of complete samples per second, i.e. the rate at which each channel
     is sampled.  If `None` (default), will be inferred from scanning one
-    second of the file.
+    second of the file or, failing that, using the time difference between two
+    consecutive frames.
 kday : int or None
     Explicit thousands of MJD of the observation start time (eg. ``57000`` for
     MJD 57999), used to infer the full MJD from the header's time information.

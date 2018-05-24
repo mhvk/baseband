@@ -14,16 +14,19 @@ Usage
 =====
 
 This section covers reading and writing DADA files with Baseband; general usage
-is covered in the :ref:`Getting Started <getting_started>` section.  The
-examples below use the sample file ``baseband/data/sample.dada``, and the
-the `astropy.units` and `baseband.dada` modules::
+is covered in the :ref:`Getting Started <getting_started>` section. For
+situations in which one is unsure of a file's format, Baseband features the
+general `baseband.open` and `baseband.file_info` functions, which are also
+discussed in :ref:`Getting Started <getting_started>`.  The examples below use
+the sample file ``baseband/data/sample.dada``, and the the `astropy.units` and
+`baseband.dada` modules::
 
     >>> from baseband import dada
     >>> import astropy.units as u
     >>> from baseband.data import SAMPLE_DADA
 
-Single files can be opened with `~baseband.dada.open` in binary mode. 
-DADA files typically consist of just a single header and payload, and can be
+Single files can be opened with `~baseband.dada.open` in binary mode. DADA
+files typically consist of just a single header and payload, and can be
 read into a single `~baseband.dada.DADAFrame`.
 
 ::
