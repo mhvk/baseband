@@ -155,7 +155,8 @@ class GSBStreamBase(VLBIStreamBase):
 
     def __init__(self, fh_ts, fh_raw, header0, sample_rate=None,
                  samples_per_frame=None, payload_nbytes=None, nchan=None,
-                 bps=None, complex_data=None, squeeze=True, subset=()):
+                 bps=None, complex_data=None, squeeze=True, subset=(),
+                 verify=True):
 
         self.fh_ts = fh_ts
         rawdump = header0.mode == 'rawdump'
@@ -187,7 +188,7 @@ class GSBStreamBase(VLBIStreamBase):
             fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, unsliced_shape=unsliced_shape,
             bps=bps, complex_data=complex_data, squeeze=squeeze, subset=subset,
-            fill_value=0.)
+            fill_value=0., verify=verify)
 
         self._payload_nbytes = payload_nbytes
 
@@ -264,6 +265,9 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         (available) polarizations.  If a tuple is passed, the first selects
         polarizations and the second selects channels.  If the tuple is empty
         (default), all components are read.
+    verify : bool, optional
+        Whether to do basic checks of frame integrity when reading.  The first
+        frame of the stream is always checked.  Default: `True`.
     """
     # TODO: right now cannot inherit from GSBFileReader, unlike for other
     # baseband classes, since we need to access multiple files.  Can this
@@ -272,13 +276,13 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
     def __init__(self, fh_ts, fh_raw, sample_rate=None, samples_per_frame=None,
                  payload_nbytes=None, nchan=None, bps=None, complex_data=None,
-                 squeeze=True, subset=()):
+                 squeeze=True, subset=(), verify=True):
         header0 = fh_ts.read_timestamp()
         super(GSBStreamReader, self).__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, payload_nbytes=payload_nbytes,
             nchan=nchan, bps=bps, complex_data=complex_data,
-            squeeze=squeeze, subset=subset)
+            squeeze=squeeze, subset=subset, verify=verify)
         self.fh_ts.seek(0)
 
     info = GSBStreamReaderInfo()
@@ -327,7 +331,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
                                   payload_nbytes=self._payload_nbytes,
                                   nchan=self._unsliced_shape.nchan,
-                                  bps=self.bps, complex_data=self.complex_data)
+                                  bps=self.bps, complex_data=self.complex_data,
+                                  verify=self.verify)
         assert int(round(((frame.header.time - self.start_time) *
                           self.sample_rate / self.samples_per_frame)
                          .to_value(u.one))) == index
@@ -503,6 +508,9 @@ def open(name, mode='rs', **kwargs):
         (available) polarizations.  If a tuple is passed, the first selects
         polarizations and the second selects channels.  If the tuple is empty
         (default), all components are read.
+    verify : bool, optional
+        Whether to do basic checks of frame integrity when reading.  The first
+        frame of the stream is always checked.  Default: `True`.
 
     --- For writing only : (see `~baseband.gsb.base.GSBStreamWriter`)
 
