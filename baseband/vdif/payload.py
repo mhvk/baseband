@@ -177,11 +177,11 @@ class VDIFPayload(VLBIPayloadBase):
             If given, used to infer the encoding, and to verify the number of
             channels and whether the data are complex.
         bps : int, optional
-            Bits per elementary sample, used if ``header`` is `None`.
+            Bits per elementary sample, used if ``header`` is not given.
             Default: 2.
         edv : int, optional
-            Should be given if ``header`` is `None` and the payload is encoded
-            as Mark 5 data (i.e., ``edv=0xab``).
+            Should be given if ``header`` is not given and the payload is
+            encoded as Mark 5 data (i.e., ``edv=0xab``).
         """
         nchan = data.shape[-1]
         complex_data = (data.dtype.kind == 'c')

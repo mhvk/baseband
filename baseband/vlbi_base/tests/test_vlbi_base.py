@@ -334,22 +334,28 @@ class TestVLBIBase(object):
         assert len(payload.words) == 4
         assert len(payload) == len(data)
         assert payload.nbytes == 16
-        payload2 = self.Payload.fromdata(self.payload.data, self.payload.bps)
+        payload2 = self.Payload.fromdata(self.payload.data,
+                                         bps=self.payload.bps)
         assert payload2 == self.payload
-        payload3 = self.Payload.fromdata(data.ravel(), bps=8)
-        assert payload3.sample_shape == ()
-        assert payload3.shape == (16,)
-        assert payload3 != payload
-        assert np.all(payload3.data == payload.data.ravel())
+        header = self.header.copy()
+        header.bps = 8
+        payload3 = self.Payload.fromdata(self.payload.data,
+                                         header=header)
+        assert payload3 == self.payload
+        payload4 = self.Payload.fromdata(data.ravel(), bps=8)
+        assert payload4.sample_shape == ()
+        assert payload4.shape == (16,)
+        assert payload4 != payload
+        assert np.all(payload4.data == payload.data.ravel())
         with pytest.raises(ValueError):  # don't have relevant encoder.
             self.Payload.fromdata(data, bps=4)
-        payload4 = self.Payload.fromdata(data[::2, 0] + 1j * data[1::2, 0],
+        payload5 = self.Payload.fromdata(data[::2, 0] + 1j * data[1::2, 0],
                                          bps=8)
-        assert payload4.complex_data is True
-        assert payload4.sample_shape == ()
-        assert payload4.shape == (8,)
-        assert payload4 != payload
-        assert np.all(payload4.words == payload.words)
+        assert payload5.complex_data is True
+        assert payload5.sample_shape == ()
+        assert payload5.shape == (8,)
+        assert payload5 != payload
+        assert np.all(payload5.words == payload.words)
 
     def test_frame_basics(self):
         assert self.frame.header is self.header
