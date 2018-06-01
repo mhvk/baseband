@@ -529,9 +529,9 @@ class TestDADA(object):
             assert fh.samples_per_frame == (
                 (filesize - self.header.nbytes) * 8 // fh.header0.bps // 2 //
                 np.prod(fh.header0.sample_shape))
-            assert fh.header0 == fh._last_header
-            assert (fh.stop_time - fh.start_time - 7478 / fh.sample_rate <
-                    1 * u.ns)
+            assert fh.header0 is fh._last_header
+            assert np.abs(fh.stop_time - fh.start_time -
+                          7478 / fh.sample_rate) < 1 * u.ns
             assert fh.shape == (7478, 2)
             # Taking advantage of data being repeated 3 times.
             assert np.all(fh.read() == data[:7478])
@@ -539,13 +539,41 @@ class TestDADA(object):
         # Check reading sequence of files.
         with dada.open(filenames) as fh:
             assert fh.samples_per_frame == header.samples_per_frame
-            assert (fh.stop_time - fh.start_time - 39478 / fh.sample_rate <
-                    1 * u.ns)
+            assert np.abs(fh.stop_time - fh.start_time -
+                          39478 / fh.sample_rate) < 1 * u.ns
             assert fh.shape == (39478, 2)
             assert np.all(fh.read() == data[:39478])
             fh.seek(-29, 2)
             assert np.all(fh.read() == data[7478 - 29:7478])
             assert fh.tell() == 39478
+
+        # Replace c.dada with only the header (and no payload).
+        with dada.open(str(tmpdir.join('c.dada')), 'rb') as fh, \
+                dada.open(str(tmpdir.join('c_header_only.dada')), 'wb') as fw:
+            fw.write(fh.read(4096))
+            fh.seek(0)
+            header_c = fh.read_header()
+
+        filenames[-1] = str(tmpdir.join('c_header_only.dada'))
+
+        # Check that reading the frame gives payload of zero size.
+        with dada.open(str(tmpdir.join('c_header_only.dada')), 'rb') as fp:
+            assert fp.read_header() == header_c
+            fp.seek(0)
+            with pytest.raises(ValueError) as excinfo:
+                fp.read_frame()
+            assert "mmap length is greater" in str(excinfo.value)
+
+        with pytest.raises(EOFError) as excinfo:
+            with dada.open(str(tmpdir.join('c_header_only.dada')), 'rs') as fp:
+                pass
+        assert "appears to end without" in str(excinfo.value)
+
+        # Reading the new sequence, the last frame should be ignored.
+        with dada.open(filenames) as fh:
+            assert np.abs(fh.stop_time - fh.start_time -
+                          32000 / fh.sample_rate) < 1 * u.ns
+            assert fh.shape == (32000, 2)
 
     def test_template_stream(self, tmpdir):
         start_time = self.header.time

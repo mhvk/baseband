@@ -8,7 +8,7 @@ import pytest
 import astropy.units as u
 from astropy.tests.helper import catch_warnings
 from collections import namedtuple
-from ..utils import bcd_encode, bcd_decode, CRC
+from ..utils import bcd_encode, bcd_decode, CRC, gcd, lcm
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
 from ..frame import VLBIFrameBase
@@ -596,3 +596,26 @@ def test_crc():
     assert '{:03x}'.format(crc) == crc_expected
     fullstream = np.hstack((bitstream, crcstream))
     assert crc12.check(fullstream)
+
+
+# PY2
+@pytest.mark.parametrize(
+    ('a', 'b', 'gcd_out'),
+    ((7, 14, 7),
+     (2712341, 234243, 1),
+     (0, 5, 5),
+     (4, -12, 4),
+     (-4, -12, 4)))
+def test_gcd(a, b, gcd_out):
+    assert gcd(a, b) == gcd_out
+
+
+@pytest.mark.parametrize(
+    ('a', 'b', 'lcm_out'),
+    ((7, 14, 14),
+     (7853, 6199, 48680747),
+     (0, 5, 0),
+     (4, -12, 12),
+     (-4, -12, 12)))
+def test_lcm(a, b, lcm_out):
+    assert lcm(a, b) == lcm_out

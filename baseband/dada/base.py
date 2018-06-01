@@ -13,6 +13,7 @@ from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
+from ..vlbi_base.utils import lcm
 from .header import DADAHeader
 from .payload import DADAPayload
 from .frame import DADAFrame
@@ -259,14 +260,23 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                                                squeeze=squeeze, subset=subset)
         # Store number of frames, for finding last header.
         raw_offset = self.fh_raw.tell()
-        self._nframes, self._pframe_nbytes = divmod(self.fh_raw.seek(0, 2),
-                                                    self.header0.frame_nbytes)
-        if self._pframe_nbytes > 0:
-            self._nframes += 1
-            # If there's only one frame and it's incomplete.
-            if self._nframes == 1:
-                self._header0 = self._last_header
-                self.samples_per_frame = self.header0.samples_per_frame
+        self._nframes, self._partial_frame_nbytes = divmod(
+            self.fh_raw.seek(0, 2), self.header0.frame_nbytes)
+        # If there is a partial last frame.
+        if self._partial_frame_nbytes > 0:
+            # If partial last frame contains payload bytes.
+            if self._partial_frame_nbytes > self.header0.nbytes:
+                self._nframes += 1
+                # If there's only one frame and it's incomplete.
+                if self._nframes == 1:
+                    self._header0 = self._last_header
+                    self.samples_per_frame = self.header0.samples_per_frame
+            # Otherwise, ignore the partial frame unless it's the only frame,
+            # in which case raise an EOFError.
+            elif self._nframes == 0:
+                raise EOFError('file (of {0} bytes) appears to end without'
+                               'any payload.'.format(
+                                   self._partial_frame_nbytes))
         self.fh_raw.seek(raw_offset)
 
     @lazyproperty
@@ -281,15 +291,17 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         raw_offset = self.fh_raw.tell()
         self.fh_raw.seek((self._nframes - 1) * self.header0.frame_nbytes)
         header = self.fh_raw.read_header()
-        if self._pframe_nbytes > 0:
+        if self._partial_frame_nbytes > self.header0.nbytes:
             header.mutable = True
-            # Payload should have integer number of words and complete samples.
-            payload_block = max(
+            # Payload should have integer number of both words and complete
+            # samples.
+            payload_block = lcm(
                 DADAPayload._dtype_word.itemsize,
                 self.header0.bps * (2 if self.header0.complex_data else 1) *
                 np.prod(self.sample_shape) // 8)
             header.payload_nbytes = payload_block * (
-                (self._pframe_nbytes - header.nbytes) // payload_block)
+                (self._partial_frame_nbytes - header.nbytes) // payload_block)
+            header.mutable = False
         self.fh_raw.seek(raw_offset)
         return header
 
@@ -305,15 +317,16 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                  self.sample_rate).to(u.s))
 
     def _read_frame(self, index):
-        if index == self._nframes - 1:
-            self.fh_raw.seek(index * self.header0.frame_nbytes +
-                             self.header0.nbytes)
-            last_payload = DADAPayload.fromfile(self.fh_raw, memmap=True,
-                                                header=self._last_header)
-            frame = DADAFrame(self._last_header, last_payload)
-        else:
+        if index < self._nframes - 1:
             self.fh_raw.seek(index * self.header0.frame_nbytes)
             frame = self.fh_raw.read_frame(memmap=True)
+        else:
+            self.fh_raw.seek(index * self.header0.frame_nbytes +
+                             self.header0.nbytes)
+            last_header = self._last_header
+            last_payload = DADAPayload.fromfile(self.fh_raw, memmap=True,
+                                                header=last_header)
+            frame = DADAFrame(last_header, last_payload)
         assert (frame.header['OBS_OFFSET'] - self.header0['OBS_OFFSET'] ==
                 index * self.header0.payload_nbytes)
         return frame
