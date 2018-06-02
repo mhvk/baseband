@@ -15,9 +15,9 @@ class GUPPIFrame(VLBIFrameBase):
 
     Parameters
     ----------
-    header : `~baseband.dada.GUPPIHeader`
+    header : `~baseband.guppi.GUPPIHeader`
         Wrapper around the header lines, providing access to the values.
-    payload : `~baseband.dada.GUPPIPayload`
+    payload : `~baseband.guppi.GUPPIPayload`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool, optional
         Whether the data are valid.  Default: `True`.
@@ -88,7 +88,7 @@ class GUPPIFrame(VLBIFrameBase):
         ----------
         data : `~numpy.ndarray`
             Array holding complex or real data to be encoded.
-        header : `~baseband.dada.GUPPIHeader` or None, optional
+        header : `~baseband.guppi.GUPPIHeader` or None, optional
             If not given, will attempt to generate one using the keywords.
         valid : bool, optional
             Whether the data are valid (default: `True`). Note that this

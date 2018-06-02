@@ -27,7 +27,7 @@ class GUPPIPayload(VLBIPayloadBase):
     words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
-    header : `~baseband.dada.GUPPIHeader`
+    header : `~baseband.guppi.GUPPIHeader`
         Header that provides information about how the payload is encoded.
         If not given, the following arguments have to be passed in.
     bps : int, optional
@@ -74,7 +74,7 @@ class GUPPIPayload(VLBIPayloadBase):
         ----------
         fh : filehandle
             Handle to the file which will be read or mapped.
-        header : `~baseband.dada.GUPPIHeader`, optional
+        header : `~baseband.guppi.GUPPIHeader`, optional
             If given, used to infer ``payload_nbytes``, ``bps``,
             ``sample_shape``, ``complex_data`` and ``channels_first``.  If not
             given, those have to be passed in.
@@ -138,7 +138,7 @@ class GUPPIPayload(VLBIPayloadBase):
         except KeyError:
             raise ValueError("{0} cannot encode data with {1} bits"
                              .format(cls.__name__, bps))
-        # If time-ordered, switch to (nchan, nsample, npol); otherwise use
+        # If channels-first, switch to (nchan, nsample, npol); otherwise use
         # (nsample, nchan, npol).
         if channels_first:
             data = data.transpose(2, 0, 1)
@@ -156,7 +156,7 @@ class GUPPIPayload(VLBIPayloadBase):
 
     def __getitem__(self, item=()):
         # GUPPI data may be stored as (nsample, nchan, npol) or, if
-        # time-ordered, (nchan, nsample, npol), both of which require
+        # channels-first, (nchan, nsample, npol), both of which require
         # reshaping to get the usual order of (nsample, npol, nchan).
         decoder = self._decoders[self._coder]
 

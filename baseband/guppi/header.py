@@ -302,6 +302,7 @@ class GUPPIHeader(fits.Header):
     @property
     def channels_first(self):
         """True if encoded payload ordering is (nchan, nsample, npol)."""
+        # Called ``time-ordered`` in DSPSR.
         return self['PKTFMT'] != 'SIMPLE'
 
     @channels_first.setter

@@ -31,11 +31,11 @@ followed by a binary :term:`payload` (or "block").  The header's length is
 variable, but always ends with "END" followed by 77 spaces.
 
 How samples are stored in the payload depends on whether or not it is
-**time-ordered**.  A time-ordered payload stores each channel's :term:`stream`
-in a contiguous data block, while a non-time-ordered one groups the
-|components| of a :term:`complete sample` together (like with other formats).
-In either case, for each channel polarization samples from the same point in
-time are stored adjacent to one another.  At the end of each channel's
+**channels-first**.  A channels-first payload stores each channel's
+:term:`stream` in a contiguous data block, while a non-channels-first one
+groups the |components| of a :term:`complete sample` together (like with other
+formats).  In either case, for each channel polarization samples from the same
+point in time are stored adjacent to one another.  At the end of each channel's
 data is a section of **overlap samples** identical to the first samples in
 the next payload.  Baseband retains these redundant samples when reading
 individual GUPPI frames, but removes them when reading files as a stream.

@@ -72,7 +72,7 @@ class GUPPIFileReader(VLBIFileReaderBase):
         oldpos = self.tell()
         self.seek(0)
         try:
-            header = self.read_frame()
+            header = self.read_header()
             return (header.sample_rate /
                     (header.samples_per_frame - header.overlap)).to(u.Hz)
         finally:
