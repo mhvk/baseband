@@ -158,7 +158,7 @@ class DADAFileReader(VLBIFileReaderBase):
         oldpos = self.tell()
         self.seek(0)
         try:
-            header = self.read_frame()
+            header = self.read_header()
             return (header.sample_rate / header.samples_per_frame).to(u.Hz)
         finally:
             self.seek(oldpos)

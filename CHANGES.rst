@@ -4,7 +4,7 @@
 New Features
 ------------
 
-- Added a new ``baseband.file_info`` function, which can be used to inpect
+- Added a new ``baseband.file_info`` function, which can be used to inspect
   data files. [#200]
 
 - Added a general file opener, ``baseband.open`` which for a set of formats
