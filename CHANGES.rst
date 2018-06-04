@@ -28,13 +28,13 @@ Other Changes and Additions
 - The `baseband.data` module with sample data files now has an explicit entry
   in the documentation. [#198]
 
-1.0.1 (unreleased)
+1.0.1 (2018-06-04)
 ==================
 
 Bug Fixes
 ---------
 
-- Fixed a bug in `~baseband.dada.open` where passing a `squeeze` setting is
+- Fixed a bug in `baseband.dada.open` where passing a ``squeeze`` setting is
   ignored when also passing header keywords in 'ws' mode. [#211]
 
 - Raise an exception rather than return incorrect times for Mark 5B files
