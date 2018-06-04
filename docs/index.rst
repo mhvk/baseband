@@ -43,6 +43,7 @@ troubleshooting help and APIs for each.
    mark5b/index
    mark4/index
    dada/index
+   guppi/index
    gsb/index
 
 .. _core_utilities_toc:
