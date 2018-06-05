@@ -403,7 +403,7 @@ samples_per_frame : int,
 sample_rate : `~astropy.units.Quantity`
     Number of complete samples per second, i.e. the rate at which each
     channel of each polarization is sampled.
-offset : `~astropy.units.Quantity`, optional
+offset : `~astropy.units.Quantity` or `~astropy.time.TimeDelta`, optional
     Time offset from the start of the whole observation (default: 0).
 npol : int, optional
     Number of polarizations (default: 1).
