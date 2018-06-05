@@ -436,9 +436,10 @@ class TestDADA(object):
             assert np.all(fhs.read() == self.payload)
             assert np.all(fhns.read() == self.payload)
 
-    # Test that writing an incomplete stream is possible, and that frame set is
-    # valid but invalid samples use the fill value.
     def test_incomplete_stream(self, tmpdir):
+        """Test that writing an incomplete stream is possible, and that frame
+        set is valid but invalid samples use the fill value.
+        """
         filename = str(tmpdir.join('a.dada'))
         with catch_warnings(UserWarning) as w:
             with dada.open(filename, 'ws', header0=self.header,
@@ -493,6 +494,86 @@ class TestDADA(object):
                 dada.open(fraw, 'rs') as fr:
             data3 = fr.read()
         assert np.all(data3 == data)
+
+    def test_partial_last_frame(self, tmpdir):
+        """Test reading an incomplete frame from one or a sequence of files."""
+        # Prepare file sequence.
+        header = self.header.copy()
+        data = self.payload.data.squeeze()
+        data = np.r_[data, data, data]
+        filenames = [str(tmpdir.join('a.dada')),
+                     str(tmpdir.join('b.dada')),
+                     str(tmpdir.join('c.dada'))]
+        with dada.open(filenames, 'ws', header0=header) as fw:
+            fw.write(data)
+
+        # Replace c.dada with partially complete file.
+        with dada.open(str(tmpdir.join('c.dada')), 'rb') as fh, \
+                dada.open(str(tmpdir.join('c_partial.dada')), 'wb') as fw:
+            full_filesize = fh.seek(0, 2)
+            fh.seek(0)
+            fw.write(fh.read(full_filesize // 2 - 37))
+
+        filenames[-1] = str(tmpdir.join('c_partial.dada'))
+
+        # Check reading single partial frame.
+        with dada.open(filenames[-1], 'rs') as fh:
+            # Check that we've written the right number of bytes to file.
+            filesize = fh.fh_raw.seek(0, 2)
+            fh.fh_raw.seek(0)
+            assert filesize == full_filesize // 2 - 37
+            # Payload truncates 3 bytes so there is an integer number of
+            # complete samples.
+            assert fh.header0.frame_nbytes == filesize - 3
+            assert fh.header0.nbytes == self.header.nbytes
+            assert fh.samples_per_frame == (
+                (filesize - self.header.nbytes) * 8 // fh.header0.bps // 2 //
+                np.prod(fh.header0.sample_shape))
+            assert fh.header0 is fh._last_header
+            assert np.abs(fh.stop_time - fh.start_time -
+                          7478 / fh.sample_rate) < 1 * u.ns
+            assert fh.shape == (7478, 2)
+            # Taking advantage of data being repeated 3 times.
+            assert np.all(fh.read() == data[:7478])
+
+        # Check reading sequence of files.
+        with dada.open(filenames) as fh:
+            assert fh.samples_per_frame == header.samples_per_frame
+            assert np.abs(fh.stop_time - fh.start_time -
+                          39478 / fh.sample_rate) < 1 * u.ns
+            assert fh.shape == (39478, 2)
+            assert np.all(fh.read() == data[:39478])
+            fh.seek(-29, 2)
+            assert np.all(fh.read() == data[7478 - 29:7478])
+            assert fh.tell() == 39478
+
+        # Replace c.dada with only the header (and no payload).
+        with dada.open(str(tmpdir.join('c.dada')), 'rb') as fh, \
+                dada.open(str(tmpdir.join('c_header_only.dada')), 'wb') as fw:
+            fw.write(fh.read(4096))
+            fh.seek(0)
+            header_c = fh.read_header()
+
+        filenames[-1] = str(tmpdir.join('c_header_only.dada'))
+
+        # Check that reading the frame gives payload of zero size.
+        with dada.open(str(tmpdir.join('c_header_only.dada')), 'rb') as fp:
+            assert fp.read_header() == header_c
+            fp.seek(0)
+            with pytest.raises(ValueError) as excinfo:
+                fp.read_frame()
+            assert "mmap length is greater" in str(excinfo.value)
+
+        with pytest.raises(EOFError) as excinfo:
+            with dada.open(str(tmpdir.join('c_header_only.dada')), 'rs') as fp:
+                pass
+        assert "appears to end without" in str(excinfo.value)
+
+        # Reading the new sequence, the last frame should be ignored.
+        with dada.open(filenames) as fh:
+            assert np.abs(fh.stop_time - fh.start_time -
+                          32000 / fh.sample_rate) < 1 * u.ns
+            assert fh.shape == (32000, 2)
 
     def test_template_stream(self, tmpdir):
         start_time = self.header.time

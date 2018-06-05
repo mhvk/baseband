@@ -13,6 +13,9 @@ New Features
 
 - Added support for the GUPPI format. [#212]
 
+- Enabled `baseband.dada.open` to read streams where the last frame has an
+  incomplete payload. [#228]
+
 API Changes
 -----------
 
