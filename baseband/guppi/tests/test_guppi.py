@@ -543,6 +543,28 @@ class TestGUPPI(object):
             data3 = fr.read()
         assert np.all(data3 == data)
 
+    def test_partial_last_frame(self, tmpdir):
+        """Test reading a file with an incomplete last frame."""
+        # Read in sample file as a byte stream.
+        with guppi.open(SAMPLE_FILE, 'rb') as fh:
+            puppi_raw = fh.read()
+
+        # Try reading a file with an incomplete payload.
+        with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'wb') as fw:
+            fw.write(puppi_raw[:len(puppi_raw) - 6091])
+        with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'rs') as fn:
+            assert fn.shape == (2880, 2, 4)
+            assert np.abs(fn.stop_time - fn.start_time -
+                          2880 / (250 * u.Hz)) < 1. * u.ns
+
+        # Try reading a file with an incomplete header.
+        with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'wb') as fw:
+            fw.write(puppi_raw[:len(puppi_raw) - 17605])
+        with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'rs') as fn:
+            assert fn.shape == (2880, 2, 4)
+            assert np.abs(fn.stop_time - fn.start_time -
+                          2880 / (250 * u.Hz)) < 1. * u.ns
+
     def test_chan_ordered_stream(self, tmpdir):
         """Test encoding and decoding frames and streams that use
         (nsample, nchan, npol).
