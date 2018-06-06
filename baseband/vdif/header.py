@@ -71,6 +71,12 @@ class VDIFHeaderMeta(type):
 
             VDIFHeaderMeta._registry.update({edv: cls})
 
+        # If header parser has a sync pattern, append it as a private
+        # attribute for cls.verify.
+        if (hasattr(cls, '_header_parser') and
+                'sync_pattern' in cls._header_parser.keys()):
+            cls._sync_pattern = cls._header_parser.defaults['sync_pattern']
+
         super(VDIFHeaderMeta, cls).__init__(name, bases, dct)
 
 
@@ -189,7 +195,7 @@ class VDIFHeader(VLBIHeaderBase):
         vdif_version : 1
         thread_id : 0
         frame_nr : 0
-        sync_pattern : 0xACABFEED (for edv 1 and 3)
+        sync_pattern : 0xACABFEED for EDV 1 and 3, 0xa5ea5 for EDV 2
 
         Values set by other keyword arguments (if present):
 
@@ -489,9 +495,9 @@ class VDIFBaseHeader(VDIFHeader):
         assert not self['legacy_mode']
         assert self.edv is None or self.edv == self['edv']
         assert len(self.words) == 8
+        # _sync_pattern is added by VDIFHeaderMeta.
         if 'sync_pattern' in self.keys():
-            assert (self['sync_pattern'] ==
-                    self._header_parser.defaults['sync_pattern'])
+            assert self['sync_pattern'] == self._sync_pattern
 
 
 class VDIFHeader0(VDIFBaseHeader):
@@ -508,6 +514,7 @@ class VDIFHeader0(VDIFBaseHeader):
 
 class VDIFSampleRateHeader(VDIFBaseHeader):
     """Base for VDIF headers that include the sample rate (EDV= 1, 3, 4)."""
+
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
         (('sampling_unit', (4, 23, 1)),
          ('sampling_rate', (4, 0, 23)),
@@ -650,6 +657,7 @@ class VDIFHeader2(VDIFBaseHeader):
     different sync values.
     """
     _edv = 2
+
     _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
         (('complex_data', (3, 31, 1, 0x0)),  # Repeat, to set default.
          ('bits_per_sample', (3, 26, 5, 0x1)),  # Repeat, to set default.

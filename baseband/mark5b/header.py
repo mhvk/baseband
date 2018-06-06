@@ -69,6 +69,7 @@ class Mark5BHeader(VLBIHeaderBase):
          ('bcd_seconds', (2, 0, 20)),
          ('bcd_fraction', (3, 16, 16)),
          ('crc', (3, 0, 16))))
+    _sync_pattern = _header_parser.defaults['sync_pattern']
 
     _struct = four_word_struct
 
@@ -91,8 +92,7 @@ class Mark5BHeader(VLBIHeaderBase):
     def verify(self):
         """Verify header integrity."""
         assert len(self.words) == 4
-        assert (self['sync_pattern'] ==
-                self._header_parser.defaults['sync_pattern'])
+        assert self['sync_pattern'] == self._sync_pattern
         assert self.kday is None or (33000 < self.kday < 400000)
         if self.kday is not None:
             assert self.kday % 1000 == 0, "kday must be thousands of MJD."

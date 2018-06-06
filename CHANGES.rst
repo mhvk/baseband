@@ -37,6 +37,11 @@ Other Changes and Additions
 - The `baseband.data` module with sample data files now has an explicit entry
   in the documentation. [#198]
 
+- Increased speed of VLBI stream reading by changing the way header sync
+  patterns are stored, and removing redundant verification steps.  VDIF
+  sequential decode is now 5 - 10% faster (depending on the number of
+  threads). [#241]
+
 1.0.1 (2018-06-04)
 ==================
 

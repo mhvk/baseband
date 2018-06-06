@@ -139,6 +139,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
          ('bcd_second', (4, 24, 8)),
          ('bcd_fraction', (4, 12, 12)),
          ('crc', (4, 0, 12))))
+    _sync_pattern = _header_parser.defaults['sync_pattern']
 
     _properties = ('decade', 'track_id', 'fraction', 'time')
     """Properties accessible/usable in initialisation."""
@@ -160,8 +161,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
     def verify(self):
         """Verify header integrity."""
         assert len(self.words) == 5
-        assert np.all(self['sync_pattern'] ==
-                      self._header_parser.defaults['sync_pattern'])
+        assert np.all(self['sync_pattern'] == self._sync_pattern)
         assert np.all((self['bcd_fraction'] & 0xf) % 5 != 4)
         if self.decade is not None:
             assert (1950 < self.decade < 3000)
