@@ -82,10 +82,10 @@ class TestDADA(object):
         header3.frame_nbytes = 9096
         assert header3.payload_nbytes == 5000
         # Try initialising with properties instead of keywords.
-        # Here, we first just try the start time.
+        # Here, we first just try the start time and offset.
         header4 = dada.DADAHeader.fromvalues(
             start_time=header.start_time,
-            offset=header.time-header.start_time,
+            offset=header.time - header.start_time,
             bps=header.bps, complex_data=header.complex_data,
             sample_rate=header.sample_rate, sideband=header.sideband,
             samples_per_frame=header.samples_per_frame,
@@ -96,9 +96,9 @@ class TestDADA(object):
             pic_version=header['PIC_VERSION'])
         assert header4 == header
         assert header4.mutable is True
-        # And now try both start time and time of observation.
+        # And now try the time and offset.
         header5 = dada.DADAHeader.fromvalues(
-            offset=header.offset, time=header.time,
+            offset=header.time - header.start_time, time=header.time,
             bps=header.bps, complex_data=header.complex_data,
             sample_rate=header.sample_rate, sideband=header.sideband,
             samples_per_frame=header.samples_per_frame,
@@ -107,28 +107,40 @@ class TestDADA(object):
             telescope=header['TELESCOPE'], instrument=header['INSTRUMENT'],
             receiver=header['RECEIVER'], freq=header['FREQ'],
             pic_version=header['PIC_VERSION'])
+        # Finally try the time and start time.
         assert header5 == header
-        # Check repr can be used to instantiate header
-        header6 = eval('dada.' + repr(header))
+        header6 = dada.DADAHeader.fromvalues(
+            time=header.time, start_time=header.start_time,
+            bps=header.bps, complex_data=header.complex_data,
+            sample_rate=header.sample_rate, sideband=header.sideband,
+            samples_per_frame=header.samples_per_frame,
+            sample_shape=header.sample_shape,
+            source=header['SOURCE'], ra=header['RA'], dec=header['DEC'],
+            telescope=header['TELESCOPE'], instrument=header['INSTRUMENT'],
+            receiver=header['RECEIVER'], freq=header['FREQ'],
+            pic_version=header['PIC_VERSION'])
         assert header6 == header
-        # repr includes the comments
-        assert header6.comments == header.comments
-        # Therefore repr should be identical too.
-        assert repr(header6) == repr(header)
-        # Check instantiation via tuple
-        header7 = dada.DADAHeader(((key, (header[key], header.comments[key]))
-                                   for key in header))
+        # Check repr can be used to instantiate header
+        header7 = eval('dada.' + repr(header))
         assert header7 == header
+        # repr includes the comments
         assert header7.comments == header.comments
-        # Check copying
-        header8 = header.copy()
+        # Therefore repr should be identical too.
+        assert repr(header7) == repr(header)
+        # Check instantiation via tuple
+        header8 = dada.DADAHeader(((key, (header[key], header.comments[key]))
+                                   for key in header))
         assert header8 == header
-        assert header8.mutable is True
         assert header8.comments == header.comments
-        header9 = copy.copy(header8)
+        # Check copying
+        header9 = header.copy()
         assert header9 == header
         assert header9.mutable is True
         assert header9.comments == header.comments
+        header10 = copy.copy(header9)
+        assert header10 == header
+        assert header10.mutable is True
+        assert header10.comments == header.comments
 
     def test_payload(self, tmpdir):
         payload = self.payload

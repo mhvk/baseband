@@ -336,7 +336,7 @@ class GUPPIHeader(fits.Header):
 
     @offset.setter
     def offset(self, offset):
-        self['PKTIDX'] = int(round((offset.to_value(u.s) / self['TBIN'] /
+        self['PKTIDX'] = int(round((offset.to(u.s).value / self['TBIN'] /
                                     self['PKTSIZE']) *
                                    ((self._bpcs + 7) // 8)))
 
@@ -363,15 +363,19 @@ class GUPPIHeader(fits.Header):
     def time(self, time):
         """Set header time.
 
-        Note that this sets the start time of the header, assuming the offset
-        is already set correctly.
+        If ``start_time`` is not already set, this sets it using the time and
+        ``offset``.  Otherwise, this sets ``offset`` using the time and
+        ``start_time``.
 
         Parameters
         ----------
         time : `~astropy.time.Time`
             Time for the first sample associated with this header.
         """
-        self.start_time = time - self.offset
+        if 'STT_IMJD' not in self.keys():
+            self.start_time = time - self.offset
+        else:
+            self.offset = time - self.start_time
 
     def _ipython_key_completions_(self):
         # Enables tab-completion of header keys in IPython.

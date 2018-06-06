@@ -128,6 +128,34 @@ class TestGUPPI(object):
         assert header8 == header
         assert header8.mutable is True
 
+        # Check that we can set the offset by either passing the offset or the
+        # start time.
+        offset = 9.472 * u.s
+        header9 = guppi.GUPPIHeader.fromvalues(
+            time=header.start_time + offset, offset=offset,
+            sample_rate=header.sample_rate,
+            samples_per_frame=header.samples_per_frame,
+            overlap=header.overlap, sample_shape=header.sample_shape,
+            sideband=header.sideband, bps=header.bps,
+            pktsize=header['PKTSIZE'], obsfreq=header['OBSFREQ'],
+            src_name=header['SRC_NAME'], observer=header['OBSERVER'],
+            telescop=header['TELESCOP'], ra_str=header['RA_STR'],
+            dec_str=header['DEC_STR'])
+        header10 = guppi.GUPPIHeader.fromvalues(
+            start_time=header.start_time, time=header.start_time + offset,
+            sample_rate=header.sample_rate,
+            samples_per_frame=header.samples_per_frame,
+            overlap=header.overlap, sample_shape=header.sample_shape,
+            sideband=header.sideband, bps=header.bps,
+            pktsize=header['PKTSIZE'], obsfreq=header['OBSFREQ'],
+            src_name=header['SRC_NAME'], observer=header['OBSERVER'],
+            telescop=header['TELESCOP'], ra_str=header['RA_STR'],
+            dec_str=header['DEC_STR'])
+        assert np.abs(header9.offset - offset) < 1 * u.ns
+        assert np.abs(header9.start_time - header.start_time) < 1 * u.ns
+        assert np.abs(header10.offset - offset) < 1 * u.ns
+        assert np.abs(header10.start_time - header.start_time) < 1 * u.ns
+
     def test_payload(self, tmpdir):
         payload = self.payload
         assert payload.nbytes == 16384

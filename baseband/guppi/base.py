@@ -285,7 +285,7 @@ samples_per_frame : int
     ``payload_nbytes``.
 payload_nbytes : int
     Number of bytes per payload.  Can alternatively give ``samples_per_frame``.
-offset : `~astropy.units.Quantity`, optional
+offset : `~astropy.units.Quantity` or `~astropy.time.TimeDelta`, optional
     Time offset from the start of the whole observation (default: 0).
 npol : int, optional
     Number of polarizations (default: 1).
