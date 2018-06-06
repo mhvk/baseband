@@ -897,6 +897,39 @@ class TestVDIF(object):
             check = fhn.read()
             assert np.all(check == data4x[(slice(None),) + subset_md])
 
+    def test_stream_verify(self, tmpdir):
+        """Test that we can pass or set verify=False to bypass header
+        checking."""
+        # Grab data from the sample file.
+        with vdif.open(SAMPLE_FILE, 'rs') as fh:
+            data = fh.read()
+
+        testverifyfile = str(tmpdir.join('testverify.vdif'))
+        # Make a file with a sync pattern error in the second set of frames.
+        with vdif.open(SAMPLE_FILE, 'rb') as fh, \
+                vdif.open(testverifyfile, 'wb') as fw:
+            fr = fh.read_frameset()
+            fr.tofile(fw)
+            fr = fh.read_frameset()
+            fr.frames[2].header.mutable = True
+            fr.frames[2].header['sync_pattern'] = 0xabbaabba
+            fr.tofile(fw)
+
+        with vdif.open(testverifyfile, 'rs') as fn:
+            assert fn.verify is True
+            # This should fail at the second frameset.
+            with pytest.raises(AssertionError):
+                fn.read()
+            assert fn.tell() == 20000
+            fn.verify = False
+            assert fn.verify is False
+            assert np.all(fn.read() == data[20000:])
+
+        # Check that we can pass verify=False.
+        with vdif.open(testverifyfile, 'rs', verify=False) as fn:
+            assert fn.verify is False
+            assert np.all(fn.read() == data)
+
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
     @pytest.mark.parametrize('fill_value', (0., -999.))

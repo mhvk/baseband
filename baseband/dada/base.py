@@ -127,7 +127,7 @@ class DADAFileReader(VLBIFileReaderBase):
         """
         return DADAHeader.fromfile(self.fh_raw)
 
-    def read_frame(self, memmap=True):
+    def read_frame(self, memmap=True, verify=True):
         """Read the frame header and read or map the corresponding payload.
 
         Parameters
@@ -135,6 +135,8 @@ class DADAFileReader(VLBIFileReaderBase):
         memmap : bool, optional
             If `True` (default), map the payload using `~numpy.memmap`, so that
             parts are only loaded into memory as needed to access data.
+        verify : bool, optional
+            Whether to do basic checks of frame integrity.  Default: `True`.
 
         Returns
         -------
@@ -144,7 +146,7 @@ class DADAFileReader(VLBIFileReaderBase):
             be too large to fit in memory, it may be better to access the
             parts of interest by slicing the frame.
         """
-        return DADAFrame.fromfile(self.fh_raw, memmap=memmap)
+        return DADAFrame.fromfile(self.fh_raw, memmap=memmap, verify=verify)
 
     def get_frame_rate(self):
         """Determine the number of frames per second.
@@ -223,14 +225,14 @@ class DADAStreamBase(VLBIStreamBase):
 
     _sample_shape_maker = DADAPayload._sample_shape_maker
 
-    def __init__(self, fh_raw, header0, squeeze=True, subset=()):
+    def __init__(self, fh_raw, header0, squeeze=True, subset=(), verify=True):
 
         super(DADAStreamBase, self).__init__(
             fh_raw=fh_raw, header0=header0, sample_rate=header0.sample_rate,
             samples_per_frame=header0.samples_per_frame,
             unsliced_shape=header0.sample_shape, bps=header0.bps,
             complex_data=header0.complex_data, squeeze=squeeze, subset=subset,
-            fill_value=0.)
+            fill_value=0., verify=verify)
 
 
 class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
@@ -251,13 +253,18 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         polarizations.  With a tuple, the first selects polarizations and the
         second selects channels.  If the tuple is empty (default), all
         components are read.
+    verify : bool, optional
+        Whether to do basic checks of frame integrity when reading.  The first
+        frame of the stream is always checked, so ``verify`` is effective only
+        when reading sequences of files.  Default: `True`.
     """
 
-    def __init__(self, fh_raw, squeeze=True, subset=()):
+    def __init__(self, fh_raw, squeeze=True, subset=(), verify=True):
         fh_raw = DADAFileReader(fh_raw)
         header0 = DADAHeader.fromfile(fh_raw)
         super(DADAStreamReader, self).__init__(fh_raw, header0,
-                                               squeeze=squeeze, subset=subset)
+                                               squeeze=squeeze, subset=subset,
+                                               verify=verify)
         # Store number of frames, for finding last header.
         raw_offset = self.fh_raw.tell()
         self._nframes, self._partial_frame_nbytes = divmod(
@@ -319,7 +326,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
     def _read_frame(self, index):
         if index < self._nframes - 1:
             self.fh_raw.seek(index * self.header0.frame_nbytes)
-            frame = self.fh_raw.read_frame(memmap=True)
+            frame = self.fh_raw.read_frame(memmap=True, verify=self.verify)
         else:
             self.fh_raw.seek(index * self.header0.frame_nbytes +
                              self.header0.nbytes)
@@ -327,6 +334,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
             last_payload = DADAPayload.fromfile(self.fh_raw, memmap=True,
                                                 header=last_header)
             frame = DADAFrame(last_header, last_payload)
+
         assert (frame.header['OBS_OFFSET'] - self.header0['OBS_OFFSET'] ==
                 index * self.header0.payload_nbytes)
         return frame

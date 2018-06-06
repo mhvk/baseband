@@ -63,7 +63,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
         return Mark5BHeader.fromfile(self, kday=self.kday,
                                      ref_time=self.ref_time)
 
-    def read_frame(self):
+    def read_frame(self, verify=True):
         """Read a single frame (header plus payload).
 
         Returns
@@ -72,13 +72,15 @@ class Mark5BFileReader(VLBIFileReaderBase):
             With ``header`` and ``data`` properties that return the
             `~baseband.mark5b.Mark5BHeader` and data encoded in the frame,
             respectively.
+        verify : bool, optional
+            Whether to do basic checks of frame integrity.  Default: `True`.
         """
         if self.nchan is None:
             raise TypeError("In order to read frames, the file handle should "
                             "be initialized with nchan set.")
         return Mark5BFrame.fromfile(self.fh_raw, kday=self.kday,
                                     ref_time=self.ref_time, nchan=self.nchan,
-                                    bps=self.bps)
+                                    bps=self.bps, verify=verify)
 
     def get_frame_rate(self):
         """Determine the number of frames per second.
@@ -229,12 +231,13 @@ class Mark5BStreamBase(VLBIStreamBase):
     """Base for Mark 5B streams."""
 
     def __init__(self, fh_raw, header0, sample_rate=None, nchan=1,
-                 bps=2, squeeze=True, subset=(), fill_value=0.):
+                 bps=2, squeeze=True, subset=(), fill_value=0., verify=True):
         super(Mark5BStreamBase, self).__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
             unsliced_shape=(nchan,), bps=bps, complex_data=False,
-            squeeze=squeeze, subset=subset, fill_value=fill_value)
+            squeeze=squeeze, subset=subset, fill_value=fill_value,
+            verify=verify)
         self._frame_rate = int(round((self.sample_rate /
                                       self.samples_per_frame).to_value(u.Hz)))
 
@@ -272,12 +275,16 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         squeezing). If an empty tuple (default), all channels are read.
     fill_value : float or complex
         Value to use for invalid or missing data. Default: 0.
+    verify : bool, optional
+        Whether to do basic checks of frame integrity when reading.  The first
+        frame of the stream is always checked.  Default: `True`.
     """
 
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, kday=None, ref_time=None,
-                 nchan=None, bps=2, squeeze=True, subset=(), fill_value=0.):
+                 nchan=None, bps=2, squeeze=True, subset=(), fill_value=0.,
+                 verify=True):
 
         if nchan is None:
             raise TypeError("Mark 5B stream reader requires nchan to be "
@@ -292,7 +299,8 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         header0 = fh_raw.find_header()
         super(Mark5BStreamReader, self).__init__(
             fh_raw, header0, sample_rate=sample_rate, nchan=nchan, bps=bps,
-            squeeze=squeeze, subset=subset, fill_value=fill_value)
+            squeeze=squeeze, subset=subset, fill_value=fill_value,
+            verify=verify)
         # Use ref_time in preference to kday so we can handle files that
         # span a change in 1000s of MJD.
         self.fh_raw.kday = None
@@ -309,7 +317,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
 
     def _read_frame(self, index):
         self.fh_raw.seek(index * self.header0.frame_nbytes)
-        frame = self.fh_raw.read_frame()
+        frame = self.fh_raw.read_frame(verify=self.verify)
         # Set decoded value for invalid data.
         frame.fill_value = self.fill_value
         # TODO: OK to ignore leap seconds? Not sure what writer does.
@@ -413,6 +421,9 @@ subset : indexing object, optional
     squeezing). If an empty tuple (default), all channels are read.
 fill_value : float or complex
     Value to use for invalid or missing data. Default: 0.
+verify : bool, optional
+    Whether to do basic checks of frame integrity when reading.  The first
+    frame of the stream is always checked.  Default: `True`.
 
 --- For writing a stream : (see `~baseband.mark5b.base.Mark5BStreamWriter`)
 

@@ -112,7 +112,7 @@ class VDIFFileReader(VLBIFileReaderBase):
             use that of the first frame.  (Passing it in slightly improves file
             integrity checking.)
         verify : bool, optional
-            Whether to do (light) sanity checks on the header. Default: `True`.
+            Whether to do basic checks of frame integrity.  Default: `True`.
 
         Returns
         -------
@@ -310,7 +310,7 @@ class VDIFStreamBase(VLBIStreamBase):
     _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
 
     def __init__(self, fh_raw, header0, sample_rate=None, nthread=1,
-                 squeeze=True, subset=(), fill_value=0.):
+                 squeeze=True, subset=(), fill_value=0., verify=True):
         samples_per_frame = header0.samples_per_frame
 
         super(VDIFStreamBase, self).__init__(
@@ -318,7 +318,7 @@ class VDIFStreamBase(VLBIStreamBase):
             samples_per_frame=samples_per_frame,
             unsliced_shape=(nthread, header0.nchan), bps=header0.bps,
             complex_data=header0['complex_data'], squeeze=squeeze,
-            subset=subset, fill_value=fill_value)
+            subset=subset, fill_value=fill_value, verify=verify)
 
         self._frame_rate = int(round((self.sample_rate /
                                       self.samples_per_frame).to_value(u.Hz)))
@@ -368,10 +368,13 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         channels.  If the tuple is empty (default), all components are read.
     fill_value : float or complex, optional
         Value to use for invalid or missing data. Default: 0.
+    verify : bool, optional
+        Whether to do basic checks of frame integrity when reading.  The first
+        frameset of the stream is always checked.  Default: `True`.
     """
 
     def __init__(self, fh_raw, sample_rate=None, squeeze=True, subset=(),
-                 fill_value=0.):
+                 fill_value=0., verify=True):
         fh_raw = VDIFFileReader(fh_raw)
         # We read the first frameset, since we need to know how many threads
         # there are, and what the frameset size is.
@@ -385,7 +388,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         super(VDIFStreamReader, self).__init__(
             fh_raw, header0, sample_rate=sample_rate,
             nthread=len(frameset.frames), squeeze=squeeze, subset=subset,
-            fill_value=fill_value)
+            fill_value=fill_value, verify=verify)
         # Check whether we are reading only some threads.  This is somewhat
         # messy since normally we apply the whole subset to the whole data,
         # but here we need to split it up in the part that selects specific
@@ -464,7 +467,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     def _read_frame(self, index):
         self.fh_raw.seek(index * self._frameset_nbytes)
         frameset = self.fh_raw.read_frameset(self._thread_ids,
-                                             edv=self.header0.edv)
+                                             edv=self.header0.edv,
+                                             verify=self.verify)
         frameset.fill_value = self.fill_value
         assert ((frameset['seconds'] - self.header0['seconds']) *
                 self._frame_rate +
@@ -583,6 +587,9 @@ subset : indexing object or tuple of objects, optional
     channels.  If the tuple is empty (default), all components are read.
 fill_value : float or complex, optional
     Value to use for invalid or missing data. Default: 0.
+verify : bool, optional
+    Whether to do basic checks of frame integrity when reading.  The first
+    frameset of the stream is always checked.  Default: `True`.
 
 --- For writing a stream : (see :class:`~baseband.vdif.base.VDIFStreamWriter`)
 

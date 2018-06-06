@@ -11,6 +11,9 @@ New Features
   will check whether the file is of that format, and then load it using the
   corresponding module. [#198]
 
+- Allow users to pass a ``verify`` keyword to file openers reading streams. 
+  [#233]
+
 - Added support for the GUPPI format. [#212]
 
 - Enabled `baseband.dada.open` to read streams where the last frame has an

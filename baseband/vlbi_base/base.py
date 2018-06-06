@@ -114,7 +114,7 @@ class VLBIStreamBase(object):
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
                  unsliced_shape, bps, complex_data, squeeze, subset=(),
-                 fill_value=0.):
+                 fill_value=0., verify=True):
         self.fh_raw = fh_raw
         self._header0 = header0
         self._bps = bps
@@ -137,6 +137,8 @@ class VLBIStreamBase(object):
         self._subset = subset
         self._sample_shape = self._get_sample_shape()
         self._frame_index = None
+
+        self.verify = verify
 
     @property
     def squeeze(self):
@@ -242,6 +244,15 @@ class VLBIStreamBase(object):
             raise
         self._sample_rate = sample_rate
 
+    @property
+    def verify(self):
+        """Whether to do consistency checks on frames being read."""
+        return self._verify
+
+    @verify.setter
+    def verify(self, verify):
+        self._verify = bool(verify)
+
     def tell(self, unit=None):
         """Current offset in the file.
 
@@ -298,7 +309,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
                  unsliced_shape, bps, complex_data, squeeze, subset,
-                 fill_value):
+                 fill_value, verify):
 
         if sample_rate is None:
             try:
@@ -315,7 +326,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         super(VLBIStreamReaderBase, self).__init__(
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
-            bps, complex_data, squeeze, subset, fill_value)
+            bps, complex_data, squeeze, subset, fill_value, verify)
 
     info = VLBIStreamReaderInfo()
 
@@ -550,14 +561,14 @@ class VLBIStreamWriterBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
                  unsliced_shape, bps, complex_data, squeeze, subset,
-                 fill_value):
+                 fill_value, verify):
 
         if sample_rate is None:
             raise ValueError("must pass in an explicit `sample_rate`.")
 
         super(VLBIStreamWriterBase, self).__init__(
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
-            bps, complex_data, squeeze, subset, fill_value)
+            bps, complex_data, squeeze, subset, fill_value, verify)
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)

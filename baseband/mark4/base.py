@@ -65,7 +65,7 @@ class Mark4FileReader(VLBIFileReaderBase):
         return Mark4Header.fromfile(self, ntrack=self.ntrack,
                                     decade=self.decade, ref_time=self.ref_time)
 
-    def read_frame(self):
+    def read_frame(self, verify=True):
         """Read a single frame (header plus payload).
 
         Returns
@@ -74,9 +74,12 @@ class Mark4FileReader(VLBIFileReaderBase):
             With ``.header`` and ``.data`` properties that return the
             :class:`~baseband.mark4.Mark4Header` and data encoded in the frame,
             respectively.
+        verify : bool, optional
+            Whether to do basic checks of frame integrity.  Default: `True`.
         """
         return Mark4Frame.fromfile(self.fh_raw, self.ntrack,
-                                   decade=self.decade, ref_time=self.ref_time)
+                                   decade=self.decade, ref_time=self.ref_time,
+                                   verify=verify)
 
     def get_frame_rate(self):
         """Determine the number of frames per second.
@@ -310,13 +313,13 @@ class Mark4StreamBase(VLBIStreamBase):
     """Base for Mark 4 streams."""
 
     def __init__(self, fh_raw, header0, sample_rate=None, squeeze=True,
-                 subset=(), fill_value=0.):
+                 subset=(), fill_value=0., verify=True):
         super(Mark4StreamBase, self).__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=header0.samples_per_frame,
             unsliced_shape=(header0.nchan,),
             bps=header0.bps, complex_data=False, squeeze=squeeze,
-            subset=subset, fill_value=fill_value)
+            subset=subset, fill_value=fill_value, verify=verify)
         self._frame_rate = int(round((self.sample_rate /
                                       self.samples_per_frame).to_value(u.Hz)))
 
@@ -353,12 +356,16 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         squeezing).  If an empty tuple (default), all channels are read.
     fill_value : float or complex, optional
         Value to use for invalid or missing data. Default: 0.
+    verify : bool, optional
+        Whether to do basic checks of frame integrity when reading.  The first
+        frame of the stream is always checked.  Default: `True`.
     """
 
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, ntrack=None, decade=None,
-                 ref_time=None, squeeze=True, subset=(), fill_value=0.):
+                 ref_time=None, squeeze=True, subset=(), fill_value=0.,
+                 verify=True):
 
         if decade is None and ref_time is None:
             raise TypeError("Mark 4 stream reader requires either decade or "
@@ -375,7 +382,8 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         self._offset0 = fh_raw.tell()
         super(Mark4StreamReader, self).__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
-            squeeze=squeeze, subset=subset, fill_value=fill_value)
+            squeeze=squeeze, subset=subset, fill_value=fill_value,
+            verify=verify)
         # Use reference time in preference to decade so that a stream wrapping
         # a decade will work.
         self.fh_raw.decade = None
@@ -392,7 +400,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
 
     def _read_frame(self, index):
         self.fh_raw.seek(self._offset0 + index * self.header0.frame_nbytes)
-        frame = self.fh_raw.read_frame()
+        frame = self.fh_raw.read_frame(verify=self.verify)
         # Set decoded value for invalid data.
         frame.fill_value = self.fill_value
         # TODO: add check that we got the right frame.
@@ -485,6 +493,9 @@ subset : indexing object, optional
     squeezing).  If an empty tuple (default), all channels are read.
 fill_value : float or complex, optional
     Value to use for invalid or missing data. Default: 0.
+verify : bool, optional
+    Whether to do basic checks of frame integrity when reading.  The first
+    frame of the stream is always checked.  Default: `True`.
 
 --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
 

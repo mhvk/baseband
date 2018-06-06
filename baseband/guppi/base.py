@@ -39,7 +39,7 @@ class GUPPIFileReader(VLBIFileReaderBase):
         """
         return GUPPIHeader.fromfile(self.fh_raw)
 
-    def read_frame(self, memmap=True):
+    def read_frame(self, memmap=True, verify=True):
         """Read the frame header and read or map the corresponding payload.
 
         Parameters
@@ -47,6 +47,8 @@ class GUPPIFileReader(VLBIFileReaderBase):
         memmap : bool, optional
             If `True` (default), map the payload using `~numpy.memmap`, so that
             parts are only loaded into memory as needed to access data.
+        verify : bool, optional
+            Whether to do basic checks of frame integrity.  Default: `True`.
 
         Returns
         -------
@@ -56,7 +58,7 @@ class GUPPIFileReader(VLBIFileReaderBase):
             be too large to fit in memory, it may be better to access the
             parts of interest by slicing the frame.
         """
-        return GUPPIFrame.fromfile(self.fh_raw, memmap=memmap)
+        return GUPPIFrame.fromfile(self.fh_raw, memmap=memmap, verify=verify)
 
     def get_frame_rate(self):
         """Determine the number of frames per second.
@@ -137,7 +139,7 @@ class GUPPIStreamBase(VLBIStreamBase):
 
     _sample_shape_maker = GUPPIPayload._sample_shape_maker
 
-    def __init__(self, fh_raw, header0, squeeze=True, subset=()):
+    def __init__(self, fh_raw, header0, squeeze=True, subset=(), verify=True):
 
         # GUPPI headers report their offsets using 'PKTIDX', the number of
         # unique UDP data packets (i.e. excluding overlap) written since the
@@ -155,7 +157,7 @@ class GUPPIStreamBase(VLBIStreamBase):
             samples_per_frame=samples_per_frame,
             unsliced_shape=header0.sample_shape, bps=header0.bps,
             complex_data=header0.complex_data, squeeze=squeeze, subset=subset,
-            fill_value=0.)
+            fill_value=0., verify=verify)
 
     # Overriding so the docstring indicates the exclusion of the overlap.
     samples_per_frame = property(VLBIStreamBase.samples_per_frame.fget,
@@ -182,12 +184,17 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
         polarizations.  With a tuple, the first selects polarizations and the
         second selects channels.  If the tuple is empty (default), all
         components are read.
+    verify : bool, optional
+        Whether to do basic checks of frame integrity when reading.  The first
+        frame of the stream is always checked, so ``verify`` is effective only
+        when reading sequences of files.  Default: `True`.
     """
-    def __init__(self, fh_raw, squeeze=True, subset=()):
+    def __init__(self, fh_raw, squeeze=True, subset=(), verify=True):
         fh_raw = GUPPIFileReader(fh_raw)
         header0 = GUPPIHeader.fromfile(fh_raw)
         super(GUPPIStreamReader, self).__init__(fh_raw, header0,
-                                                squeeze=squeeze, subset=subset)
+                                                squeeze=squeeze,
+                                                subset=subset, verify=verify)
 
     @lazyproperty
     def _last_header(self):
@@ -201,7 +208,7 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
 
     def _read_frame(self, index):
         self.fh_raw.seek(index * self.header0.frame_nbytes)
-        frame = self.fh_raw.read_frame(memmap=True)
+        frame = self.fh_raw.read_frame(memmap=True, verify=self.verify)
         assert (frame.header['PKTIDX'] - self.header0['PKTIDX'] ==
                 index * self._packets_per_frame)
         return frame
