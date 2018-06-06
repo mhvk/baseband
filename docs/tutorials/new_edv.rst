@@ -90,7 +90,7 @@ inheritance diagram.  To support a new EDV, we create a new subclass to
 
     >>> class VDIFHeader4(vdif.header.VDIFHeader):
     ...     _edv = 4
-    ...     
+    ...
     ...     _header_parser = vlbi.header.HeaderParser(
     ...         (('invalid_data', (0, 31, 1, False)),
     ...          ('legacy_mode', (0, 30, 1, False)),

@@ -119,7 +119,9 @@ class VDIFFrame(VLBIFrameBase):
         """
         header = cls._header_class.fromfile(fh, edv, verify)
         payload = cls._payload_class.fromfile(fh, header=header)
-        return cls(header, payload, verify=verify)
+        # Since header was (optionally) verified, and payload was initialized
+        # using header, frame verification is unnecessary.
+        return cls(header, payload, verify=False)
 
     @classmethod
     def fromdata(cls, data, header=None, verify=True, **kwargs):
