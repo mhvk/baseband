@@ -23,7 +23,7 @@ API Changes
 -----------
 
 - In analogy with Mark 5B, VDIF header time getting and setting now requires
-  a frame rate rather than a sample rate. [#217]
+  a frame rate rather than a sample rate. [#217, #218]
 
 - DADA and GUPPI now support passing either a ``start_time`` or ``offset`` 
   (in addition to ``time``) to set the start time in the header. [#240]
