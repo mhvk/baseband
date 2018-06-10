@@ -16,7 +16,7 @@ Baseband requires:
 Installing Baseband
 ===================
 
-Using pip
+Using PIP
 ---------
 
 To install Baseband with `pip <http://www.pip-installer.org/en/latest/>`_,
@@ -29,7 +29,7 @@ run::
     To run without pip potentially updating Numpy and Astropy, run, include the
     ``--no-deps`` flag.
 
-Obtaining source code
+Obtaining Source Code
 ---------------------
 
 The source code and latest development version of Baseband can found on `its
@@ -41,7 +41,7 @@ using::
 Of course, it is even better to fork it on GitHub, and then clone your own
 repository, so that you can more easily contribute!
 
-Running code without installing
+Running Code without Installing
 -------------------------------
 
 As Baseband is purely Python, it can be used without being built or installed,
@@ -54,7 +54,7 @@ the path::
 
 where ``BASEBAND_PATH`` is the directory you downloaded or cloned Baseband into.
 
-Installing source code
+Installing Source Code
 ----------------------
 
 If you want Baseband to be more broadly available, either to all users on a
@@ -72,7 +72,7 @@ are described further in `Astropy's installation documentation
 
 .. _sourcebuildtest:
 
-Testing the installation
+Testing the Installation
 ========================
 
 The root directory :file:`setup.py` can also be used to test if Baseband can
@@ -92,7 +92,7 @@ documentation can be found on the `Astropy running tests documentation
 
 .. _builddocs:
 
-Building documentation
+Building Documentation
 ======================
 
 .. note::
