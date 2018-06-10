@@ -21,7 +21,7 @@ Overview
 ========
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    install
    tutorials/getting_started
