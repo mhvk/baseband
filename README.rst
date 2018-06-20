@@ -5,8 +5,8 @@ Baseband: a Package for Radio Baseband I/O
     :target: http://www.astropy.org
     :alt: Powered by Astropy Badge
 
-.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214269.svg
-   :target: https://doi.org/10.5281/zenodo.1214269
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214268.svg
+   :target: https://doi.org/10.5281/zenodo.1214268
 
 Baseband is a package for reading and writing VLBI and other radio baseband
 files, with the aim of simplifying and streamlining data conversion and
