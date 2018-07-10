@@ -54,7 +54,7 @@ decoder_levels = {
     1: np.array([-1.0, 1.0], dtype=np.float32),
     2: np.array([-OPTIMAL_2BIT_HIGH, -1.0, 1.0, OPTIMAL_2BIT_HIGH],
                 dtype=np.float32),
-    4: (np.arange(16, dtype=np.float32) - 8.)/FOUR_BIT_1_SIGMA}
+    4: (np.arange(16, dtype=np.float32) - 8.) / FOUR_BIT_1_SIGMA}
 """Levels for data encoded with different numbers of bits.."""
 
 two_bit_2_sigma = 2 * TWO_BIT_1_SIGMA
@@ -95,8 +95,8 @@ def encode_4bit_base(values):
     This returns an unsigned integer array containing encoded sample
     values that range from 0 to 15.  Floating point sample values are
     converted to unsigned int by first scaling them by
-    ``FOUR_BIT_1_SIGMA = 2.95``, then adding 8.  Some sample output
-    levels are:
+    ``FOUR_BIT_1_SIGMA = 2.95``, then adding 8.5 (the 0.5 to ensure proper
+    rounding when typecasting to uint8). Some sample output levels are:
 
       ========================= ======
       Input range               Output
@@ -111,7 +111,7 @@ def encode_4bit_base(values):
     """
     # Optimized for speed by doing calculations in-place.
     values = values * FOUR_BIT_1_SIGMA
-    values += 8.
+    values += 8.5
     return np.clip(values, 0., 15., out=values).astype(np.uint8)
 
 
