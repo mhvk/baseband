@@ -7,6 +7,9 @@ Bug Fixes
 - Ensure ``gsb`` times can be decoded with astropy-dev (which is to become
   astropy 3.1). [#249]
 
+- Fixed rounding error when encoding 4-bit data using
+  `baseband.vlbi_base.encoding.encode_4bit_base`. [#250]
+
 1.1 (2018-06-06)
 ================
 
