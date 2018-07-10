@@ -280,10 +280,13 @@ class TestVDIF(object):
         assert np.allclose(payload2.data, acmplx)
         header = vdif.VDIFHeader.fromvalues(edv=0, complex_data=False, bps=8,
                                             payload_nbytes=payload1.nbytes)
-        assert np.all(vdif.VDIFPayload.fromdata(areal, header) == payload1)
+        assert vdif.VDIFPayload.fromdata(areal, header) == payload1
+        # Also check that a circular decode-encode is self-consistent.
+        assert vdif.VDIFPayload.fromdata(payload1.data, header) == payload1
         header['complex_data'] = True
-        assert np.all(vdif.VDIFPayload.fromdata(acmplx, header) == payload2)
-        # Also check for bps=4
+        assert vdif.VDIFPayload.fromdata(acmplx, header) == payload2
+        assert vdif.VDIFPayload.fromdata(payload2.data, header) == payload2
+        # Also check for bps=4.
         decode = (aint[:, np.newaxis] >> np.array([0, 4])) & 0xf
         areal = ((decode - 8.) / 2.95).reshape(-1, 1)
         acmplx = areal[::2] + 1j * areal[1::2]
@@ -294,8 +297,10 @@ class TestVDIF(object):
         header = vdif.VDIFHeader.fromvalues(edv=0, complex_data=False, bps=4,
                                             payload_nbytes=payload3.nbytes)
         assert vdif.VDIFPayload.fromdata(areal, header) == payload3
+        assert vdif.VDIFPayload.fromdata(payload3.data, header) == payload3
         header['complex_data'] = True
         assert vdif.VDIFPayload.fromdata(acmplx, header) == payload4
+        assert vdif.VDIFPayload.fromdata(payload4.data, header) == payload4
 
     def test_payload(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
