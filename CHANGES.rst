@@ -1,4 +1,13 @@
-1.1 (unreleased)
+1.1.1 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- Ensure ``gsb`` times can be decoded with astropy-dev (which is to become
+  astropy 3.1). [#249]
+
+1.1 (2018-06-06)
 ================
 
 New Features
@@ -11,7 +20,7 @@ New Features
   will check whether the file is of that format, and then load it using the
   corresponding module. [#198]
 
-- Allow users to pass a ``verify`` keyword to file openers reading streams. 
+- Allow users to pass a ``verify`` keyword to file openers reading streams.
   [#233]
 
 - Added support for the GUPPI format. [#212]
@@ -25,7 +34,7 @@ API Changes
 - In analogy with Mark 5B, VDIF header time getting and setting now requires
   a frame rate rather than a sample rate. [#217, #218]
 
-- DADA and GUPPI now support passing either a ``start_time`` or ``offset`` 
+- DADA and GUPPI now support passing either a ``start_time`` or ``offset``
   (in addition to ``time``) to set the start time in the header. [#240]
 
 Bug Fixes
