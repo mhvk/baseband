@@ -1,7 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 from __future__ import division, unicode_literals, print_function
 import io
-import os
 import re
 
 import numpy as np
@@ -23,8 +22,8 @@ __all__ = ['DADAFileNameSequencer', 'DADAFileReader', 'DADAFileWriter',
            'DADAStreamBase', 'DADAStreamReader', 'DADAStreamWriter', 'open']
 
 
-class DADAFileNameSequencer:
-    """List-like generator of filenames using a template.
+class DADAFileNameSequencer(sf.FileNameSequencer):
+    """List-like generator of DADA filenames using a template.
 
     The template is formatted, filling in any items in curly brackets with
     values from the header, as well as possibly a file number equal to the
@@ -39,7 +38,8 @@ class DADAFileNameSequencer:
     Parameters
     ----------
     template : str
-        Template to format to get specific filenames.
+        Template to format to get specific filenames.  Curly bracket item
+        keywords are not case-sensitive.
     header : dict-like
         Structure holding key'd values that are used to fill in the format.
         Keys must be in all caps (eg. ``DATE``), as with DADA header keys.
@@ -48,9 +48,6 @@ class DADAFileNameSequencer:
     --------
 
     >>> from baseband import dada
-    >>> dfs = dada.base.DADAFileNameSequencer('a{file_nr:03d}.dada', {})
-    >>> dfs[10]
-    'a010.dada'
     >>> dfs = dada.base.DADAFileNameSequencer(
     ...     '{date}_{file_nr:03d}.dada', {'DATE': "2018-01-01"})
     >>> dfs[10]
@@ -59,7 +56,7 @@ class DADAFileNameSequencer:
     >>> with open(SAMPLE_DADA, 'rb') as fh:
     ...     header = dada.DADAHeader.fromfile(fh)
     >>> template = '{utc_start}.{obs_offset:016d}.000000.dada'
-    >>> dfs = DADAFileNameSequencer(template, header)
+    >>> dfs = dada.base.DADAFileNameSequencer(template, header)
     >>> dfs[0]
     '2013-07-02-01:37:40.0000006400000000.000000.dada'
     >>> dfs[1]
@@ -85,24 +82,14 @@ class DADAFileNameSequencer:
             self._obs_offset0 = self.items['OBS_OFFSET']
             self._file_size = header['FILE_SIZE']
 
-    def __getitem__(self, frame_nr):
-        if frame_nr < 0:
-            frame_nr += len(self)
-            if frame_nr < 0:
-                raise IndexError('frame number out of range.')
-
-        self.items['FRAME_NR'] = self.items['FILE_NR'] = frame_nr
+    def _process_items(self, file_nr):
+        super(DADAFileNameSequencer, self)._process_items(file_nr)
+        # Pop file_nr, as we need to capitalize it.
+        file_nr = self.items.pop('file_nr')
+        self.items['FRAME_NR'] = self.items['FILE_NR'] = file_nr
         if self._has_obs_offset:
             self.items['OBS_OFFSET'] = (self._obs_offset0 +
-                                        frame_nr * self._file_size)
-        return self.template.format(**self.items)
-
-    def __len__(self):
-        frame_nr = 0
-        while os.path.isfile(self[frame_nr]):
-            frame_nr += 1
-
-        return frame_nr
+                                        file_nr * self._file_size)
 
 
 class DADAFileReader(VLBIFileReaderBase):

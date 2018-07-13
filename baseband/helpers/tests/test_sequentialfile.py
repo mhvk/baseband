@@ -8,6 +8,9 @@ from astropy.tests.helper import pytest
 
 from .. import sequentialfile as sf
 
+from baseband import vdif
+from baseband.data import SAMPLE_VDIF as SAMPLE_FILE
+
 
 class Sequencer(object):
     def __init__(self, template):
@@ -288,3 +291,42 @@ class TestSequentialFileWriter(object):
         with sf.open(self.files, 'wb', file_size=10) as fh:
             with pytest.raises(ValueError):
                 fh.memmap(shape=(5,))
+
+
+class TestFileNameSequencer(object):
+    def setup(self):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            self.header = vdif.VDIFHeader.fromfile(fh)
+
+    def test_enumeration(self):
+        fns1 = sf.FileNameSequencer('x{file_nr:03d}.vdif', {})
+        assert fns1[0] == 'x000.vdif'
+        assert fns1[107] == 'x107.vdif'
+        fns2 = sf.FileNameSequencer('{SNAKE}_{file_nr}', {'SNAKE': 'python'})
+        assert fns2[13] == 'python_13'
+
+        with pytest.raises(KeyError):
+            sf.FileNameSequencer('{SNAKE:06d}.x', {'PYTHON': 10})
+
+    def test_header_extraction(self):
+        # Follow the typical naming scheme:
+        # 2016-04-23-07:29:30_0000000000000000.000000.dada
+        template = 'x.v{vdif_version}.{header_time}.{file_nr:05d}.vdif'
+        fns = sf.FileNameSequencer(template, self.header)
+        assert fns[0] == 'x.v1.2014-06-16T05:56:07.00000.vdif'
+        assert fns[133] == 'x.v1.2014-06-16T05:56:07.00133.vdif'
+
+    def test_len(self, tmpdir):
+        template = str(tmpdir.join('a{file_nr}.bin'))
+        fns = sf.FileNameSequencer(template, {})
+        for i in range(5):
+            assert len(fns) == i
+            filename = fns[i]
+            assert filename.endswith('a{}.bin'.format(i))
+            with open(filename, 'wb') as fh:
+                fh.write(b'bird')
+        assert len(fns) == 5
+        assert fns[-2] == fns[3]
+        assert fns[-1].endswith('a4.bin')
+        with pytest.raises(IndexError):
+            fns[-10]

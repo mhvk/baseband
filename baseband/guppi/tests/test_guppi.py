@@ -9,6 +9,7 @@ import astropy.units as u
 from astropy.tests.helper import catch_warnings
 from ... import guppi
 from ...helpers import sequentialfile as sf
+from ..base import GUPPIFileNameSequencer
 from ...data import SAMPLE_PUPPI as SAMPLE_FILE
 
 
@@ -584,3 +585,17 @@ class TestGUPPI(object):
             fn.seek(1231)
             new_data = fn.read(47)
             assert np.all(new_data == data[1231:1231 + 47])
+
+
+class TestGUPPIFileNameSequencer(object):
+    def setup(self):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            self.header = guppi.GUPPIHeader.fromfile(fh)
+
+    def test_header_extraction(self):
+        # Follow Nikhil's J1810 Arecibo observation file naming scheme:
+        # puppi_58132_J1810+1744_2176.0000.raw, etc.
+        template = 'puppi_{stt_imjd}_{src_name}_{scannum}.{file_nr:04d}.raw'
+        fns = GUPPIFileNameSequencer(template, self.header)
+        assert fns[0] == 'puppi_58132_J1810+1744_2176.0000.raw'
+        assert fns[29] == 'puppi_58132_J1810+1744_2176.0029.raw'
