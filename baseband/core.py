@@ -6,7 +6,7 @@ import numpy as np
 
 __all__ = ['file_info', 'open']
 
-FILE_FORMATS = ('dada', 'mark4', 'mark5b', 'vdif', 'gsb')
+FILE_FORMATS = ('dada', 'mark4', 'mark5b', 'vdif', 'guppi', 'gsb')
 
 
 def file_info(name, format=FILE_FORMATS, **kwargs):
