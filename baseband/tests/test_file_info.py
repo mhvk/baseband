@@ -5,13 +5,13 @@ from __future__ import (absolute_import, division, print_function,
 import importlib
 import pytest
 from astropy.time import Time
-import astropy.units as u
 
 from .. import file_info
 from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
                     SAMPLE_VDIF, SAMPLE_MWA_VDIF as SAMPLE_MWA, SAMPLE_DADA,
-                    SAMPLE_GSB_RAWDUMP_HEADER, SAMPLE_GSB_RAWDUMP,
-                    SAMPLE_GSB_PHASED_HEADER, SAMPLE_GSB_PHASED)
+                    SAMPLE_PUPPI, SAMPLE_GSB_RAWDUMP_HEADER,
+                    SAMPLE_GSB_RAWDUMP, SAMPLE_GSB_PHASED_HEADER,
+                    SAMPLE_GSB_PHASED)
 
 
 @pytest.mark.parametrize(
@@ -21,6 +21,7 @@ from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
      (SAMPLE_VDIF, 'vdif'),
      (SAMPLE_MWA, 'vdif'),
      (SAMPLE_DADA, 'dada'),
+     (SAMPLE_PUPPI, 'guppi'),
      (SAMPLE_GSB_RAWDUMP_HEADER, 'gsb'),
      (SAMPLE_GSB_PHASED_HEADER, 'gsb')))
 def test_basic_file_info(sample, format_):
@@ -51,7 +52,8 @@ def test_open_missing_args(sample, missing):
     ((SAMPLE_M4, 'mark4', ('ref_time',), ('nchan',), ()),
      (SAMPLE_M5B, 'mark5b', ('ref_time', 'nchan'), (), ()),
      (SAMPLE_VDIF, 'vdif', (), ('nchan', 'ref_time'), ()),
-     (SAMPLE_DADA, 'dada', (), ('ref_time',), ('nchan',))))
+     (SAMPLE_DADA, 'dada', (), ('ref_time',), ('nchan',)),
+     (SAMPLE_PUPPI, 'guppi', (), ('nchan',), ('ref_time',))))
 def test_file_info(sample, format_, used, consistent, inconsistent):
     # Pass on extra arguments needed to get Mark4 and Mark5B to pass.
     # For GSB, we also need raw files, so we omit them.
