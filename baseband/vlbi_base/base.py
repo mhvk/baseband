@@ -2,6 +2,7 @@
 from __future__ import division, unicode_literals, print_function
 
 import io
+import six
 import warnings
 import numpy as np
 import operator
@@ -9,6 +10,7 @@ from collections import namedtuple
 import astropy.units as u
 from astropy.utils import lazyproperty
 from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from ..helpers import sequentialfile as sf
 
 
 __all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
@@ -641,7 +643,25 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         return super(VLBIStreamWriterBase, self).close()
 
 
-default_open_doc = """Open baseband file for reading or writing.
+default_open_doc_head = """Open baseband file for reading or writing.
+
+Opened as a binary file, one gets a wrapped filehandle that adds
+methods to read/write a frame.  Opened as a stream, the handle is
+wrapped further, with methods such as reading and writing to the file
+as if it were a stream of samples.
+
+Parameters
+----------
+name : str or filehandle
+    File name or handle.
+mode : {'rb', 'wb', 'rs', or 'ws'}, optional
+    Whether to open for reading or writing, and as a regular binary
+    file or as a stream. Default: 'rs', for reading a stream.
+**kwargs
+    Additional arguments when opening the file as a stream.
+"""
+
+default_open_doc_tail = """Open baseband file for reading or writing.
 
 Opened as a binary file, one gets a wrapped filehandle that adds
 methods to read/write a frame.  Opened as a stream, the handle is
@@ -660,29 +680,83 @@ mode : {'rb', 'wb', 'rs', or 'ws'}, optional
 """
 
 
-def make_opener(fmt, classes, doc='', append_doc=True):
+def make_opener(fmt, reader_classes, seqfile_class, filesize_func=None,
+                doc='', append_doc=True):
     """Create a baseband file opener.
 
     Parameters
     ----------
     fmt : str
         Name of the baseband format.
-    classes : dict
+    reader_classes : dict
         With the file/stream reader/writer classes keyed by names equal to
         'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed by
-        ``fmt``.  Typically, one will pass in ``classes=globals()``.
+        ``fmt``.  Typically, one will pass in ``reader_classes=globals()``.
     doc : str, optional
         If given, used to define the docstring of the opener.
     append_doc : bool, optional
         If `True` (default), append ``doc`` to the default docstring rather
         than override it.
     """
-    module = classes.get('__name__', None)
-    classes = {cls_type: classes[fmt + cls_type]
-               for cls_type in ('FileReader', 'FileWriter',
-                                'StreamReader', 'StreamWriter')}
+    module = reader_classes.get('__name__', None)
+    reader_classes = {cls_type: reader_classes[fmt + cls_type]
+                      for cls_type in ('Header', 'FileReader', 'FileWriter',
+                                       'StreamReader', 'StreamWriter')}
 
     def open(name, mode='rs', **kwargs):
+        # 
+        header0 = kwargs.get('header0', None)
+        squeeze = kwargs.pop('squeeze', None)
+        # If sequentialfile object, check that it's opened properly.
+        if isinstance(name, sf.SequentialFileBase):
+            assert (('r' in mode and name.mode == 'rb') or
+                    ('w' in mode and name.mode == 'w+b')), (
+                        "open only accepts sequential files opened in 'rb' "
+                        "mode for reading or 'w+b' mode for writing.")
+        is_template = isinstance(name, six.string_types) and ('{' in name and
+                                                              '}' in name)
+        is_sequence = isinstance(name, (tuple, list))
+
+        if 'b' not in mode:
+            if header0 is None:
+                if 'w' in mode:
+                    # For writing a header is required.
+                    header0 = reader_classes[cls_type].fromvalues(**kwargs)
+                    kwargs = {}
+
+                elif is_template and ('OBS_OFFSET' in name or
+                                      'obs_offset' in name):
+                    # For reading try reading header from first file if needed.
+                    # We make a temporary file sequencer for this, as the real one
+                    # will need the header file size.
+                    kwargs = {key.upper(): value for key, value in kwargs.items()}
+                    for key in ('FILE_NR', 'FRAME_NR', 'OBS_OFFSET', 'FILE_SIZE'):
+                        kwargs.setdefault(key, 0)
+                    first_file = (DADAFileNameSequencer(name, kwargs)
+                                  [kwargs['FRAME_NR']])
+                    with io.open(first_file, 'rb') as fh:
+                        header0 = DADAHeader.fromfile(fh)
+                    kwargs = {}
+                else:
+                    header0 = {}
+
+            if is_template:
+                name = DADAFileNameSequencer(name, header0)
+
+            if is_template or is_sequence:
+                if 'r' in mode:
+                    name = sf.open(name, 'rb')
+                else:
+                    name = sf.open(name, 'w+b', file_size=header0.frame_nbytes)
+
+            if header0 and 'w' in mode:
+                kwargs['header0'] = header0
+
+        if squeeze is not None:
+            kwargs['squeeze'] = squeeze
+
+
+
         if 'b' in mode:
             cls_type = 'File'
         else:
@@ -703,7 +777,7 @@ def make_opener(fmt, classes, doc='', append_doc=True):
                              "or writing (mode='r' or 'w')."
                              .format(fmt))
         try:
-            return classes[cls_type](name, **kwargs)
+            return reader_classes[cls_type](name, **kwargs)
         except Exception as exc:
             if not got_fh:
                 try:
