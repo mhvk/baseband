@@ -90,6 +90,15 @@ class FileNameSequencer(object):
 
         return file_nr
 
+    @classmethod
+    def template_first_file(cls, name, **kwargs):
+        """Returns the first file of a template based on its keys.
+
+        Used by openers to access first header within a file sequence.
+        """
+        kwargs.setdefault('file_nr', 0)
+        return cls(name, kwargs)[kwargs['file_nr']]
+
 
 class SequentialFileBase(object):
     """Deal with several files as if they were one contiguous one.

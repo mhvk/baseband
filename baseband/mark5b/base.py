@@ -8,6 +8,7 @@ from astropy.utils import lazyproperty
 from ..vlbi_base.base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase,
                               make_opener)
+from ..helpers import sequentialfile as sf
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 from .frame import Mark5BFrame
@@ -393,8 +394,12 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
         # Reuse payload.
         return Mark5BFrame(header, self._payload, valid=True)
 
-
-open = make_opener('Mark5B', globals(), doc="""
+# 2**14 is totally arbitrary.
+open = make_opener('Mark5B', globals(), sf.FileNameSequencer,
+                   ('sample_rate', 'kday', 'ref_time', 'nchan',
+                    'bps', 'squeeze', 'subset', 'fill_value', 'verify'),
+                   ('sample_rate', 'nchan', 'bps', 'squeeze'),
+                   default_frames_per_file=2**14, doc="""
 --- For reading a stream : (see `~baseband.mark5b.base.Mark5BStreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional

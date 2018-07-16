@@ -80,7 +80,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
         self._has_obs_offset = 'OBS_OFFSET' in self.items
         if self._has_obs_offset:
             self._obs_offset0 = self.items['OBS_OFFSET']
-            self._file_size = header['FILE_SIZE']
+            self._payload_size = header['FILE_SIZE']
 
     def _process_items(self, file_nr):
         super(DADAFileNameSequencer, self)._process_items(file_nr)
@@ -89,7 +89,18 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
         self.items['FRAME_NR'] = self.items['FILE_NR'] = file_nr
         if self._has_obs_offset:
             self.items['OBS_OFFSET'] = (self._obs_offset0 +
-                                        file_nr * self._file_size)
+                                        file_nr * self._payload_size)
+
+    @classmethod
+    def template_first_file(cls, name, **kwargs):
+        """Returns the first file of a template based on its keys.
+
+        Used by openers to access first header within a file sequence.
+        """
+        kwargs = {key.upper(): value for key, value in kwargs.items()}
+        for key in ('FILE_NR', 'FRAME_NR', 'OBS_OFFSET', 'FILE_SIZE'):
+            kwargs.setdefault(key, 0)
+        return cls(name, kwargs)[kwargs['FRAME_NR']]
 
 
 class DADAFileReader(VLBIFileReaderBase):
@@ -337,12 +348,40 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     raw : filehandle
         For writing the header and raw data to storage.
     header0 : :class:`~baseband.dada.DADAHeader`
-        Header for the first frame, holding time information, etc.
+        Header for the first frame, holding time information, etc.  Can instead
+        give keyword arguments to construct a header (see ``**kwargs``).
     squeeze : bool, optional
         If `True` (default), `write` accepts squeezed arrays as input,
         and adds any dimensions of length unity.
+    **kwargs
+        If no header is given, an attempt is made to construct one from these.
+        For a standard header, this would include the following.
+
+    --- Header keywords : (see :meth:`~baseband.dada.DADAHeader.fromvalues`)
+
+    time : `~astropy.time.Time`
+        Start time of the file.
+    samples_per_frame : int,
+        Number of complete samples per frame.
+    sample_rate : `~astropy.units.Quantity`
+        Number of complete samples per second, i.e. the rate at which each
+        channel of each polarization is sampled.
+    offset : `~astropy.units.Quantity` or `~astropy.time.TimeDelta`, optional
+        Time offset from the start of the whole observation (default: 0).
+    npol : int, optional
+        Number of polarizations (default: 1).
+    nchan : int, optional
+        Number of channels (default: 1).
+    complex_data : bool, optional
+        Whether data are complex (default: `False`).
+    bps : int, optional
+        Bits per elementary sample, i.e. per real or imaginary component for
+        complex data (default: 8).
     """
-    def __init__(self, fh_raw, header0, squeeze=True):
+
+    def __init__(self, fh_raw, header0=None, squeeze=True, **kwargs):
+        if header0 is None:
+            header0 = DADAHeader.fromvalues(**kwargs)
         assert header0.get('OBS_OVERLAP', 0) == 0
         fh_raw = DADAFileWriter(fh_raw)
         super(DADAStreamWriter, self).__init__(fh_raw, header0,
@@ -364,7 +403,9 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
         del frame
 
 
-opener = make_opener('DADA', globals(), doc="""
+open = make_opener('DADA', globals(), DADAFileNameSequencer,
+                   ('squeeze', 'subset', 'verify'), ('squeeze',),
+                   default_frames_per_file=1, doc="""
 --- For reading a stream : (see :class:`~baseband.dada.base.DADAStreamReader`)
 
 squeeze : bool, optional
@@ -387,28 +428,8 @@ squeeze : bool, optional
     any dimensions of length unity.
 **kwargs
     If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.
-
---- Header keywords : (see :meth:`~baseband.dada.DADAHeader.fromvalues`)
-
-time : `~astropy.time.Time`
-    Start time of the file.
-samples_per_frame : int,
-    Number of complete samples per frame.
-sample_rate : `~astropy.units.Quantity`
-    Number of complete samples per second, i.e. the rate at which each
-    channel of each polarization is sampled.
-offset : `~astropy.units.Quantity` or `~astropy.time.TimeDelta`, optional
-    Time offset from the start of the whole observation (default: 0).
-npol : int, optional
-    Number of polarizations (default: 1).
-nchan : int, optional
-    Number of channels (default: 1).
-complex_data : bool, optional
-    Whether data are complex (default: `False`).
-bps : int, optional
-    Bits per elementary sample, i.e. per real or imaginary component for
-    complex data (default: 8).
+    with any further keyword arguments.  See
+    :class:`~baseband.dada.base.DADAStreamWriter`.
 
 Returns
 -------
@@ -417,71 +438,12 @@ Filehandle
     :class:`~baseband.dada.base.DADAFileWriter` (binary), or
     :class:`~baseband.dada.base.DADAStreamReader` or
     :class:`~baseband.dada.base.DADAStreamWriter` (stream).
-""")
 
-
-# Need to wrap the opener to be able to deal with file lists or templates.
-# TODO: move this up to the opener??
-def open(name, mode='rs', **kwargs):
-    header0 = kwargs.get('header0', None)
-    squeeze = kwargs.pop('squeeze', None)
-    # If sequentialfile object, check that it's opened properly.
-    if isinstance(name, sf.SequentialFileBase):
-        assert (('r' in mode and name.mode == 'rb') or
-                ('w' in mode and name.mode == 'w+b')), (
-                    "open only accepts sequential files opened in 'rb' mode "
-                    "for reading or 'w+b' mode for writing.")
-    is_template = isinstance(name, six.string_types) and ('{' in name and
-                                                          '}' in name)
-    is_sequence = isinstance(name, (tuple, list))
-
-    if 'b' not in mode:
-        if header0 is None:
-            if 'w' in mode:
-                # For writing a header is required.
-                header0 = DADAHeader.fromvalues(**kwargs)
-                kwargs = {}
-
-            elif is_template and ('OBS_OFFSET' in name or
-                                  'obs_offset' in name):
-                # For reading try reading header from first file if needed.
-                # We make a temporary file sequencer for this, as the real one
-                # will need the header file size.
-                kwargs = {key.upper(): value for key, value in kwargs.items()}
-                for key in ('FILE_NR', 'FRAME_NR', 'OBS_OFFSET', 'FILE_SIZE'):
-                    kwargs.setdefault(key, 0)
-                first_file = (DADAFileNameSequencer(name, kwargs)
-                              [kwargs['FRAME_NR']])
-                with io.open(first_file, 'rb') as fh:
-                    header0 = DADAHeader.fromfile(fh)
-                kwargs = {}
-            else:
-                header0 = {}
-
-        if is_template:
-            name = DADAFileNameSequencer(name, header0)
-
-        if is_template or is_sequence:
-            if 'r' in mode:
-                name = sf.open(name, 'rb')
-            else:
-                name = sf.open(name, 'w+b', file_size=header0.frame_nbytes)
-
-        if header0 and 'w' in mode:
-            kwargs['header0'] = header0
-
-    if squeeze is not None:
-        kwargs['squeeze'] = squeeze
-
-    return opener(name, mode, **kwargs)
-
-
-open.__doc__ = opener.__doc__ + """\n
 Notes
 -----
-For streams, one can also pass in a list of files, or a template string that
-can be formatted using 'frame_nr', 'obs_offset', and other header keywords
-(by `~baseband.dada.base.DADAFileNameSequencer`).
+For streams, one can pass a template string formatted using header
+keywords.  In particular, 'obs_offset' and 'frame_nr' are
+appropriately incremented by `~baseband.dada.base.DADAFileNameSequencer`.
 
 For writing, one can mimic what is done at quite a few telescopes by using
 the template '{utc_start}_{obs_offset:016d}.000000.dada'.
@@ -497,4 +459,4 @@ keyword arguments with values appropriate for the first file.
 One may also pass in a `~baseband.helpers.sequentialfile` object
 (opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
 cases it is practically identical to passing in a list or template.
-"""
+""")

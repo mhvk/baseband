@@ -8,6 +8,7 @@ import astropy.units as u
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase)
+from ..helpers import sequentialfile as sf
 from .header import Mark4Header
 from .payload import Mark4Payload
 from .frame import Mark4Frame
@@ -468,7 +469,12 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
         return Mark4Frame(header, self._payload)
 
 
-open = make_opener('Mark4', globals(), doc="""
+# 2**14 is totally arbitrary.
+open = make_opener('Mark4', globals(), sf.FileNameSequencer,
+                   ('sample_rate', 'ntrack', 'decade', 'ref_time',
+                    'squeeze', 'subset', 'fill_value', 'verify'),
+                   ('sample_rate', 'squeeze'),
+                   default_frames_per_file=2**14, doc="""
 --- For reading a stream : (see `~baseband.mark4.base.Mark4StreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional

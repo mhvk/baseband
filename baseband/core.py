@@ -47,7 +47,12 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
       - ``inconsistent_kwargs``: not needed to open the file, and inconsistent.
       - ``irrelevant_kwargs``: provide information irrelevant for opening.
     """
-    if isinstance(format, tuple):
+
+    # Handle lists and tuples of files, which may be passed from open.
+    if isinstance(name, (tuple, list)):
+        return file_info(name[0], format, **kwargs)
+    # If we're looking at one file but multiple formats, cycle through formats.
+    elif isinstance(format, tuple):
         for format_ in format:
             info = file_info(name, format_, **kwargs)
             if info:

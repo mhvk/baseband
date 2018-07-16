@@ -544,6 +544,19 @@ class TestGUPPI(object):
             data3 = fr.read()
         assert np.all(data3 == data)
 
+        # Test writing and reading based on a pattern.
+        template = str(tmpdir.join('guppi_{file_nr:01d}.raw'))
+        with guppi.open(template, 'ws', header0=self.header_w,
+                        file_size=(2 * self.header_w.frame_nbytes)) as fw:
+            fw.write(data)
+
+        with guppi.open(template, 'rs') as fn:
+            assert len(fn.fh_raw.files) == 2
+            assert fn.fh_raw.files[-1] == str(tmpdir.join('guppi_1.raw'))
+            data4 = fn.read()
+        assert np.all(data4 == data)
+
+
     def test_partial_last_frame(self, tmpdir):
         """Test reading a file with an incomplete last frame."""
         # Read in sample file as a byte stream.
