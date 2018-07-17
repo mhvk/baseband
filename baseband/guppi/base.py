@@ -1,6 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 from __future__ import division, unicode_literals, print_function
 
+import re
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -13,8 +14,75 @@ from .payload import GUPPIPayload
 from .frame import GUPPIFrame
 
 
-__all__ = ['GUPPIFileReader', 'GUPPIFileWriter', 'GUPPIStreamBase',
-           'GUPPIStreamReader', 'GUPPIStreamWriter', 'open']
+__all__ = ['GUPPIFileNameSequencer', 'GUPPIFileReader', 'GUPPIFileWriter',
+           'GUPPIStreamBase', 'GUPPIStreamReader', 'GUPPIStreamWriter', 'open']
+
+
+class GUPPIFileNameSequencer(sf.FileNameSequencer):
+    """List-like generator of GUPPI filenames using a template.
+
+    The template is formatted, filling in any items in curly brackets with
+    values from the header, as well as possibly a file number equal to the
+    indexing value, indicated with '{file_nr}'.
+
+    The length of the instance will be the number of files that exist that
+    match the template for increasing values of the file number.
+
+    Parameters
+    ----------
+    template : str
+        Template to format to get specific filenames.  Curly bracket item
+        keywords are not case-sensitive.
+    header : dict-like
+        Structure holding key'd values that are used to fill in the format.
+        Keys must be in all caps (eg. ``DATE``), as with GUPPI header keys.
+
+    Examples
+    --------
+
+    >>> from baseband import guppi
+    >>> gfs = guppi.base.GUPPIFileNameSequencer(
+    ...     '{date}_{file_nr:03d}.raw', {'DATE': "2018-01-01"})
+    >>> gfs[10]
+    '2018-01-01_010.raw'
+    >>> from baseband.data import SAMPLE_PUPPI
+    >>> with open(SAMPLE_PUPPI, 'rb') as fh:
+    ...     header = guppi.GUPPIHeader.fromfile(fh)
+    >>> template = 'puppi_{stt_imjd}_{src_name}_{scannum}.{file_nr:04d}.raw'
+    >>> gfs = guppi.base.GUPPIFileNameSequencer(template, header)
+    >>> gfs[0]
+    'puppi_58132_J1810+1744_2176.0000.raw'
+    >>> gfs[10]
+    'puppi_58132_J1810+1744_2176.0010.raw'
+    """
+    def __init__(self, template, header):
+        # convert template names to upper case, since header keywords are
+        # upper case as well.
+        self.items = {}
+
+        def check_and_convert(x):
+            string = x.group().upper()
+            key = string[1:-1]
+            if key != 'FILE_NR':
+                self.items[key] = header[key]
+            return string
+
+        self.template = re.sub(r'{\w+[}:]', check_and_convert, template)
+
+    def _process_items(self, file_nr):
+        super(GUPPIFileNameSequencer, self)._process_items(file_nr)
+        # Pop file_nr, as we need to capitalize it.
+        self.items['FILE_NR'] = self.items.pop('file_nr')
+
+    @classmethod
+    def template_first_file(cls, name, **kwargs):
+        """Returns the first file of a template based on its keys.
+
+        Used by openers to access first header within a file sequence.
+        """
+        kwargs = {key.upper(): value for key, value in kwargs.items()}
+        kwargs.setdefault('FILE_NR', 0)
+        return cls(name, kwargs)[kwargs['FILE_NR']]
 
 
 class GUPPIFileReader(VLBIFileReaderBase):
@@ -224,12 +292,42 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
     raw : filehandle
         For writing the header and raw data to storage.
     header0 : :class:`~baseband.guppi.GUPPIHeader`
-        Header for the first frame, holding time information, etc.
+        Header for the first frame, holding time information, etc.  Can instead
+        give keyword arguments to construct a header (see ``**kwargs``).
     squeeze : bool, optional
         If `True` (default), `write` accepts squeezed arrays as input,
         and adds any dimensions of length unity.
+    **kwargs
+        If no header is given, an attempt is made to construct one from these.
+        For a standard header, this would include the following.
+
+    --- Header keywords : (see :meth:`~baseband.guppi.GUPPIHeader.fromvalues`)
+
+    time : `~astropy.time.Time`
+        Start time of the file.  Must have an integer number of seconds.
+    sample_rate : `~astropy.units.Quantity`
+        Number of complete samples per second, i.e. the rate at which each
+        channel of each polarization is sampled.
+    samples_per_frame : int
+        Number of complete samples per frame.  Can alternatively give
+        ``payload_nbytes``.
+    payload_nbytes : int
+        Number of bytes per payload.  Can alternatively give ``samples_per_frame``.
+    offset : `~astropy.units.Quantity` or `~astropy.time.TimeDelta`, optional
+        Time offset from the start of the whole observation (default: 0).
+    npol : int, optional
+        Number of polarizations (default: 1).
+    nchan : int, optional
+        Number of channels (default: 1).  For GUPPI, complex data is only allowed
+        when nchan > 1.
+    bps : int, optional
+        Bits per elementary sample, i.e. per real or imaginary component for
+        complex data (default: 8).
     """
-    def __init__(self, fh_raw, header0, squeeze=True):
+
+    def __init__(self, fh_raw, header0=None, squeeze=True, **kwargs):
+        if header0 is None:
+            header0 = GUPPIHeader.fromvalues(**kwargs)
         assert header0.get('OVERLAP', 0) == 0, ("overlap must be 0 when "
                                                 "writing GUPPI files.")
         fh_raw = GUPPIFileWriter(fh_raw)
@@ -252,7 +350,9 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
         del frame
 
 
-opener = make_opener('GUPPI', globals(), doc="""
+open = make_opener('GUPPI', globals(), GUPPIFileNameSequencer,
+                   ('squeeze', 'subset', 'verify'), ('squeeze',),
+                   default_frames_per_file=128, doc="""
 --- For reading a stream : (see `~baseband.guppi.base.GUPPIStreamReader`)
 
 squeeze : bool, optional
@@ -278,30 +378,8 @@ frames_per_file : int, optional
     within each file.  Default: 128.
 **kwargs
     If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.
-
---- Header keywords : (see :meth:`~baseband.guppi.GUPPIHeader.fromvalues`)
-
-time : `~astropy.time.Time`
-    Start time of the file.  Must have an integer number of seconds.
-sample_rate : `~astropy.units.Quantity`
-    Number of complete samples per second, i.e. the rate at which each
-    channel of each polarization is sampled.
-samples_per_frame : int
-    Number of complete samples per frame.  Can alternatively give
-    ``payload_nbytes``.
-payload_nbytes : int
-    Number of bytes per payload.  Can alternatively give ``samples_per_frame``.
-offset : `~astropy.units.Quantity` or `~astropy.time.TimeDelta`, optional
-    Time offset from the start of the whole observation (default: 0).
-npol : int, optional
-    Number of polarizations (default: 1).
-nchan : int, optional
-    Number of channels (default: 1).  For GUPPI, complex data is only allowed
-    when nchan > 1.
-bps : int, optional
-    Bits per elementary sample, i.e. per real or imaginary component for
-    complex data (default: 8).
+    with any further keyword arguments.  See
+    :class:`~baseband.guppi.base.GUPPIStreamWriter`.
 
 Returns
 -------
@@ -310,52 +388,10 @@ Filehandle
     :class:`~baseband.guppi.base.GUPPIFileWriter` (binary), or
     :class:`~baseband.guppi.base.GUPPIStreamReader` or
     :class:`~baseband.guppi.base.GUPPIStreamWriter` (stream).
-""")
 
-
-# Need to wrap the opener to be able to deal with file lists or templates.
-# TODO: move this up to the opener??
-def open(name, mode='rs', **kwargs):
-    frames_per_file = kwargs.pop('frames_per_file', 128)
-    header0 = kwargs.get('header0', None)
-    squeeze = kwargs.pop('squeeze', None)
-    # If sequentialfile object, check that it's opened properly.
-    if isinstance(name, sf.SequentialFileBase):
-        assert (('r' in mode and name.mode == 'rb') or
-                ('w' in mode and name.mode == 'w+b')), (
-                    "open only accepts sequential files opened in 'rb' mode "
-                    "for reading or 'w+b' mode for writing.")
-    is_sequence = isinstance(name, (tuple, list))
-
-    if 'b' not in mode:
-        if header0 is None:
-            if 'w' in mode:
-                # For writing a header is required.
-                header0 = GUPPIHeader.fromvalues(**kwargs)
-                kwargs = {}
-            else:
-                header0 = {}
-
-        if is_sequence:
-            if 'r' in mode:
-                name = sf.open(name, 'rb')
-            else:
-                name = sf.open(name, 'w+b', file_size=(
-                    frames_per_file * header0.frame_nbytes))
-
-        if header0 and 'w' in mode:
-            kwargs['header0'] = header0
-
-    if squeeze is not None:
-        kwargs['squeeze'] = squeeze
-
-    return opener(name, mode, **kwargs)
-
-
-open.__doc__ = opener.__doc__ + """\n
 Notes
 -----
 For streams, one can also pass in a list of files, or equivalently a
 `~baseband.helpers.sequentialfile` object (opened in 'rb' mode for reading or
 'w+b' for writing).
-"""
+""")

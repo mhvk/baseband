@@ -9,6 +9,7 @@ import astropy.units as u
 from astropy.tests.helper import catch_warnings
 from ... import guppi
 from ...helpers import sequentialfile as sf
+from ..base import GUPPIFileNameSequencer
 from ...data import SAMPLE_PUPPI as SAMPLE_FILE
 
 
@@ -543,6 +544,19 @@ class TestGUPPI(object):
             data3 = fr.read()
         assert np.all(data3 == data)
 
+        # Test writing and reading based on a pattern.
+        template = str(tmpdir.join('guppi_{file_nr:01d}.raw'))
+        with guppi.open(template, 'ws', header0=self.header_w,
+                        file_size=(2 * self.header_w.frame_nbytes)) as fw:
+            fw.write(data)
+
+        with guppi.open(template, 'rs') as fn:
+            assert len(fn.fh_raw.files) == 2
+            assert fn.fh_raw.files[-1] == str(tmpdir.join('guppi_1.raw'))
+            data4 = fn.read()
+        assert np.all(data4 == data)
+
+
     def test_partial_last_frame(self, tmpdir):
         """Test reading a file with an incomplete last frame."""
         # Read in sample file as a byte stream.
@@ -584,3 +598,17 @@ class TestGUPPI(object):
             fn.seek(1231)
             new_data = fn.read(47)
             assert np.all(new_data == data[1231:1231 + 47])
+
+
+class TestGUPPIFileNameSequencer(object):
+    def setup(self):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            self.header = guppi.GUPPIHeader.fromfile(fh)
+
+    def test_header_extraction(self):
+        # Follow Nikhil's J1810 Arecibo observation file naming scheme:
+        # puppi_58132_J1810+1744_2176.0000.raw, etc.
+        template = 'puppi_{stt_imjd}_{src_name}_{scannum}.{file_nr:04d}.raw'
+        fns = GUPPIFileNameSequencer(template, self.header)
+        assert fns[0] == 'puppi_58132_J1810+1744_2176.0000.raw'
+        assert fns[29] == 'puppi_58132_J1810+1744_2176.0029.raw'

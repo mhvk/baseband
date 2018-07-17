@@ -9,6 +9,7 @@ import astropy.units as u
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase)
+from ..helpers import sequentialfile as sf
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 from .file_info import VDIFFileReaderInfo
@@ -570,7 +571,11 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
         return self._frameset
 
 
-open = make_opener('VDIF', globals(), doc="""
+# 1024 is the maximum number of threads in a VDIF frameset.
+open = make_opener('VDIF', globals(), sf.FileNameSequencer,
+                   ('sample_rate', 'squeeze', 'subset', 'fill_value',
+                    'verify'), ('sample_rate', 'nthread', 'squeeze'),
+                   default_frames_per_file=1024, doc="""
 --- For reading a stream : (see :class:`~baseband.vdif.base.VDIFStreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional

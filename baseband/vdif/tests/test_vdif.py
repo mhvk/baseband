@@ -983,6 +983,39 @@ class TestVDIF(object):
             vdif.open(tmp_file, 's')
 
 
+def test_sequentialfile(tmpdir):
+    """Tests writing and reading of sequential files.
+
+    These tests focus on reading and writing with templates.
+    """
+
+    # Use sample file as basis of a file sequence.
+    with vdif.open(SAMPLE_FILE, 'rs') as fh:
+        header = fh.header0.copy()
+        data = fh.read()
+        dtime = fh.stop_time - fh.start_time
+    data = np.r_[data, data, data]
+
+    # Create a file sequence using template.
+    template = str(tmpdir.join('f.{file_nr:03d}.vdif'))
+    with vdif.open(template, 'ws', frames_per_file=2 * 8, nthread=8,
+                   **header) as fw:
+        fw.write(data)
+
+    # Read in file-sequence and check data consistency.
+    with vdif.open(template, 'rs') as fn:
+        assert len(fn.fh_raw.files) == 3
+        assert fn.fh_raw.files[-1] == str(tmpdir.join('f.002.vdif'))
+        assert fn.header0.time == header.time
+        assert fn.stop_time - fn.start_time - 3 * dtime < 1 * u.ns
+        assert np.all(data == fn.read())
+
+    # Read in one file and check if everything makes sense.
+    with vdif.open(str(tmpdir.join('f.002.vdif')), 'rs') as fn:
+        assert fn.header0.time - header.time - 2. * dtime < 1 * u.ns
+        assert np.all(data[80000:] == fn.read())
+
+
 def test_vlbi_vdif():
     """Tests SAMPLE_VLBI, which is SAMPLE_VDIF with uncorrected timestamps."""
     with vdif.open(SAMPLE_VLBI, 'rs') as fh, \

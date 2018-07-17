@@ -2,6 +2,7 @@
 from __future__ import division, unicode_literals, print_function
 
 import io
+import six
 import warnings
 import numpy as np
 import operator
@@ -9,6 +10,7 @@ from collections import namedtuple
 import astropy.units as u
 from astropy.utils import lazyproperty
 from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from ..helpers import sequentialfile as sf
 
 
 __all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
@@ -641,7 +643,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         return super(VLBIStreamWriterBase, self).close()
 
 
-default_open_doc = """Open baseband file for reading or writing.
+default_open_doc = """Open {baseband} file for reading or writing.
 
 Opened as a binary file, one gets a wrapped filehandle that adds
 methods to read/write a frame.  Opened as a stream, the handle is
@@ -651,8 +653,9 @@ as if it were a stream of samples.
 Parameters
 ----------
 name : str or filehandle
-    File name or handle.
-mode : {'rb', 'wb', 'rs', or 'ws'}, optional
+    File name or handle.  The handle can be a `~baseband.helpers.sequentialfile`
+    object, a list or tuple of files, or a template string (see Notes).
+mode : {{'rb', 'wb', 'rs', or 'ws'}}, optional
     Whether to open for reading or writing, and as a regular binary
     file or as a stream. Default: 'rs', for reading a stream.
 **kwargs
@@ -660,34 +663,109 @@ mode : {'rb', 'wb', 'rs', or 'ws'}, optional
 """
 
 
-def make_opener(fmt, classes, doc='', append_doc=True):
+def make_opener(fmt, reader_classes, seqfile_class, reader_args, writer_args,
+                default_frames_per_file=1, doc='', append_doc=True):
     """Create a baseband file opener.
 
     Parameters
     ----------
     fmt : str
         Name of the baseband format.
-    classes : dict
+    reader_classes : dict
         With the file/stream reader/writer classes keyed by names equal to
         'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed by
-        ``fmt``.  Typically, one will pass in ``classes=globals()``.
+        ``fmt``.  Typically, one will pass in ``reader_classes=globals()``.
     doc : str, optional
         If given, used to define the docstring of the opener.
     append_doc : bool, optional
         If `True` (default), append ``doc`` to the default docstring rather
         than override it.
     """
-    module = classes.get('__name__', None)
-    classes = {cls_type: classes[fmt + cls_type]
-               for cls_type in ('FileReader', 'FileWriter',
-                                'StreamReader', 'StreamWriter')}
+    module = reader_classes.get('__name__', None)
+    reader_classes = {cls_type: reader_classes[fmt + cls_type]
+                      for cls_type in ('Header', 'FileReader', 'FileWriter',
+                                       'StreamReader', 'StreamWriter')}
 
     def open(name, mode='rs', **kwargs):
+        # If sequentialfile object, check that it's opened properly.
+        if isinstance(name, sf.SequentialFileBase):
+            assert (('r' in mode and name.mode == 'rb') or
+                    ('w' in mode and name.mode == 'w+b')), (
+                        "open only accepts sequential files opened in 'rb' "
+                        "mode for reading or 'w+b' mode for writing.")
+        is_template = isinstance(name, six.string_types) and ('{' in name and
+                                                              '}' in name)
+        is_sequence = isinstance(name, (tuple, list))
+
+        # Check if user passed header0.
+        header0 = kwargs.get('header0', None)
+
+        if is_template or is_sequence:
+            if header0 is None:
+                if 'w' in mode:
+                    # For writing a header is required.
+                    # TODO: This is pretty ugly, but popping keys from kwargs
+                    # before the dict into fromvalues fails to pass
+                    # sample_rate to the header (since all other VDIF EDVs
+                    # must pass sample_rate directly to the stream writer.
+                    # Since VDIFStreamWriter's sample rate checking in
+                    # __init__ is already super-ugly, maybe add a
+                    # self-consistency check there so we can pop kwargs here?
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        header0 = reader_classes['Header'].fromvalues(**kwargs)
+                    passed_kwargs = {key: kwargs[key] for key in kwargs.keys()
+                                     if key in (
+                        writer_args + ('file_size', 'frames_per_file'))}
+                    passed_kwargs['header0'] = header0
+
+                    # Store keys to pass to stream writer (user shouldn't be
+                    # passing anything to binary classes anyway!)
+                    kwargs = passed_kwargs
+
+                elif is_template:
+                    # For reading try reading header from first file if needed.
+                    # We make a temporary file sequencer for this, as the real
+                    # one may need the header file size to iterate properly.
+                    first_file = seqfile_class.template_first_file(name,
+                                                                   **kwargs)
+                    with io.open(first_file, 'rb') as fh:
+                        header0 = reader_classes['Header'].fromfile(fh)
+
+                    passed_kwargs = {key: kwargs[key] for key in kwargs.keys()
+                                     if key in reader_args}
+
+                    # Store keys to pass to stream writer (user shouldn't be
+                    # passing anything to binary classes anyway!)
+                    kwargs = passed_kwargs
+
+                else:
+                    header0 = {}
+
+            if is_template:
+                name = seqfile_class(name, header0)
+
+            # Open a sequentialfile object.
+            if 'r' in mode:
+                name = sf.open(name, 'rb')
+            else:
+                # This also removes these keys from kwargs before passing it
+                # to stream readers/writers.
+                file_size = kwargs.pop('file_size', None)
+                frames_per_file = kwargs.pop('frames_per_file',
+                                             default_frames_per_file)
+                if file_size is None:
+                    file_size = frames_per_file * header0.frame_nbytes
+                name = sf.open(name, 'w+b', file_size=file_size)
+
+        # Select FileReader/Writer for binary, StreamReader/Writer for stream.
         if 'b' in mode:
             cls_type = 'File'
         else:
             cls_type = 'Stream'
 
+        # Select reading or writing.  Check if ``name`` is a filehandle, and
+        # open it if not.
         if 'w' in mode:
             cls_type += 'Writer'
             got_fh = hasattr(name, 'write')
@@ -702,8 +780,10 @@ def make_opener(fmt, classes, doc='', append_doc=True):
             raise ValueError("only support opening {0} file for reading "
                              "or writing (mode='r' or 'w')."
                              .format(fmt))
+        # Try wrapping ``name`` with file or stream reader (``name`` is a
+        # binary filehandle at this point).
         try:
-            return classes[cls_type](name, **kwargs)
+            return reader_classes[cls_type](name, **kwargs)
         except Exception as exc:
             if not got_fh:
                 try:
@@ -712,7 +792,8 @@ def make_opener(fmt, classes, doc='', append_doc=True):
                     pass
             raise exc
 
-    open.__doc__ = (default_open_doc.replace('baseband', fmt) + doc
+    # Load custom documentation for format.
+    open.__doc__ = (default_open_doc.format(baseband=fmt) + doc
                     if append_doc else doc)
     # This ensures the function becomes visible to sphinx.
     if module:

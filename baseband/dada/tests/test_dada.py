@@ -675,49 +675,26 @@ class TestDADAFileNameSequencer(object):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = dada.DADAHeader.fromfile(fh)
 
-    def test_basic_enumeration(self):
-        fns1 = DADAFileNameSequencer('x{file_nr:03d}.dada', {})
-        assert fns1[0] == 'x000.dada'
-        assert fns1[100] == 'x100.dada'
-        fns2 = DADAFileNameSequencer('{snake}_{frame_nr}', {'SNAKE': 'python'})
-        assert fns2[10] == 'python_10'
-        fns3 = DADAFileNameSequencer('{obs_offset:06d}.x', {'OBS_OFFSET': 10,
-                                                            'FILE_SIZE': 20})
-        assert fns3[0] == '000010.x'
-        assert fns3[9] == '000190.x'
-
-        with pytest.raises(KeyError):
-            DADAFileNameSequencer('{snake:06d}.x', {'PYTHON': 10})
+    def test_offset_enumeration(self):
+        fns = DADAFileNameSequencer('{obs_offset:06d}.x', {'OBS_OFFSET': 10,
+                                                           'FILE_SIZE': 20})
+        assert fns[0] == '000010.x'
+        assert fns[9] == '000190.x'
 
         with pytest.raises(KeyError):
             DADAFileNameSequencer('{obs_offset:06d}.x', {'OBS_OFFSET': 10})
 
-    def test_header_enumeration(self):
+    def test_complicated_enumeration(self):
+        # Tests that frame_nr properly draws from file_nr.
         template = '{frame_nr}_{obs_offset:016d}.dada'
         fns = DADAFileNameSequencer(template, self.header)
         assert fns[0] == '0_0000006400000000.dada'
         assert fns[1] == '1_0000006400064000.dada'
         assert fns[10] == '10_0000006400640000.dada'
 
-    def test_complicated_enumeration(self):
         # Follow the typical naming scheme:
         # 2016-04-23-07:29:30_0000000000000000.000000.dada
         template = '{utc_start}_{obs_offset:016d}.000000.dada'
         fns = DADAFileNameSequencer(template, self.header)
         assert fns[0] == '2013-07-02-01:37:40_0000006400000000.000000.dada'
         assert fns[100] == '2013-07-02-01:37:40_0000006406400000.000000.dada'
-
-    def test_len(self, tmpdir):
-        template = str(tmpdir.join('a{frame_nr}.dada'))
-        fns = DADAFileNameSequencer(template, {})
-        for i in range(5):
-            assert len(fns) == i
-            filename = fns[i]
-            assert filename.endswith('a{}.dada'.format(i))
-            with open(filename, 'wb') as fh:
-                fh.write(b'bird')
-        assert len(fns) == 5
-        assert fns[-2] == fns[3]
-        assert fns[-1].endswith('a4.dada')
-        with pytest.raises(IndexError):
-            fns[-10]
