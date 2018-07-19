@@ -682,6 +682,35 @@ class TestMark5B(object):
             assert abs(fh.start_time - test_time) < 1.*u.ns
             assert fh.header0['frame_nr'] == 198
 
+    def test_sequentialfile(self, tmpdir):
+        """Tests writing and reading of sequential files.
+
+        These tests focus on reading and writing with lists.
+        """
+
+        # Use sample file as basis of a file sequence.
+        with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
+                         kday=56000, nchan=8, bps=2) as fh:
+            header = fh.header0.copy()
+            data = fh.read()
+            dtime = fh.stop_time - fh.start_time
+        data = np.r_[data, data, data, data, data]
+
+        # Create a file sequence using template.
+        files = [str(tmpdir.join('f.{0:03d}.m5b'.format(x))) for x in range(5)]
+        with mark5b.open(files, 'ws', file_size=(4 * header.frame_nbytes),
+                         sample_rate=32*u.MHz, nchan=8, kday=56000,
+                         **header) as fw:
+            fw.write(data)
+
+        # Open files, checking that we can pass a subset.
+        with mark5b.open(files, 'rs', sample_rate=32*u.MHz, nchan=8,
+                         kday=56000, subset=slice(1, 5)) as fn:
+            assert len(fn.fh_raw.files) == 5
+            assert fn.header0.time == header.time
+            assert fn.stop_time - fn.start_time - 5 * dtime < 1 * u.ns
+            assert np.all(data[:, 1:5] == fn.read())
+
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
     @pytest.mark.parametrize('fill_value', (0., -999.))

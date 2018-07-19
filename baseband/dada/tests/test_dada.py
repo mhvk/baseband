@@ -471,7 +471,7 @@ class TestDADA(object):
         header.payload_nbytes = self.header.payload_nbytes // 2
         filenames = (str(tmpdir.join('a.dada')),
                      str(tmpdir.join('b.dada')))
-        with dada.open(filenames, 'ws', header0=header) as fw:
+        with dada.open(filenames, 'ws', **header) as fw:
             start_time = fw.start_time
             fw.write(data[:1000])
             time1000 = fw.time
@@ -502,10 +502,18 @@ class TestDADA(object):
                 dada.open(fraw, 'ws', header0=header) as fw:
             fw.write(data)
 
-        with sf.open(filenames, 'rb') as fraw, \
-                dada.open(fraw, 'rs') as fr:
+        with dada.open(filenames, 'rs') as fr:
             data3 = fr.read()
         assert np.all(data3 == data)
+
+        # Test subsetting.
+        with dada.open(filenames, 'rs', subset=1) as fr:
+            data4 = fr.read()
+        assert np.all(data4 == data[:, 1])
+
+        # Check that we can't pass a filename sequence in 'wb' mode.
+        with pytest.raises(ValueError):
+            dada.open(filenames, 'wb')
 
     def test_partial_last_frame(self, tmpdir):
         """Test reading an incomplete frame from one or a sequence of files."""

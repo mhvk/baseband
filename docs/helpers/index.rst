@@ -40,7 +40,7 @@ We now open a sequential file object for writing::
     >>> from baseband.helpers import sequentialfile as sf
     >>> filenames = ["seqvdif_{0}".format(i) for i in range(2)]
     >>> file_size = fh.fh_raw.seek(0, 2) // 2
-    >>> fwr = sf.open(filenames, mode='wb', file_size=file_size)
+    >>> fwr = sf.open(filenames, mode='w+b', file_size=file_size)
 
 The first argument passed to |open| must be a **time-ordered sequence** of
 filenames in a list, tuple, or other subscriptable object that returns

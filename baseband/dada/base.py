@@ -418,66 +418,7 @@ Filehandle
     :class:`~baseband.dada.base.DADAFileWriter` (binary), or
     :class:`~baseband.dada.base.DADAStreamReader` or
     :class:`~baseband.dada.base.DADAStreamWriter` (stream).
-""")
 
-
-# Need to wrap the opener to be able to deal with file lists or templates.
-# TODO: move this up to the opener??
-def open(name, mode='rs', **kwargs):
-    header0 = kwargs.get('header0', None)
-    squeeze = kwargs.pop('squeeze', None)
-    # If sequentialfile object, check that it's opened properly.
-    if isinstance(name, sf.SequentialFileBase):
-        assert (('r' in mode and name.mode == 'rb') or
-                ('w' in mode and name.mode == 'w+b')), (
-                    "open only accepts sequential files opened in 'rb' mode "
-                    "for reading or 'w+b' mode for writing.")
-    is_template = isinstance(name, six.string_types) and ('{' in name and
-                                                          '}' in name)
-    is_sequence = isinstance(name, (tuple, list))
-
-    if 'b' not in mode:
-        if header0 is None:
-            if 'w' in mode:
-                # For writing a header is required.
-                header0 = DADAHeader.fromvalues(**kwargs)
-                kwargs = {}
-
-            elif is_template and ('OBS_OFFSET' in name or
-                                  'obs_offset' in name):
-                # For reading try reading header from first file if needed.
-                # We make a temporary file sequencer for this, as the real one
-                # will need the header file size.
-                kwargs = {key.upper(): value for key, value in kwargs.items()}
-                for key in ('FILE_NR', 'FRAME_NR', 'OBS_OFFSET', 'FILE_SIZE'):
-                    kwargs.setdefault(key, 0)
-                first_file = (DADAFileNameSequencer(name, kwargs)
-                              [kwargs['FRAME_NR']])
-                with io.open(first_file, 'rb') as fh:
-                    header0 = DADAHeader.fromfile(fh)
-                kwargs = {}
-            else:
-                header0 = {}
-
-        if is_template:
-            name = DADAFileNameSequencer(name, header0)
-
-        if is_template or is_sequence:
-            if 'r' in mode:
-                name = sf.open(name, 'rb')
-            else:
-                name = sf.open(name, 'w+b', file_size=header0.frame_nbytes)
-
-        if header0 and 'w' in mode:
-            kwargs['header0'] = header0
-
-    if squeeze is not None:
-        kwargs['squeeze'] = squeeze
-
-    return opener(name, mode, **kwargs)
-
-
-open.__doc__ = opener.__doc__ + """\n
 Notes
 -----
 For streams, one can also pass in a list of files, or a template string that
@@ -498,4 +439,66 @@ keyword arguments with values appropriate for the first file.
 One may also pass in a `~baseband.helpers.sequentialfile` object
 (opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
 cases it is practically identical to passing in a list or template.
-"""
+""")
+
+
+# Need to wrap the opener to be able to deal with file lists or templates.
+def open(name, mode='rs', **kwargs):
+    # Extract needed kwargs (and keep some from being passed to opener).
+    header0 = kwargs.get('header0', None)
+
+    # Check if ``name`` is a template or sequence.
+    is_template = isinstance(name, six.string_types) and ('{' in name and
+                                                          '}' in name)
+    is_sequence = isinstance(name, (tuple, list, sf.FileNameSequencer))
+
+    # For stream writing, header0 is needed; for reading, it is needed for
+    # initializing a template only.
+    if 'b' not in mode:
+        # Initialize header0 if it doesn't yet exist.
+        if header0 is None:
+            if 'w' in mode:
+                # Store squeeze.
+                passed_kwargs = ({'squeeze': kwargs.pop('squeeze')}
+                                 if 'squeeze' in kwargs.keys() else {})
+                # Make header0.
+                header0 = DADAHeader.fromvalues(**kwargs)
+                # Pass squeeze and header0 on to stream writer.
+                kwargs = passed_kwargs
+                kwargs['header0'] = header0
+
+            elif is_template:
+                # Store parameters to pass.
+                passed_kwargs = {key: kwargs[key] for key in kwargs.keys()
+                                 if key in ('squeeze', 'subset', 'verify')}
+                kwargs = {key.upper(): value for key, value in kwargs.items()}
+
+                # If obs_offset is needed, make a temporary file sequence to
+                # read in header0.
+                if ('OBS_OFFSET' in name or 'obs_offset' in name):
+                    for key in ('OBS_OFFSET', 'FILE_SIZE'):
+                        kwargs.setdefault(key, 0)
+                    first_file = DADAFileNameSequencer(name, kwargs)[0]
+                    with io.open(first_file, 'rb') as fh:
+                        header0 = DADAHeader.fromfile(fh)
+                # If obs_offset isn't needed, just use the kwargs.
+                else:
+                    header0 = kwargs
+
+                kwargs = passed_kwargs
+
+        if is_template:
+            name = DADAFileNameSequencer(name, header0)
+
+    # If writing with a template or sequence, pass ``file_size``.
+    if 'w' in mode and (is_template or is_sequence):
+        if 'b' in mode:
+            raise ValueError("does not support opening a file sequence in "
+                             "'wb' mode.  Try passing in a SequentialFile "
+                             "object instead.")
+        kwargs['file_size'] = header0.frame_nbytes
+
+    return opener(name, mode, **kwargs)
+
+
+open.__doc__ = opener.__doc__
