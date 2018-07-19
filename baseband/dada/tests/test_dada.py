@@ -676,8 +676,8 @@ class TestDADAFileNameSequencer(object):
             self.header = dada.DADAHeader.fromfile(fh)
 
     def test_offset_enumeration(self):
-        fns = DADAFileNameSequencer('{obs_offset:06d}.x', {'OBS_OFFSET': 10,
-                                                           'FILE_SIZE': 20})
+        fns = DADAFileNameSequencer(
+            '{obs_offset:06d}.x', {'OBS_OFFSET': 10, 'FILE_SIZE': 20})
         assert fns[0] == '000010.x'
         assert fns[9] == '000190.x'
 

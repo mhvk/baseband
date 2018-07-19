@@ -26,7 +26,8 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
     indexing value, indicated with '{file_nr}'.
 
     The length of the instance will be the number of files that exist that
-    match the template for increasing values of the file number.
+    match the template for increasing values of the file number (when writing,
+    it is the number of files that have so far been generated).
 
     Parameters
     ----------
@@ -56,8 +57,6 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
     'puppi_58132_J1810+1744_2176.0010.raw'
     """
     def __init__(self, template, header):
-        # convert template names to upper case, since header keywords are
-        # upper case as well.
         self.items = {}
 
         def check_and_convert(x):
@@ -67,6 +66,8 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
                 self.items[key] = header[key]
             return string
 
+        # This converts template names to upper case, since header keywords are
+        # all upper case.
         self.template = re.sub(r'{\w+[}:]', check_and_convert, template)
 
     def _process_items(self, file_nr):

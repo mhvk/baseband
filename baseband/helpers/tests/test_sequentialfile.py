@@ -306,15 +306,13 @@ class TestFileNameSequencer(object):
         assert fns2[13] == 'python_13'
 
         with pytest.raises(KeyError):
-            sf.FileNameSequencer('{SNAKE:06d}.x', {'PYTHON': 10})
+            sf.FileNameSequencer('{snake:06d}.x', {'SNAKE': 10})
 
     def test_header_extraction(self):
-        # Follow the typical naming scheme:
-        # 2016-04-23-07:29:30_0000000000000000.000000.dada
-        template = 'x.v{vdif_version}.{header_time}.{file_nr:05d}.vdif'
+        template = 'x.edv{edv}.stn_{station_id}.{file_nr:05d}.vdif'
         fns = sf.FileNameSequencer(template, self.header)
-        assert fns[0] == 'x.v1.2014-06-16T05:56:07.00000.vdif'
-        assert fns[133] == 'x.v1.2014-06-16T05:56:07.00133.vdif'
+        assert fns[0] == 'x.edv3.stn_65532.00000.vdif'
+        assert fns[133] == 'x.edv3.stn_65532.00133.vdif'
 
     def test_len(self, tmpdir):
         template = str(tmpdir.join('a{file_nr}.bin'))

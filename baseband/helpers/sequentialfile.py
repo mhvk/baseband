@@ -19,12 +19,11 @@ class FileNameSequencer(object):
 
     The template is formatted, filling in any items in curly brackets with
     values from the header.  It is additionally possible to insert a file
-    number equal to the indexing value, indicated with '{file_nr}', and the
-    header time in ISO 8601 format, excluding fractions of a second, indicated
-    with '{header_time}'.
+    number equal to the indexing value, indicated with '{file_nr}'.
 
-    The length of the instance will be the number of files that exist
-    that match the template for increasing values of the file number.
+    The length of the instance will be the number of files that exist that
+    match the template for increasing values of the file number (when writing,
+    it is the number of files that have so far been generated).
 
     Parameters
     ----------
@@ -43,35 +42,28 @@ class FileNameSequencer(object):
     >>> vfs = sf.FileNameSequencer('a{file_nr:03d}.vdif', {})
     >>> vfs[10]
     'a010.vdif'
-    >>> vfs = sf.FileNameSequencer(
-    ...     'obs{YEAR}_{file_nr:03d}.vdif', {'YEAR': "2018"})
-    >>> vfs[10]
-    'obs2018_010.vdif'
     >>> from baseband.data import SAMPLE_VDIF
     >>> with vdif.open(SAMPLE_VDIF, 'rb') as fh:
     ...     header = vdif.VDIFHeader.fromfile(fh)
-    >>> template = 'obs.edv{edv:d}.{header_time}.{file_nr:05d}.vdif'
-    >>> vfs = sf.FileNameSequencer(template, header)
+    >>> vfs = sf.FileNameSequencer('obs.edv{edv:d}.{file_nr:05d}.vdif', header)
     >>> vfs[10]
-    'obs.edv3.2014-06-16T05:56:07.00010.vdif'
+    'obs.edv3.00010.vdif'
     """
     def __init__(self, template, header):
-        # convert template names to upper case, since header keywords are
-        # upper case as well.
         self.items = {}
 
         def check_and_convert(x):
             string = x.group()
             key = string[1:-1]
-            if key == 'header_time':
-                self.items[key] = header.time.isot.split(".")[0]
-            elif key != 'file_nr':
+            if key != 'file_nr':
                 self.items[key] = header[key]
             return string
 
         self.template = re.sub(r'{\w+[}:]', check_and_convert, template)
 
     def _process_items(self, file_nr):
+        # No check for whether file_nr > len(self), since there may not be a
+        # predeterminable length when writing.
         if file_nr < 0:
             file_nr += len(self)
             if file_nr < 0:

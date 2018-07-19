@@ -33,7 +33,8 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
     size in bytes.
 
     The length of the instance will be the number of files that exist that
-    match the template for increasing values of the file number.
+    match the template for increasing values of the file number (when writing,
+    it is the number of files that have so far been generated).
 
     Parameters
     ----------
@@ -65,8 +66,6 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
     '2013-07-02-01:37:40.0000006400640000.000000.dada'
     """
     def __init__(self, template, header):
-        # convert template names to upper case, since header keywords are
-        # upper case as well.
         self.items = {}
 
         def check_and_convert(x):
@@ -76,6 +75,8 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
                 self.items[key] = header[key]
             return string
 
+        # This converts template names to upper case, since header keywords are
+        # all upper case.
         self.template = re.sub(r'{\w+[}:]', check_and_convert, template)
         self._has_obs_offset = 'OBS_OFFSET' in self.items
         if self._has_obs_offset:
