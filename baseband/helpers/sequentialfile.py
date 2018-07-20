@@ -3,12 +3,84 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import io
+import os
+import re
 import itertools
 from bisect import bisect
 import numpy as np
 from astropy.utils import lazyproperty
 
-__all__ = ['SequentialFileReader', 'SequentialFileWriter', 'open']
+__all__ = ['FileNameSequencer', 'SequentialFileReader', 'SequentialFileWriter',
+           'open']
+
+
+class FileNameSequencer(object):
+    """List-like generator of filenames using a template.
+
+    The template is formatted, filling in any items in curly brackets with
+    values from the header.  It is additionally possible to insert a file
+    number equal to the indexing value, indicated with '{file_nr}'.
+
+    The length of the instance will be the number of files that exist that
+    match the template for increasing values of the file number (when writing,
+    it is the number of files that have so far been generated).
+
+    Parameters
+    ----------
+    template : str
+        Template to format to get specific filenames.  Curly bracket item
+        keywords are case-sensitive (eg. '{FRAME_NR}' or '{Frame_NR}' will not
+        use ``header['frame_nr']``.
+    header : dict-like
+        Structure holding key'd values that are used to fill in the format.
+
+    Examples
+    --------
+
+    >>> from baseband import vdif
+    >>> from baseband.helpers import sequentialfile as sf
+    >>> vfs = sf.FileNameSequencer('a{file_nr:03d}.vdif', {})
+    >>> vfs[10]
+    'a010.vdif'
+    >>> from baseband.data import SAMPLE_VDIF
+    >>> with vdif.open(SAMPLE_VDIF, 'rb') as fh:
+    ...     header = vdif.VDIFHeader.fromfile(fh)
+    >>> vfs = sf.FileNameSequencer('obs.edv{edv:d}.{file_nr:05d}.vdif', header)
+    >>> vfs[10]
+    'obs.edv3.00010.vdif'
+    """
+    def __init__(self, template, header):
+        self.items = {}
+
+        def check_and_convert(x):
+            string = x.group()
+            key = string[1:-1]
+            if key != 'file_nr':
+                self.items[key] = header[key]
+            return string
+
+        self.template = re.sub(r'{\w+[}:]', check_and_convert, template)
+
+    def _process_items(self, file_nr):
+        # No check for whether file_nr > len(self), since there may not be a
+        # predeterminable length when writing.
+        if file_nr < 0:
+            file_nr += len(self)
+            if file_nr < 0:
+                raise IndexError('file number out of range.')
+
+        self.items['file_nr'] = file_nr
+
+    def __getitem__(self, file_nr):
+        self._process_items(file_nr)
+        return self.template.format(**self.items)
+
+    def __len__(self):
+        file_nr = 0
+        while os.path.isfile(self[file_nr]):
+            file_nr += 1
+
+        return file_nr
 
 
 class SequentialFileBase(object):

@@ -1,6 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 from __future__ import division, unicode_literals, print_function
 
+import re
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -13,8 +14,66 @@ from .payload import GUPPIPayload
 from .frame import GUPPIFrame
 
 
-__all__ = ['GUPPIFileReader', 'GUPPIFileWriter', 'GUPPIStreamBase',
-           'GUPPIStreamReader', 'GUPPIStreamWriter', 'open']
+__all__ = ['GUPPIFileNameSequencer', 'GUPPIFileReader', 'GUPPIFileWriter',
+           'GUPPIStreamBase', 'GUPPIStreamReader', 'GUPPIStreamWriter', 'open']
+
+
+class GUPPIFileNameSequencer(sf.FileNameSequencer):
+    """List-like generator of GUPPI filenames using a template.
+
+    The template is formatted, filling in any items in curly brackets with
+    values from the header, as well as possibly a file number equal to the
+    indexing value, indicated with '{file_nr}'.
+
+    The length of the instance will be the number of files that exist that
+    match the template for increasing values of the file number (when writing,
+    it is the number of files that have so far been generated).
+
+    Parameters
+    ----------
+    template : str
+        Template to format to get specific filenames.  Curly bracket item
+        keywords are not case-sensitive.
+    header : dict-like
+        Structure holding key'd values that are used to fill in the format.
+        Keys must be in all caps (eg. ``DATE``), as with GUPPI header keys.
+
+    Examples
+    --------
+
+    >>> from baseband import guppi
+    >>> gfs = guppi.base.GUPPIFileNameSequencer(
+    ...     '{date}_{file_nr:03d}.raw', {'DATE': "2018-01-01"})
+    >>> gfs[10]
+    '2018-01-01_010.raw'
+    >>> from baseband.data import SAMPLE_PUPPI
+    >>> with open(SAMPLE_PUPPI, 'rb') as fh:
+    ...     header = guppi.GUPPIHeader.fromfile(fh)
+    >>> template = 'puppi_{stt_imjd}_{src_name}_{scannum}.{file_nr:04d}.raw'
+    >>> gfs = guppi.base.GUPPIFileNameSequencer(template, header)
+    >>> gfs[0]
+    'puppi_58132_J1810+1744_2176.0000.raw'
+    >>> gfs[10]
+    'puppi_58132_J1810+1744_2176.0010.raw'
+    """
+    def __init__(self, template, header):
+        self.items = {}
+
+        def check_and_convert(x):
+            string = x.group().upper()
+            key = string[1:-1]
+            if key != 'FILE_NR':
+                self.items[key] = header[key]
+            return string
+
+        # This converts template names to upper case, since header keywords are
+        # all upper case.
+        self.template = re.sub(r'{\w+[}:]', check_and_convert, template)
+
+    def _process_items(self, file_nr):
+        super(GUPPIFileNameSequencer, self)._process_items(file_nr)
+        # Pop file_nr, as we need to capitalize it.
+        self.items['FILE_NR'] = self.items.pop('file_nr')
 
 
 class GUPPIFileReader(VLBIFileReaderBase):
