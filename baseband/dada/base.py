@@ -65,7 +65,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
     >>> dfs[10]
     '2013-07-02-01:37:40.0000006400640000.000000.dada'
     """
-    def __init__(self, template, header):
+    def __init__(self, template, header={}):
         self.items = {}
 
         def check_and_convert(x):

@@ -299,7 +299,7 @@ class TestFileNameSequencer(object):
             self.header = vdif.VDIFHeader.fromfile(fh)
 
     def test_enumeration(self):
-        fns1 = sf.FileNameSequencer('x{file_nr:03d}.vdif', {})
+        fns1 = sf.FileNameSequencer('x{file_nr:03d}.vdif')
         assert fns1[0] == 'x000.vdif'
         assert fns1[107] == 'x107.vdif'
         fns2 = sf.FileNameSequencer('{SNAKE}_{file_nr}', {'SNAKE': 'python'})
@@ -316,7 +316,7 @@ class TestFileNameSequencer(object):
 
     def test_len(self, tmpdir):
         template = str(tmpdir.join('a{file_nr}.bin'))
-        fns = sf.FileNameSequencer(template, {})
+        fns = sf.FileNameSequencer(template)
         for i in range(5):
             assert len(fns) == i
             filename = fns[i]

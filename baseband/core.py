@@ -48,10 +48,6 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
       - ``consistent_kwargs``: not needed to open the file, but consistent.
       - ``inconsistent_kwargs``: not needed to open the file, and inconsistent.
       - ``irrelevant_kwargs``: provide information irrelevant for opening.
-
-    Instead of a file handle or name, one may pass in a
-    `~baseband.helpers.sequentialfile` object (opened in 'rb' mode for reading
-    or 'w+b' for writing) containing filenames.  For writing, .
     """
 
     # Handle lists and tuples of files, which may be passed from open.
@@ -166,7 +162,9 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
     Parameters
     ----------
     name : str or filehandle, or sequence of str
-        File name, filehandle, or sequence of file names.
+        File name, filehandle, or sequence of file names.  A sequence may be a
+        list or str of ordered filenames, or an instance of
+        `~baseband.helpers.sequentialfile.FileNameSequencer`.
     mode : {'rb', 'wb', 'rs', or 'ws'}, optional
         Whether to open for reading or writing, and as a regular binary
         file or as a stream. Default: 'rs', for reading a stream.

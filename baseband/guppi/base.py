@@ -58,7 +58,7 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
     >>> gfs[10]
     'puppi_58132_J1810+1744_2176.0010.raw'
     """
-    def __init__(self, template, header):
+    def __init__(self, template, header={}):
         self.items = {}
 
         def check_and_convert(x):

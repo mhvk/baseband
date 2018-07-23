@@ -39,7 +39,7 @@ class FileNameSequencer(object):
 
     >>> from baseband import vdif
     >>> from baseband.helpers import sequentialfile as sf
-    >>> vfs = sf.FileNameSequencer('a{file_nr:03d}.vdif', {})
+    >>> vfs = sf.FileNameSequencer('a{file_nr:03d}.vdif')
     >>> vfs[10]
     'a010.vdif'
     >>> from baseband.data import SAMPLE_VDIF
@@ -49,7 +49,7 @@ class FileNameSequencer(object):
     >>> vfs[10]
     'obs.edv3.00010.vdif'
     """
-    def __init__(self, template, header):
+    def __init__(self, template, header={}):
         self.items = {}
 
         def check_and_convert(x):

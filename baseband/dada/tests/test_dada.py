@@ -506,10 +506,10 @@ class TestDADA(object):
             data3 = fr.read()
         assert np.all(data3 == data)
 
-        # Test subsetting.
-        with dada.open(filenames, 'rs', subset=1) as fr:
+        # Test passing stream reader kwargs.
+        with dada.open(filenames, 'rs', subset=1, squeeze=False) as fr:
             data4 = fr.read()
-        assert np.all(data4 == data[:, 1])
+        assert np.all(data4.squeeze() == data[:, 1])
 
         # Check that we can't pass a filename sequence in 'wb' mode.
         with pytest.raises(ValueError):

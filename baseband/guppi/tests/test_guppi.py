@@ -533,6 +533,17 @@ class TestGUPPI(object):
             assert np.abs(fr.time - fr.stop_time) < 1. * u.ns
         assert np.all(data2 == data)
 
+        # Pass sequentialfile objects to reader.
+        with sf.open(filenames, 'w+b',
+                     file_size=2*self.header_w.frame_nbytes) as fraw, \
+                guppi.open(fraw, 'ws', header0=self.header_w) as fw:
+            fw.write(data)
+
+        with sf.open(filenames, 'rb') as fraw, \
+                guppi.open(fraw, 'rs') as fr:
+            data3 = fr.read()
+        assert np.all(data3 == data)
+
         # Check that we can't pass a filename sequence in 'wb' mode.
         with pytest.raises(ValueError):
             guppi.open(filenames, 'wb')
@@ -620,11 +631,11 @@ class TestGUPPI(object):
             data3 = fr.read()
         assert np.all(data3 == data)
 
-        # Try subsetting.
-        with guppi.open(template, 'rs', subset=(0, [2, 3]),
+        # Try passing stream reader kwargs.
+        with guppi.open(template, 'rs', subset=(0, [2, 3]), squeeze=False,
                         **kwargs) as fr:
             data4 = fr.read()
-        assert np.all(data4 == data[:, 0, 2:])
+        assert np.all(data4.squeeze() == data[:, 0, 2:])
 
         # Just to check internal checks are OK.
         filename = template.format(stt_imjd=self.header_w['STT_IMJD'],

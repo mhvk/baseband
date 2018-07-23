@@ -694,11 +694,11 @@ class TestMark5B(object):
             header = fh.header0.copy()
             data = fh.read()
             dtime = fh.stop_time - fh.start_time
-        data = np.r_[data, data, data, data, data]
+        data = np.concatenate((data, data, data, data, data))
 
         # Create a file sequence using template.
         files = [str(tmpdir.join('f.{0:03d}.m5b'.format(x))) for x in range(5)]
-        with mark5b.open(files, 'ws', file_size=(4 * header.frame_nbytes),
+        with mark5b.open(files, 'ws', file_size=4*header.frame_nbytes,
                          sample_rate=32*u.MHz, nchan=8, kday=56000,
                          **header) as fw:
             fw.write(data)

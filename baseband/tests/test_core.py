@@ -84,13 +84,14 @@ def test_open_sequence(tmpdir):
         assert np.all(fn.read() == data1)
 
     # Open VDIF file sequence by passing a FileNameSequencer.
-    files = sf.FileNameSequencer('f{file_nr:03d}.vdif', {})
+    files = sf.FileNameSequencer('f{file_nr:03d}.vdif')
     with baseband_open(SAMPLE_VDIF) as fh:
         data2 = fh.read()
         header2 = fh.header0.copy()
 
+    # Sample file has 2 framesets of 8 frames each.
     with baseband_open(files, 'ws', format='vdif', nthread=8,
-                       file_size=(8 * header2.frame_nbytes), **header2) as fw:
+                       file_size=8*header2.frame_nbytes, **header2) as fw:
         fw.write(data2)
 
     # Can't check header0 because frameset might be out of order.

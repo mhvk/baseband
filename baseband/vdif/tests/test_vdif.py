@@ -995,12 +995,12 @@ def test_sequentialfile(tmpdir):
         header = fh.header0.copy()
         data = fh.read()
         dtime = fh.stop_time - fh.start_time
-    data = np.r_[data, data, data]
+    data = np.concatenate((data, data, data))
 
     # Create a file sequence using template.
     template = str(tmpdir.join('f.{file_nr:03d}.vdif'))
-    files = sf.FileNameSequencer(template, {})
-    with vdif.open(files, 'ws', file_size=(16 * header.frame_nbytes),
+    files = sf.FileNameSequencer(template)
+    with vdif.open(files, 'ws', file_size=16*header.frame_nbytes,
                    nthread=8, **header) as fw:
         fw.write(data)
 

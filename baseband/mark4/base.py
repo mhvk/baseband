@@ -527,7 +527,8 @@ Filehandle
 
 Notes
 -----
-One can also pass in a list, tuple, or subclass of
+Although it is not generally expected to be useful for Mark 4, like for
+other formats one can also pass in a list, tuple, or subclass of
 `~baseband.helpers.sequentialfile.FileNameSequencer`.  For writing to multiple
 files, the ``file_size`` keyword must be passed or only the first file will be
 written to.  One may also pass in a `~baseband.helpers.sequentialfile` object
