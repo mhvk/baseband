@@ -469,8 +469,9 @@ def open(name, mode='rs', **kwargs):
 
             elif is_template:
                 # Store parameters to pass.
-                passed_kwargs = {key: kwargs[key] for key in kwargs.keys()
-                                 if key in ('squeeze', 'subset', 'verify')}
+                passed_kwargs = {key: kwargs.pop(key) for key in
+                                 ('squeeze', 'subset', 'verify')
+                                 if key in kwargs}
                 kwargs = {key.upper(): value for key, value in kwargs.items()}
 
                 # If obs_offset is needed, make a temporary file sequence to
