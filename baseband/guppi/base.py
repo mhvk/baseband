@@ -1,6 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
 from __future__ import division, unicode_literals, print_function
-import io
 import re
 
 from astropy.extern import six
@@ -374,20 +373,20 @@ Filehandle
 
 Notes
 -----
-For streams, one can also pass in a list of files, or a template string that
-can be formatted using 'stt_imjd', 'src_name', and other header keywords
-(by `~baseband.dada.base.GUPPIFileNameSequencer`).
+For streams, one can also pass to ``name`` a list of files, or a template
+string that can be formatted using 'stt_imjd', 'src_name', and other header
+keywords (by `~baseband.dada.base.GUPPIFileNameSequencer`).
 
 For writing, one can mimic, for example, what is done at Arecibo by using
 the template 'puppi_{stt_imjd}_{src_name}_{scannum}.{file_nr:04d}.raw'.  GUPPI
 typically has 128 frames per file; to change this, use the ``frames_per_file``
-keyword.
+keyword.  ``file_size`` is set by ``frames_per_file`` and cannot be passed.
 
 For reading, to read series such as the above, you will need to use something
 like 'puppi_58132_J1810+1744_2176.{file_nr:04d}.raw'.  Here we have to pass in
 the MJD, source name and scan number explicitly, since the template is used to
 get the first file name, before any header is read, and therefore the only
-keyword available is file_nr', which is assumed to be zero for the first file.
+keyword available is 'file_nr', which is assumed to be zero for the first file.
 To avoid this restriction, pass in keyword arguments with values appropriate
 for the first file.
 

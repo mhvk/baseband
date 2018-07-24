@@ -84,7 +84,7 @@ def test_open_sequence(tmpdir):
         assert np.all(fn.read() == data1)
 
     # Open VDIF file sequence by passing a FileNameSequencer.
-    files = sf.FileNameSequencer('f{file_nr:03d}.vdif')
+    files = sf.FileNameSequencer(str(tmpdir.join('f{file_nr:03d}.vdif')))
     with baseband_open(SAMPLE_VDIF) as fh:
         data2 = fh.read()
         header2 = fh.header0.copy()

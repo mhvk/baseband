@@ -606,7 +606,7 @@ squeeze : bool, optional
     If `True` (default), writer accepts squeezed arrays as input, and adds any
     dimensions of length unity.
 file_size : int or None, optional
-    When writing to a sequence of files, the size of one file in bytes.
+    When writing to a sequence of files, the maximum size of one file in bytes.
     If `None` (default), the file size is unlimited, and only the first
     file will be written to.
 **kwargs
@@ -616,7 +616,7 @@ file_size : int or None, optional
 
 Notes
 -----
-One can also pass in a list, tuple, or subclass of
+One can also pass to ``name`` a list, tuple, or subclass of
 `~baseband.helpers.sequentialfile.FileNameSequencer`.  For writing to multiple
 files, the ``file_size`` keyword must be passed or only the first file will be
 written to.  One may also pass in a `~baseband.helpers.sequentialfile` object

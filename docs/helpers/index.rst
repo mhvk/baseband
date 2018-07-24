@@ -24,10 +24,15 @@ for reading or writing.  It returns sequential file objects that have ``read``,
 their single file object counterparts.  They additionally have ``memmap``
 methods to read or write to files through `numpy.memmap`.
 
-As an example of how to use |open|, we write the data from the sample VDIF
-file ``baseband/data/sample.vdif`` into a sequence of two files - as the sample
-file has two |framesets| - and then read the files back in.  We first load the
-required data::
+It is usually unnecessary to directly access `~baseband.helpers.sequentialfile`,
+since it is used by `baseband.open` and all format openers (except GSB)
+whenever a sequence of files is passed - see the :ref:`Gettng Started
+documentation <getting_started_multifile>` for details. For finer control of
+file opening, however, one may manually create a
+`~baseband.helpers.sequentialfile` object, then pass it to an opener.
+
+To illustrate, we rewrite the multi-file example from :ref:`Gettng Started
+<getting_started_multifile>`.  We first load the required data::
 
     >>> from baseband import vdif
     >>> from baseband.data import SAMPLE_VDIF
@@ -35,7 +40,8 @@ required data::
     >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
     >>> d = fh.read()
 
-We now open a sequential file object for writing::
+We now create a sequence of filenames and calculate the byte size per file,
+then pass these to `~baseband.helpers.sequentialfile.open`::
 
     >>> from baseband.helpers import sequentialfile as sf
     >>> filenames = ["seqvdif_{0}".format(i) for i in range(2)]
@@ -43,19 +49,12 @@ We now open a sequential file object for writing::
     >>> fwr = sf.open(filenames, mode='w+b', file_size=file_size)
 
 The first argument passed to |open| must be a **time-ordered sequence** of
-filenames in a list, tuple, or other subscriptable object that returns
-``IndexError`` when the index is out of bounds.  The read mode is 'wb',
-though note that writing using `numpy.memmap` (eg. required for the DADA stream
-writer) is only possible if ``mode='w+b'``.  ``file_size`` determines the
-largest size a file may reach before the next one in the sequence is opened
-for writing.  We set ``file_size`` such that each file holds exactly one
-frameset.
-
-.. note::
-
-    Setting ``file_size`` to a larger value than above will lead to the
-    two files having different sizes.  By default, ``file_size=None``, meaning
-    it can be arbitrarily large, in which case only one file will be created.
+filenames in a list, tuple, or other container that returns ``IndexError`` when
+the index is out of bounds.  The read mode is 'w+b' (a requirement of all
+format openers just in case they use `numpy.memmap`), and ``file_size``
+determines the largest size a file may reach before the next one in the
+sequence is opened for writing.  We set ``file_size`` such that each file holds
+exactly one frameset.
 
 To write the data, we pass ``fwr`` to `vdif.open <baseband.vdif.open>`::
 
@@ -75,24 +74,7 @@ file's, we may again use |open|::
     >>> np.all(fr.read() == d)
     True
     >>> fr.close()
-
-We can also open the second file on its own and confirm it contains the second
-frameset of the sample file::
-
-    >>> fsf = vdif.open(filenames[1], mode='rs', sample_rate=fh.sample_rate)
-    >>> fh.seek(fh.shape[0] // 2)    # Seek to start of second frameset.
-    20000
-    >>> fsf.header0.time == fh.time
-    True
-    >>> np.all(fsf.read() == fh.read())
-    True
-    >>> fsf.close()
     >>> fh.close()  # Close sample file.
-
-While `~baseband.helpers.sequentialfile` can be used for any format, since
-file sequences are common for DADA, it is implicitly used if a list of
-files or filename template is passed to `dada.open <baseband.dada.open>`. 
-See the DADA :ref:`Usage <dada_usage>` section for details.
 
 .. |open| replace:: `~baseband.helpers.sequentialfile.open`
 

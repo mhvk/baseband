@@ -421,12 +421,13 @@ Filehandle
 
 Notes
 -----
-For streams, one can also pass in a list of files, or a template string that
-can be formatted using 'frame_nr', 'obs_offset', and other header keywords
-(by `~baseband.dada.base.DADAFileNameSequencer`).
+For streams, one can also pass to ``name`` a list of files, or a template
+string that can be formatted using 'frame_nr', 'obs_offset', and other header
+keywords (by `~baseband.dada.base.DADAFileNameSequencer`).
 
 For writing, one can mimic what is done at quite a few telescopes by using
-the template '{utc_start}_{obs_offset:016d}.000000.dada'.
+the template '{utc_start}_{obs_offset:016d}.000000.dada'.  Unlike for the VLBI
+openers, ``file_size`` is set to the size of one frame as given by the header.
 
 For reading, to read series such as the above, use something like
 '2013-07-02-01:37:40_{obs_offset:016d}.000000.dada'.  Note that here we

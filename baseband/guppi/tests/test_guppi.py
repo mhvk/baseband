@@ -610,7 +610,7 @@ class TestGUPPI(object):
         assert np.all(data2 == data)
 
         # More complex template that requires keywords.
-        template = 'puppi_{stt_imjd}.{file_nr:04d}.raw'
+        template = str(tmpdir.join('puppi_{stt_imjd}.{file_nr:04d}.raw'))
         with guppi.open(template, 'ws', frames_per_file=1,
                         header0=self.header_w) as fw:
             fw.write(data[:1920])

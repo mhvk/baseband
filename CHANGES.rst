@@ -1,3 +1,16 @@
+1.2 (unreleased)
+================
+
+New Features
+------------
+
+- Expanded support for acccessing sequences of files to VLBI format
+  openers and `baseband.open`.  Enabled `baseband.guppi.open` to open file
+  sequences using string templates like with `baseband.dada.open`. [#254]
+
+- Created `baseband.helpers.FileNameSequencer`, a general-purpose
+  filename sequencer that can be passed to any format opener. [#253]
+
 1.1.1 (unreleased)
 ==================
 
