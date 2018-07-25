@@ -21,11 +21,13 @@ class Sequencer(object):
 
 
 class TestSequentialFileReader(object):
-    def setup(self):
+
+    def _setup(self, tmpdir):
         self.data = b'abcdefghijklmnopqrstuvwxyz'
         self.uint8_data = np.frombuffer(self.data, dtype=np.uint8)
         self.size = len(self.data)
-        self.files = ['file{:1d}.raw'.format(i) for i in range(3)]
+        self.files = [str(tmpdir.join('file{:1d}.raw'.format(i)))
+                      for i in range(3)]
         self.max_file_size = 10
         self.sizes = []
         self.offsets = [0]
@@ -38,11 +40,14 @@ class TestSequentialFileReader(object):
                 self.offsets.append(self.offsets[-1] + len(part))
             offset += self.max_file_size
 
-    def test_setup(self):
+    def test_setup(self, tmpdir):
+        self._setup(tmpdir)
         assert self.sizes == [10, 10, 6]
         assert self.offsets == [0, 10, 20, 26]
 
-    def test_open_close(self):
+    def test_open_close(self, tmpdir):
+        self._setup(tmpdir)
+
         fh = sf.open(self.files)
         assert fh.readable()
         assert fh.seekable()
@@ -58,7 +63,8 @@ class TestSequentialFileReader(object):
             # cannot pass in file_size for reading
             sf.open(self.files, 'rb', file_size=10)
 
-    def test_context(self):
+    def test_context(self, tmpdir):
+        self._setup(tmpdir)
         with sf.open(self.files) as fh:
             assert fh.readable()
             assert fh.seekable()
@@ -66,7 +72,8 @@ class TestSequentialFileReader(object):
             assert not fh.closed
         assert fh.closed
 
-    def test_attributes(self):
+    def test_attributes(self, tmpdir):
+        self._setup(tmpdir)
         with sf.open(self.files) as fh:
             assert fh.files == self.files
             assert fh.tell() == 0
@@ -76,7 +83,9 @@ class TestSequentialFileReader(object):
             with pytest.raises(AttributeError):
                 fh.bla
 
-    def test_seek(self):
+    def test_seek(self, tmpdir):
+        self._setup(tmpdir)
+
         with sf.open(self.files) as fh:
             fh.seek(self.offsets[1])
             assert fh.file_nr == 1
@@ -109,7 +118,9 @@ class TestSequentialFileReader(object):
         with pytest.raises(ValueError):
             fh.seek(10)
 
-    def test_read(self):
+    def test_read(self, tmpdir):
+        self._setup(tmpdir)
+
         with sf.open(self.files) as fh:
             check = fh.read(2)
             assert check == self.data[:2]
@@ -124,12 +135,14 @@ class TestSequentialFileReader(object):
         with pytest.raises(ValueError):
             fh.read()
 
-    def test_read_all(self):
+    def test_read_all(self, tmpdir):
+        self._setup(tmpdir)
         with sf.open(self.files) as fh:
             check = fh.read()
             assert check == self.data
 
-    def test_seek_read(self):
+    def test_seek_read(self, tmpdir):
+        self._setup(tmpdir)
         with sf.open(self.files) as fh:
             fh.seek(8)
             assert fh.read(8) == self.data[8:16]
@@ -143,7 +156,9 @@ class TestSequentialFileReader(object):
             assert fh.read() == b''
             assert fh.read(10) == b''
 
-    def test_memmap(self):
+    def test_memmap(self, tmpdir):
+        self._setup(tmpdir)
+
         with sf.open(self.files) as fh:
             mm = fh.memmap(offset=0, shape=(5,))
             assert fh.tell() == 5

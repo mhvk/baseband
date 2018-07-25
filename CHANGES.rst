@@ -11,7 +11,7 @@ New Features
 - Created `baseband.helpers.FileNameSequencer`, a general-purpose
   filename sequencer that can be passed to any format opener. [#253]
 
-1.1.1 (unreleased)
+1.1.1 (2018-07-24)
 ==================
 
 Bug Fixes
