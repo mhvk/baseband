@@ -503,8 +503,8 @@ class TestGUPPI(object):
         start_time = self.header_w.time
         with guppi.open(SAMPLE_FILE, 'rs') as fh:
             data = fh.read()
-        filenames = (str(tmpdir.join('guppi_a.raw')),
-                     str(tmpdir.join('guppi_b.raw')))
+        filenames = (str(tmpdir.join('guppi_1.raw')),
+                     str(tmpdir.join('guppi_2.raw')))
         with guppi.open(filenames, 'ws', header0=self.header_w,
                         frames_per_file=2) as fw:
             start_time = fw.start_time
@@ -535,7 +535,7 @@ class TestGUPPI(object):
 
         # Pass sequentialfile objects to reader.
         with sf.open(filenames, 'w+b',
-                     file_size=(2 * self.header_w.frame_nbytes)) as fraw, \
+                     file_size=2*self.header_w.frame_nbytes) as fraw, \
                 guppi.open(fraw, 'ws', header0=self.header_w) as fw:
             fw.write(data)
 
@@ -543,6 +543,10 @@ class TestGUPPI(object):
                 guppi.open(fraw, 'rs') as fr:
             data3 = fr.read()
         assert np.all(data3 == data)
+
+        # Check that we can't pass a filename sequence in 'wb' mode.
+        with pytest.raises(ValueError):
+            guppi.open(filenames, 'wb')
 
     def test_partial_last_frame(self, tmpdir):
         """Test reading a file with an incomplete last frame."""
@@ -585,6 +589,62 @@ class TestGUPPI(object):
             fn.seek(1231)
             new_data = fn.read(47)
             assert np.all(new_data == data[1231:1231 + 47])
+
+    def test_template_stream(self, tmpdir):
+        start_time = self.header_w.time
+        with guppi.open(SAMPLE_FILE, 'rs') as fh:
+            data = fh.read()
+
+        # Simple template with file number counter.
+        template = str(tmpdir.join('guppi_{file_nr:02d}.raw'))
+        with guppi.open(template, 'ws', frames_per_file=1,
+                        **self.header_w) as fw:
+            fw.write(data)
+
+        with guppi.open(template, 'rs') as fr:
+            assert len(fr.fh_raw.files) == 4
+            assert fr.fh_raw.files[-1] == str(tmpdir.join('guppi_03.raw'))
+            assert np.abs(fr.stop_time -
+                          (start_time + 3840 / (250 * u.Hz))) < 1.*u.ns
+            data2 = fr.read()
+        assert np.all(data2 == data)
+
+        # More complex template that requires keywords.
+        template = str(tmpdir.join('puppi_{stt_imjd}.{file_nr:04d}.raw'))
+        with guppi.open(template, 'ws', frames_per_file=1,
+                        header0=self.header_w) as fw:
+            fw.write(data[:1920])
+            assert fw.start_time == start_time
+            assert (np.abs(fw.time - (start_time + 1920 / (250 * u.Hz))) <
+                    1. * u.ns)
+            fw.write(data[1920:])
+            assert (np.abs(fw.time - (start_time + 3840 / (250 * u.Hz))) <
+                    1. * u.ns)
+
+        # We cannot just open using the same template, since STT_IMJD is
+        # not available.
+        with pytest.raises(KeyError):
+            guppi.open(template, 'rs')
+
+        kwargs = dict(STT_IMJD=self.header_w['STT_IMJD'])
+        with guppi.open(template, 'rs', **kwargs) as fr:
+            data3 = fr.read()
+        assert np.all(data3 == data)
+
+        # Try passing stream reader kwargs.
+        with guppi.open(template, 'rs', subset=(0, [2, 3]), squeeze=False,
+                        **kwargs) as fr:
+            data4 = fr.read()
+        assert np.all(data4.squeeze() == data[:, 0, 2:])
+
+        # Just to check internal checks are OK.
+        filename = template.format(stt_imjd=self.header_w['STT_IMJD'],
+                                   file_nr=0)
+        with pytest.raises(ValueError):
+            guppi.open(filename, 's')
+        with pytest.raises(TypeError):
+            # Extraneous argument.
+            guppi.open(filename, 'rs', files=(filename,))
 
 
 class TestGUPPIFileNameSequencer(object):

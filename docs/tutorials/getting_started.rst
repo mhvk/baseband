@@ -564,10 +564,123 @@ of rescaling, see the ``baseband/tests/test_conversion.py`` file.
 Reading or Writing to a Sequence of Files
 =========================================
 
-Data from one continuous observation is often spread over a sequence of files.
-The `~baseband.helpers.sequentialfile` module is available for reading in a
-sequence as if it were one contiguous file.  Simple usage examples can be found
-in the :ref:`Sequential File <sequential_file>` section.  DADA data is so
-often stored in a file sequence that reading a time-ordered list of filenames
-is built into `~baseband.dada.open`; for details, see the `its API entry
-<baseband.dada.open>`.
+Data from one continuous observation is sometimes spread over a sequence of
+files. Baseband includes the `~baseband.helpers.sequentialfile` module for
+reading in a sequence as if it were one contiguous file.  This module is called
+when a list, tuple or filename template is passed to eg. `baseband.open` or
+`baseband.vdif.open`, making the syntax for handling multiple files nearly
+identical to that for single ones.
+
+As an example, we write the data from the sample VDIF file
+``baseband/data/sample.vdif`` into a sequence of two files and then read the
+files back in.  We first load the required data::
+
+    >>> from baseband import vdif
+    >>> from baseband.data import SAMPLE_VDIF
+    >>> import numpy as np
+    >>> fh = vdif.open(SAMPLE_VDIF, 'rs')
+    >>> d = fh.read()
+
+We then create a sequence of filenames::
+
+    >>> filenames = ["seqvdif_{0}".format(i) for i in range(2)]
+
+When passing ``filenames`` to `~baseband.vdif.open`, we must also pass
+``file_size``, the file size in bytes, in addition to the usual ``kwargs`` for
+writing a file.  Since we wish to split the sample file in two, and the file
+consists of two framesets, we set ``file_size`` to the byte size of one
+frameset (we could have equivalently set it to ``fh.fh_raw.seek(0, 2) // 2``)::
+
+    >>> file_size = 8 * fh.header0.frame_nbytes
+    >>> fw = vdif.open(filenames, 'ws', header0=fh.header0,
+    ...                file_size=file_size, sample_rate=fh.sample_rate,
+    ...                nthread=fh.sample_shape.nthread)
+    >>> fw.write(d)
+    >>> fw.close()    # This implicitly closes fwr.
+
+.. note::
+
+    ``file_size`` sets the maximum size a file can reach before the
+    writer writes to the next one, so setting ``file_size`` to a larger
+    value than above will lead to the two files having different sizes.  By
+    default, ``file_size=None``, meaning it can be arbitrarily large, in which
+    case only one file will be created.
+
+We now read the sequence and confirm their contents are identical to those of
+the sample file::
+
+    >>> fr = vdif.open(filenames, 'rs', sample_rate=fh.sample_rate)
+    >>> fr.header0.time == fh.header0.time
+    True
+    >>> np.all(fr.read() == d)
+    True
+    >>> fr.close()
+
+When reading, the filename sequence **must be ordered in time**.
+
+We can also open the second file on its own and confirm it contains the second
+frameset of the sample file::
+
+    >>> fsf = vdif.open(filenames[1], mode='rs', sample_rate=fh.sample_rate)
+    >>> fh.seek(fh.shape[0] // 2)    # Seek to start of second frameset.
+    20000
+    >>> fsf.header0.time == fh.time
+    True
+    >>> np.all(fsf.read() == fh.read())
+    True
+    >>> fsf.close()
+
+In situations where the ``file_size`` is known, but not the total number of
+files to write, one may use the `~baseband.helpers.sequentialfile.FileNameSequencer`
+class to create an iterable without a user-defined size.  The class is
+initialized with a template string that can be formatted with keywords, and a
+optional ``header`` that can either be an actual header or a `dict` with the
+relevant keywords.  The template may also contain the special keyword
+'{file_nr}', which is equal to the indexing value (instead of a header entry).
+
+As an example, let us create a sequencer::
+
+    >>> from baseband.helpers import sequentialfile as sf
+    >>> filenames = sf.FileNameSequencer('f.edv{edv:d}.{file_nr:03d}.vdif',
+    ...                                  header=fh.header0)
+
+Indexing the sequencer using square brackets returns a filename::
+
+    >>> filenames[0]
+    'f.edv3.000.vdif'
+    >>> filenames[42]
+    'f.edv3.042.vdif'
+
+The sequencer has extracted the EDV from the header we passed in, and the
+file number from the index.  We can use the sequencer to write a VDIF file
+sequence::
+
+    >>> fw = vdif.open(filenames, 'ws', header0=fh.header0,
+    ...                file_size=file_size, sample_rate=fh.sample_rate,
+    ...                nthread=fh.sample_shape.nthread)
+    >>> d = np.concatenate([d, d, d])
+    >>> fw.write(d)
+    >>> fw.close()
+
+This creates 6 files::
+
+    >>> import glob
+    >>> len(glob.glob("f.edv*.vdif"))
+    6
+
+We can read the file sequence using the same sequencer.  In reading mode, the
+sequencer determines the number of files by finding the largest file available
+that fits the template::
+
+    >>> fr = vdif.open(filenames, 'rs', sample_rate=fh.sample_rate)
+    >>> fr.header0.time == fh.header0.time
+    True
+    >>> np.all(fr.read() == d)
+    True
+    >>> fr.close()
+    >>> fh.close()  # Close sample file as well.
+
+Because DADA and GUPPI data are usually stored in file sequences with names
+derived from header values - eg. 'puppi_58132_J1810+1744_2176.0010.raw',
+their format openers have template support built-in.  For usage details, please
+see the API entries for `baseband.dada.open` and `baseband.guppi.open`.

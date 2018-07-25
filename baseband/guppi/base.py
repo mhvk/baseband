@@ -1,7 +1,8 @@
 # Licensed under the GPLv3 - see LICENSE
 from __future__ import division, unicode_literals, print_function
-
 import re
+
+from astropy.extern import six
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -56,7 +57,7 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
     >>> gfs[10]
     'puppi_58132_J1810+1744_2176.0010.raw'
     """
-    def __init__(self, template, header):
+    def __init__(self, template, header={}):
         self.items = {}
 
         def check_and_convert(x):
@@ -369,52 +370,78 @@ Filehandle
     :class:`~baseband.guppi.base.GUPPIFileWriter` (binary), or
     :class:`~baseband.guppi.base.GUPPIStreamReader` or
     :class:`~baseband.guppi.base.GUPPIStreamWriter` (stream).
+
+Notes
+-----
+For streams, one can also pass to ``name`` a list of files, or a template
+string that can be formatted using 'stt_imjd', 'src_name', and other header
+keywords (by `~baseband.dada.base.GUPPIFileNameSequencer`).
+
+For writing, one can mimic, for example, what is done at Arecibo by using
+the template 'puppi_{stt_imjd}_{src_name}_{scannum}.{file_nr:04d}.raw'.  GUPPI
+typically has 128 frames per file; to change this, use the ``frames_per_file``
+keyword.  ``file_size`` is set by ``frames_per_file`` and cannot be passed.
+
+For reading, to read series such as the above, you will need to use something
+like 'puppi_58132_J1810+1744_2176.{file_nr:04d}.raw'.  Here we have to pass in
+the MJD, source name and scan number explicitly, since the template is used to
+get the first file name, before any header is read, and therefore the only
+keyword available is 'file_nr', which is assumed to be zero for the first file.
+To avoid this restriction, pass in keyword arguments with values appropriate
+for the first file.
+
+One may also pass in a `~baseband.helpers.sequentialfile` object
+(opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
+cases it is practically identical to passing in a list or template.
 """)
 
 
 # Need to wrap the opener to be able to deal with file lists or templates.
-# TODO: move this up to the opener??
 def open(name, mode='rs', **kwargs):
-    frames_per_file = kwargs.pop('frames_per_file', 128)
+    # Extract needed kwargs (and keep some from being passed to opener).
     header0 = kwargs.get('header0', None)
-    squeeze = kwargs.pop('squeeze', None)
-    # If sequentialfile object, check that it's opened properly.
-    if isinstance(name, sf.SequentialFileBase):
-        assert (('r' in mode and name.mode == 'rb') or
-                ('w' in mode and name.mode == 'w+b')), (
-                    "open only accepts sequential files opened in 'rb' mode "
-                    "for reading or 'w+b' mode for writing.")
-    is_sequence = isinstance(name, (tuple, list))
+    frames_per_file = kwargs.pop('frames_per_file', 128)
 
+    # Check if ``name`` is a template or sequence.
+    is_template = isinstance(name, six.string_types) and ('{' in name and
+                                                          '}' in name)
+    is_sequence = isinstance(name, (tuple, list, sf.FileNameSequencer))
+
+    # For stream writing, header0 is needed; for reading, it is needed for
+    # initializing a template only.
     if 'b' not in mode:
+        # Initialize header0 if it doesn't yet exist.
         if header0 is None:
             if 'w' in mode:
-                # For writing a header is required.
+                # Store squeeze.
+                passed_kwargs = ({'squeeze': kwargs.pop('squeeze')}
+                                 if 'squeeze' in kwargs.keys() else {})
+                # Make header0.
                 header0 = GUPPIHeader.fromvalues(**kwargs)
-                kwargs = {}
-            else:
-                header0 = {}
+                # Pass squeeze and header0 on to stream writer.
+                kwargs = passed_kwargs
+                kwargs['header0'] = header0
 
-        if is_sequence:
-            if 'r' in mode:
-                name = sf.open(name, 'rb')
-            else:
-                name = sf.open(name, 'w+b', file_size=(
-                    frames_per_file * header0.frame_nbytes))
+            elif is_template:
+                # Store parameters to pass.
+                passed_kwargs = {key: kwargs.pop(key) for key in
+                                 ('squeeze', 'subset', 'verify')
+                                 if key in kwargs}
+                header0 = {key.upper(): value for key, value in kwargs.items()}
+                kwargs = passed_kwargs
 
-        if header0 and 'w' in mode:
-            kwargs['header0'] = header0
+        if is_template:
+            name = GUPPIFileNameSequencer(name, header0)
 
-    if squeeze is not None:
-        kwargs['squeeze'] = squeeze
+    # If writing with a template or sequence, pass ``file_size``.
+    if 'w' in mode and (is_template or is_sequence):
+        if 'b' in mode:
+            raise ValueError("does not support opening a file sequence in "
+                             "'wb' mode.  Try passing in a SequentialFile "
+                             "object instead.")
+        kwargs['file_size'] = frames_per_file * header0.frame_nbytes
 
     return opener(name, mode, **kwargs)
 
 
-open.__doc__ = opener.__doc__ + """\n
-Notes
------
-For streams, one can also pass in a list of files, or equivalently a
-`~baseband.helpers.sequentialfile` object (opened in 'rb' mode for reading or
-'w+b' for writing).
-"""
+open.__doc__ = opener.__doc__
