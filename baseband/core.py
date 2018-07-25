@@ -64,7 +64,9 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
 
     module = importlib.import_module('.' + format, package='baseband')
     # Opening as a binary file (text for GSB) should always work, and allows
-    # us to determine whether the file is of the correct format.
+    # us to determine whether the file is of the correct format.  Here, getting
+    # info should never fail or even emit warnings (i.e., if tests start to
+    # give warnings, info should be fixed, not a filter done here).
     mode = 'rb' if format != 'gsb' else 'rt'
     with module.open(name, mode=mode) as fh:
         info = fh.info

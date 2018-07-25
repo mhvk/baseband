@@ -5,6 +5,8 @@ Loosely based on `~astropy.utils.data_info.DataInfo`.
 """
 from __future__ import division, unicode_literals, print_function
 
+import warnings
+
 import astropy.units as u
 from astropy.extern import six
 
@@ -189,13 +191,17 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     def _get_header0(self):
         fh = self._parent
         old_offset = fh.tell()
-        try:
-            fh.seek(0)
-            return fh.read_header()
-        except Exception:
-            return None
-        finally:
-            fh.seek(old_offset)
+        # Here, we do not even know whether we have the right format. We thus
+        # use a try/except and filter out all warnings.
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            try:
+                fh.seek(0)
+                return fh.read_header()
+            except Exception:
+                return None
+            finally:
+                fh.seek(old_offset)
 
     def _get_format(self):
         return self._parent.__class__.__name__.split('File')[0].lower()
