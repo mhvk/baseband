@@ -1,6 +1,8 @@
 # Licensed under the GPLv3 - see LICENSE
 from __future__ import division, unicode_literals, print_function
 
+from operator import index
+
 import numpy as np
 import six
 
@@ -10,14 +12,12 @@ __all__ = ['bcd_decode', 'bcd_encode', 'CRC']
 def bcd_decode(value):
     try:
         # Far faster than my routine for scalars
-        return int('{:x}'.format(value))
-    except ValueError:  # Might be an array (older python versions)
-        if not isinstance(value, np.ndarray):
-            raise ValueError("invalid BCD encoded value {0}={1}."
-                             .format(value, hex(value)))
-    except TypeError:  # Might still be an array (newer python versions)
-        if not isinstance(value, np.ndarray):
-            raise
+        return int('{:x}'.format(index(value)))
+    except TypeError as exc:  # Might still be an array
+        try:
+            assert issubclass(value.dtype.type, np.integer)
+        except Exception:
+            raise exc
 
     bcd = value
     factor = 1
@@ -38,10 +38,12 @@ def bcd_decode(value):
 def bcd_encode(value):
     try:
         # Far faster than my routine for scalars
-        return int('{:d}'.format(value), base=16)
-    except Exception:  # Maybe an array?
-        if not isinstance(value, np.ndarray):
-            raise
+        return int('{:d}'.format(index(value)), base=16)
+    except TypeError as exc:  # Might still be an array
+        try:
+            assert issubclass(value.dtype.type, np.integer)
+        except Exception:
+            raise exc
 
     result = np.zeros_like(value)
     result = 0
