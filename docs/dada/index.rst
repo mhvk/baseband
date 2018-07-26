@@ -14,10 +14,10 @@ Usage
 =====
 
 This section covers reading and writing DADA files with Baseband; general usage
-is covered in the :ref:`Getting Started <getting_started>` section. For
+is covered in the :ref:`Using Baseband <using_baseband>` section. For
 situations in which one is unsure of a file's format, Baseband features the
 general `baseband.open` and `baseband.file_info` functions, which are also
-discussed in :ref:`Getting Started <getting_started>`.  The examples below use
+discussed in :ref:`Using Baseband <using_baseband>`.  The examples below use
 the sample file ``baseband/data/sample.dada``, and the the `astropy.units` and
 `baseband.dada` modules::
 

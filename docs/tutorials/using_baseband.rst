@@ -1,10 +1,10 @@
-.. _getting_started:
+.. _using_baseband:
 
 .. include:: ../tutorials/glossary_substitutions.rst
 
-***************
-Getting Started
-***************
+**************
+Using Baseband
+**************
 
 For most file formats, one can simply import baseband and use `baseband.open`
 to access the file.  This gives one a filehandle from which one can read
@@ -20,9 +20,9 @@ decoded samples::
     >>> fh.close()
 
 For other file formats, a bit more information is needed.  Below, we cover the
-basics of :ref:`inspecting files <getting_started_inspecting>`, :ref:`reading
-<getting_started_reading>` from and :ref:`writing <getting_started_writing>`
-to files, and :ref:`converting <getting_started_converting>` from one format
+basics of :ref:`inspecting files <using_baseband_inspecting>`, :ref:`reading
+<using_baseband_reading>` from and :ref:`writing <using_baseband_writing>`
+to files, and :ref:`converting <using_baseband_converting>` from one format
 to another.  We assume that Baseband as well as `NumPy
 <http://www.numpy.org/>`_ and the `Astropy`_ units module have been imported::
 
@@ -30,7 +30,7 @@ to another.  We assume that Baseband as well as `NumPy
     >>> import numpy as np
     >>> import astropy.units as u
 
-.. _getting_started_inspecting:
+.. _using_baseband_inspecting:
 
 Inspecting Files
 ================
@@ -93,7 +93,7 @@ stream readers (see below).
    `GSB <gsb>`_, as this format requires separate time-stamp and raw data
    files. Only the timestamp file can be inspected usefully.
 
-.. _getting_started_reading:
+.. _using_baseband_reading:
 
 Reading Files
 =============
@@ -226,7 +226,7 @@ Basic information about the file is obtained by either by ``fh.info`` or simply
         start_time=2014-06-16T05:56:07.000000000>
 
 Not coincidentally, the first is identical to what we :ref:`found above
-<getting_started_inspecting>` using `~baseband.file_info`.
+<using_baseband_inspecting>` using `~baseband.file_info`.
 
 The filehandle itself also shows the ``offset``, the current location of the
 sample file pointer. Above, it is at ``12`` since we have read in 12 (complete)
@@ -424,7 +424,7 @@ than a copy and thus avoid unnecessary processing and memory allocation.
 (An exception to this is VDIF threads, where the subset is used to selectively
 read specific threads, and thus is not used for actual slicing of the data.)
 
-.. _getting_started_writing:
+.. _using_baseband_writing:
 
 Writing to Files and Format Conversion
 ======================================
@@ -503,7 +503,7 @@ We can check the validity of our new file by re-opening it::
 .. note:: One can also use the top-level `~baseband.open` function for writing,
           with the file format passed in via its ``format`` argument.
 
-.. _getting_started_converting:
+.. _using_baseband_converting:
 
 File Format Conversion
 ----------------------
@@ -559,7 +559,7 @@ writing 2-bits-per-sample Mark 4 data to a 2-bits-per-sample VDIF file.
 Rescaling is necessary, though, to convert DADA or GSB to VDIF.  For examples
 of rescaling, see the ``baseband/tests/test_conversion.py`` file.
 
-.. _getting_started_multifile:
+.. _using_baseband_multifile:
 
 Reading or Writing to a Sequence of Files
 =========================================

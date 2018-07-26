@@ -26,13 +26,13 @@ methods to read or write to files through `numpy.memmap`.
 
 It is usually unnecessary to directly access `~baseband.helpers.sequentialfile`,
 since it is used by `baseband.open` and all format openers (except GSB)
-whenever a sequence of files is passed - see the :ref:`Gettng Started
-documentation <getting_started_multifile>` for details. For finer control of
+whenever a sequence of files is passed - see the :ref:`Using Baseband
+documentation <using_baseband_multifile>` for details. For finer control of
 file opening, however, one may manually create a
 `~baseband.helpers.sequentialfile` object, then pass it to an opener.
 
-To illustrate, we rewrite the multi-file example from :ref:`Gettng Started
-<getting_started_multifile>`.  We first load the required data::
+To illustrate, we rewrite the multi-file example from :ref:`Using Baseband
+<using_baseband_multifile>`.  We first load the required data::
 
     >>> from baseband import vdif
     >>> from baseband.data import SAMPLE_VDIF
