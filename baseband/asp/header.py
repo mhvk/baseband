@@ -92,7 +92,6 @@ class ASPFileHeader(VLBIHeaderBase):
         # Is scale UTC?
         return Time(self['iMJD'], self['fMJD'], format='mjd', scale='utc')
 
-
 class ASPBlockHeader(VLBIHeaderBase):
     _dtype = np.dtype([('totalsize', '<i4'),
                        ('NPtsSend', '<i4'),
@@ -105,20 +104,40 @@ class ASPBlockHeader(VLBIHeaderBase):
 
     _header_parser = HeaderParser(make_parser_from_dtype(_dtype))
 
-    def __init__(self, words, verify=True):
+    def __init__(self, words, file_header=None, verify=True):
         # Important for "fromvalues", though not obvious you'll ever use it.
         if words is None:
             words = np.zeros((), self._dtype)
         self._words = words
         if verify:
             self.verify()
+        self._file_header = file_header
+
+    @property
+    def file_header(self):
+        return self._file_header
+
+    @file_header.setter
+    def file_header(self, file_header):
+        self._file_header = file_header
+
+    def has_file_header(self):
+        return self._file_header is not None
 
     def verify(self):
         assert self._words.dtype == self._dtype
         # Add some more useful verification?
 
     def __getitem__(self, item):
-        return self._words[item]
+        # permit access of file header items
+        try:
+            return self._words[item]
+        except ValueError:
+            if self.has_file_header():
+                return self._file_header._words[item]
+            else:
+                raise ValueError("no field of name " + str(item))
+        # return self._words[item]
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):

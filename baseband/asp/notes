@@ -2,7 +2,7 @@ notes:
 
 General Header Comments:
 	had to manually pad the file header; the numpy alignment doesn't quite work the same way as the c struct alignment
-	changed the read methods to a straight np fromfile
+	changed the read methods to a straight np fromfile due to some complaint from the python read method.
 
 Block Header:
 	We subclass VLBIHeader
@@ -14,7 +14,8 @@ File Header:
 	Need to deal with header parser despite the fact that the headers are word aligned.
 
 Combined Header:
-	Working on it...
+	Created ASPHeader, which is a combined header class that detects position within file object and adjusts accordingly
+	(immediately deprecated)
 
 Payload:
 	define/select encoders (8bit)
