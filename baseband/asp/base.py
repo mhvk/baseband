@@ -1,22 +1,45 @@
 from ..vlbi_base.base import VLBIStreamReaderBase
 from .frame import ASPFrame
-from .header import ASPHeader
+from .header import ASPFileHeader, ASPHeader
 import astropy.units as u
 
-class ASPStreamReader(VLBIStreamReaderBase):
+
+__all__ = ['ASPStreamReaderBase', 'ASPStreamReader']
+
+
+class ASPStreamReaderBase(VLBIStreamReaderBase):
 
     # unfinished
-    def __init__(self, fh_raw):
-        self.fh_raw = fh_raw
-        pos = fh_raw.tell()
-        header0 = ASPHeader.fromfile(fh_raw)
-        fh_raw.seek(pos)
+    def __init__(self, fh_raw, header0):
+        self._fh_raw = fh_raw
         self._header0 = header0
         sample_rate = header0['ch_bw'][0] * u.MHz
         samples_per_frame = header0['NPtsSend'][0]
-        super(ASPStreamReader, self).__init__(fh_raw, header0, sample_rate,
-            samples_per_frame, unsliced_shape = None, bps=8, complex_data=True,
-            squeeze = False, subset = None, fill_value=0.0, verify=False)
+        super(ASPStreamReaderBase, self).__init__(
+            fh_raw, header0, sample_rate,
+            samples_per_frame, unsliced_shape=None, bps=8, complex_data=True,
+            squeeze=False, subset=None, fill_value=0.0, verify=False)
 
     def read_frame(self):
-        return ASPFrame.fromfile(self.fh_raw)
+        frame = ASPFrame.fromfile(self._fh_raw)
+        # associate the original file header with
+        # frame header (just in case!)
+        frame.header.file_header = self._header0.file_header
+        return frame
+
+
+class ASPStreamReader(ASPStreamReaderBase):
+    def __init__(self, fh_raw):
+        pos = fh_raw.tell()
+        fh_raw.seek(0)
+        fileheader0 = ASPFileHeader.fromfile(fh_raw)
+        pos2 = fh_raw.tell()
+        header0 = ASPHeader.fromfile(fh_raw)
+        header0.file_header = fileheader0
+
+        if pos == 0:
+            pos = pos2
+
+        fh_raw.seek(pos)
+
+        super(ASPStreamReader, self).__init__(fh_raw, header0)

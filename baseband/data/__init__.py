@@ -150,3 +150,10 @@ SAMPLE_DRAO_CORRUPT = _full_path('sample_drao_corrupted.vdif')
 First ten frames extracted from b0329 DRAO corrupted raw data file
 0059000.dat.
 """
+
+SAMPLE_ASP = _full_path('sample_asp.asp')
+"""Sample ASP file taken from Arecibo project P2067 (B1937+21) courtesy
+Paul Demorest. bps=4, npol=2
+
+128 samples from two blocks (truncated for size)
+"""
