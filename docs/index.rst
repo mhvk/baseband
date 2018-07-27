@@ -12,8 +12,8 @@ streamlining data conversion and standardization.  It provides:
   selective decoding of data into `Numpy arrays <numpy.ndarray>`, and encoding
   user-defined arrays into baseband formats. Supported formats are listed under
   :ref:`specific file formats <specific_file_formats_toc>`.
-- Helper objects for reading from and writing to an ordered sequence of files
-  as if it was a single file.
+- The ability to read from and write to an ordered sequence of files as if it
+  was a single file.
 
 .. _overview_toc:
 
@@ -25,11 +25,12 @@ Overview
 
    install
    tutorials/getting_started
+   tutorials/using_baseband
    tutorials/glossary
 
 .. _specific_file_formats_toc:
 
-Specific file formats
+Specific File Formats
 =====================
 
 Baseband's code is subdivided into its supported file formats, and the
@@ -48,7 +49,7 @@ troubleshooting help and APIs for each.
 
 .. _core_utilities_toc:
 
-Core framework and utilities
+Core Framework and Utilities
 ============================
 
 These sections contain APIs and usage notes for the sequential file opener,
@@ -65,7 +66,7 @@ used for testing).
 
 .. _dev_docs_toc:
 
-Developer documentation
+Developer Documentation
 =======================
 
 The developer documentation feature tutorials for supporting new formats or
@@ -78,7 +79,7 @@ format extensions such as VDIF EDV.
 
 .. _project_details_toc:
 
-Project details
+Project Details
 ===============
 
 .. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master

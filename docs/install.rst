@@ -1,7 +1,10 @@
+.. _installation:
+
 ************
 Installation
 ************
 
+.. _install_reqs:
 
 Requirements
 ============
@@ -11,13 +14,10 @@ Baseband requires:
     - `Astropy`_ v2.0 or later
     - `Numpy <http://www.numpy.org/>`_ v1.9 or later
 
-.. _installation:
+.. _install_baseband:
 
 Installing Baseband
 ===================
-
-Using PIP
----------
 
 To install Baseband with `pip <http://www.pip-installer.org/en/latest/>`_,
 run::
@@ -70,7 +70,7 @@ For general information on :file:`setup.py`, see `its documentation
 are described further in `Astropy's installation documentation
 <https://astropy.readthedocs.io/en/stable/install.html>`_ .
 
-.. _sourcebuildtest:
+.. _install_sourcebuildtest:
 
 Testing the Installation
 ========================
@@ -90,7 +90,7 @@ documentation can be found on the `Astropy running tests documentation
 <https://astropy.readthedocs.io/en/stable/development/testguide.html#running-tests>`_
 .
 
-.. _builddocs:
+.. _install_builddocs:
 
 Building Documentation
 ======================
