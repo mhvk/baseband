@@ -9,14 +9,11 @@ writing VLBI and other radio baseband files, with the aim of simplifying and
 streamlining data conversion and standardization.  It provides:
 
 - File input/output objects for supported radio baseband formats, enabling
-  selective decoding of data into `NumPy arrays <numpy.ndarray>`, and encoding
+  selective decoding of data into `Numpy arrays <numpy.ndarray>`, and encoding
   user-defined arrays into baseband formats. Supported formats are listed under
   :ref:`specific file formats <specific_file_formats_toc>`.
 - The ability to read from and write to an ordered sequence of files as if it
   was a single file.
-
-For a quick intro to Baseband, please see :ref:`Getting Started with Baseband
-<getting_started>`.
 
 .. _overview_toc:
 

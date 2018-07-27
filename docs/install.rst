@@ -19,9 +19,6 @@ Baseband requires:
 Installing Baseband
 ===================
 
-Using pip
----------
-
 To install Baseband with `pip <http://www.pip-installer.org/en/latest/>`_,
 run::
 
@@ -44,7 +41,7 @@ using::
 Of course, it is even better to fork it on GitHub, and then clone your own
 repository, so that you can more easily contribute!
 
-Running Code Without Installing
+Running Code without Installing
 -------------------------------
 
 As Baseband is purely Python, it can be used without being built or installed,

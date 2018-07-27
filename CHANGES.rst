@@ -8,8 +8,9 @@ New Features
   openers and `baseband.open`.  Enabled `baseband.guppi.open` to open file
   sequences using string templates like with `baseband.dada.open`. [#254]
 
-- Created `baseband.helpers.base.FileNameSequencer`, a general-purpose
-  filename sequencer that can be passed to any format opener. [#253]
+- Created `baseband.helpers.sequentialfile.FileNameSequencer`, a
+  general-purpose filename sequencer that can be passed to any format opener.
+  [#253]
 
 Other Changes and Additions
 ---------------------------

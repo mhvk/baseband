@@ -7,26 +7,24 @@ Getting Started with Baseband
 *****************************
 
 This quickstart tutorial is meant to help the reader hit the ground running
-with Baseband.  All topics here are covered in more detail in :ref:`Using
-Baseband <using_baseband>`, which additionally discusses writing to files.
+with Baseband.  For more detail, including writing to files, see :ref:`Using
+Baseband <using_baseband>`.
 
-To install Baseband, please see :ref:`Installing Baseband <install_baseband>`.
-We recommend installing using `pip <http://www.pip-installer.org/en/latest/>`_
-within a `virtual environment <https://virtualenv.pypa.io/en/stable/userguide/>`_.
+For installation instructions, please see :ref:`Installing Baseband
+<install_baseband>`.
+
+When using Baseband, we typically will also use `numpy`, `astropy.units`, and
+`astropy.time.Time`. Let's import all of these::
+
+    >>> import baseband
+    >>> import numpy as np
+    >>> import astropy.units as u
+    >>> from astropy.time import Time
 
 .. _getting_started_opening:
 
 Opening Files
 =============
-
-When using Baseband, we typically will also use `numpy` and the `astropy.units`
-and `astropy.time` modules (these should have been installed with Baseband if
-they weren't already available). Let's import all of these::
-
-    >>> import baseband
-    >>> import numpy as np
-    >>> import astropy.units as u
-    >>> import astropy.time as t
 
 For this tutorial, we'll use two sample files::
 
@@ -47,7 +45,7 @@ Opening the Mark 5B file is slightly more involved, as not all required
 metadata is stored in the file itself::
 
     >>> fh_m5b = baseband.open(SAMPLE_MARK5B, nchan=8, sample_rate=32*u.MHz,
-    ...                        ref_time=t.Time('2014-06-13 12:00:00'))
+    ...                        ref_time=Time('2014-06-13 12:00:00'))
 
 Here, we've manually passed in as keywords the number of |channels|, the
 :term:`sample rate` (number of samples per channel per second) as an
@@ -57,77 +55,28 @@ properly read timestamps from the Mark 5B file.
 
 `baseband.open` tries to open files using all available formats, returning
 whichever is successful.  If you know the format of your file, you can pass
-it with the ``format`` keyword, or directly use the format opener (for VDIF, it
-is `baseband.vdif.open`).
+its name with the ``format`` keyword, or directly use its format opener (for
+VDIF, it is `baseband.vdif.open`).  Also, the `baseband.file_info` function can
+help determine the format and any missing information needed by `baseband.open`
+- see :ref:`Inspecting Files <using_baseband_inspecting>`.
 
 Do you have a sequence of files you want to read in?  You can pass a list of
 filenames to `baseband.open`, and it will open them up as if they were a single
-file!  See :ref:`Reading or Writing to a Sequence of Files
-<using_baseband_multifile>` for more information.
-
-.. note::
-
-    GSB files, from `GMRT <http://www.gmrt.ncra.tifr.res.in/>`_, are a unique
-    format, and are best opened using their format opener, `baseband.gsb.open`.
-    See the :ref:`GSB format docs <gsb>` for more information.
-
-.. _getting_started_info:
-
-Getting File Info
-=================
-
-Radio baseband files are generally composed of blocks of binary data, or
-|payloads|, stored alongside corresponding metadata, or |headers|.  Each
-header and payload combination is known as a :term:`data frame`.  Most formats
-have files composed of a long series of frames.
-
-Baseband can be used to extract basic properties and header metadata from
-opened files.  If we wanted an overview of the VDIF file::
-
-    >>> fh_vdif.info
-    Stream information:
-    start_time = 2014-06-16T05:56:07.000000000
-    stop_time = 2014-06-16T05:56:07.001250000
-    sample_rate = 32.0 MHz
-    shape = (40000, 8)
-    format = vdif
-    bps = 2
-    complex_data = False
-    <BLANKLINE>
-    File information:
-    edv = 3
-    frame_rate = 1600.0 Hz
-    samples_per_frame = 20000
-    sample_shape = (8, 1)
-
-If we wanted to know more about the Mark 5B file::
-
-    >>> fh_m5b.info
-    Stream information:
-    start_time = 2014-06-13T05:30:01.000000000
-    stop_time = 2014-06-13T05:30:01.000625000
-    sample_rate = 32.0 MHz
-    shape = (20000, 8)
-    format = mark5b
-    bps = 2
-    complex_data = False
-    <BLANKLINE>
-    File information:
-    frame_rate = 6400.0 Hz
-    samples_per_frame = 5000
-    sample_shape = (8,)
-
-This information is extracted by `baseband.file_info`, which can also help
-determine the file format, and any missing information that needs to be passed
-to `baseband.open` - see :ref:`Inspecting Files <using_baseband_inspecting>`.
+file!  See :ref:`Reading or Writing to a Sequence of Files <using_baseband_multifile>`.
 
 .. _getting_started_reading:
 
 Reading Files
 =============
 
-Baseband file objects are wrappers around Python file objects, and have the
-same interface, including `~baseband.vlbi_base.base.VLBIStreamReaderBase.seek`
+Radio baseband files are generally composed of blocks of binary data, or
+|payloads|, stored alongside corresponding metadata, or |headers|.  Each
+header and payload combination is known as a :term:`data frame`, and most
+formats feature files composed of a long series of frames.
+
+Baseband file objects are frame-reading wrappers around Python file objects,
+and have the same interface, including
+`~baseband.vlbi_base.base.VLBIStreamReaderBase.seek`
 for seeking to different parts of the file,
 `~baseband.vlbi_base.base.VLBIStreamReaderBase.tell` for reporting the file
 pointer's current position, and
@@ -138,8 +87,13 @@ samples.
 Let's read some samples from the VDIF file::
 
     >>> data = fh_vdif.read(3)
-    >>> data[:, 0]      # Print first thread only.
-    array([-1.      , -1.      ,  3.316505], dtype=float32)
+    >>> data
+    array([[-1.      ,  1.      ,  1.      , -1.      , -1.      , -1.      ,
+             3.316505,  3.316505],
+           [-1.      ,  1.      , -1.      ,  1.      ,  1.      ,  1.      ,
+             3.316505,  3.316505],
+           [ 3.316505,  1.      , -1.      , -1.      ,  1.      ,  3.316505,
+            -3.316505,  3.316505]], dtype=float32)
     >>> data.shape
     (3, 8)
 
@@ -163,6 +117,39 @@ by::
     >>> fh_vdif.sample_shape
     SampleShape(nthread=8)
 
+Baseband extracts basic properties and header metadata from opened files.
+Notably, the start and end times of the file are given by::
+
+    >>> fh_vdif.start_time
+    <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.000000000>
+    >>> fh_vdif.stop_time
+    <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.001250000>
+
+For an overview of the file, we can either print ``fh_vdif`` itself, or use the
+``info`` method::
+
+    >>> fh_vdif
+    <VDIFStreamReader name=... offset=3
+        sample_rate=32.0 MHz, samples_per_frame=20000,
+        sample_shape=SampleShape(nthread=8),
+        bps=2, complex_data=False, edv=3, station=65532,
+        start_time=2014-06-16T05:56:07.000000000>
+    >>> fh_vdif.info
+    Stream information:
+    start_time = 2014-06-16T05:56:07.000000000
+    stop_time = 2014-06-16T05:56:07.001250000
+    sample_rate = 32.0 MHz
+    shape = (40000, 8)
+    format = vdif
+    bps = 2
+    complex_data = False
+    <BLANKLINE>
+    File information:
+    edv = 3
+    frame_rate = 1600.0 Hz
+    samples_per_frame = 20000
+    sample_shape = (8, 1)
+
 Seeking is also done in units of complete samples, which is equivalent to
 seeking in timesteps.  Let's move forward 100 complete samples::
 
@@ -182,20 +169,12 @@ time::
 
     >>> fh_vdif.tell()
     39320
+    >>> fh_vdif.tell(unit=u.us)    # Time since start of file.
+    <Quantity 1228.75 us>
     >>> fh_vdif.tell(unit='time')
     <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.001228750>
-
-The start and end time of the entire file are given by::
-
-    >>> fh_vdif.start_time
-    <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.000000000>
-    >>> fh_vdif.stop_time
-    <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.001250000>
 
 Finally, we close both files::
 
     >>> fh_vdif.close()
     >>> fh_m5b.close()
-
-See :ref:`Using Baseband's Reading Files section <using_baseband_reading>` for
-more information.
