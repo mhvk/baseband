@@ -7,7 +7,9 @@ General Header Comments:
 Block Header:
 	We subclass VLBIHeader
 	We define a custom numpy dtype that is a copy of the dspsr block header struct
-	Note that Marten wrote this class. The 'fromfile' method is the main thing here and we use the numpy 'frombuffer' method to read bytes straight into the header dtype. These headers are pretty simple since our data are 32bit word-aligned.
+	Note that Marten wrote (most of) this class. The 'fromfile' method is the main thing here and we use the numpy 'frombuffer' method to read bytes straight into the header dtype. These headers are pretty simple since our data are 32bit word-aligned.
+	Renamed ASPHeader (became the 'combined' header)
+	Had to override the 'nbytes' method to avoid reference to _struct - should investigate either overriding all references to _struct or implementing it from _dtype.
 
 File Header:
 	basically the same as for the block header; had to define a Fairly extensive dtype but otherwise not much to report.

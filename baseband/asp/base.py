@@ -1,6 +1,6 @@
 from ..vlbi_base.base import VLBIStreamReaderBase
 from .frame import ASPFrame
-from .header import ASPFileHeader, ASPBlockHeader
+from .header import ASPFileHeader, ASPHeader
 import astropy.units as u
 
 class ASPStreamReaderBase(VLBIStreamReaderBase):
@@ -28,7 +28,7 @@ class ASPStreamReader(ASPStreamReaderBase):
         fh_raw.seek(0)
         fileheader0 = ASPFileHeader.fromfile(fh_raw)
         pos2 = fh_raw.tell()
-        header0 = ASPBlockHeader.fromfile(fh_raw)
+        header0 = ASPHeader.fromfile(fh_raw)
         header0.file_header = fileheader0
 
         if pos == 0:
