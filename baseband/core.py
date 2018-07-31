@@ -1,8 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE
 """Routines to obtain information on baseband files."""
 import importlib
-
 import numpy as np
+
+from .helpers import sequentialfile as sf
 
 __all__ = ['file_info', 'open']
 
@@ -20,8 +21,9 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
 
     Parameters
     ----------
-    name : str or filehandle
-        Raw file for which to obtain information.
+    name : str or filehandle, or sequence of str
+        Raw file for which to obtain information.  If a sequence of files is
+        passed, returns information from the first file (see Notes).
     format : str, tuple of str, optional
         Formats to try.  If not given, try all standard formats.
     **kwargs
@@ -47,7 +49,12 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
       - ``inconsistent_kwargs``: not needed to open the file, and inconsistent.
       - ``irrelevant_kwargs``: provide information irrelevant for opening.
     """
-    if isinstance(format, tuple):
+
+    # Handle lists and tuples of files, which may be passed from open.
+    if isinstance(name, (tuple, list, sf.FileNameSequencer)):
+        return file_info(name[0], format, **kwargs)
+    # If we're looking at one file but multiple formats, cycle through formats.
+    elif isinstance(format, tuple):
         for format_ in format:
             info = file_info(name, format_, **kwargs)
             if info:
@@ -57,7 +64,9 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
 
     module = importlib.import_module('.' + format, package='baseband')
     # Opening as a binary file (text for GSB) should always work, and allows
-    # us to determine whether the file is of the correct format.
+    # us to determine whether the file is of the correct format.  Here, getting
+    # info should never fail or even emit warnings (i.e., if tests start to
+    # give warnings, info should be fixed, not a filter done here).
     mode = 'rb' if format != 'gsb' else 'rt'
     with module.open(name, mode=mode) as fh:
         info = fh.info
@@ -145,7 +154,7 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
 
 
 def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
-    """Open a baseband file for reading or writing.
+    """Open a baseband file (or sequence of files) for reading or writing.
 
     Opened as a binary file, one gets a wrapped filehandle that adds
     methods to read/write a frame.  Opened as a stream, the handle is
@@ -154,8 +163,10 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
 
     Parameters
     ----------
-    name : str or filehandle
-        File name or handle.
+    name : str or filehandle, or sequence of str
+        File name, filehandle, or sequence of file names.  A sequence may be a
+        list or str of ordered filenames, or an instance of
+        `~baseband.helpers.sequentialfile.FileNameSequencer`.
     mode : {'rb', 'wb', 'rs', or 'ws'}, optional
         Whether to open for reading or writing, and as a regular binary
         file or as a stream. Default: 'rs', for reading a stream.

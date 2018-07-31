@@ -46,10 +46,10 @@ Usage
 =====
 
 This section covers reading and writing GUPPI files with Baseband; general
-usage is covered in the :ref:`Getting Started <getting_started>` section.  For
+usage is covered in the :ref:`Using Baseband <using_baseband>` section.  For
 situations in which one is unsure of a file's format, Baseband features the
 general `baseband.open` and `baseband.file_info` functions, which are also
-discussed in :ref:`Getting Started <getting_started>`.  The examples below use
+discussed in :ref:`Using Baseband <using_baseband>`.  The examples below use
 the sample PUPPI file ``baseband/data/sample_puppi.raw``, and the the
 `astropy.units` and `baseband.guppi` modules::
 
@@ -102,31 +102,32 @@ zero when writing (so we set ``samples_per_frame`` to its stream reader value
 from above)::
 
     >>> from astropy.time import Time
-    >>> files = ['puppi_test.000{i}.raw'.format(i=i) for i in range(2)]
-    >>> fw = guppi.open(files, 'ws', frames_per_file=2, sample_rate=250*u.Hz,
+    >>> fw = guppi.open('puppi_test.{file_nr:04d}.raw', 'ws',
+    ...                 frames_per_file=2, sample_rate=250*u.Hz,
     ...                 samples_per_frame=960, pktsize=1024,
     ...                 time=Time(58132.59135416667, format='mjd'),
     ...                 npol=2, nchan=4)
     >>> fw.write(d)
     >>> fw.close()
-    >>> fr = guppi.open(files, 'rs')
+    >>> fr = guppi.open('puppi_test.{file_nr:04d}.raw', 'rs')
     >>> d2 = fr.read()
     >>> (d == d2).all()
     True
     >>> fr.close()
 
-Here we show how we can write to a sequence of files.  One may pass a
-time-ordered list or tuple of filenames to `~baseband.guppi.open`, which then
-uses |sequentialfile.open| to read or write to them as a single contiguous
-file.  Unlike when writing DADA files, which have one frame per file, we must
-specify the number of frames in one file.  Note that typically one does not
-have to pass ``PKTSIZE``, the UDP data packet size (set by the observing mode),
-but the sample file has small enough frames that the default of 8192 bytes is
-too large.  Baseband only uses ``PKTSIZE`` to double-check the sample offset of
-the frame, so ``PKTSIZE`` must be set to a value such each payload, excluding
-overlap samples, contains an integer number of packets.
-
-.. |sequentialfile.open| replace:: `sequentialfile.open <baseband.helpers.sequentialfile.open>`
+Here we show how to write a sequence of files by passing a string template
+to `~baseband.guppi.open`, which prompts it to create and use a filename
+sequencer generated with `~baseband.guppi.base.GUPPIFileNameSequencer`.  One
+may also pass a time-ordered list or tuple of filenames to
+`~baseband.guppi.open`.  Unlike when writing DADA files, which have one frame
+per file, we specify the number of frames in one file using``frames_per_file``.
+Note that typically one does not have to pass ``PKTSIZE``, the UDP data packet
+size (set by the observing mode), but the sample file has small enough frames
+that the default of 8192 bytes is too large.  Baseband only uses ``PKTSIZE`` to
+double-check the sample offset of the frame, so ``PKTSIZE`` must be set to a
+value such that each payload, excluding overlap samples, contains an integer
+number of packets.  (See API links for further details on how to read and
+write file sequences.)
 
 .. _guppi_api:
 

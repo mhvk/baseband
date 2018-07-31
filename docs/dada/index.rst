@@ -14,10 +14,10 @@ Usage
 =====
 
 This section covers reading and writing DADA files with Baseband; general usage
-is covered in the :ref:`Getting Started <getting_started>` section. For
+is covered in the :ref:`Using Baseband <using_baseband>` section. For
 situations in which one is unsure of a file's format, Baseband features the
 general `baseband.open` and `baseband.file_info` functions, which are also
-discussed in :ref:`Getting Started <getting_started>`.  The examples below use
+discussed in :ref:`Using Baseband <using_baseband>`.  The examples below use
 the sample file ``baseband/data/sample.dada``, and the the `astropy.units` and
 `baseband.dada` modules::
 
@@ -86,12 +86,11 @@ To set up a file for writing as a stream is possible as well::
 
 Here, we have used an even smaller size of the payload, to show how one can
 define multiple files.  DADA data are typically stored in sequences of files. 
-If, in place of a single filename, one passes a time-ordered list or tuple of
-filenames to `~baseband.dada.open`, it uses |sequentialfile.open| to read or
-write to them as a single contiguous file.  If, as above, one passes a template
-string, `~baseband.dada.open` uses `~baseband.dada.base.DADAFileNameSequencer`
-to create a subscriptable filename generator, which is then passed to
-|sequentialfile.open|.  (See API links for further details.)
+If one passes a time-ordered list or tuple of filenames to
+`~baseband.dada.open`, it uses |sequentialfile.open| to access the sequence.
+If, as above, one passes a template string, `~baseband.dada.open` uses
+`~baseband.dada.base.DADAFileNameSequencer` to create and use a filename
+sequencer.  (See API links for further details.)
 
 .. |sequentialfile.open| replace:: `sequentialfile.open <baseband.helpers.sequentialfile.open>`
 

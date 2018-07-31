@@ -1,4 +1,25 @@
-1.1.1 (unreleased)
+1.2 (2018-07-27)
+================
+
+New Features
+------------
+
+- Expanded support for acccessing sequences of files to VLBI format
+  openers and `baseband.open`.  Enabled `baseband.guppi.open` to open file
+  sequences using string templates like with `baseband.dada.open`. [#254]
+
+- Created `baseband.helpers.sequentialfile.FileNameSequencer`, a
+  general-purpose filename sequencer that can be passed to any format opener.
+  [#253]
+
+Other Changes and Additions
+---------------------------
+
+- Moved the Getting Started section to :ref:`"Using Baseband"
+  <using_baseband>`, and created a new quickstart tutorial under :ref:`Getting
+  Started <getting_started>` to better assist new users.  [#260]
+
+1.1.1 (2018-07-24)
 ==================
 
 Bug Fixes

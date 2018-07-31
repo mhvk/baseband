@@ -23,7 +23,7 @@ def test_sequentialfile_vdif_stream(tmpdir):
         edv=0, time=Time('2010-01-01'), nchan=2, bps=2,
         complex_data=False, frame_nr=0, thread_id=0, samples_per_frame=16,
         station='me')
-    with sequentialfile.open(vdif_sequencer, 'wb',
+    with sequentialfile.open(vdif_sequencer, 'w+b',
                              file_size=4*header.frame_nbytes) as sfh, \
             vdif.open(sfh, 'ws', header0=header, nthread=2,
                       sample_rate=256*u.Hz) as fw:

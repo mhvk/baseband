@@ -605,16 +605,21 @@ nthread : int, optional
 squeeze : bool, optional
     If `True` (default), writer accepts squeezed arrays as input, and adds any
     dimensions of length unity.
+file_size : int or None, optional
+    When writing to a sequence of files, the maximum size of one file in bytes.
+    If `None` (default), the file size is unlimited, and only the first
+    file will be written to.
 **kwargs
     If the header is not given, an attempt will be made to construct one
     with any further keyword arguments.  See
     :class:`~baseband.vdif.base.VDIFStreamWriter`.
 
-Returns
--------
-Filehandle
-    :class:`~baseband.vdif.base.VDIFFileReader` or
-    :class:`~baseband.vdif.base.VDIFFileWriter` (binary), or
-    :class:`~baseband.vdif.base.VDIFStreamReader` or
-    :class:`~baseband.vdif.base.VDIFStreamWriter` (stream).
+Notes
+-----
+One can also pass to ``name`` a list, tuple, or subclass of
+`~baseband.helpers.sequentialfile.FileNameSequencer`.  For writing to multiple
+files, the ``file_size`` keyword must be passed or only the first file will be
+written to.  One may also pass in a `~baseband.helpers.sequentialfile` object
+(opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
+cases it is practically identical to passing in a list or template.
 """)

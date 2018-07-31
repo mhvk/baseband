@@ -57,7 +57,7 @@ class TestBCD(object):
     def test_bcd_encode(self):
         assert bcd_encode(1) == 0x1
         assert bcd_encode(9123) == 0x9123
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             bcd_encode('bla')
 
     def test_roundtrip(self):

@@ -9,6 +9,7 @@ from collections import namedtuple
 import astropy.units as u
 from astropy.utils import lazyproperty
 from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from ..helpers import sequentialfile as sf
 
 
 __all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
@@ -641,7 +642,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         return super(VLBIStreamWriterBase, self).close()
 
 
-default_open_doc = """Open baseband file for reading or writing.
+default_open_doc = """Open baseband file(s) for reading or writing.
 
 Opened as a binary file, one gets a wrapped filehandle that adds
 methods to read/write a frame.  Opened as a stream, the handle is
@@ -650,8 +651,8 @@ as if it were a stream of samples.
 
 Parameters
 ----------
-name : str or filehandle
-    File name or handle.
+name : str or filehandle, or sequence of str
+    File name, filehandle, or sequence of file names (see Notes).
 mode : {'rb', 'wb', 'rs', or 'ws'}, optional
     Whether to open for reading or writing, and as a regular binary
     file or as a stream. Default: 'rs', for reading a stream.
@@ -683,11 +684,29 @@ def make_opener(fmt, classes, doc='', append_doc=True):
                                 'StreamReader', 'StreamWriter')}
 
     def open(name, mode='rs', **kwargs):
+        # If sequentialfile object, check that it's opened properly.
+        if isinstance(name, sf.SequentialFileBase):
+            assert (('r' in mode and name.mode == 'rb') or
+                    ('w' in mode and name.mode == 'w+b')), (
+                        "open only accepts sequential files opened in 'rb' "
+                        "mode for reading or 'w+b' mode for writing.")
+
+        # If passed some kind of list, open a sequentialfile object.
+        if isinstance(name, (tuple, list, sf.FileNameSequencer)):
+            if 'r' in mode:
+                name = sf.open(name, 'rb')
+            else:
+                file_size = kwargs.pop('file_size', None)
+                name = sf.open(name, 'w+b', file_size=file_size)
+
+        # Select FileReader/Writer for binary, StreamReader/Writer for stream.
         if 'b' in mode:
             cls_type = 'File'
         else:
             cls_type = 'Stream'
 
+        # Select reading or writing.  Check if ``name`` is a filehandle, and
+        # open it if not.
         if 'w' in mode:
             cls_type += 'Writer'
             got_fh = hasattr(name, 'write')
@@ -702,6 +721,8 @@ def make_opener(fmt, classes, doc='', append_doc=True):
             raise ValueError("only support opening {0} file for reading "
                              "or writing (mode='r' or 'w')."
                              .format(fmt))
+        # Try wrapping ``name`` with file or stream reader (``name`` is a
+        # binary filehandle at this point).
         try:
             return classes[cls_type](name, **kwargs)
         except Exception as exc:
@@ -712,6 +733,7 @@ def make_opener(fmt, classes, doc='', append_doc=True):
                     pass
             raise exc
 
+    # Load custom documentation for format.
     open.__doc__ = (default_open_doc.replace('baseband', fmt) + doc
                     if append_doc else doc)
     # This ensures the function becomes visible to sphinx.

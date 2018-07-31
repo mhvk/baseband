@@ -52,10 +52,10 @@ Usage
 =====
 
 This section covers reading and writing Mark 4 files with Baseband; general
-usage can be found under the :ref:`Getting Started <getting_started>` section.
+usage can be found under the :ref:`Using Baseband <using_baseband>` section.
 For situations in which one is unsure of a file's format, Baseband features the
 general `baseband.open` and `baseband.file_info` functions, which are also
-discussed in :ref:`Getting Started <getting_started>`.  The examples below use
+discussed in :ref:`Using Baseband <using_baseband>`.  The examples below use
 the small sample file ``baseband/data/sample.m4``, and the `numpy`,
 `astropy.units`, `astropy.time.Time`, and `baseband.mark4` modules::
 
