@@ -12,8 +12,8 @@ NPOL = 2
 NDIM = 2
 
 class ASPPayload(VLBIPayloadBase):
-	_encoders = { 8 : decode_8bit }
-   	_decoders = { 8 : encode_8bit }
+	_encoders = { 8 : encode_8bit }
+   	_decoders = { 8 : decode_8bit }
    	_dtype_word = np.dtype('int8')
 
    	_sample_shape_maker = namedtuple('SampleShape', 'npol')
