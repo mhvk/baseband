@@ -32,11 +32,14 @@ class ASPPayload(VLBIPayloadBase):
    		# the header field is actually a block header
    		assert(header is not None)
                 
-                npts = header['NPtsSend']
-   		payload_nbytes = NPOL * NDIM * npts
-                words = np.fromfile(fh, dtype=cls._dtype_word, count = payload_nbytes)
-                # words = words.astype(np.float32)
-                # words.reshape((npts, NPOL, NDIM))
+                npts = header['NPtsSend'][0]
+   		payload_count = NPOL * NDIM * npts
+                nbytes_read = payload_count * cls._dtype_word.itemsize
+
+                buf = fh.read(nbytes_read)
+                if(len(buf) < nbytes_read):
+                  raise EOFError('reached EOF while reading ASPPayload')
+                words = np.frombuffer(buf, dtype=cls._dtype_word, count = payload_count)
                 return cls(words, header=header, **kwargs)
 
    		# return super(ASPPayload, cls).fromfile(fh, header=header, payload_nbytes=payload_nbytes, **kwargs)

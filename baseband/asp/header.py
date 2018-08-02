@@ -73,7 +73,12 @@ class ASPFileHeader(VLBIHeaderBase):
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
-        return cls(np.fromfile(fh, dtype=cls._dtype, count=1), *args, **kwargs)
+        nbytes_read = cls._dtype.itemsize
+        buf = fh.read(nbytes_read)
+        if(len(buf) < nbytes_read):
+          raise EOFError('reached EOF while reading ASPFileHeader')
+        words = np.frombuffer(buf, dtype=cls._dtype, count = 1)
+        return cls(words, *args, **kwargs)
 
     @property
     def size(self):
@@ -152,7 +157,12 @@ class ASPHeader(VLBIHeaderBase):
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
-        return cls(np.fromfile(fh, dtype=cls._dtype, count=1), *args, **kwargs)
+        nbytes_read = cls._dtype.itemsize
+        buf = fh.read(nbytes_read)
+        if(len(buf) < nbytes_read):
+            raise EOFError('reached EOF while reading ASPHeader')
+        words = np.frombuffer(buf, dtype=cls._dtype, count = 1)
+        return cls(words, *args, **kwargs)
 
     @property
     def size(self):

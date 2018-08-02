@@ -7,12 +7,23 @@ import os
 import re
 import itertools
 from bisect import bisect
+from io import BufferedReader
 import numpy as np
 from astropy.utils import lazyproperty
 
-__all__ = ['FileNameSequencer', 'SequentialFileReader', 'SequentialFileWriter',
+__all__ = ['FileReader', 'FileNameSequencer', 'SequentialFileReader', 'SequentialFileWriter',
            'open']
 
+def fr_open(path, mode='rb'):
+    return FileReader(path, mode=mode)
+
+class FileReader(BufferedReader):
+    def __init__(self, path, mode='rb',*args, **kwargs):
+        super(FileReader, self).__init__(io.open(path, mode), *args, **kwargs)
+
+    @property
+    def at_start(self):
+        return self.tell() == 0
 
 class FileNameSequencer(object):
     """List-like generator of filenames using a template.
@@ -131,6 +142,10 @@ class SequentialFileBase(object):
     def tell(self):
         """Return the current stream position."""
         return self._file_offsets[self.file_nr] + self.fh.tell()
+
+    @property
+    def at_start(self):
+        return self.fh.at_start
 
     def memmap(self, dtype=np.uint8, mode=None, offset=None, shape=None,
                order='C'):
@@ -376,6 +391,11 @@ def open(files, mode='rb', file_size=None, opener=None):
     if 'r' in mode:
         if file_size is not None:
             raise TypeError("cannot pass in 'file_size' for reading.")
+
+        # a small hack to make FileReader the base file object
+        # when opener is not otherwise specified
+        if opener is None:
+            opener = fr_open
         return SequentialFileReader(files, mode, opener=opener)
     elif 'w' in mode:
         return SequentialFileWriter(files, mode, file_size=file_size,
