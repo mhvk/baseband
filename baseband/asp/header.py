@@ -35,36 +35,34 @@ def merge_dtype(dta, dtb):
 
 class ASPFileHeader(VLBIHeaderBase):
     _dtype = np.dtype([('n_ds', '<i4'),
-                        ('n_chan', '<i4'),
-                        ('ch_bw', '<f8'),
-                        ('rf', '<f8'),
-                        ('band_dir', '<i4'),
-                        ('psr_name', 'S12'),
-                        ('dm', '<f8'),
-                        ('fft_len', '<i4'),
-                        ('overlap', '<i4'),
-                        ('n_bins', '<i4'),
-                        ('t_dump', '<f4'),
-                        ('n_dump', '<i4'),
-                        ('n_samp_dump', '<i8'),
-                        ('imjd', '<i4'),
-                        ('fmjd', '<f8'),
-                        ('cal_scan', '<i4'),
-                        ('scan', 'S256'),
-                        ('observer', 'S256'),
-                        ('proj_id', 'S256'),
-                        ('comment', 'S1024'),
-                        ('telescope', 'S2'),
-                        ('front_end', 'S256'),
-                        ('pol_mode', 'S12'),
-                        ('ra', '<f8'),
-                        ('dec', '<f8'),
-                        ('epoch', '<f4'),
-                        ('pad', 'V2')])    # manual padding hack
-
+                    ('n_chan', '<i4'),
+                    ('ch_bw', '<f8'),
+                    ('rf', '<f8'),
+                    ('band_dir', '<i4'),
+                    ('psr_name', 'S12'),
+                    ('dm', '<f8'),
+                    ('fft_len', '<i4'),
+                    ('overlap', '<i4'),
+                    ('n_bins', '<i4'),
+                    ('t_dump', '<f4'),
+                    ('n_dump', '<i4'),
+                    ('n_samp_dump', '<i8'),
+                    ('imjd', '<i4'),
+                    ('fmjd', '<f8'),
+                    ('cal_scan', '<i4'),
+                    ('scan', 'S256'),
+                    ('observer', 'S256'),
+                    ('proj_id', 'S256'),
+                    ('comment', 'S1024'),
+                    ('telescope', 'S2'),
+                    ('front_end', 'S256'),
+                    ('pol_mode', 'S12'),
+                    ('ra', '<f8'),
+                    ('dec', '<f8'),
+                    ('epoch', '<f4'),
+                    ('pad', 'V2')])    # manual padding hack
 
     _header_parser = HeaderParser(make_parser_from_dtype(_dtype))
-
 
     def __init__(self, words, verify=True):
         if words is None:
@@ -85,8 +83,8 @@ class ASPFileHeader(VLBIHeaderBase):
         nbytes_read = cls._dtype.itemsize
         buf = fh.read(nbytes_read)
         if(len(buf) < nbytes_read):
-          raise EOFError('reached EOF while reading ASPFileHeader')
-        words = np.frombuffer(buf, dtype=cls._dtype, count = 1)
+            raise EOFError('reached EOF while reading ASPFileHeader')
+        words = np.frombuffer(buf, dtype=cls._dtype, count=1)
         return cls(words, *args, **kwargs)
 
     @property
@@ -114,13 +112,12 @@ class ASPFileHeader(VLBIHeaderBase):
 # block heaer class promoted to general "header" label
 class ASPHeader(VLBIHeaderBase):
     _dtype = np.dtype([('totalsize', '<i4'),
-                       ('NPtsSend', '<i4'),
-                       ('iMJD', '<f8'),
-                       ('fMJD', '<f8'),
-                       ('ipts1', '<i8'),
-                       ('ipts2', '<i8'),
-                       ('FreqChanNo', '<i4')])
-                       #itemsize is a multiple of 4 (no padding)
+                    ('NPtsSend', '<i4'),
+                    ('iMJD', '<f8'),
+                    ('fMJD', '<f8'),
+                    ('ipts1', '<i8'),
+                    ('ipts2', '<i8'),
+                    ('FreqChanNo', '<i4')])
 
     _header_parser = HeaderParser(make_parser_from_dtype(_dtype))
 
@@ -171,7 +168,7 @@ class ASPHeader(VLBIHeaderBase):
         buf = fh.read(nbytes_read)
         if(len(buf) < nbytes_read):
             raise EOFError('reached EOF while reading ASPHeader')
-        words = np.frombuffer(buf, dtype=cls._dtype, count = 1)
+        words = np.frombuffer(buf, dtype=cls._dtype, count=1)
         return cls(words, *args, **kwargs)
 
     @property

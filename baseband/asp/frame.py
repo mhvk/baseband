@@ -3,7 +3,7 @@ from .payload import ASPPayload
 from ..vlbi_base.frame import VLBIFrameBase
 
 
-__all__ = ['ASPFrame',]
+__all__ = ['ASPFrame', ]
 
 
 class ASPFrame(VLBIFrameBase):

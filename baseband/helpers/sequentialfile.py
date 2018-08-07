@@ -14,16 +14,19 @@ from astropy.utils import lazyproperty
 __all__ = ['FileReader', 'FileNameSequencer', 'SequentialFileReader', 'SequentialFileWriter',
            'open']
 
+
 def fr_open(path, mode='rb'):
     return FileReader(path, mode=mode)
 
+
 class FileReader(BufferedReader):
-    def __init__(self, path, mode='rb',*args, **kwargs):
+    def __init__(self, path, mode='rb', *args, **kwargs):
         super(FileReader, self).__init__(io.open(path, mode), *args, **kwargs)
 
     @property
     def at_start(self):
         return self.tell() == 0
+
 
 class FileNameSequencer(object):
     """List-like generator of filenames using a template.
