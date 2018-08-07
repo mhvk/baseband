@@ -18,7 +18,7 @@ class TestASP(object):
             self.header = self.frame.header
             self.payload = self.frame.payload
             assert fh.tell() == self.header.nbytes + self.header.file_header.nbytes + self.payload.nbytes, \
-                                "TestASP::setup: file position not expected"
+                "TestASP::setup: file position not expected"
 
     def test_header(self, tmpdir=None):
         """For now this is a very modest test of read integrity for the asp format

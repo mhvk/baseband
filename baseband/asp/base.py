@@ -15,9 +15,10 @@ class ASPStreamReaderBase(VLBIStreamReaderBase):
         self._header0 = header0
         sample_rate = header0['ch_bw'][0] * u.MHz
         samples_per_frame = header0['NPtsSend'][0]
-        super(ASPStreamReaderBase, self).__init__(fh_raw, header0, sample_rate,
-                                    samples_per_frame, unsliced_shape=None, bps=8, complex_data=True,
-                                    squeeze=False, subset=None, fill_value=0.0, verify=False)
+        super(ASPStreamReaderBase, self).__init__(
+            fh_raw, header0, sample_rate,
+            samples_per_frame, unsliced_shape=None, bps=8, complex_data=True,
+            squeeze=False, subset=None, fill_value=0.0, verify=False)
 
     def read_frame(self):
         frame = ASPFrame.fromfile(self._fh_raw)
