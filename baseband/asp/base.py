@@ -3,6 +3,10 @@ from .frame import ASPFrame
 from .header import ASPFileHeader, ASPHeader
 import astropy.units as u
 
+
+__all__ = ['ASPStreamReaderBase', 'ASPStreamReader']
+
+
 class ASPStreamReaderBase(VLBIStreamReaderBase):
 
     # unfinished
@@ -12,8 +16,8 @@ class ASPStreamReaderBase(VLBIStreamReaderBase):
         sample_rate = header0['ch_bw'][0] * u.MHz
         samples_per_frame = header0['NPtsSend'][0]
         super(ASPStreamReaderBase, self).__init__(fh_raw, header0, sample_rate,
-            samples_per_frame, unsliced_shape = None, bps=8, complex_data=True,
-            squeeze = False, subset = None, fill_value=0.0, verify=False)
+                            samples_per_frame, unsliced_shape=None, bps=8, complex_data=True,
+                            squeeze=False, subset=None, fill_value=0.0, verify=False)
 
     def read_frame(self):
         frame = ASPFrame.fromfile(self._fh_raw)
@@ -21,6 +25,7 @@ class ASPStreamReaderBase(VLBIStreamReaderBase):
         # frame header (just in case!)
         frame.header.file_header = self._header0.file_header
         return frame
+
 
 class ASPStreamReader(ASPStreamReaderBase):
     def __init__(self, fh_raw):
