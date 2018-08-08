@@ -29,8 +29,9 @@ class ASPPayload(VLBIPayloadBase):
     def __init__(self, words, header=None, sample_shape=(2,), **kwargs):
         assert(header is not None)
         # ASP will always hold complex data and bps is fixed at 8bit
-        super(ASPPayload, self).__init__(words, sample_shape=sample_shape,
-                                                        bps=8, complex_data=True, **kwargs)
+        super(ASPPayload, self).__init__(
+            words, sample_shape=sample_shape,
+            bps=8, complex_data=True, **kwargs)
 
     @classmethod
     def fromfile(cls, fh, header=None, payload_nbytes=None, **kwargs):
