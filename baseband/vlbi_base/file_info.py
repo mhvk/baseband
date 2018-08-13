@@ -190,18 +190,15 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
     def _get_header0(self):
         fh = self._parent
-        old_offset = fh.tell()
-        # Here, we do not even know whether we have the right format. We thus
-        # use a try/except and filter out all warnings.
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
-            try:
-                fh.seek(0)
-                return fh.read_header()
-            except Exception:
-                return None
-            finally:
-                fh.seek(old_offset)
+        with fh.seek_temporary(0):
+            # Here, we do not even know whether we have the right format.
+            # We thus use a try/except and filter out all warnings.
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                try:
+                    return fh.read_header()
+                except Exception:
+                    return None
 
     def _get_format(self):
         return self._parent.__class__.__name__.split('File')[0].lower()

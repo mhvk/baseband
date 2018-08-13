@@ -99,22 +99,19 @@ class Mark5BFileReader(VLBIFileReaderBase):
         try:
             return super(Mark5BFileReader, self).get_frame_rate()
         except Exception as exc:
-            oldpos = self.tell()
-            self.seek(0)
-            try:
-                header0 = self.read_header()
-                self.seek(header0.payload_nbytes, 1)
-                header1 = self.read_header()
-                tdelta = header1.fraction - header0.fraction
-                if tdelta == 0.:
-                    exc.args += ("frame rate can also not be determined "
-                                 "from the first two headers, as they have "
-                                 "identical fractional seconds.",)
-                return np.round(1 / tdelta) * u.Hz
-            except Exception:
-                pass
-            finally:
-                self.seek(oldpos)
+            with self.seek_temporary(0):
+                try:
+                    header0 = self.read_header()
+                    self.seek(header0.payload_nbytes, 1)
+                    header1 = self.read_header()
+                    tdelta = header1.fraction - header0.fraction
+                    if tdelta == 0.:
+                        exc.args += ("frame rate can also not be determined "
+                                     "from the first two headers, as they "
+                                     "have identical fractional seconds.",)
+                    return np.round(1 / tdelta) * u.Hz
+                except Exception:
+                    pass
             raise exc
 
     def find_header(self, forward=True, maximum=None):

@@ -139,16 +139,13 @@ class VDIFFileReader(VLBIFileReaderBase):
         try:
             return super(VDIFFileReader, self).get_frame_rate()
         except Exception as exc:
-            oldpos = self.tell()
-            self.seek(0)
-            try:
-                header = self.read_header()
-                return np.round((header.sample_rate /
-                                 header.samples_per_frame).to(u.Hz))
-            except Exception:
-                pass
-            finally:
-                self.seek(oldpos)
+            with self.seek_temporary(0):
+                try:
+                    header = self.read_header()
+                    return np.round((header.sample_rate /
+                                     header.samples_per_frame).to(u.Hz))
+                except Exception:
+                    pass
             raise exc
 
     def find_header(self, template_header=None, frame_nbytes=None, edv=None,
@@ -430,27 +427,27 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the file."""
-        raw_offset = self.fh_raw.tell()
         # Go to end of file.
-        self.fh_raw.seek(0, 2)
-        raw_size = self.fh_raw.tell()
-        # Find first header with same thread_id going backward.
-        found = False
-        # Set maximum as twice number of frames in frameset.
-        maximum = 2 * self._frameset_nbytes
-        while not found:
-            self.fh_raw.seek(-self.header0.frame_nbytes, 1)
-            last_header = self.fh_raw.find_header(
-                template_header=self.header0,
-                maximum=maximum, forward=False)
-            if last_header is None or raw_size - self.fh_raw.tell() > maximum:
-                raise ValueError("corrupt VDIF? No thread_id={0} frame in "
-                                 "last {1} bytes."
-                                 .format(self.header0['thread_id'], maximum))
+        with self.fh_raw.seek_temporary(0, 2):
+            raw_size = self.fh_raw.tell()
+            # Find first header with same thread_id going backward.
+            found = False
+            # Set maximum as twice number of frames in frameset.
+            maximum = 2 * self._frameset_nbytes
+            while not found:
+                self.fh_raw.seek(-self.header0.frame_nbytes, 1)
+                last_header = self.fh_raw.find_header(
+                    template_header=self.header0,
+                    maximum=maximum, forward=False)
+                if last_header is None or (raw_size - self.fh_raw.tell() >
+                                           maximum):
+                    raise ValueError("corrupt VDIF? No thread_id={0} frame "
+                                     "in last {1} bytes."
+                                     .format(self.header0['thread_id'],
+                                             maximum))
 
-            found = last_header['thread_id'] == self.header0['thread_id']
+                found = last_header['thread_id'] == self.header0['thread_id']
 
-        self.fh_raw.seek(raw_offset)
         return last_header
 
     def _squeeze_and_subset(self, data):

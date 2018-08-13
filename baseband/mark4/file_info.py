@@ -85,19 +85,16 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
 
     def _get_header0(self):
         fh = self._parent
-        old_offset = fh.tell()
-        try:
-            fh.seek(0)
-            offset0 = fh.locate_frame()
-            if offset0 is None:
-                return None
+        with fh.seek_temporary(0):
+            try:
+                offset0 = fh.locate_frame()
+                if offset0 is None:
+                    return None
 
-            self.offset0 = offset0
-            return fh.read_header()
-        except Exception:
-            return None
-        finally:
-            fh.seek(old_offset)
+                self.offset0 = offset0
+                return fh.read_header()
+            except Exception:
+                return None
 
     def _collect_info(self):
         super(Mark4FileReaderInfo, self)._collect_info()

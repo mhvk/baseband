@@ -8,6 +8,7 @@ import operator
 from collections import namedtuple
 import astropy.units as u
 from astropy.utils import lazyproperty
+from contextlib import contextmanager
 from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from ..helpers import sequentialfile as sf
 
@@ -50,6 +51,26 @@ class VLBIFileBase(object):
     def close(self):
         self.fh_raw.close()
 
+    @contextmanager
+    def seek_temporary(self, offset, whence=0):
+        """Context manager for temporarily seeking to another file position.
+
+        To be used as part of a ``with`` statement::
+
+            with fh_raw.seek_temporary(offset):
+                with-block
+
+        On entering the ``with-block``, the file pointer is moved using
+        ``offset`` and ``whence`` as for `seek`.  On exiting it is moved back
+        to its original position.  (`seek` and `tell` can freely be used within
+        ``with-block``.)
+        """
+        oldpos = self.tell()
+        try:
+            yield self.seek(offset, whence)
+        finally:
+            self.seek(oldpos)
+
     def __repr__(self):
         return "{0}(fh_raw={1})".format(self.__class__.__name__, self.fh_raw)
 
@@ -90,9 +111,7 @@ class VLBIFileReaderBase(VLBIFileBase):
         `EOFError`
             If the file contains less than one second of data.
         """
-        oldpos = self.tell()
-        self.seek(0)
-        try:
+        with self.seek_temporary(0):
             header = header0 = self.read_header()
             frame_nr0 = header0['frame_nr']
             while header['frame_nr'] == frame_nr0:
@@ -103,8 +122,7 @@ class VLBIFileReaderBase(VLBIFileBase):
                 max_frame = max(header['frame_nr'], max_frame)
                 self.seek(header.payload_nbytes, 1)
                 header = self.read_header()
-        finally:
-            self.seek(oldpos)
+
         return (max_frame + 1) * u.Hz
 
 
@@ -405,10 +423,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the file."""
-        raw_offset = self.fh_raw.tell()
-        self.fh_raw.seek(-self.header0.frame_nbytes, 2)
-        last_header = self.fh_raw.find_header(forward=False)
-        self.fh_raw.seek(raw_offset)
+        with self.fh_raw.seek_temporary(-self.header0.frame_nbytes, 2):
+            last_header = self.fh_raw.find_header(forward=False)
         if last_header is None:
             raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
                              .format(10 * self.header0.frame_nbytes))
@@ -496,6 +512,26 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                              "'current', or 2 or 'end'.")
 
         return self.offset
+
+    @contextmanager
+    def seek_temporary(self, offset, whence=0):
+        """Context manager for temporarily seeking to another file position.
+
+        To be used as part of a ``with`` statement::
+
+            with fh.seek_temporary(offset):
+                with-block
+
+        On entering the ``with-block``, the sample pointer is moved using
+        ``offset`` and ``whence`` as for `seek`.  On exiting it is moved back
+        to its original position.  (`seek` and `tell` can freely be used within
+        ``with-block``.)
+        """
+        oldpos = self.tell()
+        try:
+            yield self.seek(offset, whence=whence)
+        finally:
+            self.seek(oldpos)
 
     @property
     def dtype(self):

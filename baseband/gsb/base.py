@@ -71,14 +71,10 @@ class GSBTimeStampIO(VLBIFileBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        oldpos = self.tell()
-        self.seek(0)
-        try:
+        with self.seek_temporary(0):
             timestamp0 = self.read_timestamp()
             timestamp1 = self.read_timestamp()
             return (1. / (timestamp1.time - timestamp0.time)).to(u.Hz)
-        finally:
-            self.seek(oldpos)
 
 
 class GSBFileReader(VLBIFileBase):
@@ -290,19 +286,18 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the timestamp file."""
-        fh_ts_offset = self.fh_ts.tell()
-        self.fh_ts.seek(0, 2)
-        fh_ts_len = self.fh_ts.tell()
-        if fh_ts_len == self.header0.nbytes:
-            # Only one line in file
-            return self.header0
+        with self.fh_ts.seek_temporary(0, 2):
+            fh_ts_len = self.fh_ts.tell()
+            if fh_ts_len == self.header0.nbytes:
+                # Only one line in file
+                return self.header0
 
-        # Read last bytes in binary, since cannot seek back from end in
-        # text files.
-        from_end = min(5 * self.header0.nbytes // 2, fh_ts_len)
-        self.fh_ts.buffer.seek(-from_end, 2)
-        last_lines = self.fh_ts.buffer.read(from_end).strip().split(b'\n')
-        self.fh_ts.seek(fh_ts_offset)
+            # Read last bytes in binary, since cannot seek back from end in
+            # text files.
+            from_end = min(5 * self.header0.nbytes // 2, fh_ts_len)
+            self.fh_ts.buffer.seek(-from_end, 2)
+            last_lines = self.fh_ts.buffer.read(from_end).strip().split(b'\n')
+
         last_line = last_lines[-1].decode('ascii')
         last_line_tuple = tuple(last_line.split())
         # If the last header is missing characters, use the header before it

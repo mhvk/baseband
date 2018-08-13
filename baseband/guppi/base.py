@@ -131,14 +131,10 @@ class GUPPIFileReader(VLBIFileReaderBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        oldpos = self.tell()
-        self.seek(0)
-        try:
+        with self.seek_temporary(0):
             header = self.read_header()
             return (header.sample_rate /
                     (header.samples_per_frame - header.overlap)).to(u.Hz)
-        finally:
-            self.seek(oldpos)
 
 
 class GUPPIFileWriter(VLBIFileBase):
