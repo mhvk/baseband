@@ -20,6 +20,7 @@ Project Status
 --------------
 
 .. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master
+   :target: https://travis-ci.org/mhvk/baseband
 
 .. image:: https://coveralls.io/repos/github/mhvk/baseband/badge.svg
    :target: https://coveralls.io/github/mhvk/baseband
@@ -27,7 +28,6 @@ Project Status
 .. image:: https://readthedocs.org/projects/baseband/badge/?version=latest
    :target: http://baseband.readthedocs.io/en/latest/?badge=latest
    :alt: Documentation Status
-
 
 Contributing
 ------------

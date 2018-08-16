@@ -83,6 +83,7 @@ Project Details
 ===============
 
 .. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master
+   :target: https://travis-ci.org/mhvk/baseband
 
 .. image:: https://coveralls.io/repos/github/mhvk/baseband/badge.svg
    :target: https://coveralls.io/github/mhvk/baseband
