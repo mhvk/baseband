@@ -422,9 +422,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the file."""
-        with self.fh_raw.temporary_offset():
-            self.fh_raw.seek(-self.header0.frame_nbytes, 2)
-            last_header = self.fh_raw.find_header(forward=False)
+        with self.fh_raw.temporary_offset() as fh_raw:
+            fh_raw.seek(-self.header0.frame_nbytes, 2)
+            last_header = fh_raw.find_header(forward=False)
         if last_header is None:
             raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
                              .format(10 * self.header0.frame_nbytes))
@@ -512,24 +512,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                              "'current', or 2 or 'end'.")
 
         return self.offset
-
-    @contextmanager
-    def temporary_offset(self):
-        """Context manager for temporarily seeking to another stream position.
-
-        To be used as part of a ``with`` statement::
-
-            with fh.temporary_offset() [as fh]:
-                with-block
-
-        On exiting the ``with-block``, the sample pointer is moved back to its
-        original position.
-        """
-        oldpos = self.tell()
-        try:
-            yield self
-        finally:
-            self.seek(oldpos)
 
     @property
     def dtype(self):

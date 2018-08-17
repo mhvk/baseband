@@ -287,9 +287,9 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the timestamp file."""
-        with self.fh_ts.temporary_offset():
-            self.fh_ts.seek(0, 2)
-            fh_ts_len = self.fh_ts.tell()
+        with self.fh_ts.temporary_offset() as fh_ts:
+            fh_ts.seek(0, 2)
+            fh_ts_len = fh_ts.tell()
             if fh_ts_len == self.header0.nbytes:
                 # Only one line in file
                 return self.header0
@@ -297,8 +297,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             # Read last bytes in binary, since cannot seek back from end in
             # text files.
             from_end = min(5 * self.header0.nbytes // 2, fh_ts_len)
-            self.fh_ts.buffer.seek(-from_end, 2)
-            last_lines = self.fh_ts.buffer.read(from_end).strip().split(b'\n')
+            fh_ts.buffer.seek(-from_end, 2)
+            last_lines = fh_ts.buffer.read(from_end).strip().split(b'\n')
 
         last_line = last_lines[-1].decode('ascii')
         last_line_tuple = tuple(last_line.split())

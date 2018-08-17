@@ -251,10 +251,10 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                                                squeeze=squeeze, subset=subset,
                                                verify=verify)
         # Store number of frames, for finding last header.
-        with self.fh_raw.temporary_offset():
-            self.fh_raw.seek(0, 2)
+        with self.fh_raw.temporary_offset() as fh_raw:
+            fh_raw.seek(0, 2)
             self._nframes, self._partial_frame_nbytes = divmod(
-                self.fh_raw.tell(), self.header0.frame_nbytes)
+                fh_raw.tell(), self.header0.frame_nbytes)
             # If there is a partial last frame.
             if self._partial_frame_nbytes > 0:
                 # If partial last frame contains payload bytes.
@@ -280,9 +280,9 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         """
         # Seek forward rather than backward, as last frame often has missing
         # bytes.
-        with self.fh_raw.temporary_offset():
-            self.fh_raw.seek((self._nframes - 1) * self.header0.frame_nbytes)
-            header = self.fh_raw.read_header()
+        with self.fh_raw.temporary_offset() as fh_raw:
+            fh_raw.seek((self._nframes - 1) * self.header0.frame_nbytes)
+            header = fh_raw.read_header()
             if self._partial_frame_nbytes > self.header0.nbytes:
                 header.mutable = True
                 # Payload should have integer number of both words and complete

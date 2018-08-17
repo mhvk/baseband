@@ -429,20 +429,19 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     def _last_header(self):
         """Last header of the file."""
         # Go to end of file.
-        with self.fh_raw.temporary_offset():
-            self.fh_raw.seek(0, 2)
-            raw_size = self.fh_raw.tell()
+        with self.fh_raw.temporary_offset() as fh_raw:
+            fh_raw.seek(0, 2)
+            raw_size = fh_raw.tell()
             # Find first header with same thread_id going backward.
             found = False
             # Set maximum as twice number of frames in frameset.
             maximum = 2 * self._frameset_nbytes
             while not found:
-                self.fh_raw.seek(-self.header0.frame_nbytes, 1)
-                last_header = self.fh_raw.find_header(
+                fh_raw.seek(-self.header0.frame_nbytes, 1)
+                last_header = fh_raw.find_header(
                     template_header=self.header0,
                     maximum=maximum, forward=False)
-                if last_header is None or (raw_size - self.fh_raw.tell() >
-                                           maximum):
+                if last_header is None or (raw_size - fh_raw.tell() > maximum):
                     raise ValueError("corrupt VDIF? No thread_id={0} frame "
                                      "in last {1} bytes."
                                      .format(self.header0['thread_id'],
