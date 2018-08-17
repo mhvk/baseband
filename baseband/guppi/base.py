@@ -131,7 +131,8 @@ class GUPPIFileReader(VLBIFileReaderBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        with self.seek_temporary(0):
+        with self.temporary_offset():
+            self.seek(0)
             header = self.read_header()
             return (header.sample_rate /
                     (header.samples_per_frame - header.overlap)).to(u.Hz)

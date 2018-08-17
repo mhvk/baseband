@@ -52,22 +52,20 @@ class VLBIFileBase(object):
         self.fh_raw.close()
 
     @contextmanager
-    def seek_temporary(self, offset, whence=0):
+    def temporary_offset(self):
         """Context manager for temporarily seeking to another file position.
 
         To be used as part of a ``with`` statement::
 
-            with fh_raw.seek_temporary(offset):
+            with fh_raw.temporary_offset() [as fh_raw]:
                 with-block
 
-        On entering the ``with-block``, the file pointer is moved using
-        ``offset`` and ``whence`` as for `seek`.  On exiting it is moved back
-        to its original position.  (`seek` and `tell` can freely be used within
-        ``with-block``.)
+        On exiting the ``with-block``, the file pointer is moved back to its
+        original position.
         """
         oldpos = self.tell()
         try:
-            yield self.seek(offset, whence)
+            yield self
         finally:
             self.seek(oldpos)
 
@@ -111,7 +109,8 @@ class VLBIFileReaderBase(VLBIFileBase):
         `EOFError`
             If the file contains less than one second of data.
         """
-        with self.seek_temporary(0):
+        with self.temporary_offset():
+            self.seek(0)
             header = header0 = self.read_header()
             frame_nr0 = header0['frame_nr']
             while header['frame_nr'] == frame_nr0:
@@ -423,7 +422,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the file."""
-        with self.fh_raw.seek_temporary(-self.header0.frame_nbytes, 2):
+        with self.fh_raw.temporary_offset():
+            self.fh_raw.seek(-self.header0.frame_nbytes, 2)
             last_header = self.fh_raw.find_header(forward=False)
         if last_header is None:
             raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
@@ -514,22 +514,20 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         return self.offset
 
     @contextmanager
-    def seek_temporary(self, offset, whence=0):
-        """Context manager for temporarily seeking to another file position.
+    def temporary_offset(self):
+        """Context manager for temporarily seeking to another stream position.
 
         To be used as part of a ``with`` statement::
 
-            with fh.seek_temporary(offset):
+            with fh.temporary_offset() [as fh]:
                 with-block
 
-        On entering the ``with-block``, the sample pointer is moved using
-        ``offset`` and ``whence`` as for `seek`.  On exiting it is moved back
-        to its original position.  (`seek` and `tell` can freely be used within
-        ``with-block``.)
+        On exiting the ``with-block``, the sample pointer is moved back to its
+        original position.
         """
         oldpos = self.tell()
         try:
-            yield self.seek(offset, whence=whence)
+            yield self
         finally:
             self.seek(oldpos)
 

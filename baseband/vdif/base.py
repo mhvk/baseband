@@ -139,8 +139,9 @@ class VDIFFileReader(VLBIFileReaderBase):
         try:
             return super(VDIFFileReader, self).get_frame_rate()
         except Exception as exc:
-            with self.seek_temporary(0):
+            with self.temporary_offset():
                 try:
+                    self.seek(0)
                     header = self.read_header()
                     return np.round((header.sample_rate /
                                      header.samples_per_frame).to(u.Hz))
@@ -428,7 +429,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     def _last_header(self):
         """Last header of the file."""
         # Go to end of file.
-        with self.fh_raw.seek_temporary(0, 2):
+        with self.fh_raw.temporary_offset():
+            self.fh_raw.seek(0, 2)
             raw_size = self.fh_raw.tell()
             # Find first header with same thread_id going backward.
             found = False

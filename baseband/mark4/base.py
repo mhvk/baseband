@@ -92,7 +92,8 @@ class Mark4FileReader(VLBIFileReaderBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        with self.seek_temporary(0):
+        with self.temporary_offset():
+            self.seek(0)
             self.locate_frame()
             header0 = self.read_header()
             self.seek(header0.payload_nbytes, 1)

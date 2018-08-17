@@ -84,9 +84,9 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
     _parent_attrs = ('ntrack', 'decade', 'ref_time')
 
     def _get_header0(self):
-        fh = self._parent
-        with fh.seek_temporary(0):
+        with self._parent.temporary_offset() as fh:
             try:
+                fh.seek(0)
                 offset0 = fh.locate_frame()
                 if offset0 is None:
                     return None

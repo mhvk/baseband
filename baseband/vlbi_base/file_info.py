@@ -189,13 +189,13 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                       'sample_shape')
 
     def _get_header0(self):
-        fh = self._parent
-        with fh.seek_temporary(0):
+        with self._parent.temporary_offset() as fh:
             # Here, we do not even know whether we have the right format.
             # We thus use a try/except and filter out all warnings.
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')
                 try:
+                    fh.seek(0)
                     return fh.read_header()
                 except Exception:
                     return None

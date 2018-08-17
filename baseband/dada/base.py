@@ -147,7 +147,8 @@ class DADAFileReader(VLBIFileReaderBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        with self.seek_temporary(0):
+        with self.temporary_offset():
+            self.seek(0)
             header = self.read_header()
             return (header.sample_rate / header.samples_per_frame).to(u.Hz)
 
@@ -250,7 +251,8 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                                                squeeze=squeeze, subset=subset,
                                                verify=verify)
         # Store number of frames, for finding last header.
-        with self.fh_raw.seek_temporary(0, 2):
+        with self.fh_raw.temporary_offset():
+            self.fh_raw.seek(0, 2)
             self._nframes, self._partial_frame_nbytes = divmod(
                 self.fh_raw.tell(), self.header0.frame_nbytes)
             # If there is a partial last frame.
@@ -278,8 +280,8 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         """
         # Seek forward rather than backward, as last frame often has missing
         # bytes.
-        with self.fh_raw.seek_temporary((self._nframes - 1) *
-                                        self.header0.frame_nbytes):
+        with self.fh_raw.temporary_offset():
+            self.fh_raw.seek((self._nframes - 1) * self.header0.frame_nbytes)
             header = self.fh_raw.read_header()
             if self._partial_frame_nbytes > self.header0.nbytes:
                 header.mutable = True

@@ -71,7 +71,8 @@ class GSBTimeStampIO(VLBIFileBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        with self.seek_temporary(0):
+        with self.temporary_offset():
+            self.seek(0)
             timestamp0 = self.read_timestamp()
             timestamp1 = self.read_timestamp()
             return (1. / (timestamp1.time - timestamp0.time)).to(u.Hz)
@@ -286,7 +287,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the timestamp file."""
-        with self.fh_ts.seek_temporary(0, 2):
+        with self.fh_ts.temporary_offset():
+            self.fh_ts.seek(0, 2)
             fh_ts_len = self.fh_ts.tell()
             if fh_ts_len == self.header0.nbytes:
                 # Only one line in file
