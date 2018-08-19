@@ -10,15 +10,12 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
     _header0_attrs = ('mode',)
 
     def _get_header0(self):
-        fh = self._parent
-        old_offset = fh.tell()
-        try:
-            fh.seek(0)
-            return fh.read_timestamp()
-        except Exception:
-            return None
-        finally:
-            fh.seek(old_offset)
+        with self._parent.temporary_offset() as fh:
+            try:
+                fh.seek(0)
+                return fh.read_timestamp()
+            except Exception:
+                return None
 
     def _get_format(self):
         return 'gsb'

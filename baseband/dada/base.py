@@ -147,13 +147,10 @@ class DADAFileReader(VLBIFileReaderBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        oldpos = self.tell()
-        self.seek(0)
-        try:
+        with self.temporary_offset():
+            self.seek(0)
             header = self.read_header()
             return (header.sample_rate / header.samples_per_frame).to(u.Hz)
-        finally:
-            self.seek(oldpos)
 
 
 class DADAFileWriter(VLBIFileBase):
@@ -254,25 +251,25 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                                                squeeze=squeeze, subset=subset,
                                                verify=verify)
         # Store number of frames, for finding last header.
-        raw_offset = self.fh_raw.tell()
-        self._nframes, self._partial_frame_nbytes = divmod(
-            self.fh_raw.seek(0, 2), self.header0.frame_nbytes)
-        # If there is a partial last frame.
-        if self._partial_frame_nbytes > 0:
-            # If partial last frame contains payload bytes.
-            if self._partial_frame_nbytes > self.header0.nbytes:
-                self._nframes += 1
-                # If there's only one frame and it's incomplete.
-                if self._nframes == 1:
-                    self._header0 = self._last_header
-                    self.samples_per_frame = self.header0.samples_per_frame
-            # Otherwise, ignore the partial frame unless it's the only frame,
-            # in which case raise an EOFError.
-            elif self._nframes == 0:
-                raise EOFError('file (of {0} bytes) appears to end without'
-                               'any payload.'.format(
-                                   self._partial_frame_nbytes))
-        self.fh_raw.seek(raw_offset)
+        with self.fh_raw.temporary_offset() as fh_raw:
+            fh_raw.seek(0, 2)
+            self._nframes, self._partial_frame_nbytes = divmod(
+                fh_raw.tell(), self.header0.frame_nbytes)
+            # If there is a partial last frame.
+            if self._partial_frame_nbytes > 0:
+                # If partial last frame contains payload bytes.
+                if self._partial_frame_nbytes > self.header0.nbytes:
+                    self._nframes += 1
+                    # If there's only one frame and it's incomplete.
+                    if self._nframes == 1:
+                        self._header0 = self._last_header
+                        self.samples_per_frame = self.header0.samples_per_frame
+                # Otherwise, ignore the partial frame unless it's the only
+                # frame, in which case raise an EOFError.
+                elif self._nframes == 0:
+                    raise EOFError('file (of {0} bytes) appears to end without'
+                                   'any payload.'.format(
+                                       self._partial_frame_nbytes))
 
     @lazyproperty
     def _last_header(self):
@@ -283,21 +280,23 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         """
         # Seek forward rather than backward, as last frame often has missing
         # bytes.
-        raw_offset = self.fh_raw.tell()
-        self.fh_raw.seek((self._nframes - 1) * self.header0.frame_nbytes)
-        header = self.fh_raw.read_header()
-        if self._partial_frame_nbytes > self.header0.nbytes:
-            header.mutable = True
-            # Payload should have integer number of both words and complete
-            # samples.
-            payload_block = lcm(
-                DADAPayload._dtype_word.itemsize,
-                self.header0.bps * (2 if self.header0.complex_data else 1) *
-                np.prod(self.sample_shape) // 8)
-            header.payload_nbytes = payload_block * (
-                (self._partial_frame_nbytes - header.nbytes) // payload_block)
-            header.mutable = False
-        self.fh_raw.seek(raw_offset)
+        with self.fh_raw.temporary_offset() as fh_raw:
+            fh_raw.seek((self._nframes - 1) * self.header0.frame_nbytes)
+            header = fh_raw.read_header()
+            if self._partial_frame_nbytes > self.header0.nbytes:
+                header.mutable = True
+                # Payload should have integer number of both words and complete
+                # samples.
+                payload_block = lcm(
+                    DADAPayload._dtype_word.itemsize,
+                    self.header0.bps * (
+                        2 if self.header0.complex_data else 1) *
+                    np.prod(self.sample_shape) // 8)
+                header.payload_nbytes = payload_block * (
+                    (self._partial_frame_nbytes - header.nbytes) //
+                    payload_block)
+                header.mutable = False
+
         return header
 
     @lazyproperty
