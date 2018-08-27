@@ -1,3 +1,12 @@
+2.0 (unreleased)
+================
+
+Other Changes and Additions
+---------------------------
+
+- Added release procedure to the documentation.  [#268]
+
+
 1.2 (2018-07-27)
 ================
 

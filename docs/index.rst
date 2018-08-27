@@ -76,6 +76,7 @@ format extensions such as VDIF EDV.
    :maxdepth: 1
 
    tutorials/new_edv
+   tutorials/release_procedure
 
 .. _project_details_toc:
 
