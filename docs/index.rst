@@ -70,12 +70,14 @@ Developer Documentation
 =======================
 
 The developer documentation feature tutorials for supporting new formats or
-format extensions such as VDIF EDV.
+format extensions such as VDIF EDV.  It also contains instructions for
+publishing new code releases.
 
 .. toctree::
    :maxdepth: 1
 
    tutorials/new_edv
+   tutorials/release_procedure
 
 .. _project_details_toc:
 
