@@ -254,6 +254,12 @@ class VDIFFrameSet(object):
                     break
                 else:
                     raise
+            except AssertionError:
+                if len(frames) == len(thread_ids):
+                    break
+                else:
+                    raise
+
         else:  # Move back to before header that had incorrect frame_nr.
             fh.seek(-header.nbytes, 1)
 

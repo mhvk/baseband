@@ -6,6 +6,13 @@ Other Changes and Additions
 
 - Added release procedure to the documentation.  [#268]
 
+1.2.1 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- VDIF reader will now properly ignore corrupt last frames. [#273]
 
 1.2 (2018-07-27)
 ================
