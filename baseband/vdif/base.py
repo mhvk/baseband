@@ -225,17 +225,16 @@ class VDIFFileReader(VLBIFileReaderBase):
                 # https://bitbucket.org/ned/coveragepy/issues/198/continue-marked-as-not-covered
                 continue  # pragma: no cover
 
-            # Always also check header from a frame up.
-            next_frame = frame + frame_nbytes
-            if next_frame > nbytes - 32:
-                # if we're too far ahead for there to be another header,
-                # check consistency with a frame below.
+            # Also check header from a frame up or down.
+            if ((forward or frame < frame_nbytes) and
+                    frame < nbytes - frame_nbytes - 32):
+                next_frame = frame + frame_nbytes
+            elif frame > frame_nbytes:
                 next_frame = frame - frame_nbytes
-                # But don't bother if we already checked with a template,
-                # or if there is only one frame in the first place.
-                if template_header is not None or next_frame < 0:
-                    fh.seek(frame)
-                    return header
+            else:
+                # No choice, there are no other frames.
+                fh.seek(frame)
+                return header
 
             fh.seek(next_frame)
             try:
@@ -244,7 +243,7 @@ class VDIFFileReader(VLBIFileReaderBase):
             except AssertionError:
                 continue
 
-            if comparison.same_stream(header):
+            if header.same_stream(comparison):
                 fh.seek(frame)
                 return header
 

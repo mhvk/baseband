@@ -971,6 +971,32 @@ class TestVDIF(object):
                 with pytest.raises(ValueError):
                     f2._last_header
 
+    def test_invalid_last_frame(self, tmpdir):
+        # Some VDIF frames encountered in the wild have a last frame with a
+        # header which is mostly zeros and marked invalid.  Check that we
+        # properly ignore such a frame.  See gh-271.
+        test_file = str(tmpdir.join('test2.vdif'))
+        with vdif.open(SAMPLE_FILE, 'rb') as fh, \
+                open(test_file, 'w+b') as s:
+            allbytes = fh.read()
+            s.write(allbytes)
+            bad_header = vdif.VDIFHeader.fromvalues(edv=0, frame_nbytes=5032,
+                                                    invalid_data=True)
+            bad_header.tofile(s)
+            s.write(b'\0' * 5000)
+            assert s.tell() == fh.tell() + 5032
+
+        # For this short test file, one gets the wrong sample rate by
+        # looking for the frame number returning to zero; so we pass
+        # we pass the correct one in.
+        with vdif.open(SAMPLE_FILE, 'rs') as f1, \
+                vdif.open(test_file, 'rs', sample_rate=32*u.MHz) as f2:
+            assert f2.header0 == f1.header0
+            assert f2.stop_time == f1.stop_time
+            d1 = f1.read()
+            d2 = f2.read()
+            assert np.all(d1 == d2)
+
     def test_io_invalid(self, tmpdir):
         tmp_file = str(tmpdir.join('ts.dat'))
         with open(tmp_file, 'wb') as fw:
