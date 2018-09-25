@@ -14,6 +14,9 @@ Bug Fixes
 
 - VDIF reader will now properly ignore corrupt last frames. [#273]
 
+- Mark5B reader more robust against headers not being parsed correctly
+  in ``Mark5BFileReader.find_header``. [#275]
+
 1.2 (2018-07-27)
 ================
 
