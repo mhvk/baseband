@@ -143,7 +143,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
             header = self.read_header()
             self.seek(-header.nbytes, 1)
             return header
-        except AssertionError:
+        except Exception:
             pass
 
         self.seek(0, 2)
@@ -159,7 +159,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
             try:
                 self.seek(frame)
                 header1 = self.read_header()
-            except AssertionError:
+            except Exception:
                 continue
 
             # Get header from a frame up and check it is consistent (we always
@@ -177,7 +177,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
             self.seek(next_frame)
             try:
                 header2 = self.read_header()
-            except AssertionError:
+            except Exception:
                 continue
 
             if(header2.jday == header1.jday and
