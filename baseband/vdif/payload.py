@@ -14,11 +14,12 @@ import numpy as np
 from collections import namedtuple
 
 from ..vlbi_base.payload import VLBIPayloadBase
-from ..vlbi_base.encoding import (encode_2bit_base, encode_4bit_base,
-                                  decoder_levels, decode_8bit, encode_8bit)
+from ..vlbi_base.encoding import (
+    encode_1bit_base, encode_2bit_base, encode_4bit_base,
+    decoder_levels, decode_8bit, encode_8bit)
 
-__all__ = ['init_luts', 'decode_2bit', 'decode_4bit', 'encode_2bit',
-           'encode_4bit', 'VDIFPayload']
+__all__ = ['init_luts', 'decode_1bit', 'decode_2bit', 'decode_4bit',
+           'encode_1bit', 'encode_2bit', 'encode_4bit', 'VDIFPayload']
 
 
 def init_luts():
@@ -67,6 +68,20 @@ def init_luts():
 
 
 lut1bit, lut2bit, lut4bit = init_luts()
+
+
+def decode_1bit(words):
+    b = words.view(np.uint8)
+    return lut1bit.take(b, axis=0)
+
+
+shift1bit = np.arange(0, 8).astype(np.uint8)
+
+
+def encode_1bit(values):
+    """Encodes values using 1 bit per sample, packing the result into bytes."""
+    bitvalues = encode_1bit_base(values.reshape(-1, 8))
+    return np.packbits(bitvalues[:, ::-1])
 
 
 def decode_2bit(words):
@@ -123,11 +138,13 @@ class VDIFPayload(VLBIPayloadBase):
         Whether the data are complex, used if ``header`` is not given.
         Default: `False`.
     """
-    _decoders = {2: decode_2bit,
+    _decoders = {1: decode_1bit,
+                 2: decode_2bit,
                  4: decode_4bit,
                  8: decode_8bit}
 
-    _encoders = {2: encode_2bit,
+    _encoders = {1: encode_1bit,
+                 2: encode_2bit,
                  4: encode_4bit,
                  8: encode_8bit}
 

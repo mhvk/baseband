@@ -6,8 +6,9 @@ import numpy as np
 
 
 __all__ = ['OPTIMAL_2BIT_HIGH', 'TWO_BIT_1_SIGMA', 'FOUR_BIT_1_SIGMA',
-           'EIGHT_BIT_1_SIGMA', 'decoder_levels', 'encode_2bit_base',
-           'encode_4bit_base', 'decode_8bit', 'encode_8bit']
+           'EIGHT_BIT_1_SIGMA', 'decoder_levels',
+           'encode_1bit_base', 'encode_2bit_base', 'encode_4bit_base',
+           'decode_8bit', 'encode_8bit']
 
 
 # The high mag value for 2-bit reconstruction.  Note that mark5access uses
@@ -59,6 +60,20 @@ decoder_levels = {
 
 two_bit_2_sigma = 2 * TWO_BIT_1_SIGMA
 clip_low, clip_high = -1.5 * TWO_BIT_1_SIGMA, 1.5 * TWO_BIT_1_SIGMA
+
+
+def encode_1bit_base(values):
+    """Generic encoder for data stored using one bit.
+
+    This returns an unsigned integer array containing encoded sample
+    values that are either 0 (negative value) or 1 (positive value).
+
+    This does not pack the samples into bytes.
+    """
+    # Optimized for speed by doing calculations in-place, and ensuring that
+    # the dtypes match.
+    bitvalues = np.empty(values.shape, np.uint8)
+    return np.greater_equal(values, 0., out=bitvalues, casting='unsafe')
 
 
 def encode_2bit_base(values):
