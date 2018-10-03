@@ -136,11 +136,15 @@ class TestMark5B(object):
     def test_decoding(self):
         """Check that look-up levels are consistent with mark5access."""
         o2h = OPTIMAL_2BIT_HIGH
-        assert np.all(mark5b.payload.lut1bit[0] == -1.)
-        assert np.all(mark5b.payload.lut1bit[0xff] == 1.)
+        # Note that evaluation of sign bit for bps=1 is somewhat strange,
+        # in that set means negative, unlike what is the case for bps=2.
+        # This is as in mark5access, but not 100% sure this is correct --
+        # the documentation is rather unclear.
+        assert np.all(mark5b.payload.lut1bit[0] == 1.)
+        assert np.all(mark5b.payload.lut1bit[0xff] == -1.)
         assert np.all(mark5b.payload.lut1bit.astype(int) ==
-                      ((np.arange(256)[:, np.newaxis] >>
-                        np.arange(8)) & 1) * 2 - 1)
+                      (1 - 2 * ((np.arange(256)[:, np.newaxis] >>
+                                 np.arange(8)) & 1)))
         assert np.all(mark5b.payload.lut2bit[0] == -o2h)
         assert np.all(mark5b.payload.lut2bit[0x55] == 1.)
         assert np.all(mark5b.payload.lut2bit[0xaa] == -1.)

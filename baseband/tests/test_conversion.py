@@ -12,7 +12,8 @@ from .. import mark5b
 from .. import dada
 from ..vlbi_base.encoding import EIGHT_BIT_1_SIGMA
 from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
-                    SAMPLE_VDIF, SAMPLE_MWA_VDIF as SAMPLE_MWA, SAMPLE_DADA)
+                    SAMPLE_VDIF, SAMPLE_MWA_VDIF as SAMPLE_MWA, SAMPLE_DADA,
+                    SAMPLE_BPS1_VDIF)
 
 
 class TestVDIFMark5B(object):
@@ -240,6 +241,33 @@ class TestVDIF3ToMark5B(object):
             assert np.all(dm == dv)
             assert fm.offset == fv.offset
             assert fm.tell(unit='time') == fv.tell(unit='time')
+
+
+class TestVDIF0BPS1ToMark5B(object):
+    """Real conversion: VDIF EDV 3, BPS 1 to Mark 5B."""
+    def test_stream(self, tmpdir):
+        with vdif.open(SAMPLE_BPS1_VDIF, 'rs', sample_rate=8*u.MHz) as fr:
+            start_time = fr.start_time
+            data = fr.read(5000)  # Just one Mark 5B frame.
+
+        fl = str(tmpdir.join('test.m5b'))
+        with mark5b.open(fl, 'ws', sample_rate=8.*u.MHz, nchan=data.shape[1],
+                         bps=1, time=start_time) as fw:
+            fw.write(data)
+            fw.write(data)
+
+        with vdif.open(SAMPLE_BPS1_VDIF, 'rs',
+                       sample_rate=8*u.MHz) as fv, mark5b.open(
+                           fl, 'rs', sample_rate=8.*u.MHz, nchan=16, bps=1,
+                           ref_time=Time('2018-09-01')) as fm:
+            assert fv.start_time == fm.start_time
+            dv = fv.read(5000)
+            dm = fm.read(5000)
+            assert np.all(dm == dv)
+            assert fm.offset == fv.offset
+            assert fm.tell(unit='time') == fv.tell(unit='time')
+            dm = fm.read(5000)
+            assert np.all(dm == dv)
 
 
 class TestMark4ToVDIF1(object):

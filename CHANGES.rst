@@ -1,7 +1,8 @@
 2.0 (unreleased)
 ================
 
-- VDIF reader and writer now support 1 bit per sample. [#277]
+- VDIF and Mark 5B readers and writers now support 1 bit per sample.
+  [#277, #278]
 
 Other Changes and Additions
 ---------------------------
