@@ -63,6 +63,9 @@ SAMPLE_MWA_VDIF = _full_path('sample_mwa.vdif')
 SAMPLE_AROCHIME_VDIF = _full_path('sample_arochime.vdif')
 """VDIF sample from ARO, written by CHIME backend. EDV=1, nchan=1024, bps=4."""
 
+SAMPLE_BPS1_VDIF = _full_path('sample_bps1.vdif')
+"""VDIF sample from Christian Ploetz. EDV=0, nchan=16, bps=1."""
+
 SAMPLE_DADA = _full_path('sample.dada')
 """DADA sample from Effelsberg, with header adapted to shortened size."""
 

@@ -1,6 +1,8 @@
 2.0 (unreleased)
 ================
 
+- VDIF reader and writer now support 1 bit per sample. [#277]
+
 Other Changes and Additions
 ---------------------------
 

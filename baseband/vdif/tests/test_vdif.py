@@ -12,7 +12,8 @@ from ... import vdif, vlbi_base
 from ...helpers import sequentialfile as sf
 from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_VLBI_VDIF as
                      SAMPLE_VLBI, SAMPLE_MWA_VDIF as SAMPLE_MWA,
-                     SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME)
+                     SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME,
+                     SAMPLE_BPS1_VDIF as SAMPLE_BPS1)
 
 # Comparison with m5access routines (check code on 2015-MAY-30) on vlba.m5a,
 # which contains the first 16 frames from evn/Fd/GP052D_FD_No0006.m5a.
@@ -1136,3 +1137,64 @@ def test_legacy_vdif(tmpdir):
         s.seek(0)
         header2 = vdif.VDIFHeader.fromfile(s)
     assert header2 == header
+
+
+# m5d VDIF-1bit VDIF_8000-128-16-1 100
+# Mark5 stream: 0x558f724633b0
+#   stream = File-1/1=VDIF-1bit
+#   format = VDIF_8000-128-16-1 = 3
+#   start mjd/sec = 58385 47481.567500000
+#   frame duration = 500000.00 ns
+#   framenum = 0
+#   sample rate = 8000000 Hz
+#   offset = 0
+#   framebytes = 8032 bytes
+#   datasize = 8000 bytes
+#   sample granularity = 1
+#   frame granularity = 1
+#   gframens = 500000
+#   payload offset = 32
+#   read position = 0
+#   data window size = 1048576 bytes
+#  1 -1 -1 -1  1 -1 -1  1 -1  1 -1  1 -1 -1 -1  1
+# -1 -1  1 -1  1  1 -1  1 -1 -1  1 -1  1  1 -1  1
+#  1  1 -1 -1  1  1  1  1  1 -1  1  1 -1  1  1  1
+#  1 -1  1 -1  1  1  1 -1  1 -1  1  1  1 -1 -1 -1
+class TestVDIFBPS1(object):
+    def test_header(self):
+        with open(SAMPLE_BPS1, 'rb') as fh:
+            header0 = vdif.VDIFHeader.fromfile(fh)
+        assert header0.edv == 0
+        assert header0.payload_nbytes == 8000
+        assert header0.nchan == 16
+        assert header0.bps == 1
+        assert header0.samples_per_frame == 4000
+
+    def test_stream(self):
+        with vdif.open(SAMPLE_BPS1, 'rs', sample_rate=8*u.MHz) as fh:
+            data = fh.read(8000)
+
+        assert data.shape == (8000, 16)
+        assert np.all((data == 1) | (data == -1))
+        assert np.all(data[:4] == np.array(
+            [[+1, -1, -1, -1, +1, -1, -1, +1, -1, +1, -1, +1, -1, -1, -1, +1],
+             [-1, -1, +1, -1, +1, +1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1],
+             [+1, +1, -1, -1, +1, +1, +1, +1, +1, -1, +1, +1, -1, +1, +1, +1],
+             [+1, -1, +1, -1, +1, +1, +1, -1, +1, -1, +1, +1, +1, -1, -1, -1]]))
+
+    def test_stream_writer(self, tmpdir):
+        filename = str(tmpdir.join('bps1.vdif'))
+        with vdif.open(SAMPLE_BPS1, 'rs', sample_rate=8*u.MHz) as fh:
+            header0 = fh.header0
+            data = fh.read(8000)
+        with vdif.open(filename, 'ws', header0=header0,
+                       sample_rate=8*u.MHz) as fw:
+            fw.write(data)
+        with vdif.open(filename, 'rs', sample_rate=8*u.MHz) as f2:
+            data2 = f2.read()
+        assert np.all(data2 == data)
+        # Check byte-for-byte equality.
+        with open(SAMPLE_BPS1, 'rb') as f1, open(filename, 'rb') as f2:
+            b1 = f1.read(16064)
+            b2 = f2.read(16064)
+        assert b1 == b2
