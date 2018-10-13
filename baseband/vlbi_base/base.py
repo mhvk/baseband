@@ -515,7 +515,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
     @property
     def dtype(self):
-        return np.complex64 if self.complex_data else np.float32
+        # TODO: arguably, this should be inferred from an actual payload.
+        return np.dtype(np.complex64 if self.complex_data else np.float32)
 
     def read(self, count=None, out=None):
         """Read a number of complete (or subset) samples.

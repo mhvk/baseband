@@ -681,7 +681,9 @@ class TestVDIF(object):
             assert fh.start_time == fh.header0.time
             assert abs(fh.time - fh.start_time) < 1. * u.ns
             assert fh.time == fh.tell(unit='time')
+            assert isinstance(fh.dtype, np.dtype) and fh.dtype == np.dtype('f4')
             record = fh.read(12)
+            assert record.dtype == np.dtype('f4')
             assert fh.tell() == 12
             t12 = fh.time
             s12 = 12 / fh.sample_rate
