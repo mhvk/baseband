@@ -87,7 +87,7 @@ samples.
 Let's read some samples from the VDIF file::
 
     >>> data = fh_vdif.read(3)
-    >>> data
+    >>> data  # doctest: +FLOAT_CMP
     array([[-1.      ,  1.      ,  1.      , -1.      , -1.      , -1.      ,
              3.316505,  3.316505],
            [-1.      ,  1.      , -1.      ,  1.      ,  1.      ,  1.      ,
