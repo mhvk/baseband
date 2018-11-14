@@ -23,6 +23,9 @@ Bug Fixes
 - All stream readers now have a proper ``dtype`` attribute, not a
   corresponding ``np.float32`` or ``np.complex64``. [#280]
 
+- GUPPI stream readers no longer emit warnings on not quite FITS compliant
+  headers. [#283]
+
 1.2 (2018-07-27)
 ================
 

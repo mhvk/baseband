@@ -125,6 +125,11 @@ class GUPPIHeader(fits.Header):
         # This calls cls.__init__, which automatically runs cls.verify().
         self = cls.fromstring(hdr)
         self.mutable = False
+        # GUPPI headers are not a proper FITS standard, and we're reading
+        # from a file that the user likely cannot control, so let's not bother
+        # with card verification (this avoids warnings in repr(); gh-282)
+        for c in self.cards:
+            c._verified = True
         return self
 
     def tofile(self, fh):
