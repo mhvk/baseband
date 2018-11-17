@@ -69,7 +69,7 @@ class VDIFHeaderMeta(type):
                 raise ValueError("EDV {0} already registered in "
                                  "VDIF_HEADER_CLASSES".format(edv))
 
-            VDIFHeaderMeta._registry.update({edv: cls})
+            VDIFHeaderMeta._registry[edv] = cls
 
         # If header parser has a sync pattern, append it as a private
         # attribute for cls.verify.
