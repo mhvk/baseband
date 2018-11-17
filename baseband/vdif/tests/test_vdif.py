@@ -197,6 +197,9 @@ class TestVDIF(object):
                 pass
 
         # Working header with nonsense data in the last two words.
+        # Clear out entry in registry just in case we test twice.
+        vdif.header.VDIFHeaderMeta._registry.pop(0x58, None)
+
         class VDIFHeaderX(vdif.header.VDIFSampleRateHeader):
             _edv = 0x58
             _header_parser = (vdif.header.VDIFSampleRateHeader._header_parser +
