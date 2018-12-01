@@ -1,16 +1,8 @@
-2.0 (unreleased)
+2.0 (2018-12-12)
 ================
 
 - VDIF and Mark 5B readers and writers now support 1 bit per sample.
   [#277, #278]
-
-Other Changes and Additions
----------------------------
-
-- Added release procedure to the documentation.  [#268]
-
-1.2.1 (unreleased)
-==================
 
 Bug Fixes
 ---------
@@ -25,6 +17,11 @@ Bug Fixes
 
 - GUPPI stream readers no longer emit warnings on not quite FITS compliant
   headers. [#283]
+
+Other Changes and Additions
+---------------------------
+
+- Added release procedure to the documentation.  [#268]
 
 1.2 (2018-07-27)
 ================
