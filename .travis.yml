@@ -32,29 +32,8 @@ env:
 
 matrix:
     include:
-
-        # Slow ones first... Try Astropy development version on new python
-        - env: ASTROPY_VERSION=development
-
         # Check for sphinx doc build warnings.
-        - env: SETUP_CMD='build_sphinx -w'
-
-        # Check Python 3 with stable numpy, also verifying coverage.
-        - env: SETUP_CMD='test --coverage'
-
-        # Try some older python and numpy versions.
-        - python: 2.7
-
-        - python: 3.5
-          env: NUMPY_VERSION=1.10
-        - python: 2.7
-          env: NUMPY_VERSION=1.10 ASTROPY_VERSION=lts
-
-        # Make sure that egg_info works without dependencies
-        - env: SETUP_CMD='egg_info'
-
-        # Do a PEP8/pyflakes test with flake8 (see setup.cfg for options)
-        - env: MAIN_CMD="flake8 --count baseband" SETUP_CMD=''
+        - env: SETUP_CMD='build_sphinx -w' PYTEST_VERSION='<3.10'
 
 before_install:
 
