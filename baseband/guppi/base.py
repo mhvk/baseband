@@ -2,7 +2,6 @@
 from __future__ import division, unicode_literals, print_function
 import re
 
-from astropy.extern import six
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -400,8 +399,7 @@ def open(name, mode='rs', **kwargs):
     frames_per_file = kwargs.pop('frames_per_file', 128)
 
     # Check if ``name`` is a template or sequence.
-    is_template = isinstance(name, six.string_types) and ('{' in name and
-                                                          '}' in name)
+    is_template = isinstance(name, str) and ('{' in name and '}' in name)
     is_sequence = isinstance(name, (tuple, list, sf.FileNameSequencer))
 
     # For stream writing, header0 is needed; for reading, it is needed for

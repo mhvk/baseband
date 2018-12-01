@@ -5,7 +5,6 @@ import re
 
 import numpy as np
 import astropy.units as u
-from astropy.extern import six
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
@@ -448,8 +447,7 @@ def open(name, mode='rs', **kwargs):
     header0 = kwargs.get('header0', None)
 
     # Check if ``name`` is a template or sequence.
-    is_template = isinstance(name, six.string_types) and ('{' in name and
-                                                          '}' in name)
+    is_template = isinstance(name, str) and ('{' in name and '}' in name)
     is_sequence = isinstance(name, (tuple, list, sf.FileNameSequencer))
 
     # For stream writing, header0 is needed; for reading, it is needed for

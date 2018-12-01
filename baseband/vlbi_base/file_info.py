@@ -8,7 +8,6 @@ from __future__ import division, unicode_literals, print_function
 import warnings
 
 import astropy.units as u
-from astropy.extern import six
 
 
 class VLBIInfoMeta(type):
@@ -22,8 +21,7 @@ class VLBIInfoMeta(type):
             setattr(cls, attr, None)
 
 
-@six.add_metaclass(VLBIInfoMeta)
-class VLBIInfoBase(object):
+class VLBIInfoBase(object, metaclass=VLBIInfoMeta):
     """Container providing a standardized interface to file information."""
 
     attr_names = ('format',)

@@ -13,9 +13,6 @@ from ...data import (SAMPLE_GSB_RAWDUMP_HEADER as SAMPLE_RAWDUMP_HEADER,
                      SAMPLE_GSB_RAWDUMP as SAMPLE_RAWDUMP,
                      SAMPLE_GSB_PHASED_HEADER as SAMPLE_PHASED_HEADER,
                      SAMPLE_GSB_PHASED as SAMPLE_PHASED)
-from astropy.extern import six
-if six.PY2:
-    from io import open
 
 
 class TestGSB(object):

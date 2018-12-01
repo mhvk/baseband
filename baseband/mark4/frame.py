@@ -13,7 +13,6 @@ from __future__ import (absolute_import, division, print_function,
 
 import numpy as np
 import operator
-from astropy.extern import six
 
 from ..vlbi_base.frame import VLBIFrameBase
 from .header import Mark4Header
@@ -240,7 +239,7 @@ class Mark4Frame(VLBIFrameBase):
         return payload_item, sample_index, data_shape, ninvalid
 
     def __getitem__(self, item=()):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             return self.header.__getitem__(item)
 
         # Normally, we would just pass on to the payload here, but for
@@ -266,7 +265,7 @@ class Mark4Frame(VLBIFrameBase):
             return data[(Ellipsis,) + sample_index]
 
     def __setitem__(self, item, value):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             return self.header.__setitem__(item, value)
 
         # Normally, we would just pass on to the payload here, but for

@@ -14,7 +14,6 @@ from __future__ import absolute_import, division, print_function
 
 import numpy as np
 from astropy.time import Time
-from astropy.extern import six
 
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase
 from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
@@ -701,7 +700,7 @@ class Mark4Header(Mark4TrackHeader):
         return self.ntrack
 
     def __getitem__(self, item):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             return super(Mark4Header, self).__getitem__(item)
 
         try:

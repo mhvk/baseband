@@ -10,7 +10,6 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
-from astropy.extern import six
 
 __all__ = ['VLBIFrameBase']
 
@@ -179,7 +178,7 @@ class VLBIFrameBase(object):
     # Header behaves as a dictionary, while Payload can be indexed/sliced.
     # Let frame behave appropriately.
     def __getitem__(self, item=()):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             return self.header.__getitem__(item)
         elif self.valid:
             return self.payload.__getitem__(item)
@@ -191,7 +190,7 @@ class VLBIFrameBase(object):
     data = property(__getitem__, doc="Full decoded frame.")
 
     def __setitem__(self, item, value):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             self.header.__setitem__(item, value)
         else:
             self.payload.__setitem__(item, value)

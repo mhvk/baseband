@@ -12,7 +12,6 @@ import warnings
 from collections import OrderedDict
 import astropy.units as u
 from astropy.time import Time
-from astropy.extern import six
 
 
 __all__ = ['DADAHeader']
@@ -86,7 +85,7 @@ class DADAHeader(OrderedDict):
         mutable = kwargs.pop('mutable', True)
         self.mutable = True
         self.comments = {}
-        if len(args) == 1 and isinstance(args[0], six.string_types):
+        if len(args) == 1 and isinstance(args[0], str):
             args = (self._fromlines(args[0].split('\n')),)
 
         super(DADAHeader, self).__init__(*args, **kwargs)

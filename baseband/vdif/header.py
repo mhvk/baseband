@@ -11,7 +11,6 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import numpy as np
 import astropy.units as u
-from astropy.extern import six
 
 from astropy.time import Time, TimeDelta
 
@@ -80,8 +79,7 @@ class VDIFHeaderMeta(type):
         super(VDIFHeaderMeta, cls).__init__(name, bases, dct)
 
 
-@six.add_metaclass(VDIFHeaderMeta)
-class VDIFHeader(VLBIHeaderBase):
+class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     """VDIF Header, supporting different Extended Data Versions.
 
     Will initialize a header instance appropriate for a given EDV.

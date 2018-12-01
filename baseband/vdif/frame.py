@@ -12,7 +12,6 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import numpy as np
-from astropy.extern import six
 
 from ..vlbi_base.frame import VLBIFrameBase
 from .header import VDIFHeader, VDIFBaseHeader
@@ -432,7 +431,7 @@ class VDIFFrameSet(object):
     # Header behaves as a dictionary, while Payload can be indexed/sliced.
     # Let frameset behave appropriately.
     def __getitem__(self, item=()):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             # Header behaves as a dictionary.  Assume base keywords are the
             # same for every frame, except for thread_id (must be different)
             # and invalid_data (can be different).
@@ -466,7 +465,7 @@ class VDIFFrameSet(object):
         return data
 
     def __setitem__(self, item, data):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             # Headers behave as dictionaries; except for thread_id and
             # invalid_data, assume set base properties all to the same value.
             data = np.broadcast_to(data, (len(self.frames),))
