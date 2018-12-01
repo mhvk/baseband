@@ -72,7 +72,7 @@ class Mark5BFrame(VLBIFrameBase):
                      payload.words[2] != self._fill_pattern or
                      (payload.words[3:] != self._fill_pattern).any())
 
-        super(Mark5BFrame, self).__init__(header, payload, valid, verify)
+        super().__init__(header, payload, valid, verify)
 
     @classmethod
     def fromfile(cls, fh, kday=None, ref_time=None, nchan=1, bps=3, valid=None,

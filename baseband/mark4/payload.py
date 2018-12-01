@@ -264,8 +264,8 @@ class Mark4Payload(VLBIPayloadBase):
             self._nbytes = header.payload_nbytes
         self._dtype_word = MARK4_DTYPES[nchan * bps * fanout]
         self.fanout = fanout
-        super(Mark4Payload, self).__init__(words, sample_shape=(nchan,),
-                                           bps=bps, complex_data=False)
+        super().__init__(words, sample_shape=(nchan,),
+                         bps=bps, complex_data=False)
         self._coder = (self.sample_shape.nchan, bps, fanout)
 
     @classmethod

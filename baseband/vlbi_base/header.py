@@ -202,7 +202,7 @@ class HeaderParser(OrderedDict):
         # Use a dict rather than OrderedDict for the parsers for better speed.
         # Note that this gets filled by calls to __setitem__.
         self._parsers = {}
-        super(HeaderParser, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def copy(self):
         """Make an independent copy."""
@@ -219,7 +219,7 @@ class HeaderParser(OrderedDict):
 
     def __setitem__(self, item, value):
         self._parsers[item] = self._make_parser(*value)
-        super(HeaderParser, self).__setitem__(item, value)
+        super().__setitem__(item, value)
 
     @property
     def parsers(self):
@@ -238,7 +238,7 @@ class HeaderParser(OrderedDict):
         """Update the parser with the information from another one."""
         if not isinstance(other, HeaderParser):
             raise TypeError("can only update using a HeaderParser instance.")
-        super(HeaderParser, self).update(other)
+        super().update(other)
         # Update the parsers rather than recalculate all the functions.
         self._parsers.update(other._parsers)
 

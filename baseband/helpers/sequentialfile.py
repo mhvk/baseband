@@ -314,7 +314,7 @@ class SequentialFileWriter(SequentialFileBase):
     """
     def __init__(self, files, mode='w+b', file_size=None, opener=None):
         self.file_size = file_size
-        super(SequentialFileWriter, self).__init__(files, mode, opener)
+        super().__init__(files, mode, opener)
 
     def write(self, data):
         if self.closed:
@@ -337,8 +337,7 @@ class SequentialFileWriter(SequentialFileBase):
         """Map part of the file in memory.  Cannnot span file boundaries."""
         if shape is None:
             raise ValueError('cannot make writable memmap without shape.')
-        return super(SequentialFileWriter,
-                     self).memmap(dtype, mode, offset, shape, order)
+        return super().memmap(dtype, mode, offset, shape, order)
 
 
 def open(files, mode='rb', file_size=None, opener=None):

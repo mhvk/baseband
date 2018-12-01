@@ -208,9 +208,6 @@ class TestVDIF:
                                    ('nonsense_1', (7, 0, 8, None)),
                                    ('nonsense_2', (7, 8, 24, 0x1)))))
 
-            def verify(self):
-                super(VDIFHeaderX, self).verify()
-
         assert vdif.header.VDIF_HEADER_CLASSES[0x58] is VDIFHeaderX
 
         # Read in a header, and hack an 0x58 header with its info

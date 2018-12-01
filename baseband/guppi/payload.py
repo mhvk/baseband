@@ -56,8 +56,8 @@ class GUPPIPayload(VLBIPayloadBase):
             sample_shape = header.sample_shape
             complex_data = header.complex_data
             channels_first = header.channels_first
-        super(GUPPIPayload, self).__init__(words, sample_shape=sample_shape,
-                                           bps=bps, complex_data=complex_data)
+        super().__init__(words, sample_shape=sample_shape,
+                         bps=bps, complex_data=complex_data)
         self.channels_first = channels_first
         # If channels first, _item_to_slices must act on per-channel words.  By
         # resetting self._bpfs, we allow _item_to_slices to work unmodified.
@@ -93,8 +93,8 @@ class GUPPIPayload(VLBIPayloadBase):
                               else header.payload_nbytes)
 
         if not memmap:
-            return super(GUPPIPayload, cls).fromfile(
-                fh, header=header, payload_nbytes=payload_nbytes, **kwargs)
+            return super().fromfile(fh, header=header,
+                                    payload_nbytes=payload_nbytes, **kwargs)
 
         words_shape = (payload_nbytes // cls._dtype_word.itemsize,)
         if hasattr(fh, 'memmap'):

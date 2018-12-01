@@ -88,7 +88,7 @@ class DADAHeader(OrderedDict):
         if len(args) == 1 and isinstance(args[0], str):
             args = (self._fromlines(args[0].split('\n')),)
 
-        super(DADAHeader, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.mutable = mutable
         if verify:
             self.verify()
@@ -102,8 +102,8 @@ class DADAHeader(OrderedDict):
 
     def copy(self):
         """Create a mutable and independent copy of the header."""
-        # Cannot do super(DADAHeader, self).copy(), since this first
-        # initializes an empty header, which does not pass verification.
+        # Cannot do super().copy(), since this first initializes an empty
+        # header, which does not pass verification.
         new = self.__class__(self)
         new.comments = self.comments.copy()
         new.mutable = True
@@ -259,7 +259,7 @@ class DADAHeader(OrderedDict):
         extras = [(key, kwargs.pop(key)) for key in self._properties
                   if key in kwargs]
         # Update the normal keywords.
-        super(DADAHeader, self).update(**kwargs)
+        super().update(**kwargs)
         # Now set the properties.
         for attr, value in extras:
             setattr(self, attr, value)
@@ -274,7 +274,7 @@ class DADAHeader(OrderedDict):
             value, comment = value
             self.comments[key.upper()] = comment
 
-        super(DADAHeader, self).__setitem__(key.upper(), value)
+        super().__setitem__(key.upper(), value)
 
     @property
     def nbytes(self):

@@ -72,7 +72,7 @@ class GUPPIHeader(fits.Header):
         verify = kwargs.pop('verify', True)
         mutable = kwargs.pop('mutable', True)
         # Comments handled by fits.Header__init__().
-        super(GUPPIHeader, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.mutable = mutable
         if verify:
             self.verify()
@@ -91,7 +91,7 @@ class GUPPIHeader(fits.Header):
         """Create a mutable and independent copy of the header."""
         # This method exists because io.fits.Header.copy doesn't properly
         # return copy of the same class.
-        newfitsheader = super(GUPPIHeader, self).copy()
+        newfitsheader = super().copy()
         return self.__class__(newfitsheader)
 
     def __copy__(self):
@@ -189,7 +189,7 @@ class GUPPIHeader(fits.Header):
         extras = [(key, kwargs.pop(key)) for key in self._properties
                   if key in kwargs]
         # Update the normal keywords.
-        super(GUPPIHeader, self).update(kwargs)
+        super().update(kwargs)
         # Now set the properties.
         for attr, value in extras:
             setattr(self, attr, value)
@@ -204,7 +204,7 @@ class GUPPIHeader(fits.Header):
             value, comment = value
             self.comments[key.upper()] = comment
 
-        super(GUPPIHeader, self).__setitem__(key.upper(), value)
+        super().__setitem__(key.upper(), value)
 
     @property
     def nbytes(self):
@@ -393,6 +393,6 @@ class GUPPIHeader(fits.Header):
 
     def __repr__(self):
         name = self.__class__.__name__
-        vals = super(GUPPIHeader, self).__repr__()
+        vals = super().__repr__()
         return('<{0} {1}>'.format(name, ("\n  " + len(name) * " ").join(
             [v.rstrip() for v in vals.split('\n')])))

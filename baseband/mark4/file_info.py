@@ -97,7 +97,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
                 return None
 
     def _collect_info(self):
-        super(Mark4FileReaderInfo, self)._collect_info()
+        super()._collect_info()
         if self:
             self.complex_data = False
             # TODO: Shouldn't Mark4Header provide this?

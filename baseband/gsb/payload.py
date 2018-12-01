@@ -109,12 +109,12 @@ class GSBPayload(VLBIPayloadBase):
             Whether data are complex.  Default: `False`.
         """
         if hasattr(fh, 'read'):
-            return super(GSBPayload,
-                         cls).fromfile(fh, payload_nbytes=payload_nbytes,
-                                       sample_shape=(nchan,), bps=bps,
-                                       complex_data=complex_data)
+            return super().fromfile(fh, payload_nbytes=payload_nbytes,
+                                    sample_shape=(nchan,), bps=bps,
+                                    complex_data=complex_data)
 
         nthread = len(fh)
+        # Seem to need explicit super inside list comprehension.
         payloads = [[super(GSBPayload,
                            cls).fromfile(fh1, payload_nbytes=payload_nbytes,
                                          sample_shape=(nchan,), bps=bps,

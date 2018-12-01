@@ -51,8 +51,8 @@ class DADAPayload(VLBIPayloadBase):
             sample_shape = header.sample_shape
             bps = header.bps
             complex_data = header.complex_data
-        super(DADAPayload, self).__init__(words, sample_shape=sample_shape,
-                                          bps=bps, complex_data=complex_data)
+        super().__init__(words, sample_shape=sample_shape,
+                         bps=bps, complex_data=complex_data)
 
     @classmethod
     def fromfile(cls, fh, header=None, memmap=False, payload_nbytes=None,
@@ -82,8 +82,8 @@ class DADAPayload(VLBIPayloadBase):
                               else header.payload_nbytes)
 
         if not memmap:
-            return super(DADAPayload, cls).fromfile(
-                fh, header=header, payload_nbytes=payload_nbytes, **kwargs)
+            return super().fromfile(fh, header=header,
+                                    payload_nbytes=payload_nbytes, **kwargs)
 
         if hasattr(fh, 'memmap'):
             words = fh.memmap(dtype=cls._dtype_word,

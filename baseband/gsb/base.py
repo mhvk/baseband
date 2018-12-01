@@ -32,7 +32,7 @@ class GSBTimeStampIO(VLBIFileBase):
 
     def __init__(self, fh_raw):
         fh_raw = io.TextIOWrapper(fh_raw)
-        super(GSBTimeStampIO, self).__init__(fh_raw)
+        super().__init__(fh_raw)
 
     info = GSBTimeStampInfo()
 
@@ -102,7 +102,7 @@ class GSBFileReader(VLBIFileBase):
         self.nchan = nchan
         self.bps = bps
         self.complex_data = complex_data
-        super(GSBFileReader, self).__init__(fh_raw)
+        super().__init__(fh_raw)
 
     def __repr__(self):
         return ("{name}(fh_raw={s.fh_raw}, payload_nbytes={s.payload_nbytes}, "
@@ -181,7 +181,7 @@ class GSBStreamBase(VLBIStreamBase):
 
         unsliced_shape = (nchan,) if rawdump else (len(fh_raw), nchan)
 
-        super(GSBStreamBase, self).__init__(
+        super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, unsliced_shape=unsliced_shape,
             bps=bps, complex_data=complex_data, squeeze=squeeze, subset=subset,
@@ -275,7 +275,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                  payload_nbytes=None, nchan=None, bps=None, complex_data=None,
                  squeeze=True, subset=(), verify=True):
         header0 = fh_ts.read_timestamp()
-        super(GSBStreamReader, self).__init__(
+        super().__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, payload_nbytes=payload_nbytes,
             nchan=nchan, bps=bps, complex_data=complex_data,
@@ -402,7 +402,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
                               'rawdump' if hasattr(fh_raw, 'read') else
                               'phased')
             header0 = GSBHeader.fromvalues(mode=mode, **kwargs)
-        super(GSBStreamWriter, self).__init__(
+        super().__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, payload_nbytes=payload_nbytes,
             nchan=nchan, bps=bps, complex_data=complex_data, squeeze=squeeze)

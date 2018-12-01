@@ -82,7 +82,7 @@ class VDIFFrame(VLBIFrameBase):
         Checks consistency between the header information and payload
         data shape and type.
         """
-        super(VDIFFrame, self).verify()
+        super().verify()
         assert self.header['complex_data'] == (self.payload.dtype.kind == 'c')
         assert self.payload.shape == (self.header.samples_per_frame,
                                       self.header.nchan)

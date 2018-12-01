@@ -16,7 +16,7 @@ class Mark5BFileReaderInfo(VLBIFileReaderInfo):
             return None
 
     def _collect_info(self):
-        super(Mark5BFileReaderInfo, self)._collect_info()
+        super()._collect_info()
         if self:
             self.complex_data = False
             if self.kday is None and self.ref_time is None:

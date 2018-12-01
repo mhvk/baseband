@@ -134,8 +134,8 @@ class Mark5BPayload(VLBIPayloadBase):
         if complex_data:
             raise ValueError("Mark5B format does not support complex data.")
 
-        super(Mark5BPayload, self).__init__(words, sample_shape=(nchan,),
-                                            bps=bps, complex_data=False)
+        super().__init__(words, sample_shape=(nchan,),
+                         bps=bps, complex_data=False)
 
     @classmethod
     def fromdata(cls, data, bps=2):

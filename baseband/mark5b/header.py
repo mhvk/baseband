@@ -81,7 +81,7 @@ class Mark5BHeader(VLBIHeaderBase):
     _payload_nbytes = 10000  # 2500 words
 
     def __init__(self, words, kday=None, ref_time=None, verify=True, **kwargs):
-        super(Mark5BHeader, self).__init__(words, verify=False, **kwargs)
+        super().__init__(words, verify=False, **kwargs)
         if kday is not None:
             self.kday = kday
         elif ref_time is not None:
@@ -98,7 +98,7 @@ class Mark5BHeader(VLBIHeaderBase):
             assert self.kday % 1000 == 0, "kday must be thousands of MJD."
 
     def copy(self, **kwargs):
-        return super(Mark5BHeader, self).copy(kday=self.kday, **kwargs)
+        return super().copy(kday=self.kday, **kwargs)
 
     @classmethod
     def fromvalues(cls, **kwargs):
@@ -126,7 +126,7 @@ class Mark5BHeader(VLBIHeaderBase):
         frame_rate = kwargs.pop('frame_rate', None)
         # Pop verify and pass on False so verify happens after time is set.
         verify = kwargs.pop('verify', True)
-        self = super(Mark5BHeader, cls).fromvalues(verify=False, **kwargs)
+        self = super().fromvalues(verify=False, **kwargs)
         if time is not None:
             self.set_time(time, frame_rate=frame_rate)
             self.update()    # Recalculate CRC.
@@ -156,7 +156,7 @@ class Mark5BHeader(VLBIHeaderBase):
             verify = kwargs.pop('verify', True)
             kwargs['verify'] = False
 
-        super(Mark5BHeader, self).update(**kwargs)
+        super().update(**kwargs)
         if calculate_crc:
             # Do not use words 2 & 3 directly, so that this works also if part
             # of a VDIF header, where the time information is in words 7 & 8.

@@ -142,7 +142,7 @@ class GSBHeader(VLBIHeaderBase):
             mode = 'rawdump' if len(words) == 7 else 'phased'
 
         cls = cls._gsb_header_classes.get(mode)
-        self = super(GSBHeader, cls).__new__(cls)
+        self = super().__new__(cls)
         # We intialise VDIFHeader subclasses, so their __init__ will be called.
         return self
 
@@ -208,7 +208,7 @@ class GSBHeader(VLBIHeaderBase):
                 else:
                     raise TypeError("cannot construct a GSB header from "
                                     "values without knowing the mode.")
-        return super(GSBHeader, cls).fromvalues(mode, nbytes, *args, **kwargs)
+        return super().fromvalues(mode, nbytes, *args, **kwargs)
 
     @classmethod
     def fromkeys(cls, mode=None, nbytes=None, *args, **kwargs):
@@ -220,7 +220,7 @@ class GSBHeader(VLBIHeaderBase):
                     mode = 'phased'
                 else:
                     mode = 'rawdump'
-        return super(GSBHeader, cls).fromkeys(mode, nbytes, *args, **kwargs)
+        return super().fromkeys(mode, nbytes, *args, **kwargs)
 
     def seek_offset(self, n, nbytes=None):
         """Offset in bytes needed to move a file pointer to another header.
