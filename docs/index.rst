@@ -4,7 +4,9 @@
 Baseband
 ********
 
-Welcome to the Baseband documentation! Baseband is a package for reading and
+Welcome to the Baseband documentation!  Baseband is a package
+`affiliated <http://www.astropy.org/affiliated/index.html>`_ with the
+`Astropy project <http://www.astropy.org>`_ for reading and
 writing VLBI and other radio baseband files, with the aim of simplifying and
 streamlining data conversion and standardization.  It provides:
 
