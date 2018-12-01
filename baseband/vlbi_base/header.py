@@ -134,7 +134,7 @@ def get_default(word_index, bit_index, bit_length, default=None):
     return default
 
 
-class HeaderProperty(object):
+class HeaderProperty:
     """Mimic a dictionary, calculating entries from header words.
 
     Used to calculate setter functions and extract default values.
@@ -157,7 +157,7 @@ class HeaderProperty(object):
         return self.getter(*definition)
 
 
-class HeaderPropertyGetter(object):
+class HeaderPropertyGetter:
     """Special property for attaching HeaderProperty."""
     def __init__(self, getter, doc=None):
         self.getter = getter
@@ -243,7 +243,7 @@ class HeaderParser(OrderedDict):
         self._parsers.update(other._parsers)
 
 
-class VLBIHeaderBase(object):
+class VLBIHeaderBase:
     """Base class for all VLBI headers.
 
     Defines a number of common routines.

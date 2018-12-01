@@ -16,7 +16,7 @@ import numpy as np
 __all__ = ['VLBIPayloadBase']
 
 
-class VLBIPayloadBase(object):
+class VLBIPayloadBase:
     """Container for decoding and encoding VLBI payloads.
 
     Any subclass should define dictionaries ``_decoders`` and ``_encoders``,

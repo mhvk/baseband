@@ -53,7 +53,7 @@ from ...data import SAMPLE_MARK5B as SAMPLE_FILE
 #        [ 3, -1,  3,  3,  1, -1,  3, -1]])
 
 
-class TestMark5B(object):
+class TestMark5B:
     def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)

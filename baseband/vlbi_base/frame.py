@@ -14,7 +14,7 @@ import numpy as np
 __all__ = ['VLBIFrameBase']
 
 
-class VLBIFrameBase(object):
+class VLBIFrameBase:
     """Representation of a VLBI data frame, consisting of a header and payload.
 
     Parameters

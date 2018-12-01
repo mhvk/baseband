@@ -45,7 +45,7 @@ from ...data import (SAMPLE_MARK4 as SAMPLE_FILE,
 #  1  1 -3  1  1 -3 -1 -1
 
 
-class TestMark4(object):
+class TestMark4:
     def test_header_stream(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)

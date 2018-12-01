@@ -13,7 +13,7 @@ from ..base import GUPPIFileNameSequencer
 from ...data import SAMPLE_PUPPI as SAMPLE_FILE
 
 
-class TestGUPPI(object):
+class TestGUPPI:
     def setup(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = guppi.GUPPIHeader.fromfile(fh)
@@ -647,7 +647,7 @@ class TestGUPPI(object):
             guppi.open(filename, 'rs', files=(filename,))
 
 
-class TestGUPPIFileNameSequencer(object):
+class TestGUPPIFileNameSequencer:
     def setup(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = guppi.GUPPIHeader.fromfile(fh)

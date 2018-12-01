@@ -12,7 +12,7 @@ from baseband import vdif
 from baseband.data import SAMPLE_VDIF as SAMPLE_FILE
 
 
-class Sequencer(object):
+class Sequencer:
     def __init__(self, template):
         self.template = template
 
@@ -20,7 +20,7 @@ class Sequencer(object):
         return self.template.format(item)
 
 
-class TestSequentialFileReader(object):
+class TestSequentialFileReader:
 
     def _setup(self, tmpdir):
         self.data = b'abcdefghijklmnopqrstuvwxyz'
@@ -186,7 +186,7 @@ class TestSequentialFileReader(object):
             fh.memmap(offset=0, shape=(5,))
 
 
-class TestSequentialFileWriter(object):
+class TestSequentialFileWriter:
     def _setup(self, tmpdir):
         self.data = b'abcdefghijklmnopqrstuvwxyz'
         self.uint8_data = np.frombuffer(self.data, dtype=np.uint8)
@@ -308,7 +308,7 @@ class TestSequentialFileWriter(object):
                 fh.memmap(shape=(5,))
 
 
-class TestFileNameSequencer(object):
+class TestFileNameSequencer:
     def setup(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = vdif.VDIFHeader.fromfile(fh)

@@ -14,7 +14,7 @@ __all__ = ['FileNameSequencer', 'SequentialFileReader', 'SequentialFileWriter',
            'open']
 
 
-class FileNameSequencer(object):
+class FileNameSequencer:
     """List-like generator of filenames using a template.
 
     The template is formatted, filling in any items in curly brackets with
@@ -83,7 +83,7 @@ class FileNameSequencer(object):
         return file_nr
 
 
-class SequentialFileBase(object):
+class SequentialFileBase:
     """Deal with several files as if they were one contiguous one.
 
     For details, see `SequentialFileReader` and `SequentialFileWriter`.

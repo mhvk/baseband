@@ -17,7 +17,7 @@ __all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
            'VLBIStreamReaderBase', 'VLBIStreamWriterBase', 'make_opener']
 
 
-class VLBIFileBase(object):
+class VLBIFileBase:
     """VLBI file wrapper, used to add frame methods to a binary data file.
 
     The underlying file is stored in ``fh_raw`` and all attributes that do not
@@ -125,7 +125,7 @@ class VLBIFileReaderBase(VLBIFileBase):
         return (max_frame + 1) * u.Hz
 
 
-class VLBIStreamBase(object):
+class VLBIStreamBase:
     """VLBI file wrapper, allowing access as a stream of data."""
 
     _sample_shape_maker = None

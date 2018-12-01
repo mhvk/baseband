@@ -16,7 +16,7 @@ from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
                     SAMPLE_BPS1_VDIF)
 
 
-class TestVDIFMark5B(object):
+class TestVDIFMark5B:
     """Simplest conversion: VDIF frame containing Mark5B data (EDV 0xab)."""
 
     def test_header(self):
@@ -122,7 +122,7 @@ class TestVDIFMark5B(object):
         """Check we can encode a whole stream."""
 
 
-class TestVDIF0VDIF1(object):
+class TestVDIF0VDIF1:
     """Conversion between EDV versions."""
 
     def test_stream(self, tmpdir):
@@ -146,7 +146,7 @@ class TestVDIF0VDIF1(object):
                 assert np.all(d1r == d0)
 
 
-class TestMark5BToVDIF3(object):
+class TestMark5BToVDIF3:
     """Real conversion: Mark5B to VDIF EDV 3, and back to Mark5B"""
 
     def test_header(self):
@@ -212,7 +212,7 @@ class TestMark5BToVDIF3(object):
             assert fh_orig.read() == fh_new.read()
 
 
-class TestVDIF3ToMark5B(object):
+class TestVDIF3ToMark5B:
     """Real conversion: VDIF EDV 3 to Mark5B."""
 
     def test_header(self):
@@ -243,7 +243,7 @@ class TestVDIF3ToMark5B(object):
             assert fm.tell(unit='time') == fv.tell(unit='time')
 
 
-class TestVDIF0BPS1ToMark5B(object):
+class TestVDIF0BPS1ToMark5B:
     """Real conversion: VDIF EDV 3, BPS 1 to Mark 5B."""
     def test_stream(self, tmpdir):
         with vdif.open(SAMPLE_BPS1_VDIF, 'rs', sample_rate=8*u.MHz) as fr:
@@ -270,7 +270,7 @@ class TestVDIF0BPS1ToMark5B(object):
             assert np.all(dm == dv)
 
 
-class TestMark4ToVDIF1(object):
+class TestMark4ToVDIF1:
     """Real conversion: Mark 4 to VDIF EDV 1, and back to Mark 4.
 
     Here, need to use a VDIF format with a flexible size, since we want
@@ -340,7 +340,7 @@ class TestMark4ToVDIF1(object):
             assert orig_bytes == conv_bytes
 
 
-class TestDADAToVDIF1(object):
+class TestDADAToVDIF1:
     """Real conversion: DADA to VDIF EDV 1, and back to DADA.
 
     Here, we use a VDIF format with a flexible size so it is easier to fit

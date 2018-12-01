@@ -43,7 +43,7 @@ from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_VLBI_VDIF as
 #   data window size = 1048576 bytes
 
 
-class TestVDIF(object):
+class TestVDIF:
 
     def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -1165,7 +1165,7 @@ def test_legacy_vdif(tmpdir):
 # -1 -1  1 -1  1  1 -1  1 -1 -1  1 -1  1  1 -1  1
 #  1  1 -1 -1  1  1  1  1  1 -1  1  1 -1  1  1  1
 #  1 -1  1 -1  1  1  1 -1  1 -1  1  1  1 -1 -1 -1
-class TestVDIFBPS1(object):
+class TestVDIFBPS1:
     def test_header(self):
         with open(SAMPLE_BPS1, 'rb') as fh:
             header0 = vdif.VDIFHeader.fromfile(fh)

@@ -163,7 +163,7 @@ class VDIFFrame(VLBIFrameBase):
         return cls(header, payload, verify)
 
 
-class VDIFFrameSet(object):
+class VDIFFrameSet:
     """Representation of a set of VDIF frames, combining different threads.
 
     Parameters

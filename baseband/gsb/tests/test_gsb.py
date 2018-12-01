@@ -15,7 +15,7 @@ from ...data import (SAMPLE_GSB_RAWDUMP_HEADER as SAMPLE_RAWDUMP_HEADER,
                      SAMPLE_GSB_PHASED as SAMPLE_PHASED)
 
 
-class TestGSB(object):
+class TestGSB:
 
     def setup(self):
         # For all sample files, each frame spans 0.25165824 sec.

@@ -21,7 +21,7 @@ class VLBIInfoMeta(type):
             setattr(cls, attr, None)
 
 
-class VLBIInfoBase(object, metaclass=VLBIInfoMeta):
+class VLBIInfoBase(metaclass=VLBIInfoMeta):
     """Container providing a standardized interface to file information."""
 
     attr_names = ('format',)

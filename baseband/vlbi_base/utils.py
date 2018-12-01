@@ -55,7 +55,7 @@ def bcd_encode(value):
     return result
 
 
-class CRC(object):
+class CRC:
     """Cyclic Redundancy Check for a bitstream.
 
     See https://en.wikipedia.org/wiki/Cyclic_redundancy_check
