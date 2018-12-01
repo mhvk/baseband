@@ -1,3 +1,16 @@
+3.0 (unreleased)
+================
+
+- This version only supports python3.
+
+2.0.1 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- None yet
+
 2.0 (2018-12-12)
 ================
 
