@@ -48,8 +48,7 @@ class TimeGSB(TimeString):
             self.scale.upper().encode('utf8'), *iterator.operands[1:])
 
     # This can be removed once we only support astropy >=3.1.
-    # The str(c) is necessary for python2/numpy -> no unicode literals...
-    _new_ihmsfs_dtype = np.dtype([(str(c), np.intc) for c in 'hmsf'])
+    _new_ihmsfs_dtype = np.dtype([(c, np.intc) for c in 'hmsf'])
 
     def to_value(self, parent=None):
         scale = self.scale.upper().encode('ascii'),
