@@ -33,7 +33,7 @@ env:
 matrix:
     include:
         # Check for sphinx doc build warnings.
-        - env: SETUP_CMD='build_sphinx -w' PYTEST_VERSION='<3.10' CONDA_DEPENDENCIES='sip<4.19'
+        - env: SETUP_CMD='build_sphinx -w' CONDA_DEPENDENCIES='sip<4.19'
 
 before_install:
 
