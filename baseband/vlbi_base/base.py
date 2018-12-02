@@ -1,14 +1,14 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
-
 import io
 import warnings
 import numpy as np
 import operator
 from collections import namedtuple
+from contextlib import contextmanager
+
 import astropy.units as u
 from astropy.utils import lazyproperty
-from contextlib import contextmanager
+
 from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from ..helpers import sequentialfile as sf
 

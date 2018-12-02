@@ -8,10 +8,10 @@ or encode from a data array.
 For the specification, see
 http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-import numpy as np
 from collections import namedtuple
+
+import numpy as np
+
 from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
 

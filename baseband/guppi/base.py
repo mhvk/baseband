@@ -1,5 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
 import re
 
 import astropy.units as u

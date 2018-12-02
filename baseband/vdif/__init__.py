@@ -12,8 +12,6 @@
 
 For the VDIF specification, see http://www.vlbi.org/vdif
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 from .base import open
 from .header import VDIFHeader
 from .payload import VDIFPayload

@@ -1,11 +1,11 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import io
-import numpy as np
-from astropy.utils import lazyproperty
-import astropy.units as u
 import warnings
+
+import numpy as np
+import astropy.units as u
+from astropy.utils import lazyproperty
+
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from .header import GSBHeader

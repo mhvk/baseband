@@ -3,8 +3,6 @@
 
 Loosely based on `~astropy.utils.data_info.DataInfo`.
 """
-from __future__ import division, unicode_literals, print_function
-
 import warnings
 
 import astropy.units as u

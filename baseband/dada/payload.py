@@ -1,9 +1,8 @@
 # Licensed under the GPLv3 - see LICENSE
 """Payload for DADA format."""
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-import numpy as np
 from collections import namedtuple
+
+import numpy as np
 
 from ..vlbi_base.payload import VLBIPayloadBase
 

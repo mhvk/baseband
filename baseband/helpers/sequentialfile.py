@@ -1,14 +1,13 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import io
 import os
 import re
 import itertools
 from bisect import bisect
+
 import numpy as np
 from astropy.utils import lazyproperty
+
 
 __all__ = ['FileNameSequencer', 'SequentialFileReader', 'SequentialFileWriter',
            'open']

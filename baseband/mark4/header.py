@@ -10,8 +10,6 @@ http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 A little bit on the disk representation is at
 http://adsabs.harvard.edu/abs/2003ASPC..306..123W
 """
-from __future__ import absolute_import, division, print_function
-
 import numpy as np
 from astropy.time import Time
 

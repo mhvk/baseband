@@ -1,10 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
-
 from operator import index
 from math import gcd
 
 import numpy as np
+
 
 __all__ = ['bcd_decode', 'bcd_encode', 'CRC']
 

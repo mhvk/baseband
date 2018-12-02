@@ -8,15 +8,15 @@ or encode from a data array.
 See the `VDIF specification page <http://www.vlbi.org/vdif>`_ for payload
 specifications.
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-import numpy as np
 from collections import namedtuple
+
+import numpy as np
 
 from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.encoding import (
     encode_1bit_base, encode_2bit_base, encode_4bit_base,
     decoder_levels, decode_8bit, encode_8bit)
+
 
 __all__ = ['init_luts', 'decode_1bit', 'decode_2bit', 'decode_4bit',
            'encode_1bit', 'encode_2bit', 'encode_4bit', 'VDIFPayload']

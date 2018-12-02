@@ -1,6 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
-
 import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u

@@ -1,9 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
-import numpy as np
 import pytest
+import numpy as np
 from astropy.time import Time
 import astropy.units as u
 from astropy.tests.helper import catch_warnings

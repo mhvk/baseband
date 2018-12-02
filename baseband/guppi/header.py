@@ -4,9 +4,8 @@ Definitions for GUPPI headers.
 
 Implements a GUPPIHeader class that reads & writes FITS-like headers from file.
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import operator
+
 import numpy as np
 import astropy.units as u
 from astropy.io import fits

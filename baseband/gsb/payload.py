@@ -7,11 +7,9 @@ or encode from a data array.
 
 See http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/gmrt_gsb/index.htm
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from collections import namedtuple
 
 import numpy as np
-from collections import namedtuple
 
 from ..vlbi_base.payload import VLBIPayloadBase
 

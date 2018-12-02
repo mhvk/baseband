@@ -1,10 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
-
 from collections import namedtuple
+
 import numpy as np
-from astropy.utils import lazyproperty
 import astropy.units as u
+from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,

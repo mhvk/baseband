@@ -8,11 +8,9 @@ or encode from a data array.
 For the specification, see
 http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+import operator
 
 import numpy as np
-import operator
 
 from ..vlbi_base.frame import VLBIFrameBase
 from .header import Mark4Header

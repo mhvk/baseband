@@ -1,7 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 from ..vlbi_base.file_info import VLBIFileReaderInfo
 
 

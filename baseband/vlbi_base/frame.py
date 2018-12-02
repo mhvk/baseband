@@ -5,11 +5,8 @@ Base definitions for VLBI frames, used for VDIF and Mark 5B.
 Defines a frame class VLBIFrameBase that can be used to hold a header and a
 payload, providing access to the values encoded in both.
 """
-# Helper functions for VLBI readers (VDIF, Mark5B).
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import numpy as np
+
 
 __all__ = ['VLBIFrameBase']
 

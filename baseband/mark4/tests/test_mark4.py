@@ -1,11 +1,10 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import pytest
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import catch_warnings
+
 from ... import mark4
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
 from ..header import Mark4TrackHeader

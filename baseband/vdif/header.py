@@ -7,11 +7,8 @@ the information therein.
 
 For the VDIF specification, see http://www.vlbi.org/vdif
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import numpy as np
 import astropy.units as u
-
 from astropy.time import Time, TimeDelta
 
 from ..vlbi_base.header import (four_word_struct, eight_word_struct,

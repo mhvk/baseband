@@ -5,8 +5,6 @@ Definitions for DADA pulsar baseband headers.
 Implements a DADAHeader class used to store header definitions in a FITS
 header, and read & write these from files.
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import io
 import warnings
 from collections import OrderedDict

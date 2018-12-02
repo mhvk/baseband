@@ -1,12 +1,10 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import pytest
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import catch_warnings
+
 from ... import gsb
 from ..payload import decode_4bit, encode_4bit
 from ...data import (SAMPLE_GSB_RAWDUMP_HEADER as SAMPLE_RAWDUMP_HEADER,

@@ -6,10 +6,9 @@ Defines a payload class VLBIPayloadBase that can be used to hold the words
 corresponding to a frame payload, providing access to the values encoded in
 it as a numpy array.
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import operator
 from functools import reduce
+
 import numpy as np
 
 

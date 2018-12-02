@@ -7,11 +7,11 @@ corresponding to a frame header, providing access to the values encoded in
 via a dict-like interface.  Definitions for headers are constructed using
 the HeaderParser class.
 """
-from __future__ import absolute_import, division, print_function
 from copy import copy
 import struct
 import warnings
 from collections import OrderedDict
+
 import numpy as np
 
 

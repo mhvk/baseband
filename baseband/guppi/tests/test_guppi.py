@@ -1,12 +1,11 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+import copy
 
 import pytest
-import copy
 import numpy as np
 import astropy.units as u
 from astropy.tests.helper import catch_warnings
+
 from ... import guppi
 from ...helpers import sequentialfile as sf
 from ..base import GUPPIFileNameSequencer
