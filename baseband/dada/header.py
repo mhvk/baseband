@@ -78,9 +78,7 @@ class DADAHeader(OrderedDict):
                  ('RESOLUTION', 1),
                  ('DSB', 1)]
 
-    def __init__(self, *args, **kwargs):
-        verify = kwargs.pop('verify', True)
-        mutable = kwargs.pop('mutable', True)
+    def __init__(self, *args, verify=True, mutable=True, **kwargs):
         self.mutable = True
         self.comments = {}
         if len(args) == 1 and isinstance(args[0], str):
@@ -238,7 +236,7 @@ class DADAHeader(OrderedDict):
         self.update(**kwargs)
         return self
 
-    def update(self, **kwargs):
+    def update(self, *, verify=True, **kwargs):
         """Update the header with new values.
 
         Here, any keywords matching properties are processed as well, in the
@@ -252,7 +250,6 @@ class DADAHeader(OrderedDict):
         **kwargs
             Arguments used to set keywords and properties.
         """
-        verify = kwargs.pop('verify', True)
         # Remove kwargs that set properties, in correct order.
         extras = [(key, kwargs.pop(key)) for key in self._properties
                   if key in kwargs]

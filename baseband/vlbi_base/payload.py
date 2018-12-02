@@ -65,7 +65,7 @@ class VLBIPayloadBase:
                              .format(self._dtype_word))
 
     @classmethod
-    def fromfile(cls, fh, *args, **kwargs):
+    def fromfile(cls, fh, *args, payload_nbytes=None, **kwargs):
         """Read payload from filehandle and decode it into data.
 
         Parameters
@@ -77,10 +77,11 @@ class VLBIPayloadBase:
 
         Any other (keyword) arguments are passed on to the class initialiser.
         """
-        payload_nbytes = kwargs.pop('payload_nbytes', cls._nbytes)
         if payload_nbytes is None:
-            raise ValueError("payload_nbytes should be given as an argument "
-                             "if no default is defined on the class.")
+            payload_nbytes = cls._nbytes
+            if payload_nbytes is None:
+                raise ValueError("payload_nbytes should be given as an argument "
+                                 "if no default is defined on the class.")
         s = fh.read(payload_nbytes)
         if len(s) < payload_nbytes:
             raise EOFError("could not read full payload.")

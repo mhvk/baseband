@@ -411,7 +411,7 @@ class VLBIHeaderBase:
         self.update(**kwargs)
         return self
 
-    def update(self, **kwargs):
+    def update(self, *, verify=True, **kwargs):
         """Update the header by setting keywords or properties.
 
         Here, any keywords matching header keys are applied first, and any
@@ -425,8 +425,6 @@ class VLBIHeaderBase:
         **kwargs
             Arguments used to set keywords and properties.
         """
-        verify = kwargs.pop('verify', True)
-
         # First use keywords which are also keys into self.
         for key in set(kwargs.keys()).intersection(self.keys()):
             self[key] = kwargs.pop(key)

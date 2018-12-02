@@ -173,7 +173,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         return self
 
     @classmethod
-    def fromvalues(cls, edv=False, **kwargs):
+    def fromvalues(cls, edv=False, *, verify=True, **kwargs):
         """Initialise a header from parsed values.
 
         Here, the parsed values must be given as keyword arguments, i.e., for
@@ -219,15 +219,14 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         # provide this information, we can just proceed.
         if 'time' not in kwargs or 'frame_rate' in VDIF_HEADER_CLASSES.get(
                 edv if edv is not False else -1, VDIFBaseHeader)._properties:
-            return super().fromvalues(edv, **kwargs)
+            return super().fromvalues(edv, verify=verify, **kwargs)
         # If the VDIF header subclass does not provide the frame rate, we
         # first initialize without time, and then set the time explicitly
         # using whatever frame_rate or sample_rate was passed.
         time = kwargs.pop('time')
         sample_rate = kwargs.pop('sample_rate', None)
         frame_rate = kwargs.pop('frame_rate', None)
-        # Pop verify and pass on False so verify happens after time is set.
-        verify = kwargs.pop('verify', True)
+        # Skip verification in super as we do it after time is set.
         self = super().fromvalues(edv, verify=False, **kwargs)
         if frame_rate is None and sample_rate is not None:
             frame_rate = sample_rate / self.samples_per_frame

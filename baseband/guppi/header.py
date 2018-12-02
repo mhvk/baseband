@@ -67,9 +67,7 @@ class GUPPIHeader(fits.Header):
                  ('NPOL', 1),
                  ('OBSNCHAN', 1)]
 
-    def __init__(self, *args, **kwargs):
-        verify = kwargs.pop('verify', True)
-        mutable = kwargs.pop('mutable', True)
+    def __init__(self, *args, verify=True, mutable=True, **kwargs):
         # Comments handled by fits.Header__init__().
         super().__init__(*args, **kwargs)
         self.mutable = mutable
@@ -139,19 +137,16 @@ class GUPPIHeader(fits.Header):
         fh.write(self.tostring(padding=False).encode('ascii'))
 
     @classmethod
-    def fromkeys(cls, *args, **kwargs):
+    def fromkeys(cls, *args, verify=True, mutable=True, **kwargs):
         """Initialise a header from keyword values.
 
         Like fromvalues, but without any interpretation of keywords.
 
-        This extracts 'verify' and 'mutable', then passes the remaining kwargs
-        to the class initializer as a dict (for compatibility with
-        fits.Header). It is present for compatibility with other header classes
-        only.
+        Note that this just passes kwargs to the class initializer as a dict
+        (for compatibility with fits.Header). It is present for compatibility
+        with other header classes only.
         """
-        kwargs_special = {'verify': kwargs.pop('verify', True),
-                          'mutable': kwargs.pop('mutable', True)}
-        return cls(kwargs, *args, **kwargs_special)
+        return cls(kwargs, *args, verify=verify, mutable=mutable)
 
     @classmethod
     def fromvalues(cls, **kwargs):
@@ -169,7 +164,7 @@ class GUPPIHeader(fits.Header):
         self.update(**kwargs)
         return self
 
-    def update(self, **kwargs):
+    def update(self, *, verify=True, **kwargs):
         """Update the header with new values.
 
         Here, any keywords matching properties are processed as well, in the
@@ -183,7 +178,6 @@ class GUPPIHeader(fits.Header):
         **kwargs
             Arguments used to set keywords and properties.
         """
-        verify = kwargs.pop('verify', True)
         # Remove kwargs that set properties, in correct order.
         extras = [(key, kwargs.pop(key)) for key in self._properties
                   if key in kwargs]
