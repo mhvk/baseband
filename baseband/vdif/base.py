@@ -185,7 +185,7 @@ class VDIFFileReader(VLBIFileReaderBase):
             # First check whether we are right at a frame marker (often true).
             try:
                 header = VDIFHeader.fromfile(fh, edv=edv, verify=True)
-            except(AssertionError, IOError, EOFError):
+            except(AssertionError, OSError, EOFError):
                 pass
             else:
                 if template_header.same_stream(header):

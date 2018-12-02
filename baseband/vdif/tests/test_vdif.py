@@ -493,7 +493,7 @@ class TestVDIF:
                 fh.read_frameset(thread_ids=list(range(8)))
             # Give non-existent thread_id.
             fh.seek(0)
-            with pytest.raises(IOError):
+            with pytest.raises(OSError):
                 fh.read_frameset(thread_ids=[1, 9])
 
     def test_frameset_getitem_setitem(self):

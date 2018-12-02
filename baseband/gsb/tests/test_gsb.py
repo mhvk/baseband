@@ -808,7 +808,7 @@ class TestGSB:
                 open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
             # TextIOBase for fh
             gsb.open(s, 'rt')
-        with pytest.raises(IOError):
+        with pytest.raises(OSError):
             # non-existing file
             gsb.open(str(tmpdir.join('ts.bla')),
                      raw=str(tmpdir.join('raw.bla')))

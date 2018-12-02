@@ -260,7 +260,7 @@ class VDIFFrameSet:
             fh.seek(-header.nbytes, 1)
 
         if thread_ids and len(frames) < len(thread_ids):
-            raise IOError("could not find all requested frames.")
+            raise OSError("could not find all requested frames.")
 
         # Turn dict of frames into a list, following order given by
         # thread_ids, or just sorting by their own thread_id

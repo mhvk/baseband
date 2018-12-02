@@ -254,7 +254,7 @@ class SequentialFileReader(SequentialFileBase):
             file_nr = bisect(self._file_offsets, offset) - 1
             try:
                 self._open(file_nr)
-            except (OSError, IOError):
+            except OSError:
                 # If no files left, put pointer beyond end of last file.
                 if file_nr != len(self._file_sizes):  # pragma: no cover
                     raise
