@@ -37,7 +37,7 @@ matrix:
         - env: ASTROPY_VERSION=development
 
         # Check for sphinx doc build warnings.
-        - env: SETUP_CMD='build_sphinx -w'
+        - env: SETUP_CMD='build_sphinx -w' CONDA_DEPENDENCIES='sip<4.19'
 
         # Check Python 3 with stable numpy, also verifying coverage.
         - env: SETUP_CMD='test --coverage'
