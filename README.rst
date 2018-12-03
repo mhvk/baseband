@@ -16,6 +16,9 @@ standardization.  It relies on `NumPy <http://www.numpy.org/>`_ and `Astropy
 For installation and usage instructions, please see the `online documentation
 <https://baseband.readthedocs.io/>`_.
 
+If you used this package in your research, please cite it via DOI
+`10.5281/zenodo.1214268 <https://doi.org/10.5281/zenodo.1214268>`_.
+
 Project Status
 --------------
 
