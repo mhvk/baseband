@@ -17,6 +17,9 @@ streamlining data conversion and standardization.  It provides:
 - The ability to read from and write to an ordered sequence of files as if it
   was a single file.
 
+If you used this package in your research, please cite it via DOI
+`10.5281/zenodo.1214268 <https://doi.org/10.5281/zenodo.1214268>`_.
+
 .. _overview_toc:
 
 Overview
@@ -85,6 +88,13 @@ publishing new code releases.
 
 Project Details
 ===============
+
+.. image:: http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
+    :target: http://www.astropy.org
+    :alt: Powered by Astropy Badge
+
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214268.svg
+   :target: https://doi.org/10.5281/zenodo.1214268
 
 .. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master
    :target: https://travis-ci.org/mhvk/baseband

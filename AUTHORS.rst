@@ -2,18 +2,24 @@
 Authors and Credits
 *******************
 
-Baseband Project Contributors
-=============================
+.. image:: http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
+    :target: http://www.astropy.org
+    :alt: Powered by Astropy Badge
+
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214268.svg
+   :target: https://doi.org/10.5281/zenodo.1214268
+
+If you used this package in your research, please cite it via DOI
+`10.5281/zenodo.1214268 <https://doi.org/10.5281/zenodo.1214268>`_.
 
 Authors
--------
+=======
 
 * Marten van Kerkwijk (@mhvk)
 * Chenchong Charles Zhu (@cczhu)
 
-
-Alphabetical list of contributors
----------------------------------
+Other contributors (alphabetical)
+=================================
 
 * Rebecca Lin (@00rebe)
 * Nikhil Mahajan (@theXYZT)
