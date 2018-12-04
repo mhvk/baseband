@@ -1,13 +1,13 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 from copy import copy
 import io
-import numpy as np
+from collections import namedtuple
+
 import pytest
+import numpy as np
 import astropy.units as u
 from astropy.tests.helper import catch_warnings
-from collections import namedtuple
+
 from ..utils import bcd_encode, bcd_decode, CRC, gcd, lcm
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
@@ -40,7 +40,7 @@ class Payload(VLBIPayloadBase):
                  8: decode_8bit}
 
 
-class TestBCD(object):
+class TestBCD:
     def test_bcd_decode(self):
         assert bcd_decode(0x1) == 1
         assert bcd_decode(0x9123) == 9123
@@ -67,7 +67,7 @@ class TestBCD(object):
         assert np.all(bcd_decode(bcd_encode(a)) == a)
 
 
-class TestVLBIBase(object):
+class TestVLBIBase:
     def setup(self):
         self.header_parser = HeaderParser(
             (('x0_16_4', (0, 16, 4)),
@@ -440,7 +440,7 @@ class TestVLBIBase(object):
             assert fh.fh_raw.closed
 
 
-class TestSqueezeAndSubset(object):
+class TestSqueezeAndSubset:
     def setup(self):
         self.other_args = dict(fh_raw=None, header0=None, bps=1,
                                complex_data=False, samples_per_frame=1000,

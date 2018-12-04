@@ -1,20 +1,19 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import io
 import os
 import re
 import itertools
 from bisect import bisect
+
 import numpy as np
 from astropy.utils import lazyproperty
+
 
 __all__ = ['FileNameSequencer', 'SequentialFileReader', 'SequentialFileWriter',
            'open']
 
 
-class FileNameSequencer(object):
+class FileNameSequencer:
     """List-like generator of filenames using a template.
 
     The template is formatted, filling in any items in curly brackets with
@@ -83,7 +82,7 @@ class FileNameSequencer(object):
         return file_nr
 
 
-class SequentialFileBase(object):
+class SequentialFileBase:
     """Deal with several files as if they were one contiguous one.
 
     For details, see `SequentialFileReader` and `SequentialFileWriter`.
@@ -255,7 +254,7 @@ class SequentialFileReader(SequentialFileBase):
             file_nr = bisect(self._file_offsets, offset) - 1
             try:
                 self._open(file_nr)
-            except (OSError, IOError):
+            except OSError:
                 # If no files left, put pointer beyond end of last file.
                 if file_nr != len(self._file_sizes):  # pragma: no cover
                     raise
@@ -314,7 +313,7 @@ class SequentialFileWriter(SequentialFileBase):
     """
     def __init__(self, files, mode='w+b', file_size=None, opener=None):
         self.file_size = file_size
-        super(SequentialFileWriter, self).__init__(files, mode, opener)
+        super().__init__(files, mode, opener)
 
     def write(self, data):
         if self.closed:
@@ -337,8 +336,7 @@ class SequentialFileWriter(SequentialFileBase):
         """Map part of the file in memory.  Cannnot span file boundaries."""
         if shape is None:
             raise ValueError('cannot make writable memmap without shape.')
-        return super(SequentialFileWriter,
-                     self).memmap(dtype, mode, offset, shape, order)
+        return super().memmap(dtype, mode, offset, shape, order)
 
 
 def open(files, mode='rb', file_size=None, opener=None):

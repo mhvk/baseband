@@ -1,7 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import pytest
 import copy
 import numpy as np
@@ -14,7 +11,7 @@ from ..base import DADAFileNameSequencer
 from ...data import SAMPLE_DADA as SAMPLE_FILE
 
 
-class TestDADA(object):
+class TestDADA:
     def setup(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = dada.DADAHeader.fromfile(fh)
@@ -678,7 +675,7 @@ class TestDADA(object):
             dada.open(name3, 'rs', files=(name3,))
 
 
-class TestDADAFileNameSequencer(object):
+class TestDADAFileNameSequencer:
     def setup(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = dada.DADAHeader.fromfile(fh)

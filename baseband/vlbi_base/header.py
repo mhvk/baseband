@@ -7,11 +7,11 @@ corresponding to a frame header, providing access to the values encoded in
 via a dict-like interface.  Definitions for headers are constructed using
 the HeaderParser class.
 """
-from __future__ import absolute_import, division, print_function
 from copy import copy
 import struct
 import warnings
 from collections import OrderedDict
+
 import numpy as np
 
 
@@ -134,7 +134,7 @@ def get_default(word_index, bit_index, bit_length, default=None):
     return default
 
 
-class HeaderProperty(object):
+class HeaderProperty:
     """Mimic a dictionary, calculating entries from header words.
 
     Used to calculate setter functions and extract default values.
@@ -157,7 +157,7 @@ class HeaderProperty(object):
         return self.getter(*definition)
 
 
-class HeaderPropertyGetter(object):
+class HeaderPropertyGetter:
     """Special property for attaching HeaderProperty."""
     def __init__(self, getter, doc=None):
         self.getter = getter
@@ -202,7 +202,7 @@ class HeaderParser(OrderedDict):
         # Use a dict rather than OrderedDict for the parsers for better speed.
         # Note that this gets filled by calls to __setitem__.
         self._parsers = {}
-        super(HeaderParser, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def copy(self):
         """Make an independent copy."""
@@ -219,7 +219,7 @@ class HeaderParser(OrderedDict):
 
     def __setitem__(self, item, value):
         self._parsers[item] = self._make_parser(*value)
-        super(HeaderParser, self).__setitem__(item, value)
+        super().__setitem__(item, value)
 
     @property
     def parsers(self):
@@ -238,12 +238,12 @@ class HeaderParser(OrderedDict):
         """Update the parser with the information from another one."""
         if not isinstance(other, HeaderParser):
             raise TypeError("can only update using a HeaderParser instance.")
-        super(HeaderParser, self).update(other)
+        super().update(other)
         # Update the parsers rather than recalculate all the functions.
         self._parsers.update(other._parsers)
 
 
-class VLBIHeaderBase(object):
+class VLBIHeaderBase:
     """Base class for all VLBI headers.
 
     Defines a number of common routines.
@@ -411,7 +411,7 @@ class VLBIHeaderBase(object):
         self.update(**kwargs)
         return self
 
-    def update(self, **kwargs):
+    def update(self, *, verify=True, **kwargs):
         """Update the header by setting keywords or properties.
 
         Here, any keywords matching header keys are applied first, and any
@@ -425,8 +425,6 @@ class VLBIHeaderBase(object):
         **kwargs
             Arguments used to set keywords and properties.
         """
-        verify = kwargs.pop('verify', True)
-
         # First use keywords which are also keys into self.
         for key in set(kwargs.keys()).intersection(self.keys()):
             self[key] = kwargs.pop(key)

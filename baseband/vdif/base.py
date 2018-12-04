@@ -1,10 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
-
 from collections import namedtuple
+
 import numpy as np
-from astropy.utils import lazyproperty
 import astropy.units as u
+from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
@@ -137,7 +136,7 @@ class VDIFFileReader(VLBIFileReaderBase):
             Frames per second.
         """
         try:
-            return super(VDIFFileReader, self).get_frame_rate()
+            return super().get_frame_rate()
         except Exception as exc:
             with self.temporary_offset():
                 try:
@@ -186,7 +185,7 @@ class VDIFFileReader(VLBIFileReaderBase):
             # First check whether we are right at a frame marker (often true).
             try:
                 header = VDIFHeader.fromfile(fh, edv=edv, verify=True)
-            except(AssertionError, IOError, EOFError):
+            except(AssertionError, OSError, EOFError):
                 pass
             else:
                 if template_header.same_stream(header):
@@ -310,7 +309,7 @@ class VDIFStreamBase(VLBIStreamBase):
                  squeeze=True, subset=(), fill_value=0., verify=True):
         samples_per_frame = header0.samples_per_frame
 
-        super(VDIFStreamBase, self).__init__(
+        super().__init__(
             fh_raw=fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame,
             unsliced_shape=(nthread, header0.nchan), bps=header0.bps,
@@ -382,7 +381,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         header0 = frameset.header0
         thread_ids = [fr['thread_id'] for fr in frameset.frames]
         self._frameset_nbytes = fh_raw.tell()
-        super(VDIFStreamReader, self).__init__(
+        super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
             nthread=len(frameset.frames), squeeze=squeeze, subset=subset,
             fill_value=fill_value, verify=verify)
@@ -539,9 +538,8 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
                                  "explicitly, or through the header if it "
                                  "can be stored there.")
 
-        super(VDIFStreamWriter, self).__init__(
-            fh_raw, header0, sample_rate=sample_rate, nthread=nthread,
-            squeeze=squeeze)
+        super().__init__(fh_raw, header0, sample_rate=sample_rate,
+                         nthread=nthread, squeeze=squeeze)
         # Set sample rate in the header, if it's possible, and not set already.
         try:
             header_sample_rate = self.header0.sample_rate

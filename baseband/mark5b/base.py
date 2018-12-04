@@ -1,6 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
-
 import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
@@ -44,7 +42,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
         self.ref_time = ref_time
         self.nchan = nchan
         self.bps = bps
-        super(Mark5BFileReader, self).__init__(fh_raw)
+        super().__init__(fh_raw)
 
     def __repr__(self):
         return ("{name}(fh_raw={s.fh_raw}, kday={s.kday}, "
@@ -97,7 +95,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
             Frames per second.
         """
         try:
-            return super(Mark5BFileReader, self).get_frame_rate()
+            return super().get_frame_rate()
         except Exception as exc:
             with self.temporary_offset():
                 try:
@@ -230,7 +228,7 @@ class Mark5BStreamBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, sample_rate=None, nchan=1,
                  bps=2, squeeze=True, subset=(), fill_value=0., verify=True):
-        super(Mark5BStreamBase, self).__init__(
+        super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
             unsliced_shape=(nchan,), bps=bps, complex_data=False,
@@ -295,7 +293,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         fh_raw = Mark5BFileReader(fh_raw, nchan=nchan, bps=bps,
                                   ref_time=ref_time, kday=kday)
         header0 = fh_raw.find_header()
-        super(Mark5BStreamReader, self).__init__(
+        super().__init__(
             fh_raw, header0, sample_rate=sample_rate, nchan=nchan, bps=bps,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
@@ -307,7 +305,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the file."""
-        last_header = super(Mark5BStreamReader, self)._last_header
+        last_header = super()._last_header
         # Infer kday, assuming the end of the file is no more than
         # 500 days away from the start.
         last_header.infer_kday(self.start_time)
@@ -371,7 +369,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
             header0 = Mark5BHeader.fromvalues(**kwargs)
 
         fh_raw = Mark5BFileWriter(fh_raw)
-        super(Mark5BStreamWriter, self).__init__(
+        super().__init__(
             fh_raw, header0, sample_rate=sample_rate, nchan=nchan,
             bps=bps, squeeze=squeeze)
         # Initial payload, reused for every frame.

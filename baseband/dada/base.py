@@ -1,11 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
 import io
 import re
 
 import numpy as np
 import astropy.units as u
-from astropy.extern import six
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
@@ -84,7 +82,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
             self._file_size = header['FILE_SIZE']
 
     def _process_items(self, file_nr):
-        super(DADAFileNameSequencer, self)._process_items(file_nr)
+        super()._process_items(file_nr)
         # Pop file_nr, as we need to capitalize it.
         file_nr = self.items.pop('file_nr')
         self.items['FRAME_NR'] = self.items['FILE_NR'] = file_nr
@@ -212,7 +210,7 @@ class DADAStreamBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, squeeze=True, subset=(), verify=True):
 
-        super(DADAStreamBase, self).__init__(
+        super().__init__(
             fh_raw=fh_raw, header0=header0, sample_rate=header0.sample_rate,
             samples_per_frame=header0.samples_per_frame,
             unsliced_shape=header0.sample_shape, bps=header0.bps,
@@ -247,9 +245,8 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
     def __init__(self, fh_raw, squeeze=True, subset=(), verify=True):
         fh_raw = DADAFileReader(fh_raw)
         header0 = DADAHeader.fromfile(fh_raw)
-        super(DADAStreamReader, self).__init__(fh_raw, header0,
-                                               squeeze=squeeze, subset=subset,
-                                               verify=verify)
+        super().__init__(fh_raw, header0, squeeze=squeeze, subset=subset,
+                         verify=verify)
         # Store number of frames, for finding last header.
         with self.fh_raw.temporary_offset() as fh_raw:
             fh_raw.seek(0, 2)
@@ -345,8 +342,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     def __init__(self, fh_raw, header0, squeeze=True):
         assert header0.get('OBS_OVERLAP', 0) == 0
         fh_raw = DADAFileWriter(fh_raw)
-        super(DADAStreamWriter, self).__init__(fh_raw, header0,
-                                               squeeze=squeeze)
+        super().__init__(fh_raw, header0, squeeze=squeeze)
 
     def _make_frame(self, index):
         header = self.header0.copy()
@@ -448,8 +444,7 @@ def open(name, mode='rs', **kwargs):
     header0 = kwargs.get('header0', None)
 
     # Check if ``name`` is a template or sequence.
-    is_template = isinstance(name, six.string_types) and ('{' in name and
-                                                          '}' in name)
+    is_template = isinstance(name, str) and ('{' in name and '}' in name)
     is_sequence = isinstance(name, (tuple, list, sf.FileNameSequencer))
 
     # For stream writing, header0 is needed; for reading, it is needed for

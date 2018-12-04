@@ -1,11 +1,10 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import pytest
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import catch_warnings
+
 from ... import mark5b
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
 from ...data import SAMPLE_MARK5B as SAMPLE_FILE
@@ -53,7 +52,7 @@ from ...data import SAMPLE_MARK5B as SAMPLE_FILE
 #        [ 3, -1,  3,  3,  1, -1,  3, -1]])
 
 
-class TestMark5B(object):
+class TestMark5B:
     def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)

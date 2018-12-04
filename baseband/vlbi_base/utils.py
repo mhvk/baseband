@@ -1,10 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
-
 from operator import index
+from math import gcd
 
 import numpy as np
-import six
+
 
 __all__ = ['bcd_decode', 'bcd_encode', 'CRC']
 
@@ -55,7 +54,7 @@ def bcd_encode(value):
     return result
 
 
-class CRC(object):
+class CRC:
     """Cyclic Redundancy Check for a bitstream.
 
     See https://en.wikipedia.org/wiki/Cyclic_redundancy_check
@@ -125,15 +124,6 @@ class CRC(object):
         for i in range(0, len(stream) - len(self)):
             stream[i:i+pol_bin.size] ^= (pol_bin & stream[i])
         return stream[-len(self):]
-
-
-if not six.PY2:  # ignoring python < 3.5; could add if you wish
-    from math import gcd
-else:
-    from fractions import gcd as fgcd
-
-    def gcd(a, b):
-        return abs(fgcd(a, b))
 
 
 def lcm(a, b):

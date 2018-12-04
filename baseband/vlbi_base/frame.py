@@ -5,17 +5,13 @@ Base definitions for VLBI frames, used for VDIF and Mark 5B.
 Defines a frame class VLBIFrameBase that can be used to hold a header and a
 payload, providing access to the values encoded in both.
 """
-# Helper functions for VLBI readers (VDIF, Mark5B).
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import numpy as np
-from astropy.extern import six
+
 
 __all__ = ['VLBIFrameBase']
 
 
-class VLBIFrameBase(object):
+class VLBIFrameBase:
     """Representation of a VLBI data frame, consisting of a header and payload.
 
     Parameters
@@ -85,15 +81,20 @@ class VLBIFrameBase(object):
         self._valid = bool(valid)
 
     @classmethod
-    def fromfile(cls, fh, *args, **kwargs):
+    def fromfile(cls, fh, *args, valid=True, verify=True, **kwargs):
         """Read a frame from a filehandle.
 
-        Any arguments beyond the filehandle are used to help initialize the
-        payload, except for ``valid`` and ``verify``, which are passed on to
-        the header and class initializers.
+        Parameters
+        ----------
+        fh : filehandle
+            Handle to read the frame from
+        *args, **kwargs
+            Arguments that help to initialize the payload.
+        valid : bool
+            Whether the data are valid.  Default: `True`.
+        verify : bool
+            Whether to do basic verification of integrity.  Default: `True`.
         """
-        valid = kwargs.pop('valid', True)
-        verify = kwargs.pop('verify', True)
         header = cls._header_class.fromfile(fh, verify=verify)
         payload = cls._payload_class.fromfile(fh, *args, **kwargs)
         return cls(header, payload, valid=valid, verify=verify)
@@ -104,7 +105,7 @@ class VLBIFrameBase(object):
         self.payload.tofile(fh)
 
     @classmethod
-    def fromdata(cls, data, header, *args, **kwargs):
+    def fromdata(cls, data, header, *args, valid=True, verify=True, **kwargs):
         """Construct frame from data and header.
 
         Parameters
@@ -117,9 +118,11 @@ class VLBIFrameBase(object):
             Any arguments beyond the filehandle are used to help initialize the
             payload, except for ``valid`` and ``verify``, which are passed on
             to the header and class initializers.
+        valid : bool, optional
+            Whether this payload contains valid data.
+        verify : bool, optional
+            Whether to verify the header and frame correctness.
         """
-        valid = kwargs.pop('valid', True)
-        verify = kwargs.pop('verify', True)
         payload = cls._payload_class.fromdata(data, *args, **kwargs)
         return cls(header, payload, valid=valid, verify=verify)
 
@@ -179,7 +182,7 @@ class VLBIFrameBase(object):
     # Header behaves as a dictionary, while Payload can be indexed/sliced.
     # Let frame behave appropriately.
     def __getitem__(self, item=()):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             return self.header.__getitem__(item)
         elif self.valid:
             return self.payload.__getitem__(item)
@@ -191,7 +194,7 @@ class VLBIFrameBase(object):
     data = property(__getitem__, doc="Full decoded frame.")
 
     def __setitem__(self, item, value):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             self.header.__setitem__(item, value)
         else:
             self.payload.__setitem__(item, value)

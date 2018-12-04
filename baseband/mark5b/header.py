@@ -8,9 +8,6 @@ the information therein.
 For the specification, see
 http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
@@ -81,7 +78,7 @@ class Mark5BHeader(VLBIHeaderBase):
     _payload_nbytes = 10000  # 2500 words
 
     def __init__(self, words, kday=None, ref_time=None, verify=True, **kwargs):
-        super(Mark5BHeader, self).__init__(words, verify=False, **kwargs)
+        super().__init__(words, verify=False, **kwargs)
         if kday is not None:
             self.kday = kday
         elif ref_time is not None:
@@ -98,10 +95,10 @@ class Mark5BHeader(VLBIHeaderBase):
             assert self.kday % 1000 == 0, "kday must be thousands of MJD."
 
     def copy(self, **kwargs):
-        return super(Mark5BHeader, self).copy(kday=self.kday, **kwargs)
+        return super().copy(kday=self.kday, **kwargs)
 
     @classmethod
-    def fromvalues(cls, **kwargs):
+    def fromvalues(cls, *, verify=True, **kwargs):
         """Initialise a header from parsed values.
 
         Here, the parsed values must be given as keyword arguments, i.e., for
@@ -125,8 +122,7 @@ class Mark5BHeader(VLBIHeaderBase):
         time = kwargs.pop('time', None)
         frame_rate = kwargs.pop('frame_rate', None)
         # Pop verify and pass on False so verify happens after time is set.
-        verify = kwargs.pop('verify', True)
-        self = super(Mark5BHeader, cls).fromvalues(verify=False, **kwargs)
+        self = super().fromvalues(verify=False, **kwargs)
         if time is not None:
             self.set_time(time, frame_rate=frame_rate)
             self.update()    # Recalculate CRC.
@@ -134,7 +130,7 @@ class Mark5BHeader(VLBIHeaderBase):
             self.verify()
         return self
 
-    def update(self, **kwargs):
+    def update(self, *, crc=None, verify=True, **kwargs):
         """Update the header by setting keywords or properties.
 
         Here, any keywords matching header keys are applied first, and any
@@ -150,25 +146,20 @@ class Mark5BHeader(VLBIHeaderBase):
         **kwargs
             Arguments used to set keywords and properties.
         """
-        calculate_crc = kwargs.get('crc', None) is None
-        if calculate_crc:
-            kwargs.pop('crc', None)
-            verify = kwargs.pop('verify', True)
-            kwargs['verify'] = False
+        if crc is not None:
+            return super().update(verify=verify, crc=crc, **kwargs)
 
-        super(Mark5BHeader, self).update(**kwargs)
-        if calculate_crc:
-            # Do not use words 2 & 3 directly, so that this works also if part
-            # of a VDIF header, where the time information is in words 7 & 8.
-            stream = '{:012b}{:020b}{:016b}'.format(self['bcd_jday'],
-                                                    self['bcd_seconds'],
-                                                    self['bcd_fraction'])
-            stream = np.array([int(b) for b in stream], dtype=np.uint8)
-            crc = crc16(stream)
-            self['crc'] = int(''.join(['{:1d}'.format(c) for c in crc]),
-                              base=2)
-            if verify:
-                self.verify()
+        super().update(verify=False, **kwargs)
+        # Do not use words 2 & 3 directly, so that this works also if part
+        # of a VDIF header, where the time information is in words 7 & 8.
+        stream = '{:012b}{:020b}{:016b}'.format(self['bcd_jday'],
+                                                self['bcd_seconds'],
+                                                self['bcd_fraction'])
+        stream = np.array([int(b) for b in stream], dtype=np.uint8)
+        crc = crc16(stream)
+        self['crc'] = int(''.join(['{:1d}'.format(c) for c in crc]), base=2)
+        if verify:
+            self.verify()
 
     def infer_kday(self, ref_time):
         """Uses a reference time to set a header's ``kday``.

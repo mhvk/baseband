@@ -7,11 +7,9 @@ or encode from a data array.
 
 See http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/gmrt_gsb/index.htm
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from collections import namedtuple
 
 import numpy as np
-from collections import namedtuple
 
 from ..vlbi_base.payload import VLBIPayloadBase
 
@@ -109,12 +107,12 @@ class GSBPayload(VLBIPayloadBase):
             Whether data are complex.  Default: `False`.
         """
         if hasattr(fh, 'read'):
-            return super(GSBPayload,
-                         cls).fromfile(fh, payload_nbytes=payload_nbytes,
-                                       sample_shape=(nchan,), bps=bps,
-                                       complex_data=complex_data)
+            return super().fromfile(fh, payload_nbytes=payload_nbytes,
+                                    sample_shape=(nchan,), bps=bps,
+                                    complex_data=complex_data)
 
         nthread = len(fh)
+        # Seem to need explicit super inside list comprehension.
         payloads = [[super(GSBPayload,
                            cls).fromfile(fh1, payload_nbytes=payload_nbytes,
                                          sample_shape=(nchan,), bps=bps,

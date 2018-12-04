@@ -7,12 +7,8 @@ the information therein.
 
 For the VDIF specification, see http://www.vlbi.org/vdif
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import numpy as np
 import astropy.units as u
-from astropy.extern import six
-
 from astropy.time import Time, TimeDelta
 
 from ..vlbi_base.header import (four_word_struct, eight_word_struct,
@@ -77,11 +73,10 @@ class VDIFHeaderMeta(type):
                 'sync_pattern' in cls._header_parser.keys()):
             cls._sync_pattern = cls._header_parser.defaults['sync_pattern']
 
-        super(VDIFHeaderMeta, cls).__init__(name, bases, dct)
+        super().__init__(name, bases, dct)
 
 
-@six.add_metaclass(VDIFHeaderMeta)
-class VDIFHeader(VLBIHeaderBase):
+class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     """VDIF Header, supporting different Extended Data Versions.
 
     Will initialize a header instance appropriate for a given EDV.
@@ -127,15 +122,15 @@ class VDIFHeader(VLBIHeaderBase):
         # 0 and False as identical.
         cls = VDIF_HEADER_CLASSES.get(edv if edv is not False else -1,
                                       VDIFBaseHeader)
-        return super(VDIFHeader, cls).__new__(cls)
+        return super().__new__(cls)
 
     def __init__(self, words, edv=None, verify=True, **kwargs):
         if edv is not None:
             self._edv = edv
-        super(VDIFHeader, self).__init__(words, verify=verify, **kwargs)
+        super().__init__(words, verify=verify, **kwargs)
 
     def copy(self):
-        return super(VDIFHeader, self).copy(edv=self.edv)
+        return super().copy(edv=self.edv)
 
     def same_stream(self, other):
         """Whether header is consistent with being from the same stream."""
@@ -178,7 +173,7 @@ class VDIFHeader(VLBIHeaderBase):
         return self
 
     @classmethod
-    def fromvalues(cls, edv=False, **kwargs):
+    def fromvalues(cls, edv=False, *, verify=True, **kwargs):
         """Initialise a header from parsed values.
 
         Here, the parsed values must be given as keyword arguments, i.e., for
@@ -224,16 +219,15 @@ class VDIFHeader(VLBIHeaderBase):
         # provide this information, we can just proceed.
         if 'time' not in kwargs or 'frame_rate' in VDIF_HEADER_CLASSES.get(
                 edv if edv is not False else -1, VDIFBaseHeader)._properties:
-            return super(VDIFHeader, cls).fromvalues(edv, **kwargs)
+            return super().fromvalues(edv, verify=verify, **kwargs)
         # If the VDIF header subclass does not provide the frame rate, we
         # first initialize without time, and then set the time explicitly
         # using whatever frame_rate or sample_rate was passed.
         time = kwargs.pop('time')
         sample_rate = kwargs.pop('sample_rate', None)
         frame_rate = kwargs.pop('frame_rate', None)
-        # Pop verify and pass on False so verify happens after time is set.
-        verify = kwargs.pop('verify', True)
-        self = super(VDIFHeader, cls).fromvalues(edv, verify=False, **kwargs)
+        # Skip verification in super as we do it after time is set.
+        self = super().fromvalues(edv, verify=False, **kwargs)
         if frame_rate is None and sample_rate is not None:
             frame_rate = sample_rate / self.samples_per_frame
         self.set_time(time, frame_rate=frame_rate)
@@ -254,7 +248,7 @@ class VDIFHeader(VLBIHeaderBase):
         """
         # Get all required values.
         edv = False if kwargs['legacy_mode'] else kwargs['edv']
-        return super(VDIFHeader, cls).fromkeys(edv, **kwargs)
+        return super().fromkeys(edv, **kwargs)
 
     @classmethod
     def from_mark5b_header(cls, mark5b_header, bps, nchan, **kwargs):
@@ -509,7 +503,7 @@ class VDIFHeader0(VDIFBaseHeader):
 
     def verify(self):
         assert all(word == 0 for word in self.words[4:])
-        super(VDIFHeader0, self).verify()
+        super().verify()
 
 
 class VDIFSampleRateHeader(VDIFBaseHeader):
@@ -526,7 +520,7 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
                    ('sample_rate', 'frame_rate', 'time'))
 
     def same_stream(self, other):
-        return (super(VDIFSampleRateHeader, self).same_stream(other) and
+        return (super().same_stream(other) and
                 self.words[4] == other.words[4] and
                 self.words[5] == other.words[5])
 
@@ -592,8 +586,7 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
         """
         if frame_rate is None and self['sampling_rate'] != 0:
             frame_rate = self.frame_rate
-        return super(VDIFSampleRateHeader,
-                     self).get_time(frame_rate=frame_rate)
+        return super().get_time(frame_rate=frame_rate)
 
     def set_time(self, time, frame_rate=None):
         """Converts Time object to ref_epoch, seconds, and frame_nr.
@@ -608,7 +601,7 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
         """
         if frame_rate is None and self['sampling_rate'] != 0:
             frame_rate = self.frame_rate
-        super(VDIFSampleRateHeader, self).set_time(time, frame_rate=frame_rate)
+        super().set_time(time, frame_rate=frame_rate)
 
     time = property(get_time, set_time)
 
@@ -642,7 +635,7 @@ class VDIFHeader3(VDIFSampleRateHeader):
          ('personality', (7, 0, 8))))
 
     def verify(self):
-        super(VDIFHeader3, self).verify()
+        super().verify()
         assert self['frame_length'] == 629
 
 
@@ -669,7 +662,7 @@ class VDIFHeader2(VDIFBaseHeader):
          ('PSN', (6, 0, 64))))
 
     def verify(self):  # pragma: no cover
-        super(VDIFHeader2, self).verify()
+        super().verify()
         assert self['frame_length'] == 629 or self['frame_length'] == 1004
         assert self.bps == 2 and not self['complex_data']
 
@@ -689,7 +682,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                           for (k, v) in Mark5BHeader._header_parser.items())))
 
     def verify(self):
-        super(VDIFMark5BHeader, self).verify()
+        super().verify()
         assert self['frame_length'] == 1254  # payload+header=10000+32 bytes/8
         assert self['frame_nr'] == self['mark5b_frame_nr']
         # Check consistency of time down to the second (since some Mark 5B
@@ -700,9 +693,9 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         assert ref_mjd % 1000 == self.jday  # Latter decodes 'bcd_jday'
 
     def __setitem__(self, item, value):
-        super(VDIFMark5BHeader, self).__setitem__(item, value)
+        super().__setitem__(item, value)
         if item == 'frame_nr':
-            super(VDIFMark5BHeader, self).__setitem__('mark5b_frame_nr', value)
+            super().__setitem__('mark5b_frame_nr', value)
 
     def get_time(self, frame_rate=None):
         """
@@ -752,6 +745,6 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
 
     def set_time(self, time, frame_rate=None):
         Mark5BHeader.set_time(self, time, frame_rate)
-        super(VDIFMark5BHeader, self).set_time(time, frame_rate)
+        super().set_time(time, frame_rate)
 
     time = property(get_time, set_time)

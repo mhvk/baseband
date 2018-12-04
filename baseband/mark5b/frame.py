@@ -8,9 +8,6 @@ payload, providing access to the values encoded in both.
 For the specification, see
 http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import numpy as np
 
 from ..vlbi_base.frame import VLBIFrameBase
@@ -72,7 +69,7 @@ class Mark5BFrame(VLBIFrameBase):
                      payload.words[2] != self._fill_pattern or
                      (payload.words[3:] != self._fill_pattern).any())
 
-        super(Mark5BFrame, self).__init__(header, payload, valid, verify)
+        super().__init__(header, payload, valid, verify)
 
     @classmethod
     def fromfile(cls, fh, kday=None, ref_time=None, nchan=1, bps=3, valid=None,

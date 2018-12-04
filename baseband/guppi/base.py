@@ -1,8 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
 import re
 
-from astropy.extern import six
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -72,7 +70,7 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
         self.template = re.sub(r'{\w+[}:]', check_and_convert, template)
 
     def _process_items(self, file_nr):
-        super(GUPPIFileNameSequencer, self)._process_items(file_nr)
+        super()._process_items(file_nr)
         # Pop file_nr, as we need to capitalize it.
         self.items['FILE_NR'] = self.items.pop('file_nr')
 
@@ -209,7 +207,7 @@ class GUPPIStreamBase(VLBIStreamBase):
         # Set samples per frame to unique ones, excluding overlap.
         samples_per_frame = header0.samples_per_frame - header0.overlap
 
-        super(GUPPIStreamBase, self).__init__(
+        super().__init__(
             fh_raw=fh_raw, header0=header0, sample_rate=header0.sample_rate,
             samples_per_frame=samples_per_frame,
             unsliced_shape=header0.sample_shape, bps=header0.bps,
@@ -249,9 +247,8 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
     def __init__(self, fh_raw, squeeze=True, subset=(), verify=True):
         fh_raw = GUPPIFileReader(fh_raw)
         header0 = GUPPIHeader.fromfile(fh_raw)
-        super(GUPPIStreamReader, self).__init__(fh_raw, header0,
-                                                squeeze=squeeze,
-                                                subset=subset, verify=verify)
+        super().__init__(fh_raw, header0, squeeze=squeeze,
+                         subset=subset, verify=verify)
 
     @lazyproperty
     def _last_header(self):
@@ -290,8 +287,7 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
         assert header0.get('OVERLAP', 0) == 0, ("overlap must be 0 when "
                                                 "writing GUPPI files.")
         fh_raw = GUPPIFileWriter(fh_raw)
-        super(GUPPIStreamWriter, self).__init__(fh_raw, header0,
-                                                squeeze=squeeze)
+        super().__init__(fh_raw, header0, squeeze=squeeze)
 
     def _make_frame(self, index):
         header = self.header0.copy()
@@ -400,8 +396,7 @@ def open(name, mode='rs', **kwargs):
     frames_per_file = kwargs.pop('frames_per_file', 128)
 
     # Check if ``name`` is a template or sequence.
-    is_template = isinstance(name, six.string_types) and ('{' in name and
-                                                          '}' in name)
+    is_template = isinstance(name, str) and ('{' in name and '}' in name)
     is_sequence = isinstance(name, (tuple, list, sf.FileNameSequencer))
 
     # For stream writing, header0 is needed; for reading, it is needed for

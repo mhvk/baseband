@@ -1,7 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 from ..vlbi_base.file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 
 
@@ -21,7 +18,7 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
         return 'gsb'
 
     def _collect_info(self):
-        super(GSBTimeStampInfo, self)._collect_info()
+        super()._collect_info()
         if self:
             self.missing['raw'] = 'need raw binary files for the stream reader'
 

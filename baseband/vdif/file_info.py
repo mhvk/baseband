@@ -1,7 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 from ..vlbi_base.file_info import VLBIFileReaderInfo
 
 
@@ -39,7 +36,7 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
                 return None
 
     def _collect_info(self):
-        super(VDIFFileReaderInfo, self)._collect_info()
+        super()._collect_info()
         if self:
             self.complex_data = self.header0['complex_data']
             self.sample_shape = self._get_sample_shape()

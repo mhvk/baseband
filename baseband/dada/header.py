@@ -5,14 +5,11 @@ Definitions for DADA pulsar baseband headers.
 Implements a DADAHeader class used to store header definitions in a FITS
 header, and read & write these from files.
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import io
 import warnings
 from collections import OrderedDict
 import astropy.units as u
 from astropy.time import Time
-from astropy.extern import six
 
 
 __all__ = ['DADAHeader']
@@ -81,15 +78,13 @@ class DADAHeader(OrderedDict):
                  ('RESOLUTION', 1),
                  ('DSB', 1)]
 
-    def __init__(self, *args, **kwargs):
-        verify = kwargs.pop('verify', True)
-        mutable = kwargs.pop('mutable', True)
+    def __init__(self, *args, verify=True, mutable=True, **kwargs):
         self.mutable = True
         self.comments = {}
-        if len(args) == 1 and isinstance(args[0], six.string_types):
+        if len(args) == 1 and isinstance(args[0], str):
             args = (self._fromlines(args[0].split('\n')),)
 
-        super(DADAHeader, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.mutable = mutable
         if verify:
             self.verify()
@@ -103,8 +98,8 @@ class DADAHeader(OrderedDict):
 
     def copy(self):
         """Create a mutable and independent copy of the header."""
-        # Cannot do super(DADAHeader, self).copy(), since this first
-        # initializes an empty header, which does not pass verification.
+        # Cannot do super().copy(), since this first initializes an empty
+        # header, which does not pass verification.
         new = self.__class__(self)
         new.comments = self.comments.copy()
         new.mutable = True
@@ -241,7 +236,7 @@ class DADAHeader(OrderedDict):
         self.update(**kwargs)
         return self
 
-    def update(self, **kwargs):
+    def update(self, *, verify=True, **kwargs):
         """Update the header with new values.
 
         Here, any keywords matching properties are processed as well, in the
@@ -255,12 +250,11 @@ class DADAHeader(OrderedDict):
         **kwargs
             Arguments used to set keywords and properties.
         """
-        verify = kwargs.pop('verify', True)
         # Remove kwargs that set properties, in correct order.
         extras = [(key, kwargs.pop(key)) for key in self._properties
                   if key in kwargs]
         # Update the normal keywords.
-        super(DADAHeader, self).update(**kwargs)
+        super().update(**kwargs)
         # Now set the properties.
         for attr, value in extras:
             setattr(self, attr, value)
@@ -275,7 +269,7 @@ class DADAHeader(OrderedDict):
             value, comment = value
             self.comments[key.upper()] = comment
 
-        super(DADAHeader, self).__setitem__(key.upper(), value)
+        super().__setitem__(key.upper(), value)
 
     @property
     def nbytes(self):

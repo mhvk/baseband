@@ -1,24 +1,19 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import pytest
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
 from astropy.tests.helper import catch_warnings
+
 from ... import gsb
 from ..payload import decode_4bit, encode_4bit
 from ...data import (SAMPLE_GSB_RAWDUMP_HEADER as SAMPLE_RAWDUMP_HEADER,
                      SAMPLE_GSB_RAWDUMP as SAMPLE_RAWDUMP,
                      SAMPLE_GSB_PHASED_HEADER as SAMPLE_PHASED_HEADER,
                      SAMPLE_GSB_PHASED as SAMPLE_PHASED)
-from astropy.extern import six
-if six.PY2:
-    from io import open
 
 
-class TestGSB(object):
+class TestGSB:
 
     def setup(self):
         # For all sample files, each frame spans 0.25165824 sec.
@@ -813,7 +808,7 @@ class TestGSB(object):
                 open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
             # TextIOBase for fh
             gsb.open(s, 'rt')
-        with pytest.raises(IOError):
+        with pytest.raises(OSError):
             # non-existing file
             gsb.open(str(tmpdir.join('ts.bla')),
                      raw=str(tmpdir.join('raw.bla')))

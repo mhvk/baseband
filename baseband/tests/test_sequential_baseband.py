@@ -1,10 +1,10 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import os
+
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
+
 from .. import vdif
 from ..helpers import sequentialfile
 from ..helpers.tests.test_sequentialfile import Sequencer

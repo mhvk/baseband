@@ -6,17 +6,16 @@ Defines a payload class VLBIPayloadBase that can be used to hold the words
 corresponding to a frame payload, providing access to the values encoded in
 it as a numpy array.
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import operator
 from functools import reduce
+
 import numpy as np
 
 
 __all__ = ['VLBIPayloadBase']
 
 
-class VLBIPayloadBase(object):
+class VLBIPayloadBase:
     """Container for decoding and encoding VLBI payloads.
 
     Any subclass should define dictionaries ``_decoders`` and ``_encoders``,
@@ -66,7 +65,7 @@ class VLBIPayloadBase(object):
                              .format(self._dtype_word))
 
     @classmethod
-    def fromfile(cls, fh, *args, **kwargs):
+    def fromfile(cls, fh, *args, payload_nbytes=None, **kwargs):
         """Read payload from filehandle and decode it into data.
 
         Parameters
@@ -78,10 +77,11 @@ class VLBIPayloadBase(object):
 
         Any other (keyword) arguments are passed on to the class initialiser.
         """
-        payload_nbytes = kwargs.pop('payload_nbytes', cls._nbytes)
         if payload_nbytes is None:
-            raise ValueError("payload_nbytes should be given as an argument "
-                             "if no default is defined on the class.")
+            payload_nbytes = cls._nbytes
+            if payload_nbytes is None:
+                raise ValueError("payload_nbytes should be given as an argument "
+                                 "if no default is defined on the class.")
         s = fh.read(payload_nbytes)
         if len(s) < payload_nbytes:
             raise EOFError("could not read full payload.")

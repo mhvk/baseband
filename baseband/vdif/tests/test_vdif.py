@@ -1,9 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
-import numpy as np
 import pytest
+import numpy as np
 from astropy.time import Time
 import astropy.units as u
 from astropy.tests.helper import catch_warnings
@@ -43,7 +40,7 @@ from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_VLBI_VDIF as
 #   data window size = 1048576 bytes
 
 
-class TestVDIF(object):
+class TestVDIF:
 
     def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -207,9 +204,6 @@ class TestVDIF(object):
                                   (('nonsense_0', (6, 0, 32, 0x0)),
                                    ('nonsense_1', (7, 0, 8, None)),
                                    ('nonsense_2', (7, 8, 24, 0x1)))))
-
-            def verify(self):
-                super(VDIFHeaderX, self).verify()
 
         assert vdif.header.VDIF_HEADER_CLASSES[0x58] is VDIFHeaderX
 
@@ -499,7 +493,7 @@ class TestVDIF(object):
                 fh.read_frameset(thread_ids=list(range(8)))
             # Give non-existent thread_id.
             fh.seek(0)
-            with pytest.raises(IOError):
+            with pytest.raises(OSError):
                 fh.read_frameset(thread_ids=[1, 9])
 
     def test_frameset_getitem_setitem(self):
@@ -1165,7 +1159,7 @@ def test_legacy_vdif(tmpdir):
 # -1 -1  1 -1  1  1 -1  1 -1 -1  1 -1  1  1 -1  1
 #  1  1 -1 -1  1  1  1  1  1 -1  1  1 -1  1  1  1
 #  1 -1  1 -1  1  1  1 -1  1 -1  1  1  1 -1 -1 -1
-class TestVDIFBPS1(object):
+class TestVDIFBPS1:
     def test_header(self):
         with open(SAMPLE_BPS1, 'rb') as fh:
             header0 = vdif.VDIFHeader.fromfile(fh)

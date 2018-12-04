@@ -7,13 +7,9 @@ http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/gmrt_gsb/GSB_beam_timestamp_n
 and for rawdump data
 http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/gmrt_gsb/GSB_rawdump_data_format_v2.pdf
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import numpy as np
 from astropy import units as u, _erfa as erfa
 from astropy.time import Time, TimeString
-from astropy.extern import six
 
 from ..vlbi_base.header import VLBIHeaderBase, HeaderParser
 
@@ -52,8 +48,7 @@ class TimeGSB(TimeString):
             self.scale.upper().encode('utf8'), *iterator.operands[1:])
 
     # This can be removed once we only support astropy >=3.1.
-    # The str(c) is necessary for python2/numpy -> no unicode literals...
-    _new_ihmsfs_dtype = np.dtype([(str(c), np.intc) for c in 'hmsf'])
+    _new_ihmsfs_dtype = np.dtype([(c, np.intc) for c in 'hmsf'])
 
     def to_value(self, parent=None):
         scale = self.scale.upper().encode('ascii'),
@@ -143,7 +138,7 @@ class GSBHeader(VLBIHeaderBase):
             mode = 'rawdump' if len(words) == 7 else 'phased'
 
         cls = cls._gsb_header_classes.get(mode)
-        self = super(GSBHeader, cls).__new__(cls)
+        self = super().__new__(cls)
         # We intialise VDIFHeader subclasses, so their __init__ will be called.
         return self
 
@@ -209,7 +204,7 @@ class GSBHeader(VLBIHeaderBase):
                 else:
                     raise TypeError("cannot construct a GSB header from "
                                     "values without knowing the mode.")
-        return super(GSBHeader, cls).fromvalues(mode, nbytes, *args, **kwargs)
+        return super().fromvalues(mode, nbytes, *args, **kwargs)
 
     @classmethod
     def fromkeys(cls, mode=None, nbytes=None, *args, **kwargs):
@@ -221,7 +216,7 @@ class GSBHeader(VLBIHeaderBase):
                     mode = 'phased'
                 else:
                     mode = 'rawdump'
-        return super(GSBHeader, cls).fromkeys(mode, nbytes, *args, **kwargs)
+        return super().fromkeys(mode, nbytes, *args, **kwargs)
 
     def seek_offset(self, n, nbytes=None):
         """Offset in bytes needed to move a file pointer to another header.
@@ -247,13 +242,6 @@ class GSBHeader(VLBIHeaderBase):
                 tuple(self.words) == tuple(other.words))
 
 
-if six.PY2:  # pragma: py2
-    def str_split(string):
-        return str(string).split()
-else:
-    str_split = str.split
-
-
 class GSBRawdumpHeader(GSBHeader):
     """GSB rawdump header."""
 
@@ -263,7 +251,7 @@ class GSBRawdumpHeader(GSBHeader):
     _properties = ('gps_time', 'time')
 
     _header_parser = HeaderParser(
-        (('gps', (0, 7, ' '.join, str_split)),),
+        (('gps', (0, 7, ' '.join, str.split)),),
         make_parser=make_parser,
         make_setter=make_setter,
         get_default=get_default)
@@ -291,8 +279,8 @@ class GSBPhasedHeader(GSBRawdumpHeader):
     _properties = ('time', 'pc_time') + GSBRawdumpHeader._properties
 
     _header_parser = HeaderParser(
-        (('pc', (0, 7, ' '.join, str_split)),
-         ('gps', (7, 7, ' '.join, str_split)),
+        (('pc', (0, 7, ' '.join, str.split)),
+         ('gps', (7, 7, ' '.join, str.split)),
          ('seq_nr', (14, 1, int, str, 0)),
          ('mem_block', (15, 1, int, str, 0))),
         make_parser=make_parser,

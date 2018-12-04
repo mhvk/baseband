@@ -3,12 +3,9 @@
 
 Loosely based on `~astropy.utils.data_info.DataInfo`.
 """
-from __future__ import division, unicode_literals, print_function
-
 import warnings
 
 import astropy.units as u
-from astropy.extern import six
 
 
 class VLBIInfoMeta(type):
@@ -16,14 +13,13 @@ class VLBIInfoMeta(type):
     # always available (do this rather than overwrite __getattr__ so that
     # we can generate docstrings in sphinx for them).
     def __init__(cls, name, bases, dct):
-        super(VLBIInfoMeta, cls).__init__(name, bases, dct)
+        super().__init__(name, bases, dct)
         attr_names = dct.get('attr_names', ())
         for attr in attr_names:
             setattr(cls, attr, None)
 
 
-@six.add_metaclass(VLBIInfoMeta)
-class VLBIInfoBase(object):
+class VLBIInfoBase(metaclass=VLBIInfoMeta):
     """Container providing a standardized interface to file information."""
 
     attr_names = ('format',)
@@ -92,7 +88,7 @@ class VLBIInfoBase(object):
     def __repr__(self):
         # Use the repr for quick display of file information.
         if self._parent is None:
-            return super(VLBIInfoBase, self).__repr__()
+            return super().__repr__()
 
         if not self:
             return 'Not parsable. Wrong format?'
@@ -216,7 +212,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
             return None
 
     def _collect_info(self):
-        super(VLBIFileReaderInfo, self)._collect_info()
+        super()._collect_info()
         self.header0 = self._get_header0()
         if self.header0 is not None:
             for attr in self._header0_attrs:
@@ -230,7 +226,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
     def __repr__(self):
         result = 'File information:\n'
-        result += super(VLBIFileReaderInfo, self).__repr__()
+        result += super().__repr__()
         return result
 
 
@@ -267,7 +263,7 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         return self._parent.fh_raw.info
 
     def _collect_info(self):
-        super(VLBIStreamReaderInfo, self)._collect_info()
+        super()._collect_info()
         # We also want the raw info.
         self.file_info = self._raw_file_info()
         self.format = self.file_info.format
@@ -278,13 +274,13 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
 
     def __call__(self):
         """Create a dict with information about the stream and the raw file."""
-        info = super(VLBIStreamReaderInfo, self).__call__()
+        info = super().__call__()
         info['file_info'] = self.file_info()
         return info
 
     def __repr__(self):
         result = 'Stream information:\n'
-        result += super(VLBIStreamReaderInfo, self).__repr__()
+        result += super().__repr__()
         file_info = getattr(self, 'file_info', None)
         if file_info is not None:
             # Add information from the raw file.

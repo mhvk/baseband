@@ -4,9 +4,8 @@ Definitions for GUPPI headers.
 
 Implements a GUPPIHeader class that reads & writes FITS-like headers from file.
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import operator
+
 import numpy as np
 import astropy.units as u
 from astropy.io import fits
@@ -68,11 +67,9 @@ class GUPPIHeader(fits.Header):
                  ('NPOL', 1),
                  ('OBSNCHAN', 1)]
 
-    def __init__(self, *args, **kwargs):
-        verify = kwargs.pop('verify', True)
-        mutable = kwargs.pop('mutable', True)
+    def __init__(self, *args, verify=True, mutable=True, **kwargs):
         # Comments handled by fits.Header__init__().
-        super(GUPPIHeader, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.mutable = mutable
         if verify:
             self.verify()
@@ -91,7 +88,7 @@ class GUPPIHeader(fits.Header):
         """Create a mutable and independent copy of the header."""
         # This method exists because io.fits.Header.copy doesn't properly
         # return copy of the same class.
-        newfitsheader = super(GUPPIHeader, self).copy()
+        newfitsheader = super().copy()
         return self.__class__(newfitsheader)
 
     def __copy__(self):
@@ -140,19 +137,16 @@ class GUPPIHeader(fits.Header):
         fh.write(self.tostring(padding=False).encode('ascii'))
 
     @classmethod
-    def fromkeys(cls, *args, **kwargs):
+    def fromkeys(cls, *args, verify=True, mutable=True, **kwargs):
         """Initialise a header from keyword values.
 
         Like fromvalues, but without any interpretation of keywords.
 
-        This extracts 'verify' and 'mutable', then passes the remaining kwargs
-        to the class initializer as a dict (for compatibility with
-        fits.Header). It is present for compatibility with other header classes
-        only.
+        Note that this just passes kwargs to the class initializer as a dict
+        (for compatibility with fits.Header). It is present for compatibility
+        with other header classes only.
         """
-        kwargs_special = {'verify': kwargs.pop('verify', True),
-                          'mutable': kwargs.pop('mutable', True)}
-        return cls(kwargs, *args, **kwargs_special)
+        return cls(kwargs, *args, verify=verify, mutable=mutable)
 
     @classmethod
     def fromvalues(cls, **kwargs):
@@ -170,7 +164,7 @@ class GUPPIHeader(fits.Header):
         self.update(**kwargs)
         return self
 
-    def update(self, **kwargs):
+    def update(self, *, verify=True, **kwargs):
         """Update the header with new values.
 
         Here, any keywords matching properties are processed as well, in the
@@ -184,12 +178,11 @@ class GUPPIHeader(fits.Header):
         **kwargs
             Arguments used to set keywords and properties.
         """
-        verify = kwargs.pop('verify', True)
         # Remove kwargs that set properties, in correct order.
         extras = [(key, kwargs.pop(key)) for key in self._properties
                   if key in kwargs]
         # Update the normal keywords.
-        super(GUPPIHeader, self).update(kwargs)
+        super().update(kwargs)
         # Now set the properties.
         for attr, value in extras:
             setattr(self, attr, value)
@@ -204,7 +197,7 @@ class GUPPIHeader(fits.Header):
             value, comment = value
             self.comments[key.upper()] = comment
 
-        super(GUPPIHeader, self).__setitem__(key.upper(), value)
+        super().__setitem__(key.upper(), value)
 
     @property
     def nbytes(self):
@@ -393,6 +386,6 @@ class GUPPIHeader(fits.Header):
 
     def __repr__(self):
         name = self.__class__.__name__
-        vals = super(GUPPIHeader, self).__repr__()
+        vals = super().__repr__()
         return('<{0} {1}>'.format(name, ("\n  " + len(name) * " ").join(
             [v.rstrip() for v in vals.split('\n')])))

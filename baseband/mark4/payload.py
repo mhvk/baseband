@@ -8,11 +8,11 @@ or encode from a data array.
 For the specification, see
 http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
 import sys
-import numpy as np
 from collections import namedtuple
+
+import numpy as np
+
 from ..vlbi_base.payload import VLBIPayloadBase
 from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
 from .header import MARK4_DTYPES
@@ -264,8 +264,8 @@ class Mark4Payload(VLBIPayloadBase):
             self._nbytes = header.payload_nbytes
         self._dtype_word = MARK4_DTYPES[nchan * bps * fanout]
         self.fanout = fanout
-        super(Mark4Payload, self).__init__(words, sample_shape=(nchan,),
-                                           bps=bps, complex_data=False)
+        super().__init__(words, sample_shape=(nchan,),
+                         bps=bps, complex_data=False)
         self._coder = (self.sample_shape.nchan, bps, fanout)
 
     @classmethod

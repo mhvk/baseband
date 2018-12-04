@@ -1,7 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 from ..vlbi_base.file_info import VLBIFileReaderInfo
 
 
@@ -16,7 +13,7 @@ class Mark5BFileReaderInfo(VLBIFileReaderInfo):
             return None
 
     def _collect_info(self):
-        super(Mark5BFileReaderInfo, self)._collect_info()
+        super()._collect_info()
         if self:
             self.complex_data = False
             if self.kday is None and self.ref_time is None:

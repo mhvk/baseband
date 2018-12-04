@@ -1,14 +1,14 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
-
 import io
 import warnings
 import numpy as np
 import operator
 from collections import namedtuple
+from contextlib import contextmanager
+
 import astropy.units as u
 from astropy.utils import lazyproperty
-from contextlib import contextmanager
+
 from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from ..helpers import sequentialfile as sf
 
@@ -17,7 +17,7 @@ __all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
            'VLBIStreamReaderBase', 'VLBIStreamWriterBase', 'make_opener']
 
 
-class VLBIFileBase(object):
+class VLBIFileBase:
     """VLBI file wrapper, used to add frame methods to a binary data file.
 
     The underlying file is stored in ``fh_raw`` and all attributes that do not
@@ -125,7 +125,7 @@ class VLBIFileReaderBase(VLBIFileBase):
         return (max_frame + 1) * u.Hz
 
 
-class VLBIStreamBase(object):
+class VLBIStreamBase:
     """VLBI file wrapper, allowing access as a stream of data."""
 
     _sample_shape_maker = None
@@ -342,7 +342,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                              "`sample_rate`.",)
                 raise
 
-        super(VLBIStreamReaderBase, self).__init__(
+        super().__init__(
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
             bps, complex_data, squeeze, subset, fill_value, verify)
 
@@ -364,7 +364,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     def _get_sample_shape(self):
         """Get shape by applying squeeze and subset to a dummy data sample."""
         # First apply base class, which squeezes if needed.
-        sample_shape = super(VLBIStreamReaderBase, self)._get_sample_shape()
+        sample_shape = super()._get_sample_shape()
         if not self.subset:
             return sample_shape
 
@@ -584,7 +584,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         if sample_rate is None:
             raise ValueError("must pass in an explicit `sample_rate`.")
 
-        super(VLBIStreamWriterBase, self).__init__(
+        super().__init__(
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
             bps, complex_data, squeeze, subset, fill_value, verify)
 
@@ -656,7 +656,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             self.write(np.zeros((self.samples_per_frame - extra,) +
                                 self.sample_shape), valid=False)
             assert self.offset % self.samples_per_frame == 0
-        return super(VLBIStreamWriterBase, self).close()
+        return super().close()
 
 
 default_open_doc = """Open baseband file(s) for reading or writing.

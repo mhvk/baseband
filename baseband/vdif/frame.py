@@ -8,11 +8,7 @@ a VDIFFrameSet class that combines a set of frames from different threads.
 
 For the VDIF specification, see http://www.vlbi.org/vdif
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import numpy as np
-from astropy.extern import six
 
 from ..vlbi_base.frame import VLBIFrameBase
 from .header import VDIFHeader, VDIFBaseHeader
@@ -83,7 +79,7 @@ class VDIFFrame(VLBIFrameBase):
         Checks consistency between the header information and payload
         data shape and type.
         """
-        super(VDIFFrame, self).verify()
+        super().verify()
         assert self.header['complex_data'] == (self.payload.dtype.kind == 'c')
         assert self.payload.shape == (self.header.samples_per_frame,
                                       self.header.nchan)
@@ -164,7 +160,7 @@ class VDIFFrame(VLBIFrameBase):
         return cls(header, payload, verify)
 
 
-class VDIFFrameSet(object):
+class VDIFFrameSet:
     """Representation of a set of VDIF frames, combining different threads.
 
     Parameters
@@ -264,7 +260,7 @@ class VDIFFrameSet(object):
             fh.seek(-header.nbytes, 1)
 
         if thread_ids and len(frames) < len(thread_ids):
-            raise IOError("could not find all requested frames.")
+            raise OSError("could not find all requested frames.")
 
         # Turn dict of frames into a list, following order given by
         # thread_ids, or just sorting by their own thread_id
@@ -432,7 +428,7 @@ class VDIFFrameSet(object):
     # Header behaves as a dictionary, while Payload can be indexed/sliced.
     # Let frameset behave appropriately.
     def __getitem__(self, item=()):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             # Header behaves as a dictionary.  Assume base keywords are the
             # same for every frame, except for thread_id (must be different)
             # and invalid_data (can be different).
@@ -466,7 +462,7 @@ class VDIFFrameSet(object):
         return data
 
     def __setitem__(self, item, data):
-        if isinstance(item, six.string_types):
+        if isinstance(item, str):
             # Headers behave as dictionaries; except for thread_id and
             # invalid_data, assume set base properties all to the same value.
             data = np.broadcast_to(data, (len(self.frames),))

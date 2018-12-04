@@ -10,11 +10,8 @@ http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 A little bit on the disk representation is at
 http://adsabs.harvard.edu/abs/2003ASPC..306..123W
 """
-from __future__ import absolute_import, division, print_function
-
 import numpy as np
 from astropy.time import Time
-from astropy.extern import six
 
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase
 from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
@@ -313,18 +310,18 @@ class Mark4Header(Mark4TrackHeader):
                  verify=True):
         if words is None:
             words = np.zeros((5, ntrack), dtype=np.uint32)
-        super(Mark4Header, self).__init__(words, decade=decade,
-                                          ref_time=ref_time, verify=verify)
+        super().__init__(words, decade=decade, ref_time=ref_time,
+                         verify=verify)
 
     def verify(self):
-        super(Mark4Header, self).verify()
+        super().verify()
         assert set(self['fan_out']) == set(np.arange(self.fanout))
         assert (len(set((c, l) for (c, l) in zip(self['converter_id'],
                                                  self['lsb_output']))) ==
                 self.nchan)
 
     def infer_decade(self, ref_time):
-        super(Mark4Header, self).infer_decade(ref_time)
+        super().infer_decade(ref_time)
         if getattr(self.decade, 'size', 1) > 1:
             assert np.all(self.decade == self.decade[0])
             self.decade = self.decade[0]
@@ -455,8 +452,7 @@ class Mark4Header(Mark4TrackHeader):
         if not any(key in kwargs for key in ('lsb_output', 'converter_id',
                                              'converter')):
             kwargs.setdefault('nsb', 1)
-        return super(Mark4Header, cls).fromvalues(ntrack, decade, ref_time,
-                                                  **kwargs)
+        return super().fromvalues(ntrack, decade, ref_time, **kwargs)
 
     def update(self, crc=None, verify=True, **kwargs):
         """Update the header by setting keywords or properties.
@@ -475,14 +471,14 @@ class Mark4Header(Mark4TrackHeader):
             Arguments used to set keywords and properties.
         """
         if crc is None:
-            super(Mark4Header, self).update(verify=False, **kwargs)
+            super().update(verify=False, **kwargs)
             stream = words2stream(self.words)
             stream[-12:] = crc12(stream[:-12])
             self.words = stream2words(stream)
             if verify:
                 self.verify()
         else:
-            super(Mark4Header, self).update(verify=verify, crc=crc, **kwargs)
+            super().update(verify=verify, crc=crc, **kwargs)
 
     @property
     def ntrack(self):
@@ -684,7 +680,7 @@ class Mark4Header(Mark4TrackHeader):
 
     def set_time(self, time):
         if time.isscalar:
-            super(Mark4Header, self).set_time(time)
+            super().set_time(time)
         else:
             decades = set()
             for h, t in zip(self, time):
@@ -701,8 +697,8 @@ class Mark4Header(Mark4TrackHeader):
         return self.ntrack
 
     def __getitem__(self, item):
-        if isinstance(item, six.string_types):
-            return super(Mark4Header, self).__getitem__(item)
+        if isinstance(item, str):
+            return super().__getitem__(item)
 
         try:
             new_words = self.words[:, item]

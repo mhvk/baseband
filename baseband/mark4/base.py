@@ -1,6 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import division, unicode_literals, print_function
-
 import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
@@ -46,7 +44,7 @@ class Mark4FileReader(VLBIFileReaderBase):
         self.ntrack = ntrack
         self.decade = decade
         self.ref_time = ref_time
-        super(Mark4FileReader, self).__init__(fh_raw)
+        super().__init__(fh_raw)
 
     def __repr__(self):
         return ("{name}(fh_raw={s.fh_raw}, ntrack={s.ntrack}, "
@@ -311,7 +309,7 @@ class Mark4StreamBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, sample_rate=None, squeeze=True,
                  subset=(), fill_value=0., verify=True):
-        super(Mark4StreamBase, self).__init__(
+        super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=header0.samples_per_frame,
             unsliced_shape=(header0.nchan,),
@@ -377,7 +375,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
             "could not find a first frame using ntrack={}. Perhaps "
             "try ntrack=None for auto-determination.".format(ntrack))
         self._offset0 = fh_raw.tell()
-        super(Mark4StreamReader, self).__init__(
+        super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
@@ -389,7 +387,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the file."""
-        last_header = super(Mark4StreamReader, self)._last_header
+        last_header = super()._last_header
         # Infer the decade, assuming the end of the file is no more than
         # 4 years away from the start.
         last_header.infer_decade(self.start_time)
@@ -446,9 +444,8 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
                  **kwargs):
         if header0 is None:
             header0 = Mark4Header.fromvalues(**kwargs)
-        super(Mark4StreamWriter, self).__init__(
-            fh_raw=fh_raw, header0=header0, sample_rate=sample_rate,
-            squeeze=squeeze)
+        super().__init__(fh_raw=fh_raw, header0=header0,
+                         sample_rate=sample_rate, squeeze=squeeze)
         # Set up initial payload with right shape.
         samples_per_payload = (
             header0.samples_per_frame * header0.payload_nbytes //

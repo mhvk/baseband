@@ -1,19 +1,18 @@
 # Licensed under the GPLv3 - see LICENSE
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+import copy
 
 import pytest
-import copy
 import numpy as np
 import astropy.units as u
 from astropy.tests.helper import catch_warnings
+
 from ... import guppi
 from ...helpers import sequentialfile as sf
 from ..base import GUPPIFileNameSequencer
 from ...data import SAMPLE_PUPPI as SAMPLE_FILE
 
 
-class TestGUPPI(object):
+class TestGUPPI:
     def setup(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = guppi.GUPPIHeader.fromfile(fh)
@@ -647,7 +646,7 @@ class TestGUPPI(object):
             guppi.open(filename, 'rs', files=(filename,))
 
 
-class TestGUPPIFileNameSequencer(object):
+class TestGUPPIFileNameSequencer:
     def setup(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = guppi.GUPPIHeader.fromfile(fh)
