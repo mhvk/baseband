@@ -1,7 +1,10 @@
-language: python
+# We set the language to c because python isn't supported on the MacOS X nodes
+# on Travis. However, the language ends up being irrelevant anyway, since we
+# install Python ourselves using conda.
+language: c
 
-python:
-    - 3.6
+os:
+    - linux
 
 # Setting sudo to false opts in to Travis-CI container-based builds.
 sudo: false
@@ -20,31 +23,64 @@ addons:
 
 env:
     global:
+
         # The following versions are the 'default' for tests, unless
         # overidden underneath. They are defined here in order to save having
         # to repeat them for all configurations.
+        - PYTHON_VERSION=3.7
         - NUMPY_VERSION=stable
         - ASTROPY_VERSION=stable
         - MAIN_CMD='python setup.py'
         - SETUP_CMD='test'
-        - PIP_DEPENDENCIES=''
+        - EVENT_TYPE='pull_request push'
+
+
+        # For this package-template, we include examples of Cython modules,
+        # so Cython is required for testing. If your package does not include
+        # Cython code, you can set CONDA_DEPENDENCIES=''
         - CONDA_DEPENDENCIES=''
+        - CONDA_DEPENDENCIES_DOC='sphinx-astropy'
+
+        # List other runtime dependencies for the package that are available as
+        # pip packages here.
+        - PIP_DEPENDENCIES=''
+
+        # Conda packages for affiliated packages are hosted in channel
+        # "astropy" while builds for astropy LTS with recent numpy versions
+        # are in astropy-ci-extras. If your package uses either of these,
+        # add the channels to CONDA_CHANNELS along with any other channels
+        # you want to use.
+        - CONDA_CHANNELS='astropy-ci-extras astropy'
+
+        # If there are matplotlib or other GUI tests, uncomment the following
+        # line to use the X virtual framebuffer.
+        # - SETUP_XVFB=True
+
+        # If you want to ignore certain flake8 errors, you can list them
+        # in FLAKE8_OPT, for example:
+        # - FLAKE8_OPT='--ignore=E501'
+        - FLAKE8_OPT=''
+
 
 matrix:
+
+    # Don't wait for allowed failures
+    fast_finish: true
+
     include:
-
-        # Slow ones first... Try Astropy development version on new python
-        - env: ASTROPY_VERSION=development
-
-        # Check for sphinx doc build warnings.
-        - env: SETUP_CMD='build_sphinx -w' CONDA_DEPENDENCIES='sip<4.19'
-
-        # Check Python 3 with stable numpy, also verifying coverage.
+        # Do a coverage test.
         - env: SETUP_CMD='test --coverage'
 
+        # Check for sphinx doc build warnings - we do this first because it
+        # may run for a long time (Py3.7 does not work as of 2018-12-17).
+        - env: PYTHON_VERSION=3.6 SETUP_CMD='build_sphinx -w'
+
+        # Now try Astropy dev with the latest Python
+        - env: ASTROPY_VERSION=development
+               EVENT_TYPE='pull_request push cron'
+
         # Try combination of oldest python, numpy, and astropy versions.
-        - python: 3.5
-          env: NUMPY_VERSION=1.13 ASTROPY_VERSION=3.0
+        - env: PYTHON_VERSION=3.5 NUMPY_VERSION=1.10 ASTROPY_VERSION=3.0
 
         # Make sure that egg_info works without dependencies
         - env: SETUP_CMD='egg_info'
@@ -52,19 +88,12 @@ matrix:
         # Do a PEP8/pyflakes test with flake8 (see setup.cfg for options)
         - env: MAIN_CMD="flake8 --count baseband" SETUP_CMD=''
 
-before_install:
-
-    # If there are matplotlib tests, comment these out to
-    # Make sure that interactive matplotlib backends work
-    # - export DISPLAY=:99.0
-    # - sh -e /etc/init.d/xvfb start
-
 install:
 
     # We now use the ci-helpers package to set up our testing environment.
     # This is done by using Miniconda and then using conda and pip to install
     # dependencies. Which dependencies are installed using conda and pip is
-    # determined by the CONDA_DEPDENDENCIES and PIP_DEPENDENCIES variables,
+    # determined by the CONDA_DEPENDENCIES and PIP_DEPENDENCIES variables,
     # which should be space-delimited lists of package names. See the README
     # in https://github.com/astropy/ci-helpers for information about the full
     # list of environment variables that can be used to customize your
@@ -72,8 +101,8 @@ install:
     # in how to install a package, in which case you can have additional
     # commands in the install: section below.
 
-    - git clone git://github.com/astropy/ci-helpers.git
-    - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
+    - git clone --depth 1 git://github.com/astropy/ci-helpers.git
+    - source ci-helpers/travis/setup_conda.sh
 
     # As described above, using ci-helpers, you should be able to set up an
     # environment with dependencies installed using conda and pip, but in some
@@ -85,11 +114,9 @@ install:
     # other dependencies.
 
 script:
-    - echo "$MAIN_CMD $SETUP_CMD"
-    - $MAIN_CMD $SETUP_CMD
+   - $MAIN_CMD $SETUP_CMD
 
 after_success:
-    # If coveralls.io is set up for this package, uncomment the line
-    # below and replace "packagename" with the name of your package.
+    # If coveralls.io is set up for this package, uncomment the line below.
     # The coveragerc file may be customized as needed for your package.
-    - if [[ $SETUP_CMD == 'test --coverage' ]]; then coveralls --rcfile='baseband/tests/coveragerc'; fi
+    - if [[ $SETUP_CMD == *coverage* ]]; then coveralls --rcfile='baseband/tests/coveragerc'; fi
