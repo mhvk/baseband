@@ -4,5 +4,7 @@ channels:
     - astropy
 
 dependencies:
+    - python>=3.5
     - astropy
     - numpy
+    - sphinx-astropy
