@@ -72,8 +72,8 @@ matrix:
         - env: SETUP_CMD='test --coverage'
 
         # Check for sphinx doc build warnings - we do this first because it
-        # may run for a long time
-        - env: SETUP_CMD='build_sphinx -w' CONDA_DEPENDENCIES='sip<4.19'
+        # may run for a long time (Py3.7 does not work as of 2018-12-17).
+        - env: PYTHON_VERSION=3.6 SETUP_CMD='build_sphinx -w'
 
         # Now try Astropy dev with the latest Python
         - env: ASTROPY_VERSION=development
