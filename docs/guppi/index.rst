@@ -139,5 +139,3 @@ Reference/API
 .. automodapi:: baseband.guppi.payload
 .. automodapi:: baseband.guppi.frame
 .. automodapi:: baseband.guppi.base
-
-
