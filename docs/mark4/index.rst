@@ -137,4 +137,5 @@ Reference/API
    :include-all-objects:
 .. automodapi:: baseband.mark4.payload
 .. automodapi:: baseband.mark4.frame
+.. automodapi:: baseband.mark4.file_info
 .. automodapi:: baseband.mark4.base

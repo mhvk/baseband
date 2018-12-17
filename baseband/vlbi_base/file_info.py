@@ -8,7 +8,8 @@ import warnings
 import astropy.units as u
 
 
-__all__ = ['VLBIFileReaderInfo', 'VLBIStreamReaderInfo']
+__all__ = ['VLBIInfoMeta', 'VLBIInfoBase',
+           'VLBIFileReaderInfo', 'VLBIStreamReaderInfo']
 
 
 class VLBIInfoMeta(type):

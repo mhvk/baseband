@@ -2,14 +2,17 @@
 from ..vlbi_base.file_info import VLBIFileReaderInfo
 
 
+__all__ = ['Mark4FileReaderInfo']
+
+
 class Mark4FileReaderInfo(VLBIFileReaderInfo):
     """Standardized information on Mark 4 file readers.
 
     The ``info`` descriptor has a number of standard attributes, which are
     determined from arguments passed in opening the file, from the first header
     (``info.header0``) and from possibly scanning the file to determine the
-    duration of frames.  `Mark4FileReaderInfo` has two additional attributes
-    specific to Mark 4 files (``ntrack`` and ``offset0``, see below).
+    duration of frames.  This class has two additional attributes specific to
+    Mark 4 files (``ntrack`` and ``offset0``, see below).
 
     Attributes
     ----------

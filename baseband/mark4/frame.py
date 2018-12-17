@@ -32,7 +32,7 @@ class Mark4Frame(VLBIFrameBase):
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool or None, optional
         Whether the data are valid.  If `None` (default), inferred from header.
-        Note that `header` is updated in-place if `True` or `False`.
+        Note that ``header`` is updated in-place if `True` or `False`.
     verify : bool, optional
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and number of tracks are consistent
