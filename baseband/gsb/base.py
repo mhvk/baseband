@@ -14,8 +14,8 @@ from .frame import GSBFrame
 from .file_info import GSBTimeStampInfo, GSBStreamReaderInfo
 
 
-__all__ = ['GSBFileReader', 'GSBFileWriter', 'GSBStreamReader',
-           'GSBStreamWriter', 'open']
+__all__ = ['GSBTimeStampIO', 'GSBFileReader', 'GSBFileWriter',
+           'GSBStreamBase', 'GSBStreamReader', 'GSBStreamWriter', 'open']
 
 
 class GSBTimeStampIO(VLBIFileBase):
