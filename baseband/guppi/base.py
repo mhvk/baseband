@@ -368,7 +368,7 @@ Notes
 -----
 For streams, one can also pass to ``name`` a list of files, or a template
 string that can be formatted using 'stt_imjd', 'src_name', and other header
-keywords (by `~baseband.dada.base.GUPPIFileNameSequencer`).
+keywords (by `~baseband.guppi.base.GUPPIFileNameSequencer`).
 
 For writing, one can mimic, for example, what is done at Arecibo by using
 the template 'puppi_{stt_imjd}_{src_name}_{scannum}.{file_nr:04d}.raw'.  GUPPI

@@ -9,7 +9,8 @@ import numpy as np
 from astropy.utils import lazyproperty
 
 
-__all__ = ['FileNameSequencer', 'SequentialFileReader', 'SequentialFileWriter',
+__all__ = ['FileNameSequencer',
+           'SequentialFileBase', 'SequentialFileReader', 'SequentialFileWriter',
            'open']
 
 

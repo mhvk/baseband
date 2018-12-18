@@ -30,7 +30,7 @@ class VDIFFrame(VLBIFrameBase):
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool or None
         Whether the data are valid.  If `None` (default), is inferred from
-        header.  Note that `header` is changed in-place if `True` or `False`.
+        header.  Note that ``header`` is changed in-place if `True` or `False`.
     verify : bool
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and whether or not data are complex

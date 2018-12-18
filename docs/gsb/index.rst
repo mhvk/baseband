@@ -102,7 +102,7 @@ sample rate is::
 
     sample_rate = raw_sample_rate / (2 * nchan)
 
-where the raw sample rate is the pre-channelized one, and `nchan` the number
+where the raw sample rate is the pre-channelized one, and ``nchan`` the number
 of Fourier channels.  The samples per frame for both rawdump and phased is::
 
     samples_per_frame = timespan_of_frame * sample_rate

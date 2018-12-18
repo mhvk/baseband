@@ -1,0 +1,19 @@
+# All these exceptions are because GuppiHeader inherits from
+# astropy.io.fits.Header, which contains links that are not understood
+# (in particular to Header itself, i.e., things don't get resolved
+# correctly).
+py:obj list.append
+py:obj list.count
+py:obj list.extend
+py:obj list.index
+py:obj list.insert
+py:meth list.pop
+py:obj list.remove
+py:obj Card
+py:obj Header
+py:obj Header.append
+py:obj Header.set
+py:obj Header.update
+py:meth Header.append
+py:meth Header.set
+py:meth Header.update
