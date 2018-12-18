@@ -28,7 +28,7 @@ header that is structured as follows:
 .. figure:: VDIFHeader.png
    :scale: 50 %
 
-   Schematic of the standard 32-bit VDIF header, from `VDIF specification 
+   Schematic of the standard 32-bit VDIF header, from `VDIF specification
    release 1.1.1 document, Fig. 3
    <http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf>`_.
    32-bit words are labelled on the left, while byte and bit numbers above
@@ -82,11 +82,10 @@ See Sec. 3.1 of the specification for best practices on using
 the invalid data bit :math:`\mathrm{I}_1` in word 0.
 
 In Baseband, a header is parsed using :class:`~baseband.vdif.header.VDIFHeader`,
-which returns a header instance that is a subclass of
-:class:`~!baseband.vdif.header.VDIFHeader` corresponding to the header
-EDV.  This can be seen in the :mod:`~baseband.vdif.header` module class
+which returns a header instance of one of its subclasses, corresponding to the
+header EDV.  This can be seen in the :mod:`baseband.vdif.header` module class
 inheritance diagram.  To support a new EDV, we create a new subclass to
-:class:`~!baseband.vdif.header.VDIFHeader`::
+:class:`baseband.vdif.VDIFHeader`::
 
     >>> class VDIFHeader4(vdif.header.VDIFHeader):
     ...     _edv = 4
@@ -110,21 +109,20 @@ inheritance diagram.  To support a new EDV, we create a new subclass to
     ...          ('sync_pattern', (5, 0, 32, 0xACABFEED)),
     ...          ('validity_mask', (6, 0, 64, 0))))
 
-:class:`~!baseband.vdif.header.VDIFHeader` has a metaclass that ensures that
+:class:`~baseband.vdif.header.VDIFHeader` has a metaclass that ensures that
 whenever it is subclassed, the subclass definition is inserted into the
-:obj:`~baseband.vdif.header.VDIF_HEADER_CLASSES` dictionary using its EDV
-value as the dictionary key.  Methods in
-:class:`~!baseband.vdif.header.VDIFHeader` use this dictionary to determine
+:py:data:`~baseband.vdif.header.VDIF_HEADER_CLASSES` dictionary using
+its EDV value as the dictionary key.  Methods in
+:class:`~baseband.vdif.header.VDIFHeader` use this dictionary to determine
 the type of object to return for a particular EDV.  How all this works is
-further discussed in the documentation of the VDIF :mod:`header
-<baseband.vdif.header>` module.
+further discussed in the documentation of the VDIF
+:mod:`baseband.vdif.header` module.
 
 The class must have a private ``_edv`` attribute for it to properly be
-registered in :obj:`~!baseband.vdif.header.VDIF_HEADER_CLASSES`.  It must
+registered in :py:data:`~baseband.vdif.header.VDIF_HEADER_CLASSES`.  It must
 also feature a ``_header_parser`` that reads these words to return header
-properties.  For this, we utilize :class:`vlbi_base.header.HeaderParser
-<baseband.vlbi_base.header.HeaderParser>`, available in 
-:mod:`baseband.vlbi_base.header`.  To initialize a header parser,
+properties.  For this, we use
+:class:`baseband.vlbi_base.header.HeaderParser`.  To initialize a header parser,
 we pass it a tuple of header properties, where each entry follows the
 syntax:
 
@@ -214,9 +212,9 @@ as above by subclassing :mod:`~baseband.vdif.header.VDIFBaseHeader`::
     ...         self['validity_mask_length'] = len(validity)
     ...         self['validity_mask'] = np.packbits(bitmask[::-1]).view('>u8')
 
-Here, we set ``edv = 42`` because :class:`~!baseband.vdif.header.VDIFHeader`'s
+Here, we set ``edv = 42`` because :class:`~baseband.vdif.header.VDIFHeader`'s
 metaclass is designed to prevent accidental overwriting of existing
-entries in :obj:`~!baseband.vdif.header.VDIF_HEADER_CLASSES`.  If we had used
+entries in :py:data:`~baseband.vdif.header.VDIF_HEADER_CLASSES`.  If we had used
 ``_edv = 4``, we would have gotten an exception:
 
     ``ValueError: EDV 4 already registered in VDIF_HEADER_CLASSES``
@@ -272,7 +270,7 @@ so that we can use ``validity`` as a keyword in ``fromvalues``::
 .. note::
 
     If you have implemented support for a new EDV that is widely used, we
-    encourage you to make a pull request to Baseband's `GitHub repository 
+    encourage you to make a pull request to Baseband's `GitHub repository
     <https://github.com/mhvk/baseband>`_, as well as to `register it
     <http://www.vlbi.org/vdif/>`_ (if it is not already registered) with the
     VDIF consortium!
@@ -282,14 +280,14 @@ so that we can use ``validity`` as a keyword in ``fromvalues``::
 Replacing an Existing EDV
 =========================
 
-Above, we mentioned that :class:`~!baseband.vdif.header.VDIFHeader`'s
+Above, we mentioned that :class:`~baseband.vdif.header.VDIFHeader`'s
 metaclass is designed to prevent accidental overwriting of existing
-entries in :obj:`~!baseband.vdif.header.VDIF_HEADER_CLASSES`, so attempting
+entries in :py:data:`~baseband.vdif.header.VDIF_HEADER_CLASSES`, so attempting
 to assign two header classes to the same EDV results in an exception.  There
 are situations such the one above, however, where we'd like to replace
 one header with another.
 
-To get :class:`~!baseband.vdif.header.VDIFHeader` to use ``VDIFHeader4Enhanced``
+To get :class:`~baseband.vdif.header.VDIFHeader` to use ``VDIFHeader4Enhanced``
 when ``edv=4``, we can manually insert it in the dictionary::
 
     >>> vdif.header.VDIF_HEADER_CLASSES[4] = VDIFHeader4Enhanced
@@ -298,7 +296,7 @@ Of course, we should then be sure that its ``_edv`` attribute is correct::
 
     >>> VDIFHeader4Enhanced._edv = 4
 
-:class:`~!baseband.vdif.header.VDIFHeader` will now return instances of
+:class:`~baseband.vdif.header.VDIFHeader` will now return instances of
 ``VDIFHeader4Enhanced`` when reading headers with ``edv = 4``::
 
     >>> myheader = vdif.header.VDIFHeader.fromvalues(
@@ -312,7 +310,7 @@ Of course, we should then be sure that its ``_edv`` attribute is correct::
     Failing to modify ``_edv`` in the class definition will lead to an
     EDV mismatch when ``verify`` is called during header initialization.
 
-This can also be used to override :class:`~!baseband.vdif.header.VDIFHeader`'s
+This can also be used to override :class:`~baseband.vdif.header.VDIFHeader`'s
 behavior *even for EDVs that are supported by Baseband*, which may
 prove useful when reading data with corrupted or mislabelled headers.  To
 illustrate this, we attempt to read in a corrupted VDIF file originally
@@ -335,7 +333,7 @@ than 4 -- the number is defined such that a one-bit sample has a
 reflect the data acquisition computer node that wrote the data to disk.
 
 To accommodate these changes, we design an alternate header.  We first
-pop the EDV = 0 entry from :obj:`~!baseband.vdif.header.VDIF_HEADER_CLASSES`::
+pop the EDV = 0 entry from :py:data:`~baseband.vdif.header.VDIF_HEADER_CLASSES`::
 
     >>> vdif.header.VDIF_HEADER_CLASSES.pop(0)
     <class 'baseband.vdif.header.VDIFHeader0'>
@@ -344,11 +342,11 @@ We then define a replacement class::
 
     >>> class DRAOVDIFHeader(vdif.header.VDIFHeader0):
     ...     """DRAO VDIF Header
-    ... 
+    ...
     ...     An extension of EDV=0 which uses the thread_id to store link
     ...     and slot numbers, and adds a user keyword (illegal in EDV0,
     ...     but whatever) that identifies data taken at the same time.
-    ... 
+    ...
     ...     The header also corrects 'bits_per_sample' to be properly bps-1.
     ...     """
     ...
@@ -356,20 +354,20 @@ We then define a replacement class::
     ...         vlbi.header.HeaderParser((('link', (3, 16, 4)),
     ...                                   ('slot', (3, 20, 6)),
     ...                                   ('eud2', (5, 0, 32))))
-    ... 
+    ...
     ...     def verify(self):
     ...         pass  # this is a hack, don't bother with verification...
-    ... 
+    ...
     ...     @classmethod
     ...     def fromfile(cls, fh, edv=0, verify=False):
-    ...         self = super(DRAOVDIFHeader, cls).fromfile(fh, edv=0, 
+    ...         self = super(DRAOVDIFHeader, cls).fromfile(fh, edv=0,
     ...                                                    verify=False)
     ...         # Correct wrong bps
     ...         self.mutable = True
     ...         self['bits_per_sample'] = 3
     ...         return self
 
-We override ``verify`` because :class:`~!baseband.vdif.header.VDIFHeader0`'s
+We override ``verify`` because :class:`~baseband.vdif.header.VDIFHeader0`'s
 ``verify`` function checks that word 5 contains no data.  We also override
 the ``fromfile`` class method such that the ``bits_per_sample`` property
 is reset to its proper value whenever a header is read from file.
@@ -388,19 +386,19 @@ the payload, of each frame::
     True
     >>> fh.close()
 
-Reading a frame using :class:`~!baseband.vdif.frame.VDIFFrame` will still fail,
+Reading a frame using :class:`~baseband.vdif.frame.VDIFFrame` will still fail,
 since its ``_header_class`` is :class:`~baseband.vdif.header.VDIFHeader`,
-and so :meth:`VDIFHeader.fromfile <~!baseband.vdif.header.VDIFHeader.fromfile>`,
+and so :meth:`VDIFHeader.fromfile <baseband.vdif.header.VDIFHeader.fromfile>`,
 rather than the function we defined, is used to read in headers.  If we
-wanted to use :class:`~!baseband.vdif.frame.VDIFFrame`, we would need to set
+wanted to use :class:`~baseband.vdif.frame.VDIFFrame`, we would need to set
 
     ``VDIFFrame._header_class = DRAOVDIFHeader``
 
-before using :func:`~!baseband.vdif.open`, so that header files are read
+before using :func:`baseband.vdif.open`, so that header files are read
 using ``DRAOVDIFHeader.fromfile``.
 
-A more elegant solution that is compatible with :class:`~!baseband.vdif.base.VDIFStreamReader`
-without hacking :class:`~!baseband.vdif.frame.VDIFFrame` involves modifying the
+A more elegant solution that is compatible with :class:`baseband.vdif.base.VDIFStreamReader`
+without hacking :class:`baseband.vdif.frame.VDIFFrame` involves modifying the
 bits-per-sample code within ``__init__()``.  Let's remove our previous custom
 class, and define a replacement::
 
@@ -408,18 +406,18 @@ class, and define a replacement::
     <class '__main__.DRAOVDIFHeader'>
     >>> class DRAOVDIFHeaderEnhanced(vdif.header.VDIFHeader0):
     ...     """DRAO VDIF Header
-    ... 
+    ...
     ...     An extension of EDV=0 which uses the thread_id to store link and slot
     ...     numbers, and adds a user keyword (illegal in EDV0, but whatever) that
     ...     identifies data taken at the same time.
-    ... 
+    ...
     ...     The header also corrects 'bits_per_sample' to be properly bps-1.
     ...     """
     ...     _header_parser = vdif.header.VDIFHeader0._header_parser + \
     ...         vlbi.header.HeaderParser((('link', (3, 16, 4)),
     ...                                   ('slot', (3, 20, 6)),
     ...                                   ('eud2', (5, 0, 32))))
-    ... 
+    ...
     ...     def __init__(self, words, edv=None, verify=True, **kwargs):
     ...         super(DRAOVDIFHeaderEnhanced, self).__init__(
     ...                 words, verify=False, **kwargs)
@@ -439,9 +437,9 @@ We can then use the stream reader without further modification::
     >>> fh2.close()
 
 Reading frames using :meth:`VDIFFileReader.read_frame
-<!baseband.vdif.base.VDIFFileReader.read_frame>` will now work as well, but
-reading frame sets using :meth:`VDIFFileReader.read_frameset 
-<!baseband.vdif.base.VDIFFileReader.read_frameset>` will still fail.  
+<baseband.vdif.base.VDIFFileReader.read_frame>` will now work as well, but
+reading frame sets using :meth:`VDIFFileReader.read_frameset
+<baseband.vdif.base.VDIFFileReader.read_frameset>` will still fail.
 This is because the frame and thread numbers that function relies on
 are meaningless for these headers, and grouping threads together using
 the  ``link``, ``slot`` and ``eud2`` values should be manually performed

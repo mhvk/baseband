@@ -206,8 +206,7 @@ class VLBIStreamBase(object):
     def start_time(self):
         """Start time of the file.
 
-        See also `time` for the time of the sample pointer's current offset,
-        and (if available) `stop_time` for the time at the end of the file.
+        See also `time` for the time of the sample pointer's current offset.
         """
         return self._get_time(self.header0)
 
@@ -215,8 +214,7 @@ class VLBIStreamBase(object):
     def time(self):
         """Time of the sample pointer's current offset in file.
 
-        See also `start_time` for the start time, and (if available)
-        `stop_time` for the end time, of the file.
+        See also `start_time` for the start time of the file.
         """
         return self.tell(unit='time')
 
@@ -429,6 +427,25 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
                              .format(10 * self.header0.frame_nbytes))
         return last_header
+
+    # Override the following so we can refer to stop_time in the docstring.
+    @property
+    def start_time(self):
+        """Start time of the file.
+
+        See also `time` for the time of the sample pointer's current offset,
+        and (if available) `stop_time` for the time at the end of the file.
+        """
+        return super().start_time
+
+    @property
+    def time(self):
+        """Time of the sample pointer's current offset in file.
+
+        See also `start_time` for the start time, and (if available)
+        `stop_time` for the end time, of the file.
+        """
+        return super().time
 
     @lazyproperty
     def stop_time(self):

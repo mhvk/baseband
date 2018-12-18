@@ -61,8 +61,8 @@ class CRC(object):
     See https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 
     Once initialised, the instance can be used as a function that calculates
-    the CRC, or one can use the `check` method to check that the CRC at the
-    end of a stream is correct.
+    the CRC, or one can use the ``check`` method to verify that the CRC at
+    the end of a stream is correct.
 
     Parameters
     ----------

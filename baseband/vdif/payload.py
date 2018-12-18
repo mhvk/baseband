@@ -27,12 +27,8 @@ def init_luts():
 
     Returns
     -------
-    lut1bit : `~numpy.ndarray`
-        Look-up table for decoding bytes to 1-bit samples.
-    lut2bit : `~numpy.ndarray`
-        As `lut1bit1`, but for 2-bit samples.
-    lut4bit : `~numpy.ndarray`
-        As `lut1bit1`, but for 4-bit samples.
+    lut1bit, lut2bit, lut4but : `~numpy.ndarray`
+        Look-up table for decoding bytes to samples of 1, 2, and 4 bits, resp.
 
     Notes
     -----

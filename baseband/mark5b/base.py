@@ -14,8 +14,9 @@ from .frame import Mark5BFrame
 from .file_info import Mark5BFileReaderInfo
 
 
-__all__ = ['Mark5BFileReader', 'Mark5BFileWriter', 'Mark5BStreamReader',
-           'Mark5BStreamWriter', 'open']
+__all__ = ['Mark5BFileReader', 'Mark5BFileWriter',
+           'Mark5BStreamBase', 'Mark5BStreamReader', 'Mark5BStreamWriter',
+           'open']
 
 
 class Mark5BFileReader(VLBIFileReaderBase):

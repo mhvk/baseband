@@ -14,8 +14,9 @@ from .frame import Mark4Frame
 from .file_info import Mark4FileReaderInfo
 
 
-__all__ = ['Mark4FileReader', 'Mark4FileWriter', 'Mark4StreamReader',
-           'Mark4StreamWriter', 'open']
+__all__ = ['Mark4FileReader', 'Mark4FileWriter',
+           'Mark4StreamBase', 'Mark4StreamReader', 'Mark4StreamWriter',
+           'open']
 
 # Look-up table for the number of bits in a byte.
 nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
@@ -26,7 +27,7 @@ class Mark4FileReader(VLBIFileReaderBase):
     """Simple reader for Mark 4 files.
 
     Wraps a binary filehandle, providing methods to help interpret the data,
-    such as `locate_frame, `read_frame` and `get_frame_rate`.
+    such as `locate_frame`, `read_frame` and `get_frame_rate`.
 
     Parameters
     ----------
@@ -223,9 +224,9 @@ class Mark4FileReader(VLBIFileReaderBase):
     def determine_ntrack(self, maximum=None):
         """Determines the number of tracks, by seeking the next frame.
 
-        Uses `find_frame` to look for the first occurrence of a frame from
+        Uses `locate_frame` to look for the first occurrence of a frame from
         the current position for all supported ``ntrack`` values.  Returns the
-        first ``ntrack`` for which `find_frame` is successful, setting
+        first ``ntrack`` for which `locate_frame` is successful, setting
         the file's ``ntrack`` property appropriately, and leaving the
         file pointer at the start of the frame.
 

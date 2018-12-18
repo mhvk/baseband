@@ -11,6 +11,10 @@ import astropy.units as u
 from astropy.extern import six
 
 
+__all__ = ['VLBIInfoMeta', 'VLBIInfoBase',
+           'VLBIFileReaderInfo', 'VLBIStreamReaderInfo']
+
+
 class VLBIInfoMeta(type):
     # Ensure all attributes are initialized to None, so that they are
     # always available (do this rather than overwrite __getattr__ so that

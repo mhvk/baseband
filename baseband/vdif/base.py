@@ -118,7 +118,7 @@ class VDIFFileReader(VLBIFileReaderBase):
         -------
         frameset : :class:`~baseband.vdif.VDIFFrameSet`
             With ``.headers`` and ``.data`` properties that return a list of
-            :class:`~baseband.vdif.VDIFHeaders` and the data encoded in the
+            :class:`~baseband.vdif.VDIFHeader` and the data encoded in the
             frame set, respectively.
         """
         return VDIFFrameSet.fromfile(self.fh_raw, thread_ids, edv=edv,
@@ -270,7 +270,7 @@ class VDIFFileWriter(VLBIFileBase):
             the VDIF frame.
         header : `~baseband.vdif.VDIFHeader`
             Can instead give keyword arguments to construct a header.  Ignored
-            if `data` is a `~baseband.vdif.VDIFFrame` instance.
+            if ``data`` is a `~baseband.vdif.VDIFFrame` instance.
         **kwargs
             If ``header`` is not given, these are used to initialize one.
         """
@@ -289,9 +289,9 @@ class VDIFFileWriter(VLBIFileBase):
             the VDIF frame set.
         header : :class:`~baseband.vdif.VDIFHeader`, list of same
             Can instead give keyword arguments to construct a header.  Ignored
-            if `data` is a :class:`~baseband.vdif.VDIFFrameSet` instance.  If a
+            if ``data`` is a :class:`~baseband.vdif.VDIFFrameSet` instance.  If a
             list, should have a length matching the number of threads in
-            `data`; if a single header, ``thread_ids`` corresponding
+            ``data``; if a single header, ``thread_ids`` corresponding
             to the number of threads are generated automatically.
         **kwargs
             If ``header`` is not given, these are used to initialize one.
@@ -596,7 +596,7 @@ header0 : `~baseband.vdif.VDIFHeader`
 sample_rate : `~astropy.units.Quantity`
     Number of complete samples per second, i.e. the rate at which each
     channel in each thread is sampled.  For EDV 1 and 3, can alternatively set
-    `sample_rate` within the header.
+    ``sample_rate`` within the header.
 nthread : int, optional
     Number of threads (e.g., 2 for 2 polarisations).  Default: 1.
 squeeze : bool, optional
