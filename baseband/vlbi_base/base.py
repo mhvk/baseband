@@ -287,7 +287,8 @@ class VLBIStreamBase:
         if unit is None:
             return self.offset
 
-        if unit == 'time':
+        # "isinstance" avoids costly comparisons of an actual unit with 'time'.
+        if not isinstance(unit, u.UnitBase) and unit == 'time':
             return self.start_time + self.tell(unit=u.s)
 
         return (self.offset / self.sample_rate).to(unit)
