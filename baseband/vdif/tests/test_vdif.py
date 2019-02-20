@@ -364,6 +364,19 @@ class TestVDIF:
         header5['complex_data'] = True
         payload5 = vdif.VDIFPayload.fromdata(payload4.data, header5)
         assert payload5 == payload4
+        # Check shape for non-power-of-2 bps.  (Note: cannot yet decode.)
+        payload6 = vdif.VDIFPayload(payload.words, nchan=1, bps=7,
+                                    complex_data=False)
+        assert payload6.shape == (1250 * 4, 1)
+        payload7 = vdif.VDIFPayload(payload.words, nchan=1, bps=7,
+                                    complex_data=True)
+        assert payload7.shape == (1250 * 2, 1)
+        payload8 = vdif.VDIFPayload(payload.words, nchan=1, bps=11,
+                                    complex_data=False)
+        assert payload8.shape == (1250 * 2, 1)
+        payload9 = vdif.VDIFPayload(payload.words, nchan=1, bps=11,
+                                    complex_data=True)
+        assert payload9.shape == (1250 * 1, 1)
 
     @pytest.mark.parametrize('item', (2, (), -1, slice(1, 3),
                                       slice(2, 4), slice(-3, None)))
