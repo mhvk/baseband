@@ -11,11 +11,15 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
             try:
                 fh.seek(0)
                 return fh.read_timestamp()
-            except Exception:
+            except Exception as exc:
+                self.errors['header0'] = exc
                 return None
 
     def _get_format(self):
         return 'gsb'
+
+    def _readable(self):
+        return "unknown: need raw binary files"
 
     def _collect_info(self):
         super()._collect_info()

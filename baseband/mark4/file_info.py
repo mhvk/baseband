@@ -1,4 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
+import numpy as np
+
 from ..vlbi_base.file_info import VLBIFileReaderInfo
 
 
@@ -37,11 +39,16 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
     offset0 : int
         Offset in bytes from the start of the file to the location of the
         first header.
+    readable : bool
+        Whether the first sample could be read and decoded.
     missing : dict
         Entries are keyed by names of arguments that should be passed to
         the file reader to obtain full information. The associated entries
         explain why these arguments are needed. For Mark 4, the possible
         entries are ``decade`` and ``ref_time``.
+    errors : dict
+        Any exceptions raised while trying to determine attributes.  Keyed
+        by the attributes.
 
     Examples
     --------
@@ -59,10 +66,12 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         sample_shape = (8,)
         bps = 2
         complex_data = False
+        readable = True
         offset0 = 2696
         <BLANKLINE>
         missing:  decade, ref_time: needed to infer full times.
         <BLANKLINE>
+        errors:  start_time: unsupported operand type(s) for //: 'NoneType' and 'int'
         >>> fh.close()
 
         >>> fh = mark4.open(SAMPLE_MARK4, 'rb', decade=2010)
@@ -76,6 +85,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         bps = 2
         complex_data = False
         start_time = 2014-06-16T07:38:12.475000000
+        readable = True
         offset0 = 2696
         >>> fh.close()
     """
@@ -89,11 +99,23 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
                 fh.seek(0)
                 offset0 = fh.locate_frame()
                 if offset0 is None:
+                    self.errors['header0'] = 'Cannot find start of frame'
                     return None
 
                 self.offset0 = offset0
                 return fh.read_header()
-            except Exception:
+            except Exception as exc:
+                self.errors['header0'] = exc
+                return None
+
+    def _get_frame0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(0)
+            fh.locate_frame()
+            try:
+                return fh.read_frame()
+            except Exception as exc:
+                self.errors['frame0'] = exc
                 return None
 
     def _collect_info(self):

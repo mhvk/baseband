@@ -240,7 +240,8 @@ class TestMark5B:
                     'sample_shape': (8,),
                     'bps': 2,
                     'complex_data': False,
-                    'start_time': start_time}
+                    'start_time': start_time,
+                    'readable': True}
         for key, value in expected.items():
             assert getattr(info, key) == value
         assert info() == expected

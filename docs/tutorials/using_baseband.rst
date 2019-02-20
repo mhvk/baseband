@@ -56,6 +56,7 @@ files can all be found in the `baseband.data` module)::
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)
+    readable = True
 
 The same function will also tell you when more information is needed. For
 instance, for Mark 5B files one needs the number of channels used, as well as
@@ -67,9 +68,13 @@ instance, for Mark 5B files one needs the number of channels used, as well as
     frame_rate = 6400.0 Hz
     bps = 2
     complex_data = False
+    readable = False
     <BLANKLINE>
     missing:  nchan: needed to determine sample shape and rate.
               kday, ref_time: needed to infer full times.
+    <BLANKLINE>
+    errors:  frame0: In order to read frames, the file handle should be initialized with nchan set.
+
     >>> from astropy.time import Time
     >>> baseband.file_info(baseband.data.SAMPLE_MARK5B, nchan=8, ref_time=Time('2014-01-01'))
     Stream information:
@@ -85,6 +90,7 @@ instance, for Mark 5B files one needs the number of channels used, as well as
     frame_rate = 6400.0 Hz
     samples_per_frame = 5000
     sample_shape = (8,)
+    readable = True
 
 The information is gleaned from ``info`` properties on the various file and
 stream readers (see below).
@@ -217,6 +223,7 @@ Basic information about the file is obtained by either by ``fh.info`` or simply
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)
+    readable = True
 
     >>> fh
     <VDIFStreamReader name=... offset=12
