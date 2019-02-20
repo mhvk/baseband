@@ -322,12 +322,16 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         # Mostly here so GSB can override.
         return self._parent.fh_raw.info
 
+    def _readable(self):
+        # Again mostly here so GSB can override.
+        return self._parent.readable()
+
     def _collect_info(self):
         super()._collect_info()
         # We also want the raw info.
         self.file_info = self._raw_file_info()
         self.format = self.file_info.format
-        self.readable = self.file_info.readable
+        self.readable = self._readable()
 
     def _up_to_date(self):
         # Stream readers cannot change after initialization, so the check is easy.

@@ -536,6 +536,10 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         # TODO: arguably, this should be inferred from an actual payload.
         return np.dtype(np.complex64 if self.complex_data else np.float32)
 
+    def readable(self):
+        """Whether the file can be read and decoded."""
+        return self.fh_raw.readable and self.fh_raw.info.readable
+
     def read(self, count=None, out=None):
         """Read a number of complete (or subset) samples.
 

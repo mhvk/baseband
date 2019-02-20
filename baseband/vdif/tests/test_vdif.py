@@ -1238,7 +1238,7 @@ def test_bad_file_info(tmpdir):
         while fr.tell() != length:
             frame = fr.read_frame()
             frame.header.mutable = True
-            frame.header.bps = 32
+            frame.header.bps = 31
             frame.payload = vdif.VDIFPayload(frame.payload.words, frame.header)
             fw.write_frame(frame)
 
@@ -1254,5 +1254,4 @@ def test_bad_file_info(tmpdir):
         assert isinstance(fh.info.errors['readable'], KeyError)
 
     with vdif.open(filename, 'rs') as fh:
-        info = fh.info
-        assert info.readable is False
+        assert fh.info.readable is False

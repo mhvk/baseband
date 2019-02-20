@@ -320,6 +320,10 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             last_header = self.header0.__class__(second_last_line_tuple)
         return last_header
 
+    def readable(self):
+        """Whether the file can be read and decoded."""
+        return self.info.readable
+
     def _read_frame(self, index):
         self.fh_ts.seek(self.header0.seek_offset(index))
         if self.header0.mode == 'rawdump':
