@@ -325,17 +325,24 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     @bps.setter
     def bps(self, bps):
         assert bps % 1 == 0
+        int_bps = int(bps)
+        if (int_bps & (int_bps - 1)) and self.nchan != 1:
+            raise ValueError("bits per sample that is not a power of two "
+                             "is only possible for single-channel data.")
         self['bits_per_sample'] = int(bps) - 1
 
     @property
     def nchan(self):
         """Number of channels in the frame."""
-        return 2**self['lg2_nchan']
+        return 2 ** self['lg2_nchan']
 
     @nchan.setter
     def nchan(self, nchan):
         lg2_nchan = np.log2(nchan)
         assert lg2_nchan % 1 == 0
+        if nchan != 1 and (self.bps & (self.bps - 1)) != 0:
+            raise ValueError("Multi-channel data requires bits per sample "
+                             "that is a power of two.")
         self['lg2_nchan'] = int(lg2_nchan)
 
     @property

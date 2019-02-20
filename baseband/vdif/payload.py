@@ -160,6 +160,18 @@ class VDIFPayload(VLBIPayloadBase):
                     raise ValueError("VDIF/Mark5B payload cannot be complex.")
         super().__init__(words, sample_shape=(nchan,),
                          bps=bps, complex_data=complex_data)
+        # Recalculate bpfs: samples do not cross word boundaries.
+        if (bps & (bps - 1)) != 0:
+            if nchan != 1:
+                raise ValueError("Multi-channel VDIF data requires "
+                                 "bits per sample that is a power of two.")
+            spw = 32 // self._bpfs
+            if (spw & (spw - 1)) == 0:
+                self._bpfs = 32 // spw
+            else:
+                raise ValueError(
+                    "cannot yet sensibly handle {} data with bps={}"
+                    .format('complex' if complex_data else 'real', bps))
 
     @classmethod
     def fromfile(cls, fh, header):
