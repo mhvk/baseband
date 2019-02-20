@@ -19,6 +19,7 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
         return 'gsb'
 
     def _readable(self):
+        # Cannot know whether it is readable without the raw data files.
         return None
 
     def _collect_info(self):
@@ -37,6 +38,7 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
             return None
 
     def _readable(self):
+        # Bit of a hack, but the base reader one suffices here.
         return VLBIFileReaderInfo._readable(self)
 
     def _raw_file_info(self):

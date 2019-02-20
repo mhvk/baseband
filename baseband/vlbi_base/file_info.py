@@ -312,6 +312,8 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         Number of bits used to encode each elementary sample.
     complex_data : bool
         Whether the data are complex.
+    readable : bool
+        Whether the first sample could be read and decoded.
     """
     attr_names = ('start_time', 'stop_time', 'sample_rate', 'shape',
                   'format', 'bps', 'complex_data', 'readable')
