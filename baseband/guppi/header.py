@@ -8,11 +8,15 @@ import operator
 
 import numpy as np
 import astropy.units as u
+import astropy
 from astropy.io import fits
 from astropy.time import Time
 
 
 __all__ = ['GUPPIHeader']
+
+
+ASTROPY_LT_3_2 = (astropy.version.major, astropy.version.minor) < (3, 2)
 
 
 class GUPPIHeader(fits.Header):
@@ -71,7 +75,8 @@ class GUPPIHeader(fits.Header):
         # Comments handled by fits.Header__init__().
         super().__init__(*args, **kwargs)
         self.mutable = mutable
-        if verify:
+        # Empty header always OK, since things will be added to it.
+        if len(self) and verify:
             self.verify()
 
     def verify(self):
@@ -119,9 +124,12 @@ class GUPPIHeader(fits.Header):
         header_end = fh.tell()
         fh.seek(header_start)
         hdr = fh.read(header_end - header_start).decode('ascii')
-        # This calls cls.__init__, which automatically runs cls.verify().
+        # Create the header using the base class.
         self = cls.fromstring(hdr)
         self.mutable = False
+        # Above does not verify in astropy >= 3.2, so do it here if needed.
+        if verify and not ASTROPY_LT_3_2:
+            self.verify()
         # GUPPI headers are not a proper FITS standard, and we're reading
         # from a file that the user likely cannot control, so let's not bother
         # with card verification (this avoids warnings in repr(); gh-282)
