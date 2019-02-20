@@ -11,11 +11,16 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
             try:
                 fh.seek(0)
                 return fh.read_timestamp()
-            except Exception:
+            except Exception as exc:
+                self.errors['header0'] = exc
                 return None
 
     def _get_format(self):
         return 'gsb'
+
+    def _readable(self):
+        # Cannot know whether it is readable without the raw data files.
+        return None
 
     def _collect_info(self):
         super()._collect_info()
@@ -24,6 +29,17 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
 
 
 class GSBStreamReaderInfo(VLBIStreamReaderInfo):
+
+    def _get_frame0(self):
+        try:
+            return self._parent._read_frame(0)
+        except Exception as exc:
+            self.errors['frame0'] = exc
+            return None
+
+    def _readable(self):
+        # Bit of a hack, but the base reader one suffices here.
+        return VLBIFileReaderInfo._readable(self)
 
     def _raw_file_info(self):
         info = self._parent.fh_ts.info

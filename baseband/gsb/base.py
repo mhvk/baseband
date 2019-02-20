@@ -164,7 +164,10 @@ class GSBStreamBase(VLBIStreamBase):
 
         # By default, GSB frames span 4 MB for rawdump and 8 MB for phased.
         if payload_nbytes is None and samples_per_frame is None:
-            payload_nbytes = 2**22 if rawdump else 2**23 // len(fh_raw[0])
+            if sample_rate is None:
+                payload_nbytes = 2**22 if rawdump else 2**23 // len(fh_raw[0])
+            else:
+                payload_nbytes = round((sample_rate / self.fh_ts.info.frame_rate).to_value(1))
 
         if payload_nbytes is None:
             payload_nbytes = (samples_per_frame * nchan *
@@ -316,6 +319,10 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             second_last_line_tuple = tuple(second_last_line.split())
             last_header = self.header0.__class__(second_last_line_tuple)
         return last_header
+
+    def readable(self):
+        """Whether the file can be read and decoded."""
+        return self.info.readable
 
     def _read_frame(self, index):
         self.fh_ts.seek(self.header0.seek_offset(index))

@@ -98,9 +98,13 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
         # then this should always be possible if we have a frame rate, or
         # if a sample_rate was passed on.
         frame_rate = info.frame_rate
-        if frame_rate is None and 'sample_rate' in kwargs:
-            used_kwargs['sample_rate'] = kwargs['sample_rate']
-            frame_rate = 'known'
+        if 'sample_rate' in kwargs:
+            if format == 'gsb':
+                used_kwargs['sample_rate'] = kwargs['sample_rate']
+
+            elif frame_rate is None:
+                used_kwargs['sample_rate'] = kwargs['sample_rate']
+                frame_rate = 'known'
 
         if frame_rate is not None:
             with module.open(name, mode='rs', **used_kwargs) as fh:

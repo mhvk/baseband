@@ -143,6 +143,7 @@ For an overview of the file, we can either print ``fh_vdif`` itself, or use the
     format = vdif
     bps = 2
     complex_data = False
+    readable = True
     <BLANKLINE>
     File information:
     edv = 3

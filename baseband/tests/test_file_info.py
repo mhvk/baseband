@@ -1,6 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 import importlib
 import pytest
+from astropy import units as u
 from astropy.time import Time
 
 from .. import file_info
@@ -12,26 +13,24 @@ from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
 
 
 @pytest.mark.parametrize(
-    ('sample', 'format_'),
-    ((SAMPLE_M4, 'mark4'),
-     (SAMPLE_M5B, 'mark5b'),
-     (SAMPLE_VDIF, 'vdif'),
-     (SAMPLE_MWA, 'vdif'),
-     (SAMPLE_DADA, 'dada'),
-     (SAMPLE_PUPPI, 'guppi'),
-     (SAMPLE_GSB_RAWDUMP_HEADER, 'gsb'),
-     (SAMPLE_GSB_PHASED_HEADER, 'gsb')))
-def test_basic_file_info(sample, format_):
+    ('sample', 'format_', 'missing', 'readable', 'error_keys'),
+    ((SAMPLE_M4, 'mark4', True, True, ['start_time']),
+     (SAMPLE_M5B, 'mark5b', True, False, ['start_time', 'frame0']),
+     (SAMPLE_VDIF, 'vdif', False, True, []),
+     (SAMPLE_MWA, 'vdif', False, True, ['frame_rate']),
+     (SAMPLE_DADA, 'dada', False, True, []),
+     (SAMPLE_PUPPI, 'guppi', False, True, []),
+     (SAMPLE_GSB_RAWDUMP_HEADER, 'gsb', True, None, []),
+     (SAMPLE_GSB_PHASED_HEADER, 'gsb', True, None, [])))
+def test_basic_file_info(sample, format_, missing, readable, error_keys):
     info = file_info(sample)
     info_dict = info()
     assert info.format == format_
     assert info_dict['format'] == format_
-    if format_.startswith('mark') or format_.startswith('gsb'):
-        assert info.missing
-        assert 'missing' in info_dict
-    else:
-        assert not info.missing
-        assert 'missing' not in info_dict
+    assert (info.missing != {}) is missing
+    assert ('missing' in info_dict) is missing
+    assert info.readable is readable
+    assert list(info.errors.keys()) == error_keys
 
 
 @pytest.mark.parametrize(
@@ -53,7 +52,7 @@ def test_open_missing_args(sample, missing):
      (SAMPLE_PUPPI, 'guppi', (), ('nchan',), ('ref_time',))))
 def test_file_info(sample, format_, used, consistent, inconsistent):
     # Pass on extra arguments needed to get Mark4 and Mark5B to pass.
-    # For GSB, we also need raw files, so we omit them.
+    # For GSB, we also need raw files, so we test that below.
     extra_args = {'ref_time': Time('2014-01-01'),
                   'nchan': 8}
     info = file_info(sample, **extra_args)
@@ -85,9 +84,19 @@ def test_file_info(sample, format_, used, consistent, inconsistent):
     ((SAMPLE_GSB_RAWDUMP_HEADER, SAMPLE_GSB_RAWDUMP, 'rawdump'),
      (SAMPLE_GSB_PHASED_HEADER, SAMPLE_GSB_PHASED, 'phased')))
 def test_gsb_with_raw_files(sample, raw, mode):
-    info = file_info(sample, raw=raw)
+    # Note that the payload size in our sample files is reduced,
+    # so without anything the file is not readable.
+    bad_info = file_info(sample, raw=raw)
+    assert bad_info.readable is False
+    assert list(bad_info.errors.keys()) == ['frame0']
+    # But with the correct sample_rate, it works.
+    base_info = file_info(sample)
+    sample_rate = 2**12 * base_info.frame_rate
+    info = file_info(sample, raw=raw, sample_rate=sample_rate)
     assert info.format == 'gsb'
+    assert info.readable is True
     assert not info.missing
+    assert not info.errors
     module = importlib.import_module('.' + info.format, package='baseband')
     # Check we can indeed open a file with the extra arguments.
     with module.open(sample, mode='rs', **info.used_kwargs) as fh:

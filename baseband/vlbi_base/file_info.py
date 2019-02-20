@@ -4,7 +4,9 @@
 Loosely based on `~astropy.utils.data_info.DataInfo`.
 """
 import warnings
+from collections import OrderedDict
 
+import numpy as np
 import astropy.units as u
 
 
@@ -38,6 +40,7 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
         for attr in self._parent_attrs:
             setattr(self, attr, getattr(self._parent, attr))
         self.missing = {}
+        self.errors = OrderedDict()
 
     def _up_to_date(self):
         """Determine whether the information we have stored is up to date."""
@@ -86,6 +89,8 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
                     info[attr] = value
             if self.missing:
                 info['missing'] = self.missing
+            if self.errors:
+                info['errors'] = self.errors
 
         return info
 
@@ -117,6 +122,13 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
                 result += "{} {}: {}\n".format(prefix, ', '.join(keys), msg)
                 prefix = ' ' * len(prefix)
 
+        if self.errors:
+            result += '\n'
+            prefix = 'errors: '
+            for item, error in self.errors.items():
+                result += "{} {}: {}\n".format(prefix, item, str(error))
+                prefix = ' ' * len(prefix)
+
         return result
 
 
@@ -146,10 +158,15 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         Whether the data are complex.
     start_time : `~astropy.time.Time`
         Time of the first complete sample.
+    readable : bool
+        Whether the first sample could be read and decoded.
     missing : dict
         Entries are keyed by names of arguments that should be passed to
         the file reader to obtain full information. The associated entries
         explain why these arguments are needed.
+    errors : dict
+        Any exceptions raised while trying to determine attributes.  Keyed
+        by the attributes.
 
     Examples
     --------
@@ -164,10 +181,14 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         frame_rate = 6400.0 Hz
         bps = 2
         complex_data = False
+        readable = False
         <BLANKLINE>
         missing:  nchan: needed to determine sample shape and rate.
                   kday, ref_time: needed to infer full times.
         <BLANKLINE>
+        errors:  start_time: unsupported operand type(s) for +: 'NoneType' and 'int'
+                 frame0: In order to read frames, the file handle should be initialized with nchan set.
+
         >>> fh.close()
 
         >>> fh = mark5b.open(SAMPLE_MARK5B, 'rb', kday=56000, nchan=8)
@@ -181,10 +202,11 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         bps = 2
         complex_data = False
         start_time = 2014-06-13T05:30:01.000000000
+        readable = True
         >>> fh.close()
     """
     attr_names = ('format', 'frame_rate', 'sample_rate', 'samples_per_frame',
-                  'sample_shape', 'bps', 'complex_data', 'start_time')
+                  'sample_shape', 'bps', 'complex_data', 'start_time', 'readable')
     _header0_attrs = ('bps', 'complex_data', 'samples_per_frame',
                       'sample_shape')
 
@@ -197,8 +219,38 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                 try:
                     fh.seek(0)
                     return fh.read_header()
-                except Exception:
+                except Exception as exc:
+                    self.errors['header0'] = exc
                     return None
+
+    def _get_frame0(self):
+        with self._parent.temporary_offset() as fh:
+            # Try reading a frame.  This has no business failing if a
+            # frame rate could be determined, but try anyway.
+            try:
+                fh.seek(0)
+                return fh.read_frame()
+            except Exception as exc:
+                self.errors['frame0'] = exc
+                return None
+
+    def _readable(self):
+        frame0 = self._get_frame0()
+        if frame0 is None:
+            return False
+
+        # Getting the first sample can fail if we don't have the right decoder.
+        try:
+            first_sample = frame0[0]
+        except Exception as exc:
+            self.errors['readable'] = exc
+            return False
+
+        if not isinstance(first_sample, np.ndarray):
+            self.errors['readable'] = 'first sample is not an ndarray'
+            return False
+
+        return True
 
     def _get_format(self):
         return self._parent.__class__.__name__.split('File')[0].lower()
@@ -206,13 +258,15 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     def _get_frame_rate(self):
         try:
             return self._parent.get_frame_rate()
-        except Exception:
+        except Exception as exc:
+            self.errors['frame_rate'] = exc
             return None
 
     def _get_start_time(self):
         try:
             return self.header0.time
-        except Exception:
+        except Exception as exc:
+            self.errors['start_time'] = exc
             return None
 
     def _collect_info(self):
@@ -227,6 +281,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                     self.samples_per_frame is not None):
                 self.sample_rate = self.frame_rate * self.samples_per_frame
             self.start_time = self._get_start_time()
+            self.readable = self._readable()
 
     def __repr__(self):
         result = 'File information:\n'
@@ -257,23 +312,31 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         Number of bits used to encode each elementary sample.
     complex_data : bool
         Whether the data are complex.
+    readable : bool
+        Whether the first sample could be read and decoded.
     """
     attr_names = ('start_time', 'stop_time', 'sample_rate', 'shape',
-                  'format', 'bps', 'complex_data')
-    _parent_attrs = tuple(attr for attr in attr_names if attr != 'format')
+                  'format', 'bps', 'complex_data', 'readable')
+    _parent_attrs = tuple(attr for attr in attr_names
+                          if attr not in ('format', 'readable'))
 
     def _raw_file_info(self):
         # Mostly here so GSB can override.
         return self._parent.fh_raw.info
+
+    def _readable(self):
+        # Again mostly here so GSB can override.
+        return self._parent.readable()
 
     def _collect_info(self):
         super()._collect_info()
         # We also want the raw info.
         self.file_info = self._raw_file_info()
         self.format = self.file_info.format
+        self.readable = self._readable()
 
     def _up_to_date(self):
-        # Stream readers cannot after initialization, so the check is easy.
+        # Stream readers cannot change after initialization, so the check is easy.
         return True
 
     def __call__(self):

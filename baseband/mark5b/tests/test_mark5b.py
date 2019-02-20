@@ -240,7 +240,8 @@ class TestMark5B:
                     'sample_shape': (8,),
                     'bps': 2,
                     'complex_data': False,
-                    'start_time': start_time}
+                    'start_time': start_time,
+                    'readable': True}
         for key, value in expected.items():
             assert getattr(info, key) == value
         assert info() == expected
@@ -281,6 +282,7 @@ class TestMark5B:
                            'shape': (20000, 8),
                            'bps': 2,
                            'complex_data': False,
+                           'readable': True,
                            'file_info': expected}
 
         for key, value in stream_expected.items():

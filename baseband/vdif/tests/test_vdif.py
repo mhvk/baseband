@@ -1227,3 +1227,31 @@ class TestVDIFBPS1:
             b1 = f1.read(16064)
             b2 = f2.read(16064)
         assert b1 == b2
+
+
+def test_bad_file_info(tmpdir):
+    filename = str(tmpdir.join('bps32file.vdif'))
+    with vdif.open(SAMPLE_FILE, 'rb') as fr, \
+            vdif.open(filename, 'wb') as fw:
+        length = fr.seek(0, 2)
+        fr.seek(0)
+        while fr.tell() != length:
+            frame = fr.read_frame()
+            frame.header.mutable = True
+            frame.header.bps = 31
+            frame.payload = vdif.VDIFPayload(frame.payload.words, frame.header)
+            fw.write_frame(frame)
+
+    with vdif.open(filename, 'rb') as fh:
+        frame = fh.read_frame()
+        with pytest.raises(KeyError):
+            frame[0]
+
+    with vdif.open(filename, 'rb') as fh:
+        info = fh.info
+        assert info.readable is False
+        assert 'readable' in fh.info.errors.keys()
+        assert isinstance(fh.info.errors['readable'], KeyError)
+
+    with vdif.open(filename, 'rs') as fh:
+        assert fh.info.readable is False
