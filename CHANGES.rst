@@ -3,6 +3,13 @@
 
 - This version only supports python3.
 
+New Features
+------------
+
+- File information now includes whether a file can be read and decoded.
+  The ``readable()`` method on stream readers also includes whether the
+  data in a file can be decoded. [#316]
+
 Bug Fixes
 ---------
 
