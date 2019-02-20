@@ -9,7 +9,8 @@ class Mark5BFileReaderInfo(VLBIFileReaderInfo):
     def _get_start_time(self):
         try:
             return self.header0.get_time(frame_rate=self.frame_rate)
-        except Exception:
+        except Exception as exc:
+            self.errors['start_time'] = exc
             return None
 
     def _collect_info(self):

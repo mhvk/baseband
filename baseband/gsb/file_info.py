@@ -19,7 +19,7 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
         return 'gsb'
 
     def _readable(self):
-        return "unknown: need raw binary files"
+        return None
 
     def _collect_info(self):
         super()._collect_info()

@@ -12,32 +12,24 @@ from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
 
 
 @pytest.mark.parametrize(
-    ('sample', 'format_'),
-    ((SAMPLE_M4, 'mark4'),
-     (SAMPLE_M5B, 'mark5b'),
-     (SAMPLE_VDIF, 'vdif'),
-     (SAMPLE_MWA, 'vdif'),
-     (SAMPLE_DADA, 'dada'),
-     (SAMPLE_PUPPI, 'guppi'),
-     (SAMPLE_GSB_RAWDUMP_HEADER, 'gsb'),
-     (SAMPLE_GSB_PHASED_HEADER, 'gsb')))
-def test_basic_file_info(sample, format_):
+    ('sample', 'format_', 'missing', 'readable', 'error_keys'),
+    ((SAMPLE_M4, 'mark4', True, True, ['start_time']),
+     (SAMPLE_M5B, 'mark5b', True, False, ['start_time', 'frame0']),
+     (SAMPLE_VDIF, 'vdif', False, True, []),
+     (SAMPLE_MWA, 'vdif', False, True, ['frame_rate']),
+     (SAMPLE_DADA, 'dada', False, True, []),
+     (SAMPLE_PUPPI, 'guppi', False, True, []),
+     (SAMPLE_GSB_RAWDUMP_HEADER, 'gsb', True, None, []),
+     (SAMPLE_GSB_PHASED_HEADER, 'gsb', True, None, [])))
+def test_basic_file_info(sample, format_, missing, readable, error_keys):
     info = file_info(sample)
     info_dict = info()
     assert info.format == format_
     assert info_dict['format'] == format_
-    if format_.startswith('mark') or format_ == 'gsb':
-        assert info.missing
-        assert 'missing' in info_dict
-    else:
-        assert not info.missing
-        assert 'missing' not in info_dict
-    if format_.startswith('mark5b'):
-        assert info.readable is False
-    elif format_ == 'gsb':
-        assert info.readable.startswith('unknown')
-    else:
-        assert info.readable is True
+    assert (info.missing != {}) is missing
+    assert ('missing' in info_dict) is missing
+    assert info.readable is readable
+    assert list(info.errors.keys()) == error_keys
 
 
 @pytest.mark.parametrize(
