@@ -29,11 +29,21 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
 
 class GSBStreamReaderInfo(VLBIStreamReaderInfo):
 
+    def _get_frame0(self):
+        try:
+            return self._parent._read_frame(0)
+        except Exception as exc:
+            self.errors['frame0'] = exc
+            return None
+
+    def _readable(self):
+        return VLBIFileReaderInfo._readable(self)
+
     def _raw_file_info(self):
         info = self._parent.fh_ts.info
         # The timestamp reader info has a built-in missing for the
         # raw file, but this is incorrect if we're in a stream, which
         # cannot have been opened without one. (Yes, this is a hack.)
         info.missing = {}
-        info.readable = True
+        info.readable = self._readable()
         return info

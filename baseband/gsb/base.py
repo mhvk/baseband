@@ -164,7 +164,10 @@ class GSBStreamBase(VLBIStreamBase):
 
         # By default, GSB frames span 4 MB for rawdump and 8 MB for phased.
         if payload_nbytes is None and samples_per_frame is None:
-            payload_nbytes = 2**22 if rawdump else 2**23 // len(fh_raw[0])
+            if sample_rate is None:
+                payload_nbytes = 2**22 if rawdump else 2**23 // len(fh_raw[0])
+            else:
+                payload_nbytes = round((sample_rate / self.fh_ts.info.frame_rate).to_value(1))
 
         if payload_nbytes is None:
             payload_nbytes = (samples_per_frame * nchan *

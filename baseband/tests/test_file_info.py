@@ -1,6 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 import importlib
 import pytest
+from astropy import units as u
 from astropy.time import Time
 
 from .. import file_info
@@ -51,7 +52,7 @@ def test_open_missing_args(sample, missing):
      (SAMPLE_PUPPI, 'guppi', (), ('nchan',), ('ref_time',))))
 def test_file_info(sample, format_, used, consistent, inconsistent):
     # Pass on extra arguments needed to get Mark4 and Mark5B to pass.
-    # For GSB, we also need raw files, so we omit them.
+    # For GSB, we also need raw files, so we test that below.
     extra_args = {'ref_time': Time('2014-01-01'),
                   'nchan': 8}
     info = file_info(sample, **extra_args)
@@ -83,9 +84,19 @@ def test_file_info(sample, format_, used, consistent, inconsistent):
     ((SAMPLE_GSB_RAWDUMP_HEADER, SAMPLE_GSB_RAWDUMP, 'rawdump'),
      (SAMPLE_GSB_PHASED_HEADER, SAMPLE_GSB_PHASED, 'phased')))
 def test_gsb_with_raw_files(sample, raw, mode):
-    info = file_info(sample, raw=raw)
+    # Note that the payload size in our sample files is reduced,
+    # so without anything the file is not readable.
+    bad_info = file_info(sample, raw=raw)
+    assert bad_info.readable is False
+    assert list(bad_info.errors.keys()) == ['frame0']
+    # But with the correct sample_rate, it works.
+    base_info = file_info(sample)
+    sample_rate = 2**12 * base_info.frame_rate
+    info = file_info(sample, raw=raw, sample_rate=sample_rate)
     assert info.format == 'gsb'
+    assert info.readable is True
     assert not info.missing
+    assert not info.errors
     module = importlib.import_module('.' + info.format, package='baseband')
     # Check we can indeed open a file with the extra arguments.
     with module.open(sample, mode='rs', **info.used_kwargs) as fh:
