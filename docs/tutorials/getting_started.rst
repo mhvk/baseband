@@ -143,13 +143,13 @@ For an overview of the file, we can either print ``fh_vdif`` itself, or use the
     format = vdif
     bps = 2
     complex_data = False
+    readable = True
     <BLANKLINE>
     File information:
     edv = 3
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)
-    readable = True
 
 Seeking is also done in units of complete samples, which is equivalent to
 seeking in timesteps.  Let's move forward 100 complete samples::

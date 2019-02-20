@@ -313,8 +313,9 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         Whether the data are complex.
     """
     attr_names = ('start_time', 'stop_time', 'sample_rate', 'shape',
-                  'format', 'bps', 'complex_data')
-    _parent_attrs = tuple(attr for attr in attr_names if attr != 'format')
+                  'format', 'bps', 'complex_data', 'readable')
+    _parent_attrs = tuple(attr for attr in attr_names
+                          if attr not in ('format', 'readable'))
 
     def _raw_file_info(self):
         # Mostly here so GSB can override.
@@ -325,6 +326,7 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         # We also want the raw info.
         self.file_info = self._raw_file_info()
         self.format = self.file_info.format
+        self.readable = self.file_info.readable
 
     def _up_to_date(self):
         # Stream readers cannot change after initialization, so the check is easy.

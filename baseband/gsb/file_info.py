@@ -35,4 +35,5 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
         # raw file, but this is incorrect if we're in a stream, which
         # cannot have been opened without one. (Yes, this is a hack.)
         info.missing = {}
+        info.readable = True
         return info

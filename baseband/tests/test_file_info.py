@@ -26,12 +26,18 @@ def test_basic_file_info(sample, format_):
     info_dict = info()
     assert info.format == format_
     assert info_dict['format'] == format_
-    if format_.startswith('mark') or format_.startswith('gsb'):
+    if format_.startswith('mark') or format_ == 'gsb':
         assert info.missing
         assert 'missing' in info_dict
     else:
         assert not info.missing
         assert 'missing' not in info_dict
+    if format_.startswith('mark5b'):
+        assert info.readable is False
+    elif format_ == 'gsb':
+        assert info.readable.startswith('unknown')
+    else:
+        assert info.readable is True
 
 
 @pytest.mark.parametrize(

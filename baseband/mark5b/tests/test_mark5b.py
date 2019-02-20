@@ -282,6 +282,7 @@ class TestMark5B:
                            'shape': (20000, 8),
                            'bps': 2,
                            'complex_data': False,
+                           'readable': True,
                            'file_info': expected}
 
         for key, value in stream_expected.items():
