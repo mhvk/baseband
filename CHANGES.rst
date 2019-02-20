@@ -3,6 +3,13 @@
 
 - This version only supports python3.
 
+Bug Fixes
+---------
+
+- Empty GUPPI headers can now be created without having to pass in
+  ``verify=False``. This is needed for astropy 3.2, which initializes an empty
+  header in its revamped ``.fromstring`` method. [#314]
+
 2.0.1 (unreleased)
 ==================
 
