@@ -16,7 +16,11 @@ Bug Fixes
 Bug Fixes
 ---------
 
-- None yet
+- VDIF multichannel headers and payloads are now forced to have power-of-two
+  bits per sample. [#315]
+
+- Bits per complete sample for VDIF payloads are now calculated correctly also
+  for non power-of-two bits per sample. [#315]
 
 2.0 (2018-12-12)
 ================
