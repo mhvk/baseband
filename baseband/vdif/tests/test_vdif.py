@@ -183,6 +183,23 @@ class TestVDIF:
         assert (header10.get_time(frame_rate=headerT.frame_rate) ==
                 headerT.time)
 
+        # Check that bps has to be power of 2 for multi-channel data.
+        header11 = header.copy()
+        header11.bps = 5
+        assert header11.bps == 5
+        with pytest.raises(ValueError):
+            header11.nchan = 2
+        header11.bps = 8
+        assert header11.bps == 8
+        header11.nchan = 2
+        assert header11.nchan == 2
+
+        header12 = header.copy()
+        header12.nchan = 2
+        assert header12.nchan == 2
+        with pytest.raises(ValueError):
+            header12.bps = 5
+
     def test_custom_header(self, tmpdir):
         # Custom header with an EDV that already exists
         with pytest.raises(ValueError):
