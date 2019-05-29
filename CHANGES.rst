@@ -29,6 +29,9 @@ Bug Fixes
 - Bits per complete sample for VDIF payloads are now calculated correctly also
   for non power-of-two bits per sample. [#315]
 
+- Guppi raw file info now presents the correct sample rate, corrected for
+  overlap. [#319]
+
 2.0 (2018-12-12)
 ================
 

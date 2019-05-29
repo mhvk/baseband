@@ -277,7 +277,8 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                 setattr(self, attr, getattr(self.header0, attr))
             self.format = self._get_format()
             self.frame_rate = self._get_frame_rate()
-            if (self.frame_rate is not None and
+            if ('sample_rate' not in self._header0_attrs and
+                    self.frame_rate is not None and
                     self.samples_per_frame is not None):
                 self.sample_rate = self.frame_rate * self.samples_per_frame
             self.start_time = self._get_start_time()

@@ -11,6 +11,7 @@ from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
 from .frame import GUPPIFrame
+from .file_info import GUPPIFileReaderInfo
 
 
 __all__ = ['GUPPIFileNameSequencer', 'GUPPIFileReader', 'GUPPIFileWriter',
@@ -87,6 +88,7 @@ class GUPPIFileReader(VLBIFileReaderBase):
     fh_raw : filehandle
         Filehandle of the raw binary data file.
     """
+    info = GUPPIFileReaderInfo()
 
     def read_header(self):
         """Read a single header from the file.
