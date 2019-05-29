@@ -246,6 +246,22 @@ class TestGUPPI:
             assert fh.tell() == current_pos
             # Frame is done below, as is writing in binary.
 
+    def test_file_info(self):
+        with guppi.open(SAMPLE_FILE, 'rb') as fh:
+            info = fh.info
+            assert info.format == 'guppi'
+            header = fh.read_header()
+            assert info.bps == header.bps
+            assert info.complex_data == header.complex_data
+            assert info.sample_shape == header.sample_shape
+            assert info.start_time == header.start_time
+            assert info.samples_per_frame == header.samples_per_frame
+            # Note: sample_rate used to be wrong, since calculated from
+            # from frame rate and samples_per_frame w/o corr. for overlap.
+            assert info.sample_rate == header.sample_rate
+            assert info.frame_rate == header.sample_rate / (
+                header.samples_per_frame - header.overlap)
+
     def test_frame(self, tmpdir):
         with guppi.open(SAMPLE_FILE, 'rb') as fh:
             frame = fh.read_frame(memmap=False)
@@ -644,6 +660,16 @@ class TestGUPPI:
         with pytest.raises(TypeError):
             # Extraneous argument.
             guppi.open(filename, 'rs', files=(filename,))
+
+    def test_stream_info(self):
+        with guppi.open(SAMPLE_FILE, 'rs') as fh:
+            info = fh.info
+            assert info.format == 'guppi'
+            assert info.shape == fh.shape
+            assert info.sample_rate == fh.sample_rate
+            assert info.start_time == fh.start_time
+            assert info.stop_time == fh.stop_time
+            assert info.file_info is fh.fh_raw.info
 
 
 class TestGUPPIFileNameSequencer:
