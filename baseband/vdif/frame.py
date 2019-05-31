@@ -6,7 +6,7 @@ Implements a VDIFFrame class  that can be used to hold a header and a
 payload, providing access to the values encoded in both.  Also, define
 a VDIFFrameSet class that combines a set of frames from different threads.
 
-For the VDIF specification, see http://www.vlbi.org/vdif
+For the VDIF specification, see https://www.vlbi.org/vdif
 """
 import numpy as np
 
@@ -150,7 +150,7 @@ class VDIFFrame(VLBIFrameBase):
         Any additional keywords can be used to set VDIF header properties
         not found in the Mark 5B header (such as station).
 
-        See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
+        See https://vlbi.org/wp-content/uploads/2019/03/vdif_extension_0xab.pdf
         """
         m5h, m5pl = mark5b_frame.header, mark5b_frame.payload
         header = cls._header_class.from_mark5b_header(

@@ -7,7 +7,7 @@ Supporting a New VDIF EDV
 Users may encounter VDIF files with unusual headers not currently supported by
 Baseband.  These may either have novel EDV, or they may purport to be a
 supported EDV but not conform to its `formal specification
-<http://www.vlbi.org/vdif/>`_.  To handle such situations, Baseband supports
+<https://www.vlbi.org/vdif/>`_.  To handle such situations, Baseband supports
 implementation of new EDVs and overriding of existing EDVs without the need to
 modify Baseband's source code.
 
@@ -30,7 +30,7 @@ header that is structured as follows:
 
    Schematic of the standard 32-bit VDIF header, from `VDIF specification
    release 1.1.1 document, Fig. 3
-   <http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf>`_.
+   <https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf>`_.
    32-bit words are labelled on the left, while byte and bit numbers above
    indicate relative addresses within each word.  Subscripts indicate field
    length in bits.
@@ -46,11 +46,11 @@ where the abbreviated labels are
 - :math:`\mathrm{EDV}_8` - "extended data version" number; see below
 
 Detailed definitions of terms are found on pages 5 to 7 of the `VDIF specification
-document <http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf>`_.
+document <https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf>`_.
 
 Words 4 - 7 hold optional extended user data, using a layout specified by the
 EDV, in word 4 of the header.  EDV formats can be registered on the `VDIF
-website <http://www.vlbi.org/vdif/>`_; Baseband aims to support all registered
+website <https://www.vlbi.org/vdif/>`_; Baseband aims to support all registered
 formats (but does not currently support EDV = 4).
 
 .. _new_edv_new_edv:
@@ -63,7 +63,7 @@ be a first and required step to support that format, but does not suffice, as
 it also needs a new frame class that allows the purpose of the EDV class,
 which is to independently store the validity of sub-band channels within a
 single data frame, rather than using the single invalid-data bit.  From the
-`EDV=4 specification <http://www.vlbi.org/vdif/docs/edv4description.pdf>`_, we
+`EDV=4 specification <https://vlbi.org/wp-content/uploads/2019/03/edv4description.pdf>`_, we
 see that we need to add the following to the standard VDIF header:
 
 - Validity header mask (word 4, bits 16 - 24): integer value between 1 and
@@ -272,7 +272,7 @@ so that we can use ``validity`` as a keyword in ``fromvalues``::
     If you have implemented support for a new EDV that is widely used, we
     encourage you to make a pull request to Baseband's `GitHub repository
     <https://github.com/mhvk/baseband>`_, as well as to `register it
-    <http://www.vlbi.org/vdif/>`_ (if it is not already registered) with the
+    <https://www.vlbi.org/vdif/>`_ (if it is not already registered) with the
     VDIF consortium!
 
 .. _new_edv_replacement:

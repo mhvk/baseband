@@ -5,7 +5,7 @@ Definitions for VLBI VDIF payloads.
 Implements a VDIFPayload class used to store payload words, and decode to
 or encode from a data array.
 
-See the `VDIF specification page <http://www.vlbi.org/vdif>`_ for payload
+See the `VDIF specification page <https://www.vlbi.org/vdif>`_ for payload
 specifications.
 """
 from collections import namedtuple
@@ -37,7 +37,7 @@ def init_luts():
     by byte value (in uint8 form) and whose second axis represents sample
     temporal order.  Table values are decoded sample values.  Sec. 10 in
     the `VDIF Specification
-    <http://vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf>`_
+    <https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf>`_
     states that samples are encoded by offset-binary, such that all 0
     bits is lowest and all 1 bits is highest.  I.e., for 2-bit sampling,
     the order is 00, 01, 10, 11.  These are decoded using

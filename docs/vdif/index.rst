@@ -6,10 +6,10 @@
 VDIF
 ****
 
-The `VLBI Data Interchange Format (VDIF) <http://www.vlbi.org/vdif/>`_ was
+The `VLBI Data Interchange Format (VDIF) <https://www.vlbi.org/vdif/>`_ was
 introduced in 2009 to standardize VLBI data transfer and storage.  Detailed
 specifications are found in VDIF's `specification document
-<http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf>`_.
+<https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf>`_.
 
 .. _vdif_file_structure:
 
@@ -127,7 +127,7 @@ For small files, one could just do::
     ...                   nthread=fr.sample_shape.nthread) as fw:
     ...     fw.write(fr.read())
 
-This copies everything to memory, though, and some header information is lost. 
+This copies everything to memory, though, and some header information is lost.
 
 .. _vdif_troubleshooting:
 
@@ -157,7 +157,7 @@ the class EDV.  If they do not, the following line
 returns an AssertionError.  If this occurs because the VDIF EDV is not yet
 supported by Baseband, support can be added by implementing a custom header
 class.  If the EDV is supported, but the header deviates from the format
-found in the `VLBI.org EDV registry <http://www.vlbi.org/vdif/>`_, the
+found in the `VLBI.org EDV registry <https://www.vlbi.org/vdif/>`_, the
 best solution is to create a custom header class, then override the
 subclass selector in `~baseband.vdif.header.VDIFHeader`.  Tutorials
 for doing either can be found :ref:`here <new_edv>`.

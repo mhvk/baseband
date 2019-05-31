@@ -5,7 +5,7 @@ Definitions for VLBI VDIF Headers.
 Implements a VDIFHeader class used to store header words, and decode/encode
 the information therein.
 
-For the VDIF specification, see http://www.vlbi.org/vdif
+For the VDIF specification, see https://www.vlbi.org/vdif
 """
 import numpy as np
 import astropy.units as u
@@ -80,7 +80,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     """VDIF Header, supporting different Extended Data Versions.
 
     Will initialize a header instance appropriate for a given EDV.
-    See http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf
+    See https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf
 
     Parameters
     ----------
@@ -254,7 +254,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     def from_mark5b_header(cls, mark5b_header, bps, nchan, **kwargs):
         """Construct an Mark5B over VDIF header (EDV=0xab).
 
-        See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
+        See https://vlbi.org/wp-content/uploads/2019/03/vdif_extension_0xab.pdf
 
         Note that the Mark 5B header does not encode the bits-per-sample and
         the number of channels used in the payload, so these need to be given
@@ -456,7 +456,7 @@ class VDIFLegacyHeader(VDIFHeader):
     """Legacy VDIF header that uses only 4 32-bit words.
 
     See Section 6 of
-    http://www.vlbi.org/vdif/docs/VDIF_specification_Release_1.1.1.pdf
+    https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf
     """
     _struct = four_word_struct
 
@@ -616,7 +616,7 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
 class VDIFHeader1(VDIFSampleRateHeader):
     """VDIF Header for EDV=1.
 
-    See http://www.vlbi.org/vdif/docs/vdif_extension_0x01.pdf
+    See https://vlbi.org/wp-content/uploads/2019/03/vdif_extension_0x01.pdf
     """
     _edv = 1
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
@@ -626,7 +626,7 @@ class VDIFHeader1(VDIFSampleRateHeader):
 class VDIFHeader3(VDIFSampleRateHeader):
     """VDIF Header for EDV=3.
 
-    See http://www.vlbi.org/vdif/docs/vdif_extension_0x03.pdf
+    See https://vlbi.org/wp-content/uploads/2019/03/vdif_extension_0x03.pdf
     """
     _edv = 3
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
@@ -649,7 +649,7 @@ class VDIFHeader3(VDIFSampleRateHeader):
 class VDIFHeader2(VDIFBaseHeader):
     """VDIF Header for EDV=2.
 
-    See http://www.vlbi.org/vdif/docs/alma-vdif-edv.pdf
+    See https://vlbi.org/wp-content/uploads/2019/03/alma-vdif-edv.pdf
 
     Notes
     -----
@@ -677,7 +677,7 @@ class VDIFHeader2(VDIFBaseHeader):
 class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
     """Mark 5B over VDIF (EDV=0xab).
 
-    See http://www.vlbi.org/vdif/docs/vdif_extension_0xab.pdf
+    See https://vlbi.org/wp-content/uploads/2019/03/vdif_extension_0xab.pdf
     """
     _edv = 0xab
     # Repeat 'frame_length' to set default.
