@@ -52,12 +52,12 @@ class VLBIPayloadBase:
             self.sample_shape = self._sample_shape_maker(*sample_shape)
         else:
             self.sample_shape = sample_shape
+        self._sample_size = reduce(operator.mul, sample_shape, 1)
         self.bps = bps
         self.complex_data = complex_data
-        self._bpfs = (bps * (2 if complex_data else 1) *
-                      reduce(operator.mul, sample_shape, 1))
+        self._bpfs = bps * (2 if complex_data else 1) * self._sample_size
         self._coder = bps
-        if self._nbytes is not None and self._nbytes != self.nbytes:
+        if self._nbytes is not None and self._nbytes != words.nbytes:
             raise ValueError("encoded data should have length {0}"
                              .format(self._nbytes))
         if words.dtype != self._dtype_word:
@@ -131,11 +131,11 @@ class VLBIPayloadBase:
     @property
     def nbytes(self):
         """Size of the payload in bytes."""
-        return self.words.size * self.words.dtype.itemsize
+        return self.words.nbytes
 
     def __len__(self):
         """Number of samples in the payload."""
-        return self.nbytes * 8 // self._bpfs
+        return self.words.nbytes * 8 // self._bpfs
 
     @property
     def shape(self):
@@ -145,15 +145,12 @@ class VLBIPayloadBase:
     @property
     def size(self):
         """Total number of component samples in the decoded data array."""
-        prod = 1
-        for dim in self.shape:
-            prod *= dim
-        return prod
+        return len(self) * self._sample_size
 
     @property
     def ndim(self):
         """Number of dimensions of the decoded data array."""
-        return len(self.shape)
+        return 1 + len(self.sample_shape)
 
     @property
     def dtype(self):
@@ -221,7 +218,7 @@ class VLBIPayloadBase:
             data_slice = slice(None, None, step) if is_slice else 0
 
         else:
-            bpw = 8 * self.words.dtype.itemsize
+            bpw = 8 * self.words.itemsize
             bpfs = self._bpfs
             if bpfs % bpw == 0:
                 # Each full sample requires one or more encoded words.
