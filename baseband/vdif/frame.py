@@ -239,7 +239,9 @@ class VDIFFrameSet:
             thread_id = header['thread_id']
             if thread_ids is None or thread_id in thread_ids:
                 payload = VDIFPayload.fromfile(fh, header=header)
-                frames[thread_id] = VDIFFrame(header, payload, verify=verify)
+                # Since header was (optionally) verified, and payload was
+                # initialized using header, no frame verification is needed.
+                frames[thread_id] = VDIFFrame(header, payload, verify=False)
             else:
                 fh.seek(header.payload_nbytes, 1)
 

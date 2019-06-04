@@ -185,8 +185,11 @@ class VDIFPayload(VLBIPayloadBase):
             Used to infer the payload size, number of channels, bits per
             sample, and whether the data are complex.
         """
-        s = fh.read(header.payload_nbytes)
-        if len(s) < header.payload_nbytes:
+        nbytes = header.payload_nbytes
+        # Could do super().fromfile(fh, header, payload_nbytes=nbytes),
+        # but that is rather more costly.
+        s = fh.read(nbytes)
+        if len(s) < nbytes:
             raise EOFError("could not read full payload.")
         return cls(np.frombuffer(s, dtype=cls._dtype_word), header)
 

@@ -66,10 +66,9 @@ class VLBIFrameBase:
         """Simple verification.  To be added to by subclasses."""
         assert isinstance(self.header, self._header_class)
         assert isinstance(self.payload, self._payload_class)
-        assert (self.payload.nbytes ==
-                self.payload.words.size * self.payload.words.dtype.itemsize)
-        assert (self.payload.nbytes == getattr(self.header, 'payload_nbytes',
-                                               self.payload.nbytes))
+        payload_nbytes = getattr(self.header, 'payload_nbytes', None)
+        if payload_nbytes is not None:
+            assert self.payload.nbytes == payload_nbytes
 
     @property
     def valid(self):
