@@ -17,6 +17,13 @@ Bug Fixes
   ``verify=False``. This is needed for astropy 3.2, which initializes an empty
   header in its revamped ``.fromstring`` method. [#314]
 
+Other Changes and Additions
+---------------------------
+
+- Increased speed of VDIF stream reading by removing redundant verification.
+  Reduces the overhead for verification for VDIF CHIME data from 50% (factor
+  1.5) to 13%. [#321]
+
 2.0.1 (unreleased)
 ==================
 
