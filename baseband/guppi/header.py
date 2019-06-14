@@ -322,7 +322,14 @@ class GUPPIHeader(fits.Header):
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
+        old_payload_nbytes = self.payload_nbytes
         self.payload_nbytes = (samples_per_frame * self._bpcs + 7) // 8
+        if self.samples_per_frame != samples_per_frame:
+            exc = ValueError("header cannot store {} samples per frame. "
+                             "Nearest is {}.".format(samples_per_frame,
+                                                     self.samples_per_frame))
+            self.payload_nbytes = old_payload_nbytes
+            raise exc
 
     @property
     def overlap(self):

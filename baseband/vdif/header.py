@@ -7,6 +7,8 @@ the information therein.
 
 For the VDIF specification, see https://www.vlbi.org/vdif
 """
+import operator
+
 import numpy as np
 import astropy.units as u
 from astropy.time import Time, TimeDelta
@@ -359,7 +361,15 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         # units of frame length are 8 bytes, i.e., 2 words.
         values_per_long = values_per_word * 2
         longs = (samples_per_frame * self.nchan - 1) // values_per_long + 1
-        self['frame_length'] = int(longs) + self.nbytes // 8
+        old_payload_nbytes = self.payload_nbytes
+        self.payload_nbytes = int(8 * longs)
+        # Check that samples_per_frame would be recovered.
+        if self.samples_per_frame != samples_per_frame:
+            exc = ValueError("header cannot store {} samples per frame. "
+                             "Nearest is {}.".format(samples_per_frame,
+                                                     self.samples_per_frame))
+            self.payload_nbytes = old_payload_nbytes
+            raise exc
 
     @property
     def station(self):

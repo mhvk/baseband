@@ -6,8 +6,10 @@ Implements a DADAHeader class used to store header definitions in a FITS
 header, and read & write these from files.
 """
 import io
+import operator
 import warnings
 from collections import OrderedDict
+
 import astropy.units as u
 from astropy.time import Time
 
@@ -65,6 +67,7 @@ class DADAHeader(OrderedDict):
                  ('SECONDARY', 'unset'),
                  ('FILE_NAME', 'unset'),
                  ('FILE_NUMBER', 0),
+                 ('FILE_SIZE', 0),
                  ('OBS_OFFSET', 0),
                  ('OBS_OVERLAP', 0),
                  ('SOURCE', 'unset'),
@@ -354,9 +357,16 @@ class DADAHeader(OrderedDict):
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
-        self.payload_nbytes = (
+        old_payload_nbytes = self.payload_nbytes
+        self.payload_nbytes = int(
             (samples_per_frame * self['NCHAN'] * self['NPOL'] *
              self.bps * (2 if self.complex_data else 1) + 7) // 8)
+        if self.samples_per_frame != samples_per_frame:
+            exc = ValueError("header cannot store {} samples per frame. "
+                             "Nearest is {}.".format(samples_per_frame,
+                                                     self.samples_per_frame))
+            self.payload_nbytes = old_payload_nbytes
+            raise exc
 
     @property
     def offset(self):

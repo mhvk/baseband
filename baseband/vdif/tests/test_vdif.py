@@ -200,6 +200,13 @@ class TestVDIF:
         with pytest.raises(ValueError):
             header12.bps = 5
 
+    def test_header_bad_samples_per_frame(self):
+        """Samples per frame should fit nicely in a frame."""
+        # Regression test for gh-323
+        with pytest.raises(ValueError):
+            vdif.VDIFHeader.fromvalues(samples_per_frame=78125, nchan=2, edv=0,
+                                       complex_data=True)
+
     def test_custom_header(self, tmpdir):
         # Custom header with an EDV that already exists
         with pytest.raises(ValueError):
