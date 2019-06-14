@@ -39,6 +39,9 @@ Bug Fixes
 - Guppi raw file info now presents the correct sample rate, corrected for
   overlap. [#319]
 
+- All headers now check that ``samples_per_frame`` are set to possible numbers.
+  [#325]
+
 2.0 (2018-12-12)
 ================
 

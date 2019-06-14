@@ -106,6 +106,11 @@ class TestMark4:
         # Check that passing a year into decade leads to an error.
         with pytest.raises(AssertionError):
             mark4.Mark4Header(header.words, decade=2014)
+        # And that not just any samples_per_frame is possible
+        with pytest.raises(ValueError):
+            mark4.Mark4Header.fromvalues(
+                ntrack=64, samples_per_frame=80001, bps=2, nsb=1,
+                time=header.time, system_id=108)
         # Check that passing approximate ref_time is equivalent to passing a
         # decade.
         with open(SAMPLE_FILE, 'rb') as fh:

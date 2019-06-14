@@ -139,6 +139,11 @@ class TestDADA:
         assert header10.mutable is True
         assert header10.comments == header.comments
 
+    def test_header_impossible_samples_per_frame(self):
+        with pytest.raises(ValueError):
+            dada.DADAHeader.fromvalues(nchan=1, npol=1, complex_data=False,
+                                       bps=4, samples_per_frame=10001)
+
     def test_payload(self, tmpdir):
         payload = self.payload
         assert payload.nbytes == 64000

@@ -10,6 +10,8 @@ http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 A little bit on the disk representation is at
 http://adsabs.harvard.edu/abs/2003ASPC..306..123W
 """
+import operator
+
 import numpy as np
 from astropy.time import Time
 
@@ -541,7 +543,15 @@ class Mark4Header(Mark4TrackHeader):
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
-        self.fanout = samples_per_frame * self.ntrack // 8 // self.frame_nbytes
+        fanout, extra = divmod(samples_per_frame * self.ntrack,
+                               8 * self.frame_nbytes)
+        if extra or fanout not in (1, 2, 4):
+            raise ValueError(
+                "header cannot store {} samples per frame. Should be one of {}."
+                .format(samples_per_frame,
+                        ', '.join([str(f * 8 * self.frame_nbytes)
+                                   for f in (1, 2, 4)])))
+        self.fanout = int(fanout)
 
     @property
     def bps(self):

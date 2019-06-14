@@ -156,6 +156,11 @@ class TestGUPPI:
         assert np.abs(header10.offset - offset) < 1 * u.ns
         assert np.abs(header10.start_time - header.start_time) < 1 * u.ns
 
+    def test_header_impossible_samples_per_frame(self):
+        with pytest.raises(ValueError):
+            guppi.GUPPIHeader.fromvalues(nchan=1, npol=1, bps=4,
+                                         samples_per_frame=10001)
+
     def test_payload(self, tmpdir):
         payload = self.payload
         assert payload.nbytes == 16384

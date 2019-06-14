@@ -242,8 +242,9 @@ class VLBIStreamBase:
     def samples_per_frame(self, samples_per_frame):
         try:
             self._samples_per_frame = operator.index(samples_per_frame)
-        except Exception:
-            raise TypeError("samples per frame must have an integer value.")
+        except Exception as exc:
+            exc.args += ("samples per frame must have an integer value.",)
+            raise exc
 
     @property
     def sample_rate(self):
