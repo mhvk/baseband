@@ -17,6 +17,9 @@ Bug Fixes
   ``verify=False``. This is needed for astropy 3.2, which initializes an empty
   header in its revamped ``.fromstring`` method. [#314]
 
+- Getting ``.info`` on closed files no longer leads to an error (though
+  no information can be retrieved). [#326]
+
 Other Changes and Additions
 ---------------------------
 

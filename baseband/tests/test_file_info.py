@@ -4,7 +4,7 @@ import pytest
 from astropy import units as u
 from astropy.time import Time
 
-from .. import file_info
+from .. import file_info, vdif
 from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
                     SAMPLE_VDIF, SAMPLE_MWA_VDIF as SAMPLE_MWA, SAMPLE_DADA,
                     SAMPLE_PUPPI, SAMPLE_GSB_RAWDUMP_HEADER,
@@ -77,6 +77,14 @@ def test_file_info(sample, format_, used, consistent, inconsistent):
     with module.open(sample, mode='rs', **info.used_kwargs) as fh:
         info3 = fh.info
     assert info3() == info_dict
+    # Check that things properly do *not* work on a closed file.
+    with module.open(sample, mode='rs', **info.used_kwargs) as fh:
+        pass
+    info4 = fh.info
+    assert not info4
+    assert 'File closed' in repr(info4)
+    assert 'errors' in info4()
+    assert any(isinstance(v, ValueError) for v in info4.errors.values())
 
 
 @pytest.mark.parametrize(

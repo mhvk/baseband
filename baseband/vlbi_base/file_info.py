@@ -26,7 +26,12 @@ class VLBIInfoMeta(type):
 
 
 class VLBIInfoBase(metaclass=VLBIInfoMeta):
-    """Container providing a standardized interface to file information."""
+    """Container providing a standardized interface to file information.
+
+    In order to ensure that information is always returned, all access
+    to the parent should be within ``try/except`` with a possible error
+    stored in ``self.errors``.  See ``self._getattr`` for an example.
+    """
 
     attr_names = ('format',)
     """Attributes that the container provides."""
@@ -34,17 +39,27 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
     _parent_attrs = ()
     _parent = None
 
+    def _getattr(self, object_, attr, error=True):
+        """Guarded getattr, returning None on error (and storing the error)."""
+        try:
+            return getattr(object_, attr)
+        except Exception as exc:
+            if error:
+                self.errors[attr] = exc
+            return None
+
     def _collect_info(self):
         # We link to attributes from the parent rather than just overriding
         # __getattr__ to allow us to look for changes.
-        for attr in self._parent_attrs:
-            setattr(self, attr, getattr(self._parent, attr))
         self.missing = {}
         self.errors = OrderedDict()
+        for attr in self._parent_attrs:
+            setattr(self, attr, self._getattr(self._parent, attr))
 
     def _up_to_date(self):
         """Determine whether the information we have stored is up to date."""
-        return all(getattr(self, attr) == getattr(self._parent, attr)
+        return all(getattr(self, attr) == self._getattr(self._parent, attr,
+                                                        error=False)
                    for attr in self._parent_attrs)
 
     def __get__(self, instance, owner_cls):
@@ -89,8 +104,9 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
                     info[attr] = value
             if self.missing:
                 info['missing'] = self.missing
-            if self.errors:
-                info['errors'] = self.errors
+
+        if self.errors:
+            info['errors'] = self.errors
 
         return info
 
@@ -100,7 +116,10 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
             return super().__repr__()
 
         if not self:
-            return 'Not parsable. Wrong format?'
+            if self._parent.closed:
+                return 'File closed. Not parsable.'
+            else:
+                return 'Not parsable. Wrong format?'
 
         result = ''
         for attr in self.attr_names:
@@ -211,28 +230,29 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                       'sample_shape')
 
     def _get_header0(self):
-        with self._parent.temporary_offset() as fh:
-            # Here, we do not even know whether we have the right format.
-            # We thus use a try/except and filter out all warnings.
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')
-                try:
+        # Here, we do not even know whether the file is open or whether we
+        # have the right format. We thus use a try/except and filter out all
+        # warnings.
+        try:
+            with self._parent.temporary_offset() as fh:
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore')
                     fh.seek(0)
                     return fh.read_header()
-                except Exception as exc:
-                    self.errors['header0'] = exc
-                    return None
+        except Exception as exc:
+            self.errors['header0'] = exc
+            return None
 
     def _get_frame0(self):
-        with self._parent.temporary_offset() as fh:
-            # Try reading a frame.  This has no business failing if a
-            # frame rate could be determined, but try anyway.
-            try:
+        # Try reading a frame.  This has no business failing if a
+        # frame rate could be determined, but try anyway; maybe file is closed.
+        try:
+            with self._parent.temporary_offset() as fh:
                 fh.seek(0)
                 return fh.read_frame()
-            except Exception as exc:
-                self.errors['frame0'] = exc
-                return None
+        except Exception as exc:
+            self.errors['frame0'] = exc
+            return None
 
     def _readable(self):
         frame0 = self._get_frame0()
