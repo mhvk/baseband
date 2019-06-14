@@ -7,8 +7,8 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
     _header0_attrs = ('edv', 'bps', 'samples_per_frame')
 
     def _get_header0(self):
-        with self._parent.temporary_offset() as fh:
-            try:
+        try:
+            with self._parent.temporary_offset() as fh:
                 fh.seek(0)
                 header0 = fh.read_header()
                 # Almost all bytes are interpretable as headers,
@@ -17,23 +17,26 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
                 header1 = fh.read_header()
                 if header1.same_stream(header0):
                     return header0
-            except Exception:
-                pass
+        except Exception as exc:
+            self.errors['header0'] = exc
+            return None
 
     def _get_start_time(self):
         try:
             return self.header0.get_time(frame_rate=self.frame_rate)
-        except Exception:
+        except Exception as exc:
+            self.errors['start_time'] = exc
             return None
 
     def _get_sample_shape(self):
         # To get the sample shape, need to read a while frameset.
-        with self._parent.temporary_offset() as fh:
-            try:
+        try:
+            with self._parent.temporary_offset() as fh:
                 fh.seek(0)
                 return fh.read_frameset().sample_shape
-            except Exception:
-                return None
+        except Exception as exc:
+            self.errors['sample_shape'] = exc
+            return None
 
     def _collect_info(self):
         super()._collect_info()
