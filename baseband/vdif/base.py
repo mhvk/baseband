@@ -142,8 +142,8 @@ class VDIFFileReader(VLBIFileReaderBase):
                 try:
                     self.seek(0)
                     header = self.read_header()
-                    return np.round((header.sample_rate /
-                                     header.samples_per_frame).to(u.Hz))
+                    return (header.sample_rate /
+                            header.samples_per_frame).to(u.Hz).round()
                 except Exception:
                     pass
             raise exc
@@ -316,8 +316,8 @@ class VDIFStreamBase(VLBIStreamBase):
             complex_data=header0['complex_data'], squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
 
-        self._frame_rate = int(round((self.sample_rate /
-                                      self.samples_per_frame).to_value(u.Hz)))
+        self._frame_rate = int((self.sample_rate /
+                                self.samples_per_frame).to(u.Hz).round().value)
 
     def _get_time(self, header):
         """Get time from a header.

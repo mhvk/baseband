@@ -101,7 +101,7 @@ class Mark4FileReader(VLBIFileReaderBase):
         # Mark 4 specification states frames-lengths range from 1.25 ms
         # to 160 ms.
         tdelta = header1.fraction[0] - header0.fraction[0]
-        return np.round(1 / tdelta) * u.Hz
+        return u.Quantity(1 / tdelta, u.Hz).round()
 
     def locate_frame(self, forward=True, maximum=None):
         """Locate the frame nearest the current position.
@@ -316,8 +316,8 @@ class Mark4StreamBase(VLBIStreamBase):
             unsliced_shape=(header0.nchan,),
             bps=header0.bps, complex_data=False, squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
-        self._frame_rate = int(round((self.sample_rate /
-                                      self.samples_per_frame).to_value(u.Hz)))
+        self._frame_rate = int((self.sample_rate /
+                                self.samples_per_frame).to(u.Hz).round().value)
 
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):

@@ -43,7 +43,7 @@ def decode_8bit(words):
 
 
 def encode_4bit(values):
-    b = np.clip(np.round(values), -8, 7).astype(np.int8).reshape(-1, 2)
+    b = np.clip(np.around(values), -8, 7).astype(np.int8).reshape(-1, 2)
     b &= 0xf
     b <<= shift04
     return b[:, 0] | b[:, 1]

@@ -169,7 +169,7 @@ class Mark5BHeader(VLBIHeaderBase):
         ref_time : `~astropy.time.Time`
             Reference time within 500 days of the observation time.
         """
-        self.kday = np.round(ref_time.mjd - self.jday, decimals=-3).astype(int)
+        self.kday = np.around(ref_time.mjd - self.jday, decimals=-3).astype(int)
 
     @property
     def payload_nbytes(self):
@@ -230,10 +230,10 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @fraction.setter
     def fraction(self, fraction):
-        ns = round(fraction * 1.e9)
+        ns = np.around(fraction * 1.e9)
         # From inspecting sample files, the fraction appears to be truncated,
         # not rounded.
-        fraction = int(ns / 100000)
+        fraction = (ns / 100000).astype(int)
         self['bcd_fraction'] = bcd_encode(fraction)
 
     def get_time(self, frame_rate=None):
@@ -311,7 +311,7 @@ class Mark5BHeader(VLBIHeaderBase):
             if frame_rate is None:
                 raise ValueError("cannot calculate frame rate. Pass it "
                                  "in explicitly.")
-            frame_nr = int(round((fraction * frame_rate).to(u.one).value))
+            frame_nr = int((fraction * frame_rate).to(u.one).round())
             fraction = frame_nr / frame_rate
             if abs(fraction - 1. * u.s) < 1. * u.ns:
                 int_sec += 1

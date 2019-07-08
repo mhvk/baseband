@@ -109,7 +109,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
                         exc.args += ("frame rate can also not be determined "
                                      "from the first two headers, as they "
                                      "have identical fractional seconds.",)
-                    return np.round(1 / tdelta) * u.Hz
+                    return u.Quantity(1 / tdelta, u.Hz).round()
                 except Exception:
                     pass
             raise exc
@@ -235,8 +235,8 @@ class Mark5BStreamBase(VLBIStreamBase):
             unsliced_shape=(nchan,), bps=bps, complex_data=False,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
-        self._frame_rate = int(round((self.sample_rate /
-                                      self.samples_per_frame).to_value(u.Hz)))
+        self._frame_rate = int((self.sample_rate /
+                                self.samples_per_frame).to(u.Hz).round().value)
 
 
 class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
