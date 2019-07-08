@@ -451,7 +451,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
                 raise ValueError("this header does not provide a frame "
                                  "rate. Pass it in explicitly.")
 
-            frame_nr = int((frac_sec * frame_rate).to(u.one).round().value)
+            frame_nr = int((frac_sec * frame_rate).to(u.one).round())
             if abs(frame_nr / frame_rate - 1. * u.s) < 1. * u.ns:
                 frame_nr = 0
                 int_sec += 1

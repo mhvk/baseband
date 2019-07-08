@@ -350,7 +350,7 @@ class GUPPIHeader(fits.Header):
     @offset.setter
     def offset(self, offset):
         self['PKTIDX'] = int((offset / (self['TBIN'] * u.s) / self['PKTSIZE'] *
-                              ((self._bpcs + 7) // 8)).to(u.one).round().value)
+                              ((self._bpcs + 7) // 8)).to(u.one).round())
 
     @property
     def start_time(self):
