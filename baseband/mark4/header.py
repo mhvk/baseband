@@ -174,8 +174,8 @@ class Mark4TrackHeader(VLBIHeaderBase):
         ref_time : `~astropy.time.Time`
             Reference time within 5 years of the observation time.
         """
-        self.decade = np.round(ref_time.decimalyear - self['bcd_unit_year'],
-                               decimals=-1).astype(int)
+        self.decade = np.around(ref_time.decimalyear - self['bcd_unit_year'],
+                                decimals=-1).astype(int)
 
     @property
     def track_id(self):
@@ -202,7 +202,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
     @fraction.setter
     def fraction(self, fraction):
         ms = fraction * 1000.
-        if np.any(np.abs((ms / 1.25) - np.round(ms / 1.25)) > 1e-6):
+        if np.any(np.abs((ms / 1.25) - np.around(ms / 1.25)) > 1e-6):
             raise ValueError("{0} ms is not a multiple of 1.25 ms"
                              .format(ms))
         self['bcd_fraction'] = bcd_encode(np.floor(ms + 1e-6)

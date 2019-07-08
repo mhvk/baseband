@@ -167,7 +167,9 @@ class GSBStreamBase(VLBIStreamBase):
             if sample_rate is None:
                 payload_nbytes = 2**22 if rawdump else 2**23 // len(fh_raw[0])
             else:
-                payload_nbytes = round((sample_rate / self.fh_ts.info.frame_rate).to_value(1))
+                payload_nbytes = int((sample_rate /
+                                      self.fh_ts.info.frame_rate)
+                                     .to(u.one).round())
 
         if payload_nbytes is None:
             payload_nbytes = (samples_per_frame * nchan *
@@ -337,9 +339,9 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                                   nchan=self._unsliced_shape.nchan,
                                   bps=self.bps, complex_data=self.complex_data,
                                   verify=self.verify)
-        assert int(round(((frame.header.time - self.start_time) *
-                          self.sample_rate / self.samples_per_frame)
-                         .to_value(u.one))) == index
+        assert int(((frame.header.time - self.start_time) *
+                    self.sample_rate / self.samples_per_frame)
+                   .to(u.one).round()) == index
         return frame
 
 

@@ -349,9 +349,8 @@ class GUPPIHeader(fits.Header):
 
     @offset.setter
     def offset(self, offset):
-        self['PKTIDX'] = int(round((offset.to(u.s).value / self['TBIN'] /
-                                    self['PKTSIZE']) *
-                                   ((self._bpcs + 7) // 8)))
+        self['PKTIDX'] = int((offset / (self['TBIN'] * u.s) / self['PKTSIZE'] *
+                              ((self._bpcs + 7) // 8)).to(u.one).round().value)
 
     @property
     def start_time(self):
@@ -363,7 +362,7 @@ class GUPPIHeader(fits.Header):
     def start_time(self, start_time):
         start_time = Time(start_time, scale='utc', format='isot', precision=9)
         self['STT_IMJD'] = int(start_time.mjd)
-        self['STT_SMJD'] = int(np.round(
+        self['STT_SMJD'] = int(np.around(
             (start_time - Time(self['STT_IMJD'], format='mjd',
                                scale=start_time.scale)).sec))
 

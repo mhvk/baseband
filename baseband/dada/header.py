@@ -378,8 +378,8 @@ class DADAHeader(OrderedDict):
 
     @offset.setter
     def offset(self, offset):
-        self['OBS_OFFSET'] = (int(round(offset.to(u.us).value /
-                                        self['TSAMP'])) *
+        self['OBS_OFFSET'] = (int((offset / (self['TSAMP'] * u.us))
+                                  .to(u.one).round().value) *
                               ((self['NBIT'] * self['NDIM'] *
                                 self['NPOL'] * self['NCHAN'] + 7) // 8))
 
