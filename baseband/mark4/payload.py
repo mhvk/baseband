@@ -125,8 +125,8 @@ def decode_2chan_2bit_fanout4(frame):
     # header['fan_out'] = 01230123,01230123
     # header['converter_id'] = 00000000,11111111
     # header['lsb_output'] = 11111111,11111111
-    # After reshape: byte 0: ch0/s0, ch0/s1, ch0/s2, ch0/s3
-    #                byte 1: ch1/s0, ch1/s1, ch1/s2, ch1/s3
+    # After reshape: byte 0: ch0/s0, ch0/s1, ch0/s2, ch0/s3, + mag.
+    #                byte 1: ch1/s0, ch1/s1, ch1/s2, ch1/s3, + mag.
     frame = frame.view(np.uint8).reshape(-1, 2)
     # The look-up table splits each data word into the above 8 measurements,
     # the transpose pushes channels first and fanout last, and the reshape
@@ -179,13 +179,13 @@ def decode_8chan_2bit_fanout2(frame):
     # header['magnitude_bit'] = 00001111,00001111,00001111,00001111
     # makes sense with lut2bit3
     # header['fan_out'] = 00110011,00110011,00110011,00110011
-    # i.e., s0s0,s1s1,s0s0,s1s1 for each byte
+    # i.e., s0s0,s1s1,m0m0,m1m1 for each byte
     # header['converter_id'] = 02020202,13131313,02020202,13131313
     # header['lsb_output'] =   00000000,00000000,11111111,11111111
-    # After reshape: byte 0: ch0/s0, ch4/s0, ch0/s1, ch4/s1
-    #                byte 1: ch1/s0, ch5/s0, ch1/s1, ch5/s1
-    #                byte 2: ch2/s0, ch6/s0, ch2/s1, ch6/s1
-    #                byte 3: ch3/s0, ch7/s0, ch3/s1, ch7/s1
+    # After reshape: byte 0: ch0/s0, ch4/s0, ch0/s1, ch4/s1, + mag.
+    #                byte 1: ch1/s0, ch5/s0, ch1/s1, ch5/s1, + mag.
+    #                byte 2: ch2/s0, ch6/s0, ch2/s1, ch6/s1, + mag.
+    #                byte 3: ch3/s0, ch7/s0, ch3/s1, ch7/s1, + mag.
     frame = frame.view(np.uint8).reshape(-1, 4)
     # The look-up table splits each data word into the above 16 measurements.
     # the first reshape means one gets time, channel&0x3, sample, channel&0x4
@@ -209,6 +209,68 @@ def encode_8chan_2bit_fanout2(values):
     bitvalues <<= np.array([0, 1, 2, 3], dtype=np.uint8)
     out = np.bitwise_or.reduce(bitvalues, axis=-1).ravel().view('<u4')
     return out
+
+
+def decode_16chan_2bit_fanout2_ft(frame):
+    """Decode payload for 16 channels using 2 bits, fan-out 2 (64 tracks)."""
+    # These Fortaleza files have an unusual ordering:
+    # header['magnitude_bit'] = 00000101,10101111,00001111,00001111 * 2
+    # White later two are as for lut2bit3, the first two are different.
+    # header['fan_out'] = 00110011 * 8
+    # i.e., s0s0,s1s1,m0m0,m1m1 for the later bytes.
+    # header['converter_id'] = 03030303,04040404,15151515,26262626,
+    #                          7a7a7a7a,7b7b7b7b,8c8c8c8c,9d9d9d9d
+    # 0, 7 are doubled; those have lsb & usb;
+    # header['lsb_output'] =   00001010,00001010,00000000,00000000 * 2
+    # Should take magnitude bit literally,
+    # byte 0: 0u/s0, 3u/s0, 0u/s1, 3u/s1, 0l/s0, 3u/m0, 0l/s1, 3u/m1
+    # byte 1: 0u/m0, 4u/s0, 0u/m1, 4u/s1, 0l/m0, 4u/m0, 0l/m1, 4u/m1
+    # byte 2: 1u/s0, 5u/s0, 1u/s1, 5u/s1, 1u/m0, 5u/m0, 1u/m1, 5u/m1
+    # byte 3: 2u/s0, 6u/s0, 2u/s1, 6u/s1, 2u/m0, 6u/m0, 2u/m1, 6u/m1
+    # byte 4: 7u/s0, au/s0, 7u/s1, au/s1, 7l/s0, au/m0, 7l/s1, au/m1
+    # byte 5: 7u/m0, bu/s0, 7u/m1, bu/s1, 7l/m0, bu/m0, 7l/m1, bu/m1
+    # byte 6: 8u/s0, cu/s0, 8u/s1, cu/s1, 8u/m0, cu/m0, 8u/m1, cu/m1
+    # byte 7: 9u/s0, du/s0, 9u/s1, du/s1, 9u/m0, du/m0, 9u/m1, du/m1
+    # This means the re-ordering is different from the usual: we just
+    # need to shift bits around in bytes 0,1,4,5:
+    frame = reorder64_Ft(frame)
+    # This leaves samples as
+    # byte 0: 0u/s0, 3u/s0, 0u/s1, 3u/s1, 0u/m0, 3u/m0, 0u/m1, 3u/m1
+    # byte 1: 0l/s0, 4u/s0, 0l/s1, 4u/s1, 0l/m0, 4u/m0, 0l/m1, 4u/m1
+    # byte 2: 1u/s0, 5u/s0, 1u/s1, 5u/s1, 1u/m0, 5u/m0, 1u/m1, 5u/m1
+    # byte 3: 2u/s0, 6u/s0, 2u/s1, 6u/s1, 2u/m0, 6u/m0, 2u/m1, 6u/m1
+    # byte 4: 7u/s0, au/s0, 7u/s1, au/s1, 7u/m0, au/m0, 7u/m1, au/m1
+    # byte 5: 7l/s0, bu/s0, 7l/s1, bu/s1, 7l/m0, bu/m0, 7l/m1, bu/m1
+    # byte 6: 8u/s0, cu/s0, 8u/s1, cu/s1, 8u/m0, cu/m0, 8u/m1, cu/m1
+    # byte 7: 9u/s0, du/s0, 9u/s1, du/s1, 9u/m0, du/m0, 9u/m1, du/m1
+    frame = frame.view(np.uint8).reshape(-1, 8)
+    # The look-up table splits each data word into the above 32 measurements.
+    # Translating 0u=0, 0l=1, 1..6=2..7, 7u=8, 7l=9, 8..d=a..f, the
+
+    # first reshape yieds time, channel&0x8, channel&0x3, sample, channel&0x4
+    # transpose makes this channel&0x8, channel&0x4, channel&0x3, time, sample.
+    # and the second reshape (which makes a copy) gets one just time, channel,
+    # and the final transpose time, channel.
+    return (lut2bit3.take(frame, axis=0).reshape(-1, 2, 4, 2, 2)
+            .transpose(1, 4, 2, 0, 3).reshape(16, -1).T)
+
+
+def encode_16chan_2bit_fanout2_ft(values):
+    """Encode payload for 16 channels using 2 bits, fan-out 2 (64 tracks)."""
+    # words encode 32 values (above) in order ch&0x8, ch&0x3, sample, ch&0x4
+    # First reshape goes to time, sample, ch&0x8, ch&0x4, ch&0x3,
+    # transpose makes this time, ch&0x8, ch&0x3, sample, ch&0x4.
+    # second reshape future bytes, sample+ch&0x4.
+    values = (values.reshape(-1, 2, 2, 2, 4).transpose(0, 2, 4, 1, 3)
+              .reshape(-1, 4))
+    bitvalues = encode_2bit_base(values)
+    # values are -3, -1, +1, 3 -> 00, 01, 10, 11;
+    # get first bit (sign) as 1, second bit (magnitude) as 16
+    reorder_bits = np.array([0, 16, 1, 17], dtype=np.uint8)
+    reorder_bits.take(bitvalues, out=bitvalues)
+    bitvalues <<= np.array([0, 1, 2, 3], dtype=np.uint8)
+    out = np.bitwise_or.reduce(bitvalues, axis=-1).ravel().view(np.uint64)
+    return reorder64_Ft(out).view('<u8')
 
 
 def decode_8chan_2bit_fanout4(frame):
@@ -266,25 +328,41 @@ class Mark4Payload(VLBIPayloadBase):
     _encoders = {(2, 2, 4): encode_2chan_2bit_fanout4,
                  (4, 2, 4): encode_4chan_2bit_fanout4,
                  (8, 2, 2): encode_8chan_2bit_fanout2,
-                 (8, 2, 4): encode_8chan_2bit_fanout4}
+                 (8, 2, 4): encode_8chan_2bit_fanout4,
+                 (16, 0xf0faf050f0faf05, 2): encode_16chan_2bit_fanout2_ft}
     _decoders = {(2, 2, 4): decode_2chan_2bit_fanout4,
                  (4, 2, 4): decode_4chan_2bit_fanout4,
                  (8, 2, 2): decode_8chan_2bit_fanout2,
-                 (8, 2, 4): decode_8chan_2bit_fanout4}
+                 (8, 2, 4): decode_8chan_2bit_fanout4,
+                 (16, 0xf0faf050f0faf05, 2): decode_16chan_2bit_fanout2_ft}
 
     _sample_shape_maker = namedtuple('SampleShape', 'nchan')
 
     def __init__(self, words, header=None, nchan=1, bps=2, fanout=1):
         if header is not None:
-            nchan = header.nchan
-            bps = header.bps
+            magnitude_bit = header['magnitude_bit']
+            bps = 2 if magnitude_bit.any() else 1
+            ta = header.track_assignment
+            if bps == 1 or np.all(magnitude_bit[ta] == [False, True]):
+                magnitude_bit = None
+            else:
+                magnitude_bit = (np.packbits(magnitude_bit)
+                                 .view(header.stream_dtype).item())
+
+            ntrack = header.ntrack
             fanout = header.fanout
+            nchan = ntrack // (bps * fanout)
             self._nbytes = header.payload_nbytes
-        self._dtype_word = MARK4_DTYPES[nchan * bps * fanout]
+        else:
+            ntrack = nchan * bps * fanout
+            magnitude_bit = None
+
+        self._dtype_word = MARK4_DTYPES[ntrack]
         self.fanout = fanout
         super().__init__(words, sample_shape=(nchan,),
                          bps=bps, complex_data=False)
-        self._coder = (self.sample_shape.nchan, bps, fanout)
+        self._coder = (nchan, (bps if magnitude_bit is None
+                               else magnitude_bit), fanout)
 
     @classmethod
     def fromfile(cls, fh, header):
@@ -306,6 +384,8 @@ class Mark4Payload(VLBIPayloadBase):
         if header.nchan != data.shape[-1]:
             raise ValueError("header is for {0} channels but data has {1}"
                              .format(header.nchan, data.shape[-1]))
-        encoder = cls._encoders[header.nchan, header.bps, header.fanout]
-        words = encoder(data)
-        return cls(words, header)
+        words = np.empty(header.payload_nbytes // header.stream_dtype.itemsize,
+                         header.stream_dtype)
+        self = cls(words, header)
+        self[:] = data
+        return self

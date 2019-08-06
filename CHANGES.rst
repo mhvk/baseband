@@ -4,6 +4,12 @@
 - This future version will likely only support python 3.7, numpy 1.17 and
   astropy 4.0.
 
+Bug Fixes
+---------
+
+- Mark 4 data written with the non-standard channel assignment used at Ft
+  can now be read and written. [#380]
+
 
 3.1.1 (unreleased)
 ==================
