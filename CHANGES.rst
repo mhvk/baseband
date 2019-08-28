@@ -1,4 +1,4 @@
-3.0 (unreleased)
+3.0 (2019-08-28)
 ================
 
 - This version only supports python3.
@@ -17,22 +17,6 @@ Bug Fixes
   ``verify=False``. This is needed for astropy 3.2, which initializes an empty
   header in its revamped ``.fromstring`` method. [#314]
 
-- Getting ``.info`` on closed files no longer leads to an error (though
-  no information can be retrieved). [#326]
-
-Other Changes and Additions
----------------------------
-
-- Increased speed of VDIF stream reading by removing redundant verification.
-  Reduces the overhead for verification for VDIF CHIME data from 50% (factor
-  1.5) to 13%. [#321]
-
-2.0.1 (unreleased)
-==================
-
-Bug Fixes
----------
-
 - VDIF multichannel headers and payloads are now forced to have power-of-two
   bits per sample. [#315]
 
@@ -44,6 +28,16 @@ Bug Fixes
 
 - All headers now check that ``samples_per_frame`` are set to possible numbers.
   [#325]
+
+- Getting ``.info`` on closed files no longer leads to an error (though
+  no information can be retrieved). [#326]
+
+Other Changes and Additions
+---------------------------
+
+- Increased speed of VDIF stream reading by removing redundant verification.
+  Reduces the overhead for verification for VDIF CHIME data from 50% (factor
+  1.5) to 13%. [#321]
 
 2.0 (2018-12-12)
 ================
