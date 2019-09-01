@@ -6,9 +6,6 @@ language: c
 os:
     - linux
 
-# Setting sudo to false opts in to Travis-CI container-based builds.
-sudo: false
-
 # The apt packages below are needed for sphinx builds. A full list of packages
 # that can be included can be found here:
 #
@@ -18,14 +15,22 @@ addons:
     apt:
         packages:
             - graphviz
-            - texlive-latex-extra
-            - dvipng
+
+stage: Comprehensive tests
+
+stages:
+   # Do the style check and a single test job covering the basic.
+   - name: Initial tests
+   # If above pass, test docs and details, including coverage.
+   - name: Comprehensive tests
+   # Regularly, also test astropy-dev.
+   - name: Cron tests
+     if: type = cron
 
 env:
     global:
-
         # The following versions are the 'default' for tests, unless
-        # overidden underneath. They are defined here in order to save having
+        # overridden underneath. They are defined here in order to save having
         # to repeat them for all configurations.
         - PYTHON_VERSION=3.7
         - NUMPY_VERSION=stable
@@ -50,7 +55,7 @@ env:
         # are in astropy-ci-extras. If your package uses either of these,
         # add the channels to CONDA_CHANNELS along with any other channels
         # you want to use.
-        - CONDA_CHANNELS='astropy-ci-extras astropy'
+        - CONDA_CHANNELS='astropy'
 
         # If there are matplotlib or other GUI tests, uncomment the following
         # line to use the X virtual framebuffer.
@@ -68,26 +73,31 @@ matrix:
     fast_finish: true
 
     include:
-        # Do a coverage test.
-        - env: SETUP_CMD='test --coverage'
 
-        # Check for sphinx doc build warnings - we do this first because it
-        # may run for a long time.
+        # Initial tests that all the basics are covered:
+        # Default python, numpy, astropy.
+        - stage: Initial tests
+
+        # Do a PEP8/pyflakes test with flake8 (see setup.cfg for options)
+        - stage: Initial tests
+          env: MAIN_CMD="flake8 --count baseband" SETUP_CMD=''
+
+        # Comprehensive tests.
+        # Check for sphinx doc build warnings.
         - env: SETUP_CMD='build_sphinx -w'
                CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES_DOC
 
-        # Now try Astropy dev with the latest Python
-        - env: ASTROPY_VERSION=development
-               EVENT_TYPE='pull_request push cron'
-
-        # Try combination of oldest python, numpy, and astropy versions.
-        - env: PYTHON_VERSION=3.5 NUMPY_VERSION=1.10 ASTROPY_VERSION=3.0
+        # Check everything, including coverage, with oldest supported versions.
+        - env: SETUP_CMD='test --coverage'
+               PYTHON_VERSION=3.5 NUMPY_VERSION=1.10 ASTROPY_VERSION=3.0
 
         # Make sure that egg_info works without dependencies
         - env: SETUP_CMD='egg_info'
 
-        # Do a PEP8/pyflakes test with flake8 (see setup.cfg for options)
-        - env: MAIN_CMD="flake8 --count baseband" SETUP_CMD=''
+        # Now try Astropy dev with the latest Python
+        - stage: Cron tests
+          env: ASTROPY_VERSION=development
+               EVENT_TYPE='cron'
 
 install:
 
