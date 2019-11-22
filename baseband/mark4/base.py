@@ -100,7 +100,7 @@ class Mark4FileReader(VLBIFileReaderBase):
 
         # Mark 4 specification states frames-lengths range from 1.25 ms
         # to 160 ms.
-        tdelta = header1.fraction[0] - header0.fraction[0]
+        tdelta = (header1.fraction[0] - header0.fraction[0]) % 1.
         return u.Quantity(1 / tdelta, u.Hz).round()
 
     def locate_frame(self, forward=True, maximum=None):

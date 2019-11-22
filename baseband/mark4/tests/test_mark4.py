@@ -1011,3 +1011,21 @@ class Test16TrackFanout4():
             orig_bytes = fr.read(number_of_bytes)
             conv_bytes = fh.read()
             assert conv_bytes == orig_bytes
+
+
+def test_start_at_last_frame(tmpdir):
+    """Regression test for files where first frame is last in a second.
+
+    Previously, this caused the frame rate and thus the sample rate to
+    be calculated wrongly.  See gh-340.
+    """
+    fl = str(tmpdir.join('test.m4'))
+    sample_rate = 32*u.MHz
+    frame_rate = sample_rate / 80000
+    start_time = Time('2012-01-02') - 1/frame_rate
+    with mark4.open(fl, 'ws', sample_rate=sample_rate, time=start_time,
+                    ntrack=32, nchan=4, fanout=4, bps=2) as fw:
+        fw.write(np.ones((80000*2, 4)))
+
+    with mark4.open(fl, 'rs', decade=2010) as fr:
+        assert fr.sample_rate == sample_rate
