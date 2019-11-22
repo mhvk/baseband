@@ -1,6 +1,11 @@
 3.1 (unreleaded)
 ================
 
+Bug Fixes
+---------
+
+- Frame rates are now calculated correctly also for Mark 4 data in which the
+  first frame is the last within a second. [#341]
 
 3.0 (2019-08-28)
 ================
