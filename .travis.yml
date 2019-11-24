@@ -39,7 +39,7 @@ env:
         - SETUP_CMD='test'
         - EVENT_TYPE='pull_request push'
         - INSTALL_WITH_APT=False
-        - APT_DEPENDENCIES='python3-astropy python3-pytest-astropy'
+        - APT_DEPENDENCIES='python3-astropy python3-pytest-astropy python3-setuptools'
 
 
         # For this package-template, we include examples of Cython modules,
