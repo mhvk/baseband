@@ -292,8 +292,8 @@ class GUPPIHeader(fits.Header):
     @sample_rate.setter
     def sample_rate(self, sample_rate):
         self['TBIN'] = 1. / abs(sample_rate.to_value(u.Hz))
-        bw = (sample_rate.to_value(u.MHz) * self['OBSNCHAN'] /
-              (1 if self.complex_data else 2))
+        bw = (sample_rate.to_value(u.MHz) * self['OBSNCHAN']
+              / (1 if self.complex_data else 2))
         self['OBSBW'] = bw
 
     @property
@@ -344,19 +344,19 @@ class GUPPIHeader(fits.Header):
     def offset(self):
         """Offset from start of observation in units of time."""
         # PKTIDX only counts valid packets, not overlap ones.
-        return self['STT_OFFS'] + ((self['PKTIDX'] * self['PKTSIZE'] * 8 //
-                                    self._bpcs) * self['TBIN'] * u.s)
+        return self['STT_OFFS'] + ((self['PKTIDX'] * self['PKTSIZE'] * 8
+                                    // self._bpcs) * self['TBIN'] * u.s)
 
     @offset.setter
     def offset(self, offset):
-        self['PKTIDX'] = int((offset / (self['TBIN'] * u.s) / self['PKTSIZE'] *
-                              ((self._bpcs + 7) // 8)).to(u.one).round())
+        self['PKTIDX'] = int((offset / (self['TBIN'] * u.s) / self['PKTSIZE']
+                              * ((self._bpcs + 7) // 8)).to(u.one).round())
 
     @property
     def start_time(self):
         """Start time of the observation."""
-        return (Time(self['STT_IMJD'], scale='utc', format='mjd') +
-                self['STT_SMJD'] * u.s)
+        return (Time(self['STT_IMJD'], scale='utc', format='mjd')
+                + self['STT_SMJD'] * u.s)
 
     @start_time.setter
     def start_time(self, start_time):

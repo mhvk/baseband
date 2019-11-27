@@ -136,8 +136,8 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
                 # being equal to `sample_shape.nchan` or equal to the product
                 # of all elements (e.g., a VDIF file with 8 threads and 1
                 # channel per thread is consistent with nchan=8).
-                consistent = (getattr(sample_shape, 'nchan', -1) == value or
-                              np.prod(sample_shape) == value)
+                consistent = (getattr(sample_shape, 'nchan', -1) == value
+                              or np.prod(sample_shape) == value)
 
         elif key in {'ref_time', 'kday', 'decade'}:
             start_time = info_dict.get('start_time')
@@ -193,9 +193,9 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
     else:
         info = file_info(name, format, **kwargs)
         if not info:
-            raise ValueError("file could not be opened as " +
-                             ("any of {}".format(format) if
-                              isinstance(format, tuple) else str(format)))
+            raise ValueError("file could not be opened as "
+                             + ("any of {}".format(format) if
+                                isinstance(format, tuple) else str(format)))
         format = info.format
 
         if info.missing and 's' in mode:

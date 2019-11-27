@@ -331,8 +331,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         if sample_rate is None:
             try:
-                sample_rate = (samples_per_frame *
-                               fh_raw.get_frame_rate()).to(u.MHz)
+                sample_rate = (samples_per_frame
+                               * fh_raw.get_frame_rate()).to(u.MHz)
 
             except Exception as exc:
                 exc.args += ("the sample rate could not be auto-detected. "
@@ -354,8 +354,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         The first dimension (sample number) is never removed.
         """
         if self.squeeze:
-            data = data.reshape(data.shape[:1] +
-                                tuple(sh for sh in data.shape[1:] if sh > 1))
+            data = data.reshape(data.shape[:1]
+                                + tuple(sh for sh in data.shape[1:] if sh > 1))
         if self.subset:
             data = data[(slice(None),) + self.subset]
 
@@ -390,16 +390,16 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         # We got the shape.  We only bother trying to associate names with the
         # dimensions when we know for sure what happened in the subsetting.
         subset_shape = dummy_subset.shape[1:]
-        if (not hasattr(sample_shape, '_fields') or subset_shape == () or
-                len(self.subset) > len(sample_shape)):
+        if (not hasattr(sample_shape, '_fields') or subset_shape == ()
+                or len(self.subset) > len(sample_shape)):
             return subset_shape
 
         # We can only associate names when indexing each dimension separately
         # gives a consistent result with the complete subset.
         subset_axis = 0
         fields = []
-        subset = self.subset + (slice(None),) * (len(sample_shape) -
-                                                 len(self.subset))
+        subset = self.subset + (slice(None),) * (len(sample_shape)
+                                                 - len(self.subset))
         try:
             for field, sample_dim, item in zip(sample_shape._fields,
                                                sample_shape, subset):
@@ -456,14 +456,14 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         See also `start_time` for the start time of the file, and `time` for
         the time of the sample pointer's current offset.
         """
-        return (self._get_time(self._last_header) +
-                (self.samples_per_frame / self.sample_rate).to(u.s))
+        return (self._get_time(self._last_header)
+                + (self.samples_per_frame / self.sample_rate).to(u.s))
 
     @lazyproperty
     def _nsample(self):
         """Number of complete samples in the stream data."""
-        return int(((self.stop_time - self.start_time) *
-                    self.sample_rate).to(u.one).round())
+        return int(((self.stop_time - self.start_time)
+                    * self.sample_rate).to(u.one).round())
 
     @property
     def shape(self):
@@ -676,8 +676,8 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         if extra != 0:
             warnings.warn("closing with partial buffer remaining.  "
                           "Writing padded frame, marked as invalid.")
-            self.write(np.zeros((self.samples_per_frame - extra,) +
-                                self.sample_shape), valid=False)
+            self.write(np.zeros((self.samples_per_frame - extra,)
+                                + self.sample_shape), valid=False)
             assert self.offset % self.samples_per_frame == 0
         return super().close()
 
@@ -726,8 +726,8 @@ def make_opener(fmt, classes, doc='', append_doc=True):
     def open(name, mode='rs', **kwargs):
         # If sequentialfile object, check that it's opened properly.
         if isinstance(name, sf.SequentialFileBase):
-            assert (('r' in mode and name.mode == 'rb') or
-                    ('w' in mode and name.mode == 'w+b')), (
+            assert (('r' in mode and name.mode == 'rb')
+                    or ('w' in mode and name.mode == 'w+b')), (
                         "open only accepts sequential files opened in 'rb' "
                         "mode for reading or 'w+b' mode for writing.")
 

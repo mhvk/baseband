@@ -190,8 +190,8 @@ class Mark4FileReader(VLBIFileReaderBase):
             for possibility in possibilities[::1 if forward else -1]:
                 # Real start of possible header.
                 frame_start = frame + possibility - 63 * ntrack // 8
-                if (forward and frame_start < file_pos or
-                        not forward and frame_start > file_pos):
+                if (forward and frame_start < file_pos
+                        or not forward and frame_start > file_pos):
                     continue
                 # Check there is a header following this.
                 check = frame_start + frame_nbytes
@@ -317,8 +317,8 @@ class Mark4StreamBase(VLBIStreamBase):
             unsliced_shape=(header0.nchan,),
             bps=header0.bps, complex_data=False, squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
-        self._frame_rate = int((self.sample_rate /
-                                self.samples_per_frame).to(u.Hz).round().value)
+        self._frame_rate = int((self.sample_rate / self.samples_per_frame)
+                               .to(u.Hz).round().value)
 
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
@@ -450,16 +450,16 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
                          sample_rate=sample_rate, squeeze=squeeze)
         # Set up initial payload with right shape.
         samples_per_payload = (
-            header0.samples_per_frame * header0.payload_nbytes //
-            header0.frame_nbytes)
+            header0.samples_per_frame * header0.payload_nbytes
+            // header0.frame_nbytes)
         self._payload = Mark4Payload.fromdata(
             np.zeros((samples_per_payload, header0.nchan), np.float32),
             header0)
 
     def _make_frame(self, frame_index):
         header = self.header0.copy()
-        header.update(time=self.start_time + frame_index /
-                      self._frame_rate * u.s)
+        header.update(time=self.start_time + frame_index
+                      / self._frame_rate * u.s)
         # Reuse payload.
         return Mark4Frame(header, self._payload)
 

@@ -127,8 +127,8 @@ class SequentialFileBase:
                 file_size = self.file_size
                 if file_size is not None:  # can happen for single-file write.
                     self._file_sizes.append(file_size)
-                    self._file_offsets.append(self._file_offsets[-1] +
-                                              file_size)
+                    self._file_offsets.append(self._file_offsets[-1]
+                                              + file_size)
 
     def tell(self):
         """Return the current stream position."""
@@ -248,8 +248,8 @@ class SequentialFileReader(SequentialFileBase):
             raise OSError('invalid offset')
 
         # If the offset is not in the current file, find right one.
-        while not (0 <= offset - self._file_offsets[self.file_nr] <
-                   self._file_sizes[self.file_nr]):
+        while not (0 <= offset - self._file_offsets[self.file_nr]
+                   < self._file_sizes[self.file_nr]):
             # Note that not all files may have been opened at this point.
             # In that case, bisecting would find we're out of the current files
             # and one would open a new one.  The while loop ensures we keep

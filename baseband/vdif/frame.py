@@ -419,8 +419,8 @@ class VDIFFrameSet:
         if len(item) == 1:
             return self.frames, False, item[0], single_sample, False
 
-        single_channel = (len(item) > 2 and
-                          np.empty(self.shape[2:])[item[2:]].ndim == 0)
+        single_channel = (len(item) > 2
+                          and np.empty(self.shape[2:])[item[2:]].ndim == 0)
         frame_indices = np.arange(len(self.frames))[item[1]]
         assert frame_indices.ndim <= 1
         single_frame = frame_indices.ndim == 0
@@ -437,8 +437,8 @@ class VDIFFrameSet:
             # and invalid_data (can be different).
             if item == 'thread_id':
                 return np.array([f.header[item] for f in self.frames])
-            elif (item != 'invalid_data' and
-                  item in VDIFBaseHeader._header_parser.keys()):
+            elif (item != 'invalid_data'
+                  and item in VDIFBaseHeader._header_parser.keys()):
                 return self.header0[item]
 
             values = np.array([f.header[item] for f in self.frames])
@@ -455,8 +455,8 @@ class VDIFFrameSet:
             swapped = data = np.empty((len(frames),) + data0.shape,
                                       dtype=self.dtype)
         else:
-            data = np.empty((data0.shape[0], len(frames)) +
-                            data0.shape[1:], dtype=self.dtype)
+            data = np.empty((data0.shape[0], len(frames))
+                            + data0.shape[1:], dtype=self.dtype)
             swapped = data.swapaxes(0, 1)
 
         swapped[0] = data0
@@ -472,8 +472,8 @@ class VDIFFrameSet:
             if item == 'thread_id':
                 if len(np.unique(data)) != len(self.frames):
                     raise ValueError("all thread ids should be unique.")
-            elif (item != 'invalid_data' and
-                  item in VDIFBaseHeader._header_parser.keys()):
+            elif (item != 'invalid_data'
+                  and item in VDIFBaseHeader._header_parser.keys()):
                 if data.strides != (0,) and len(np.unique(data)) > 1:
                     raise ValueError("base header keys should be identical.")
 
@@ -529,7 +529,7 @@ class VDIFFrameSet:
 
     # For tests, it is useful to define equality.
     def __eq__(self, other):
-        return (type(self) is type(other) and
-                len(self.frames) == len(other.frames) and
-                self.header0 == other.header0 and
-                all(f1 == f2 for f1, f2 in zip(self.frames, other.frames)))
+        return (type(self) is type(other)
+                and len(self.frames) == len(other.frames)
+                and self.header0 == other.header0
+                and all(f1 == f2 for f1, f2 in zip(self.frames, other.frames)))

@@ -218,7 +218,7 @@ class VLBIFrameBase:
 
     # For tests, it is useful to define equality.
     def __eq__(self, other):
-        return (type(self) is type(other) and
-                self.valid == other.valid and
-                self.header == other.header and
-                self.payload == other.payload)
+        return (type(self) is type(other)
+                and self.valid == other.valid
+                and self.header == other.header
+                and self.payload == other.payload)

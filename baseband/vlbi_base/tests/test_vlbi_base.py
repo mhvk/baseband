@@ -146,8 +146,8 @@ class TestVLBIBase:
         assert self.header['x0_16_4'] == 4
         assert self.header['x0_31_1'] is False
         assert self.header['x1_0_32'] == self.header.words[1]
-        assert (self.header['x2_0_64'] ==
-                self.header.words[2] + self.header.words[3] * (1 << 32))
+        assert (self.header['x2_0_64']
+                == self.header.words[2] + self.header.words[3] * (1 << 32))
         assert 'x0_31_1' in self.header
         assert 'bla' not in self.header
         with pytest.raises(KeyError):
@@ -209,29 +209,30 @@ class TestVLBIBase:
         assert self.payload.shape == (4, 2)
         assert self.payload.size == 8
         assert self.payload.ndim == 2
-        assert np.all(self.payload.data.ravel() ==
-                      self.payload.words.view(np.int8))
-        assert np.all(np.array(self.payload).ravel() ==
-                      self.payload.words.view(np.int8))
-        assert np.all(np.array(self.payload, dtype=np.int8).ravel() ==
-                      self.payload.words.view(np.int8))
+        assert np.all(self.payload.data.ravel()
+                      == self.payload.words.view(np.int8))
+        assert np.all(np.array(self.payload).ravel()
+                      == self.payload.words.view(np.int8))
+        assert np.all(np.array(self.payload, dtype=np.int8).ravel()
+                      == self.payload.words.view(np.int8))
         payload = self.Payload(self.payload.words, bps=4)
         with pytest.raises(KeyError):
             payload.data
         with pytest.raises(ValueError):
             self.Payload(self.payload.words.astype('>u4'), bps=4)
         payload = self.Payload(self.payload.words, bps=8, complex_data=True)
-        assert np.all(payload.data ==
-                      self.payload.data[:, 0] + 1j * self.payload.data[:, 1])
+        assert np.all(payload.data
+                      == (self.payload.data[:, 0]
+                          + 1j * self.payload.data[:, 1]))
 
         assert self.payload1bit.complex_data is True
         assert self.payload1bit.sample_shape == (5,)
         assert self.payload1bit.bps == 1
         assert self.payload1bit.shape == (16, 5)
         assert self.payload1bit.nbytes == 20
-        assert np.all(self.payload1bit.data.ravel() ==
-                      np.unpackbits(self.payload1bit.words.view(np.uint8))
-                      .astype(np.float32).view(np.complex64))
+        assert np.all(self.payload1bit.data.ravel()
+                      == (np.unpackbits(self.payload1bit.words.view(np.uint8))
+                          .astype(np.float32).view(np.complex64)))
 
     @pytest.mark.parametrize('item', (2, slice(1, 3), (), slice(2, None),
                                       (2, 1), (slice(None), 0),
@@ -248,8 +249,8 @@ class TestVLBIBase:
         check[item] = 1 - sel_data
         assert np.all(payload[item] == 1 - sel_data)
         assert np.all(payload.data == check)
-        assert np.all(payload[:] ==
-                      payload.words.view(np.int8).reshape(-1, 2))
+        assert np.all(payload[:]
+                      == payload.words.view(np.int8).reshape(-1, 2))
         assert payload != self.payload
         payload[item] = sel_data
         assert np.all(payload[item] == sel_data)
@@ -367,8 +368,8 @@ class TestVLBIBase:
         assert self.frame.ndim == self.payload.ndim
         assert np.all(self.frame.data == self.payload.data)
         assert np.all(np.array(self.frame) == np.array(self.payload))
-        assert np.all(np.array(self.frame, dtype=np.float64) ==
-                      np.array(self.payload))
+        assert np.all(np.array(self.frame, dtype=np.float64)
+                      == np.array(self.payload))
         assert self.frame.valid is True
         frame = self.Frame(self.header, self.payload, valid=False)
         assert np.all(frame.data == 0.)
@@ -492,10 +493,10 @@ class TestSqueezeAndSubset:
         sr = self.make_reader_with_shape(squeeze=True)
         assert sr.sample_shape == self.squeezed_shape
         assert sr.sample_shape._fields == self.squeezed_fields
-        assert (sr._squeeze_and_subset(self.unsliced_data).shape ==
-                self.squeezed_data.shape)
-        assert (sr._squeeze_and_subset(self.unsliced_data[:1]).shape ==
-                (1,) + self.squeezed_shape)
+        assert (sr._squeeze_and_subset(self.unsliced_data).shape
+                == self.squeezed_data.shape)
+        assert (sr._squeeze_and_subset(self.unsliced_data[:1]).shape
+                == (1,) + self.squeezed_shape)
 
         # With VLBIStreamWriterBase, we can access _unsqueeze.
         sw = self.make_writer_with_shape(squeeze=False)
@@ -505,10 +506,10 @@ class TestSqueezeAndSubset:
         sw = self.make_writer_with_shape(squeeze=True)
         assert sw.sample_shape == self.squeezed_shape
         assert sw.sample_shape._fields == self.squeezed_fields
-        assert (sw._unsqueeze(self.squeezed_data).shape ==
-                self.unsliced_data.shape)
-        assert (sw._unsqueeze(self.squeezed_data[:1]).shape ==
-                (1,) + self.unsliced_shape)
+        assert (sw._unsqueeze(self.squeezed_data).shape
+                == self.unsliced_data.shape)
+        assert (sw._unsqueeze(self.squeezed_data[:1]).shape
+                == (1,) + self.unsliced_shape)
 
         # Check that single-axis sample shape squeezes to ().
         sample_shape_maker_s = namedtuple('SampleShape', 'n0')
@@ -592,8 +593,8 @@ def test_crc():
     bitstream = np.array([((istream & (1 << bit)) != 0)
                           for bit in range(37*4-1, -1, -1)], np.bool)
     crcstream = crc12(bitstream)
-    crc = np.bitwise_or.reduce(crcstream.astype(np.uint32) <<
-                               np.arange(11, -1, -1))
+    crc = np.bitwise_or.reduce(crcstream.astype(np.uint32)
+                               << np.arange(11, -1, -1))
     assert '{:03x}'.format(crc) == crc_expected
     fullstream = np.hstack((bitstream, crcstream))
     assert crc12.check(fullstream)

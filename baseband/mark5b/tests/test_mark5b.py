@@ -65,8 +65,8 @@ class TestMark5B:
         assert header.payload_nbytes == 10000
         assert header.frame_nbytes == 10016
         assert header['frame_nr'] == 0
-        assert abs(header.time -
-                   Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
+        assert abs(header.time
+                   - Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             header.tofile(s)
             s.seek(0)
@@ -141,9 +141,9 @@ class TestMark5B:
         # the documentation is rather unclear.
         assert np.all(mark5b.payload.lut1bit[0] == 1.)
         assert np.all(mark5b.payload.lut1bit[0xff] == -1.)
-        assert np.all(mark5b.payload.lut1bit.astype(int) ==
-                      (1 - 2 * ((np.arange(256)[:, np.newaxis] >>
-                                 np.arange(8)) & 1)))
+        assert np.all(mark5b.payload.lut1bit.astype(int)
+                      == (1 - 2 * ((np.arange(256)[:, np.newaxis]
+                                    >> np.arange(8)) & 1)))
         assert np.all(mark5b.payload.lut2bit[0] == -o2h)
         assert np.all(mark5b.payload.lut2bit[0x55] == 1.)
         assert np.all(mark5b.payload.lut2bit[0xaa] == -1.)
@@ -162,10 +162,10 @@ class TestMark5B:
         assert payload.sample_shape == (8,)
         assert payload.sample_shape.nchan == 8
         assert payload.dtype == np.float32
-        assert np.all(payload[:3].astype(int) ==
-                      np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
-                                [-3, +3, -1, +3, -1, -1, -1, +1],
-                                [+3, -1, +3, +3, +1, -1, +3, -1]]))
+        assert np.all(payload[:3].astype(int)
+                      == np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
+                                   [-3, +3, -1, +3, -1, -1, -1, +1],
+                                   [+3, -1, +3, +3, +1, -1, +3, -1]]))
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             payload.tofile(s)
             s.seek(0)
@@ -306,10 +306,10 @@ class TestMark5B:
         assert frame.size == payload.size
         assert frame.ndim == payload.ndim
         assert frame == mark5b.Mark5BFrame(header, payload)
-        assert np.all(frame.data[:3].astype(int) ==
-                      np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
-                                [-3, +3, -1, +3, -1, -1, -1, +1],
-                                [+3, -1, +3, +3, +1, -1, +3, -1]]))
+        assert np.all(frame.data[:3].astype(int)
+                      == np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
+                                   [-3, +3, -1, +3, -1, -1, -1, +1],
+                                   [+3, -1, +3, +3, +1, -1, +3, -1]]))
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
@@ -367,8 +367,8 @@ class TestMark5B:
                 except EOFError:
                     break
                 header_time = frame.header.time
-                expected = (start_time +
-                            frame.header['frame_nr'] * frame_duration)
+                expected = (start_time
+                            + frame.header['frame_nr'] * frame_duration)
                 assert abs(header_time - expected) < 1. * u.ns
 
         # Some files have headers in which the fraction is not set.
@@ -388,23 +388,23 @@ class TestMark5B:
         header.set_time(time=(start_time + 1. / frame_rate),
                         frame_rate=frame_rate)
         header.get_time(frame_rate)
-        assert abs(header.get_time(frame_rate) -
-                   start_time - 1. / frame_rate) < 1. * u.ns
+        assert abs(header.get_time(frame_rate)
+                   - start_time - 1. / frame_rate) < 1. * u.ns
         header.set_time(time=(start_time + 3921. / frame_rate),
                         frame_rate=frame_rate)
-        assert abs(header.get_time(frame_rate) -
-                   start_time - 3921. / frame_rate) < 1. * u.ns
+        assert abs(header.get_time(frame_rate)
+                   - start_time - 3921. / frame_rate) < 1. * u.ns
         # Test using bcd_fraction gives us within 0.1 ms accuracy.
         assert abs(header.time - start_time - 3921. / frame_rate) < 0.1 * u.ms
         header.set_time(time=(start_time + 25599. / frame_rate),
                         frame_rate=frame_rate)
-        assert abs(header.get_time(frame_rate) -
-                   start_time - 25599. / frame_rate) < 1. * u.ns
+        assert abs(header.get_time(frame_rate)
+                   - start_time - 25599. / frame_rate) < 1. * u.ns
         # Check rounding when using passing fractional frametimes.
         header.set_time(time=(start_time + 25598.53 / frame_rate),
                         frame_rate=frame_rate)
-        assert abs(header.get_time(frame_rate) -
-                   start_time - 25599. / frame_rate) < 1. * u.ns
+        assert abs(header.get_time(frame_rate)
+                   - start_time - 25599. / frame_rate) < 1. * u.ns
         # Check rounding to the nearest second when less than 2 ns away.
         header.set_time(time=(start_time + 0.9 * u.ns), frame_rate=frame_rate)
         assert header.seconds == header0.seconds
@@ -470,8 +470,8 @@ class TestMark5B:
             assert fh.shape == (20000,) + fh.sample_shape
             assert fh.size == np.prod(fh.shape)
             assert fh.ndim == len(fh.shape)
-            assert abs(fh.start_time -
-                       Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
+            assert abs(fh.start_time
+                       - Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
             assert abs(fh.stop_time - fh.start_time - 625 * u.us) < 1. * u.ns
             record = fh.read(12)
             assert fh.tell() == 12
@@ -480,8 +480,8 @@ class TestMark5B:
             assert fh.tell() == 10002
             assert fh.fh_raw.tell() == 3. * header.frame_nbytes
             assert fh.time == fh.tell(unit='time')
-            assert (np.abs(fh.time - (fh.start_time + 10002 / (32 * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fh.time - (fh.start_time + 10002 / (32 * u.MHz)))
+                    < 1. * u.ns)
             fh.seek(fh.start_time + 1000 / (32 * u.MHz))
             assert fh.tell() == 1000
             fh.seek(-10, 2)
@@ -508,14 +508,14 @@ class TestMark5B:
         frate = (1. / ((last_header.time - header.time) / 3.)).to(u.Hz).value
         assert round(frate) == 6400
         assert record.shape == (12, 8)
-        assert np.all(record.astype(int)[:3] ==
-                      np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
-                                [-3, +3, -1, +3, -1, -1, -1, +1],
-                                [+3, -1, +3, +3, +1, -1, +3, -1]]))
+        assert np.all(record.astype(int)[:3]
+                      == np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
+                                   [-3, +3, -1, +3, -1, -1, -1, +1],
+                                   [+3, -1, +3, +3, +1, -1, +3, -1]]))
         assert record2.shape == (2, 8)
-        assert np.all(record2.astype(int) ==
-                      np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
-                                [-1, +1, -3, +3, -3, +1, +3, +1]]))
+        assert np.all(record2.astype(int)
+                      == np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
+                                   [-1, +1, -3, +3, -3, +1, +3, +1]]))
         assert record3.shape == (10, 8)
 
         # Check passing a time object.
@@ -589,8 +589,8 @@ class TestMark5B:
                          nchan=8, bps=2) as fh:
             record5 = fh.read()     # Read across days.
             assert np.all(record5 == record)
-            assert (abs(fh.time - Time('2014:165:00:00:01', precision=9)) <
-                    1. * u.ns)
+            assert (abs(fh.time - Time('2014:165:00:00:01', precision=9))
+                    < 1. * u.ns)
 
         # As above, but checking if data can be read across kday increments
         # (2017-09-03 is MJD 57999 and 2017-09-04 is MJD 58000).

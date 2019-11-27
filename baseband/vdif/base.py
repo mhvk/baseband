@@ -142,8 +142,8 @@ class VDIFFileReader(VLBIFileReaderBase):
                 try:
                     self.seek(0)
                     header = self.read_header()
-                    return (header.sample_rate /
-                            header.samples_per_frame).to(u.Hz).round()
+                    return (header.sample_rate
+                            / header.samples_per_frame).to(u.Hz).round()
                 except Exception:
                     pass
             raise exc
@@ -217,16 +217,17 @@ class VDIFFileReader(VLBIFileReaderBase):
             except AssertionError:
                 continue
 
-            if(header.frame_nbytes != frame_nbytes or
-               template_header and not template_header.same_stream(header)):
-                # CPython optimizations will make this as uncovered, even
+            if (header.frame_nbytes != frame_nbytes
+                    or (template_header
+                        and not template_header.same_stream(header))):
+                # CPython optimizations will mark this as uncovered, even
                 # though it is. See
                 # https://bitbucket.org/ned/coveragepy/issues/198/continue-marked-as-not-covered
                 continue  # pragma: no cover
 
             # Also check header from a frame up or down.
-            if ((forward or frame < frame_nbytes) and
-                    frame < nbytes - frame_nbytes - 32):
+            if ((forward or frame < frame_nbytes)
+                    and frame < nbytes - frame_nbytes - 32):
                 next_frame = frame + frame_nbytes
             elif frame > frame_nbytes:
                 next_frame = frame - frame_nbytes
@@ -316,8 +317,8 @@ class VDIFStreamBase(VLBIStreamBase):
             complex_data=header0['complex_data'], squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
 
-        self._frame_rate = int((self.sample_rate /
-                                self.samples_per_frame).to(u.Hz).round().value)
+        self._frame_rate = int((self.sample_rate / self.samples_per_frame)
+                               .to(u.Hz).round().value)
 
     def _get_time(self, header):
         """Get time from a header.
@@ -325,8 +326,8 @@ class VDIFStreamBase(VLBIStreamBase):
         This passes on sample rate, since not all VDIF headers can calculate
         it.
         """
-        return header.get_time(frame_rate=self.sample_rate /
-                               self.samples_per_frame)
+        return header.get_time(frame_rate=self.sample_rate
+                               / self.samples_per_frame)
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
@@ -453,8 +454,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         # Overwrite VLBIStreamReaderBase version, since the threads part of
         # subset has already been used.
         if self.squeeze:
-            data = data.reshape(data.shape[:1] +
-                                tuple(sh for sh in data.shape[1:] if sh > 1))
+            data = data.reshape(data.shape[:1]
+                                + tuple(sh for sh in data.shape[1:] if sh > 1))
         if self._frameset_subset:
             data = data[(slice(None),) + self._frameset_subset]
 
@@ -466,9 +467,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                                              edv=self.header0.edv,
                                              verify=self.verify)
         frameset.fill_value = self.fill_value
-        assert ((frameset['seconds'] - self.header0['seconds']) *
-                self._frame_rate +
-                frameset['frame_nr'] - self.header0['frame_nr']) == index
+        assert ((frameset['seconds'] - self.header0['seconds'])
+                * self._frame_rate
+                + frameset['frame_nr'] - self.header0['frame_nr']) == index
         return frameset
 
 

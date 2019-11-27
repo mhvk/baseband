@@ -88,8 +88,8 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
         file_nr = self.items.pop('file_nr')
         self.items['FRAME_NR'] = self.items['FILE_NR'] = file_nr
         if self._has_obs_offset:
-            self.items['OBS_OFFSET'] = (self._obs_offset0 +
-                                        file_nr * self._file_size)
+            self.items['OBS_OFFSET'] = (self._obs_offset0
+                                        + file_nr * self._file_size)
 
 
 class DADAFileReader(VLBIFileReaderBase):
@@ -288,12 +288,11 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                 # samples.
                 payload_block = lcm(
                     DADAPayload._dtype_word.itemsize,
-                    self.header0.bps * (
-                        2 if self.header0.complex_data else 1) *
-                    np.prod(self.sample_shape) // 8)
+                    self.header0.bps * (2 if self.header0.complex_data else 1)
+                    * np.prod(self.sample_shape) // 8)
                 header.payload_nbytes = payload_block * (
-                    (self._partial_frame_nbytes - header.nbytes) //
-                    payload_block)
+                    (self._partial_frame_nbytes - header.nbytes)
+                    // payload_block)
                 header.mutable = False
 
         return header
@@ -305,24 +304,24 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         See also `start_time` for the start time of the file, and `time` for
         the time of the sample pointer's current offset.
         """
-        return (self._get_time(self._last_header) +
-                (self._last_header.samples_per_frame /
-                 self.sample_rate).to(u.s))
+        return (self._get_time(self._last_header)
+                + (self._last_header.samples_per_frame
+                   / self.sample_rate).to(u.s))
 
     def _read_frame(self, index):
         if index < self._nframes - 1:
             self.fh_raw.seek(index * self.header0.frame_nbytes)
             frame = self.fh_raw.read_frame(memmap=True, verify=self.verify)
         else:
-            self.fh_raw.seek(index * self.header0.frame_nbytes +
-                             self.header0.nbytes)
+            self.fh_raw.seek(index * self.header0.frame_nbytes
+                             + self.header0.nbytes)
             last_header = self._last_header
             last_payload = DADAPayload.fromfile(self.fh_raw, memmap=True,
                                                 header=last_header)
             frame = DADAFrame(last_header, last_payload)
 
-        assert (frame.header['OBS_OFFSET'] - self.header0['OBS_OFFSET'] ==
-                index * self.header0.payload_nbytes)
+        assert (frame.header['OBS_OFFSET'] - self.header0['OBS_OFFSET']
+                == index * self.header0.payload_nbytes)
         return frame
 
 
@@ -349,8 +348,8 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
 
     def _make_frame(self, index):
         header = self.header0.copy()
-        header.update(obs_offset=self.header0['OBS_OFFSET'] +
-                      index * self.header0.payload_nbytes)
+        header.update(obs_offset=self.header0['OBS_OFFSET']
+                      + index * self.header0.payload_nbytes)
         return self.fh_raw.memmap_frame(header)
 
     def _write_frame(self, frame, valid=True):

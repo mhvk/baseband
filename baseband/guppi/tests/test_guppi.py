@@ -74,18 +74,20 @@ class TestGUPPI:
         assert header3.mutable is True
         # Check setting attributes.
         header3.start_time = header.start_time - 0.5 * u.day
-        assert np.abs(header3.start_time -
-                      (header.start_time - 0.5 * u.day)) < 1 * u.ns
+        assert np.abs(header3.start_time
+                      - (header.start_time - 0.5 * u.day)) < 1 * u.ns
         assert np.abs(header3.time - (header.time - 0.5 * u.day)) < 1 * u.ns
         header3.frame_nbytes = 13000
         assert header3.payload_nbytes == 6600
         header4 = guppi.GUPPIHeader.fromkeys(**header)
-        packet_time = (header4['PKTSIZE'] * 8 // header4['OBSNCHAN'] //
-                       header4['NPOL'] // header4.bps) * header4['TBIN'] * u.s
+        packet_time = (header4['PKTSIZE'] * 8
+                       // header4['OBSNCHAN']
+                       // header4['NPOL']
+                       // header4.bps) * header4['TBIN'] * u.s
         header4.offset += packet_time
         assert header4['PKTIDX'] == header['PKTIDX'] + 1
-        assert np.abs(header4.time -
-                      (header.time + packet_time)) < 1 * u.ns
+        assert np.abs(header4.time
+                      - (header.time + packet_time)) < 1 * u.ns
 
         header5 = guppi.GUPPIHeader.fromvalues(
             start_time=header.start_time,
@@ -246,8 +248,9 @@ class TestGUPPI:
             assert header == self.header
             current_pos = fh.tell()
             frame_rate = fh.get_frame_rate()
-            assert frame_rate == (header.sample_rate /
-                                  (header.samples_per_frame - header.overlap))
+            assert frame_rate == (header.sample_rate
+                                  / (header.samples_per_frame
+                                     - header.overlap))
             assert fh.tell() == current_pos
             # Frame is done below, as is writing in binary.
 
@@ -398,12 +401,12 @@ class TestGUPPI:
             assert np.all(record2 == fh._frame[563:565])
             assert fh.tell() == 1525
             assert fh.time == fh.tell(unit='time')
-            assert (np.abs(fh.time - (start_time + 1525 / (250 * u.Hz))) <
-                    1. * u.ns)
+            assert (np.abs(fh.time - (start_time + 1525 / (250 * u.Hz)))
+                    < 1. * u.ns)
             fh.seek(fh.start_time + 100 / (250 * u.Hz))
             assert fh.tell() == 100
-            assert (np.abs(fh.stop_time -
-                           (start_time + 3840 / (250 * u.Hz))) < 1. * u.ns)
+            assert (np.abs(fh.stop_time
+                           - (start_time + 3840 / (250 * u.Hz))) < 1. * u.ns)
             fh.seek(1, 'end')
             with pytest.raises(EOFError):
                 fh.read()
@@ -428,14 +431,14 @@ class TestGUPPI:
             assert fw.sample_rate == 250 * u.Hz
             fw.write(self.payload[:spf])
             assert fw.start_time == start_time
-            assert (np.abs(fw.time - (start_time + spf / (250 * u.Hz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + spf / (250 * u.Hz)))
+                    < 1. * u.ns)
 
         with guppi.open(filename, 'rs') as fh:
             data = fh.read()
             assert fh.start_time == start_time
-            assert (np.abs(fh.time - (start_time + spf / (250 * u.Hz))) <
-                    1. * u.ns)
+            assert (np.abs(fh.time - (start_time + spf / (250 * u.Hz)))
+                    < 1. * u.ns)
             assert fh.stop_time == fh.time
             assert fh.sample_rate == 250 * u.Hz
         assert np.all(data == self.payload[:spf].squeeze())
@@ -451,14 +454,14 @@ class TestGUPPI:
                         nchan=2, npol=1) as fw:
             fw.write(self.payload[:spf, 0, :2])
             assert np.abs(fw.start_time - start_time) < 1.*u.ns
-            assert (np.abs(fw.time - (start_time + spf / (250 * u.Hz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + spf / (250 * u.Hz)))
+                    < 1. * u.ns)
 
         with guppi.open(filename, 'rs') as fh:
             data_onepol = fh.read()
             assert np.abs(fh.start_time - start_time) < 1.*u.ns
-            assert np.abs(fh.stop_time - (start_time + spf /
-                                          (250 * u.Hz))) < 1.*u.ns
+            assert np.abs(fh.stop_time
+                          - (start_time + spf / (250 * u.Hz))) < 1.*u.ns
         assert np.all(data_onepol == self.payload[:spf, 0, :2])
 
         # Try reading a single polarization.
@@ -496,8 +499,8 @@ class TestGUPPI:
                         nchan=2, npol=1, squeeze=False) as fw:
             fw.write(self.payload[:spf, 0:1, :2])
             assert np.abs(fw.start_time - start_time) < 1.*u.ns
-            assert (np.abs(fw.time - (start_time + spf / (250 * u.Hz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + spf / (250 * u.Hz)))
+                    < 1. * u.ns)
 
         with guppi.open(filename, 'rs', squeeze=False) as fh:
             data_onepol = fh.read()
@@ -533,22 +536,22 @@ class TestGUPPI:
             fw.write(data[1000:])
             stop_time = fw.time
         assert start_time == self.header_w.time
-        assert np.abs(time1000 -
-                      (start_time + 1000 / (250 * u.Hz))) < 1.*u.ns
-        assert np.abs(stop_time -
-                      (start_time + 3840 / (250 * u.Hz))) < 1.*u.ns
+        assert np.abs(time1000
+                      - (start_time + 1000 / (250 * u.Hz))) < 1.*u.ns
+        assert np.abs(stop_time
+                      - (start_time + 3840 / (250 * u.Hz))) < 1.*u.ns
 
         with guppi.open(filenames[1], 'rs') as fr:
-            assert (np.abs(fr.time - (start_time + 1920 / (250 * u.Hz))) <
-                    1. * u.ns)
+            assert (np.abs(fr.time - (start_time + 1920 / (250 * u.Hz)))
+                    < 1. * u.ns)
             data1 = fr.read()
         assert np.all(data1 == data[1920:])
 
         with guppi.open(filenames, 'rs') as fr:
             assert fr.start_time == start_time
             assert fr.time == start_time
-            assert np.abs(fr.stop_time -
-                          (start_time + 3840 / (250 * u.Hz))) < 1. * u.ns
+            assert np.abs(fr.stop_time
+                          - (start_time + 3840 / (250 * u.Hz))) < 1. * u.ns
             data2 = fr.read()
             assert np.abs(fr.time - fr.stop_time) < 1. * u.ns
         assert np.all(data2 == data)
@@ -579,16 +582,16 @@ class TestGUPPI:
             fw.write(puppi_raw[:len(puppi_raw) - 6091])
         with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'rs') as fn:
             assert fn.shape == (2880, 2, 4)
-            assert np.abs(fn.stop_time - fn.start_time -
-                          2880 / (250 * u.Hz)) < 1. * u.ns
+            assert np.abs(fn.stop_time
+                          - fn.start_time - 2880 / (250 * u.Hz)) < 1. * u.ns
 
         # Try reading a file with an incomplete header.
         with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'wb') as fw:
             fw.write(puppi_raw[:len(puppi_raw) - 17605])
         with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'rs') as fn:
             assert fn.shape == (2880, 2, 4)
-            assert np.abs(fn.stop_time - fn.start_time -
-                          2880 / (250 * u.Hz)) < 1. * u.ns
+            assert np.abs(fn.stop_time
+                          - fn.start_time - 2880 / (250 * u.Hz)) < 1. * u.ns
 
     def test_chan_ordered_stream(self, tmpdir):
         """Test encoding and decoding frames and streams that use
@@ -624,8 +627,8 @@ class TestGUPPI:
         with guppi.open(template, 'rs') as fr:
             assert len(fr.fh_raw.files) == 4
             assert fr.fh_raw.files[-1] == str(tmpdir.join('guppi_03.raw'))
-            assert np.abs(fr.stop_time -
-                          (start_time + 3840 / (250 * u.Hz))) < 1.*u.ns
+            assert np.abs(fr.stop_time
+                          - (start_time + 3840 / (250 * u.Hz))) < 1.*u.ns
             data2 = fr.read()
         assert np.all(data2 == data)
 
@@ -635,11 +638,11 @@ class TestGUPPI:
                         header0=self.header_w) as fw:
             fw.write(data[:1920])
             assert fw.start_time == start_time
-            assert (np.abs(fw.time - (start_time + 1920 / (250 * u.Hz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + 1920 / (250 * u.Hz)))
+                    < 1. * u.ns)
             fw.write(data[1920:])
-            assert (np.abs(fw.time - (start_time + 3840 / (250 * u.Hz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + 3840 / (250 * u.Hz)))
+                    < 1. * u.ns)
 
         # We cannot just open using the same template, since STT_IMJD is
         # not available.

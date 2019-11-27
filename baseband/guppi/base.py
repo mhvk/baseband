@@ -135,8 +135,8 @@ class GUPPIFileReader(VLBIFileReaderBase):
         with self.temporary_offset():
             self.seek(0)
             header = self.read_header()
-            return (header.sample_rate /
-                    (header.samples_per_frame - header.overlap)).to(u.Hz)
+            return (header.sample_rate
+                    / (header.samples_per_frame - header.overlap)).to(u.Hz)
 
 
 class GUPPIFileWriter(VLBIFileBase):
@@ -205,8 +205,8 @@ class GUPPIStreamBase(VLBIStreamBase):
         # start of observation.  'PKTSIZE' is the packet size in bytes.  Here
         # we calculate the packets per frame.
         self._packets_per_frame = (
-            (header0.payload_nbytes - header0.overlap * header0._bpcs // 8) //
-            header0['PKTSIZE'])
+            (header0.payload_nbytes - header0.overlap * header0._bpcs // 8)
+            // header0['PKTSIZE'])
 
         # Set samples per frame to unique ones, excluding overlap.
         samples_per_frame = header0.samples_per_frame - header0.overlap
@@ -268,8 +268,8 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
     def _read_frame(self, index):
         self.fh_raw.seek(index * self.header0.frame_nbytes)
         frame = self.fh_raw.read_frame(memmap=True, verify=self.verify)
-        assert (frame.header['PKTIDX'] - self.header0['PKTIDX'] ==
-                index * self._packets_per_frame)
+        assert (frame.header['PKTIDX'] - self.header0['PKTIDX']
+                == index * self._packets_per_frame)
         return frame
 
 
@@ -297,8 +297,8 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
 
     def _make_frame(self, index):
         header = self.header0.copy()
-        header.update(pktidx=self.header0['PKTIDX'] +
-                      index * self._packets_per_frame)
+        header.update(pktidx=self.header0['PKTIDX']
+                      + index * self._packets_per_frame)
         return self.fh_raw.memmap_frame(header)
 
     def _write_frame(self, frame, valid=True):

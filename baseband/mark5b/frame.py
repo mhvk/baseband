@@ -64,10 +64,10 @@ class Mark5BFrame(VLBIFrameBase):
     def __init__(self, header, payload, valid=None, verify=True):
         if valid is None:
             # Is this payload OK?  Usually yes, so short-circuit on first few.
-            valid = (payload.words[0] != self._fill_pattern or
-                     payload.words[1] != self._fill_pattern or
-                     payload.words[2] != self._fill_pattern or
-                     (payload.words[3:] != self._fill_pattern).any())
+            valid = (payload.words[0] != self._fill_pattern
+                     or payload.words[1] != self._fill_pattern
+                     or payload.words[2] != self._fill_pattern
+                     or (payload.words[3:] != self._fill_pattern).any())
 
         super().__init__(header, payload, valid, verify)
 
