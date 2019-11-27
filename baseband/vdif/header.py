@@ -80,8 +80,8 @@ class VDIFHeaderMeta(type):
 class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     """VDIF Header, supporting different Extended Data Versions.
 
-    Will initialize a header instance appropriate for a given EDV.
-    See https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf
+    Will initialize a header instance appropriate for a given EDV.  See
+    https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf
 
     Parameters
     ----------

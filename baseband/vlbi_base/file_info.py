@@ -205,8 +205,8 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         missing:  nchan: needed to determine sample shape and rate.
                   kday, ref_time: needed to infer full times.
         <BLANKLINE>
-        errors:  start_time: unsupported operand type(s) for +: 'NoneType' and 'int'
-                 frame0: In order to read frames, the file handle should be initialized with nchan set.
+        errors:  start_time: unsupported operand type(s) for +: ...
+                 frame0: In order to read frames, the file handle ...
 
         >>> fh.close()
 
