@@ -11,8 +11,8 @@ Requirements
 
 Baseband requires:
 
-    - `Astropy`_ v2.0 or later
-    - `Numpy <http://www.numpy.org/>`_ v1.9 or later
+    - `Astropy`_ v3.0 or later
+    - `Numpy <http://www.numpy.org/>`_ v1.10 or later
 
 .. _install_baseband:
 
@@ -46,7 +46,7 @@ Running Code without Installing
 
 As Baseband is purely Python, it can be used without being built or installed,
 by appending the directory it is located in to the ``PYTHON_PATH`` environment
-variable.  Alternatively, you can use :obj:`sys.path` within Python to append 
+variable.  Alternatively, you can use :obj:`sys.path` within Python to append
 the path::
 
     import sys
@@ -99,10 +99,10 @@ Building Documentation
 
     As with Astropy, building the documentation is unnecessary unless you
     are writing new documentation or do not have internet access, as Baseband's
-    documentation is available online at `baseband.readthedocs.io 
+    documentation is available online at `baseband.readthedocs.io
     <https://baseband.readthedocs.io>`_.
 
-The Baseband documentation can be built again using :file:`setup.py` from 
+The Baseband documentation can be built again using :file:`setup.py` from
 the root directory::
 
     python3 setup.py build_docs
