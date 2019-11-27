@@ -38,6 +38,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
     bps : int, optional
         Bits per elementary sample.  Default: 2.
     """
+
     def __init__(self, fh_raw, kday=None, ref_time=None, nchan=None, bps=2):
         self.kday = kday
         self.ref_time = ref_time
@@ -195,6 +196,7 @@ class Mark5BFileWriter(VLBIFileBase):
 
     Adds `write_frame` method to the VLBI binary file wrapper.
     """
+
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
 

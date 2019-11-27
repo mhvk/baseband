@@ -41,6 +41,7 @@ class Mark4FileReader(VLBIFileReaderBase):
         Reference time within 4 years of the observation time.  Used only
         if ``decade`` is not given.
     """
+
     def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None):
         self.ntrack = ntrack
         self.decade = decade

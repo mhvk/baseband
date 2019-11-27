@@ -242,6 +242,7 @@ class TestVDIF3ToMark5B:
 
 class TestVDIF0BPS1ToMark5B:
     """Real conversion: VDIF EDV 3, BPS 1 to Mark 5B."""
+
     def test_stream(self, tmpdir):
         with vdif.open(SAMPLE_BPS1_VDIF, 'rs', sample_rate=8*u.MHz) as fr:
             start_time = fr.start_time

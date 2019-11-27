@@ -96,6 +96,7 @@ class GSBFileReader(VLBIFileBase):
     complex_data : bool, optional
         Whether data are complex.  Default: `False`.
     """
+
     def __init__(self, fh_raw, payload_nbytes, nchan=1, bps=4,
                  complex_data=False):
         self.payload_nbytes = payload_nbytes

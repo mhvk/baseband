@@ -56,6 +56,7 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
     >>> gfs[10]
     'puppi_58132_J1810+1744_2176.0010.raw'
     """
+
     def __init__(self, template, header={}):
         self.items = {}
 
@@ -145,6 +146,7 @@ class GUPPIFileWriter(VLBIFileBase):
     wrapper.  The latter allows one to encode data in pieces, writing to disk
     as needed.
     """
+
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
 
@@ -246,6 +248,7 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
         frame of the stream is always checked, so ``verify`` is effective only
         when reading sequences of files.  Default: `True`.
     """
+
     def __init__(self, fh_raw, squeeze=True, subset=(), verify=True):
         fh_raw = GUPPIFileReader(fh_raw)
         header0 = GUPPIHeader.fromfile(fh_raw)
@@ -285,6 +288,7 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
         If `True` (default), `write` accepts squeezed arrays as input,
         and adds any dimensions of length unity.
     """
+
     def __init__(self, fh_raw, header0, squeeze=True):
         assert header0.get('OVERLAP', 0) == 0, ("overlap must be 0 when "
                                                 "writing GUPPI files.")

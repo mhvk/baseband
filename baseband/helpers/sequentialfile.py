@@ -49,6 +49,7 @@ class FileNameSequencer:
     >>> vfs[10]
     'obs.edv3.00010.vdif'
     """
+
     def __init__(self, template, header={}):
         self.items = {}
 
@@ -88,6 +89,7 @@ class SequentialFileBase:
 
     For details, see `SequentialFileReader` and `SequentialFileWriter`.
     """
+
     def __init__(self, files, mode='rb', opener=None):
         self.files = files
         self.mode = mode
@@ -312,6 +314,7 @@ class SequentialFileWriter(SequentialFileBase):
     opener : callable, optional
         Function to open a single file (default: `io.open`).
     """
+
     def __init__(self, files, mode='w+b', file_size=None, opener=None):
         self.file_size = file_size
         super().__init__(files, mode, opener)

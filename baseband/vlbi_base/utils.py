@@ -69,6 +69,7 @@ class CRC:
         Binary encoded CRC divisor. For instance, that used by Mark 4 headers
         is 0x180f, or x^12 + x^11 + x^3 + x^2 + x + 1.
     """
+
     def __init__(self, polynomial):
         self.polynomial = polynomial
         self.pol_bin = np.array(

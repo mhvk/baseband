@@ -146,6 +146,7 @@ class HeaderProperty:
     getter : function
         Function that uses the encoding information to calculate a result.
     """
+
     def __init__(self, header_parser, getter, doc=None):
         self.header_parser = header_parser
         self.getter = getter
@@ -159,6 +160,7 @@ class HeaderProperty:
 
 class HeaderPropertyGetter:
     """Special property for attaching HeaderProperty."""
+
     def __init__(self, getter, doc=None):
         self.getter = getter
         self.__doc__ = doc or getter.__doc__

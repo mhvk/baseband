@@ -196,6 +196,7 @@ class VDIFFrameSet:
     (available via ``.header0``).  Any attribute that is not defined on the
     frame set itself, such as ``.time`` will also be looked up on the header.
     """
+
     def __init__(self, frames, header0=None):
         self.frames = frames
         if header0 is None:

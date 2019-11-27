@@ -63,6 +63,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
     >>> dfs[10]
     '2013-07-02-01:37:40.0000006400640000.000000.dada'
     """
+
     def __init__(self, template, header={}):
         self.items = {}
 
@@ -158,6 +159,7 @@ class DADAFileWriter(VLBIFileBase):
     wrapper.  The latter allows one to encode data in pieces, writing to disk
     as needed.
     """
+
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
 
@@ -339,6 +341,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
         If `True` (default), `write` accepts squeezed arrays as input,
         and adds any dimensions of length unity.
     """
+
     def __init__(self, fh_raw, header0, squeeze=True):
         assert header0.get('OBS_OVERLAP', 0) == 0
         fh_raw = DADAFileWriter(fh_raw)
