@@ -10,7 +10,6 @@ http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 A little bit on the disk representation is at
 http://adsabs.harvard.edu/abs/2003ASPC..306..123W
 """
-import operator
 
 import numpy as np
 from astropy.time import Time
@@ -547,7 +546,8 @@ class Mark4Header(Mark4TrackHeader):
                                8 * self.frame_nbytes)
         if extra or fanout not in (1, 2, 4):
             raise ValueError(
-                "header cannot store {} samples per frame. Should be one of {}."
+                "header cannot store {} samples per frame. "
+                "Should be one of {}."
                 .format(samples_per_frame,
                         ', '.join([str(f * 8 * self.frame_nbytes)
                                    for f in (1, 2, 4)])))

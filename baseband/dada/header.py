@@ -6,7 +6,6 @@ Implements a DADAHeader class used to store header definitions in a FITS
 header, and read & write these from files.
 """
 import io
-import operator
 import warnings
 from collections import OrderedDict
 

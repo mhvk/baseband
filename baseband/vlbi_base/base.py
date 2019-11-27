@@ -571,7 +571,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             out = np.empty((count,) + self.sample_shape, dtype=self.dtype)
         else:
             assert out.shape[1:] == self.sample_shape, (
-                "'out' should have trailing shape {}".format(self.sample_shape))
+                "'out' must have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
 
         offset0 = self.offset

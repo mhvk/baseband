@@ -552,7 +552,7 @@ class TestGSB:
                 assert abs(fh_n.stop_time - fh_n.time) < 1.*u.ns
                 assert abs(fh_n.stop_time - fh_r.stop_time) < 1.*u.ns
 
-        # Try writing a file with squeeze off, and reading it back with squeeze.
+        # Try writing with squeeze off, and reading it back with squeeze.
         with gsb.open(gsbtest_ts, 'ws', raw=gsbtest_raw,
                       header0=header0, sample_rate=sample_rate,
                       samples_per_frame=(self.payload_nbytes * (8 // bps)),

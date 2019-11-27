@@ -80,7 +80,7 @@ class VLBIPayloadBase:
         if payload_nbytes is None:
             payload_nbytes = cls._nbytes
             if payload_nbytes is None:
-                raise ValueError("payload_nbytes should be given as an argument "
+                raise ValueError("payload_nbytes should be passed in "
                                  "if no default is defined on the class.")
         s = fh.read(payload_nbytes)
         if len(s) < payload_nbytes:
