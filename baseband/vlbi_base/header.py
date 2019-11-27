@@ -146,6 +146,7 @@ class HeaderProperty:
     getter : function
         Function that uses the encoding information to calculate a result.
     """
+
     def __init__(self, header_parser, getter, doc=None):
         self.header_parser = header_parser
         self.getter = getter
@@ -159,6 +160,7 @@ class HeaderProperty:
 
 class HeaderPropertyGetter:
     """Special property for attaching HeaderProperty."""
+
     def __init__(self, getter, doc=None):
         self.getter = getter
         self.__doc__ = doc or getter.__doc__
@@ -395,8 +397,8 @@ class VLBIHeaderBase:
         KeyError : if not all keys required are present in ``kwargs``
         """
         self = cls(None, *args, verify=False)
-        not_in_both = (set(self.keys()).symmetric_difference(kwargs) -
-                       {'verify'})
+        not_in_both = (set(self.keys()).symmetric_difference(kwargs)
+                       - {'verify'})
         if not_in_both:
             not_in_kwarg = set(self.keys()).difference(kwargs)
             not_in_self = set(kwargs).difference(self.keys()) - {'verify'}
@@ -476,14 +478,14 @@ class VLBIHeaderBase:
         return key in self.keys()
 
     def __eq__(self, other):
-        return (type(self) is type(other) and
-                np.all(np.array(self.words, copy=False) ==
-                       np.array(other.words, copy=False)))
+        return (type(self) is type(other)
+                and np.all(np.array(self.words, copy=False)
+                           == np.array(other.words, copy=False)))
 
     @staticmethod
     def _repr_as_hex(key):
-        return (key.startswith('bcd') or key.startswith('crc') or
-                key == 'sync_pattern')
+        return (key.startswith('bcd') or key.startswith('crc')
+                or key == 'sync_pattern')
 
     def __repr__(self):
         name = self.__class__.__name__

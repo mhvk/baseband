@@ -270,9 +270,9 @@ class Mark4Header(Mark4TrackHeader):
     """
 
     _track_header = Mark4TrackHeader
-    _properties = (Mark4TrackHeader._properties +
-                   ('fanout', 'samples_per_frame', 'bps', 'nchan', 'nsb',
-                    'converters'))
+    _properties = (Mark4TrackHeader._properties
+                   + ('fanout', 'samples_per_frame', 'bps', 'nchan', 'nsb',
+                      'converters'))
     _dtypes = MARK4_DTYPES
 
     # keyed with bps, fanout; Tables 10-14 in reference documentation:
@@ -318,8 +318,8 @@ class Mark4Header(Mark4TrackHeader):
         super().verify()
         assert set(self['fan_out']) == set(np.arange(self.fanout))
         assert (len(set((c, l) for (c, l) in zip(self['converter_id'],
-                                                 self['lsb_output']))) ==
-                self.nchan)
+                                                 self['lsb_output'])))
+                == self.nchan)
 
     def infer_decade(self, ref_time):
         super().infer_decade(ref_time)
@@ -726,8 +726,8 @@ class Mark4Header(Mark4TrackHeader):
             return self.__class__(new_words, self.decade, verify=False)
 
     def __eq__(self, other):
-        return (type(self) is type(other) and
-                np.all(self.words == other.words))
+        return (type(self) is type(other)
+                and np.all(self.words == other.words))
 
     def __repr__(self):
         name = self.__class__.__name__

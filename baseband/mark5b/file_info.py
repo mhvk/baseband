@@ -26,6 +26,6 @@ class Mark5BFileReaderInfo(VLBIFileReaderInfo):
                     "needed to determine sample shape and rate.")
             else:
                 self.sample_shape = (self.nchan,)
-                self.samples_per_frame = (self.header0.payload_nbytes * 8 //
-                                          (self.bps * self.nchan))
+                self.samples_per_frame = (self.header0.payload_nbytes * 8
+                                          // (self.bps * self.nchan))
                 self.sample_rate = self.samples_per_frame * self.frame_rate

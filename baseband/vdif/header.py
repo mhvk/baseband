@@ -70,8 +70,8 @@ class VDIFHeaderMeta(type):
 
         # If header parser has a sync pattern, append it as a private
         # attribute for cls.verify.
-        if (hasattr(cls, '_header_parser') and
-                'sync_pattern' in cls._header_parser.keys()):
+        if (hasattr(cls, '_header_parser')
+                and 'sync_pattern' in cls._header_parser.keys()):
             cls._sync_pattern = cls._header_parser.defaults['sync_pattern']
 
         super().__init__(name, bases, dct)
@@ -80,8 +80,8 @@ class VDIFHeaderMeta(type):
 class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     """VDIF Header, supporting different Extended Data Versions.
 
-    Will initialize a header instance appropriate for a given EDV.
-    See https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf
+    Will initialize a header instance appropriate for a given EDV.  See
+    https://vlbi.org/wp-content/uploads/2019/03/VDIF_specification_Release_1.1.1.pdf
 
     Parameters
     ----------
@@ -136,11 +136,10 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     def same_stream(self, other):
         """Whether header is consistent with being from the same stream."""
         # EDV and most parts of words 2 and 3 should be invariant.
-        return (self.edv == other.edv and
-                all(self[key] == other[key]
-                    for key in ('ref_epoch', 'vdif_version', 'frame_length',
-                                'complex_data', 'bits_per_sample',
-                                'station_id')))
+        return (self.edv == other.edv
+                and all(self[key] == other[key] for key in (
+                    'ref_epoch', 'vdif_version', 'frame_length',
+                    'complex_data', 'bits_per_sample', 'station_id')))
 
     @classmethod
     def fromfile(cls, fh, edv=None, verify=True):
@@ -416,8 +415,8 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
 
             offset = (frame_nr / frame_rate).to_value(u.s)
 
-        return (ref_epochs[self['ref_epoch']] +
-                TimeDelta(self['seconds'], offset, format='sec', scale='tai'))
+        return (ref_epochs[self['ref_epoch']]
+                + TimeDelta(self['seconds'], offset, format='sec'))
 
     def set_time(self, time, frame_rate=None):
         """Converts Time object to ref_epoch, seconds, and frame_nr.
@@ -532,13 +531,13 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
 
     # Add extra properties, ensuring 'time' comes after 'sample_rate' and
     # 'frame_rate', since time setting requires the frame rate.
-    _properties = (VDIFBaseHeader._properties[:-1] +
-                   ('sample_rate', 'frame_rate', 'time'))
+    _properties = (VDIFBaseHeader._properties[:-1]
+                   + ('sample_rate', 'frame_rate', 'time'))
 
     def same_stream(self, other):
-        return (super().same_stream(other) and
-                self.words[4] == other.words[4] and
-                self.words[5] == other.words[5])
+        return (super().same_stream(other)
+                and self.words[4] == other.words[4]
+                and self.words[5] == other.words[5])
 
     @property
     def sample_rate(self):
@@ -548,8 +547,8 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
         sample rate for complex samples, or half the sample rate for real ones.
         """
         # Interprets sample rate correctly for EDV=3, but may not for EDV=1.
-        return u.Quantity(self['sampling_rate'] *
-                          (1 if self['complex_data'] else 2),
+        return u.Quantity(self['sampling_rate']
+                          * (1 if self['complex_data'] else 2),
                           u.MHz if self['sampling_unit'] else u.kHz)
 
     @sample_rate.setter
@@ -559,8 +558,8 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
         assert sample_rate.to_value(u.Hz) % 1 == 0
         complex_sample_rate = sample_rate / (1 if self['complex_data'] else 2)
         self['sampling_unit'] = not (
-            complex_sample_rate.unit == u.kHz or
-            complex_sample_rate.to_value(u.MHz) % 1 != 0)
+            complex_sample_rate.unit == u.kHz
+            or complex_sample_rate.to_value(u.MHz) % 1 != 0)
         if self['sampling_unit']:
             self['sampling_rate'] = int(complex_sample_rate.to_value(u.MHz))
         else:
@@ -690,9 +689,9 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
     """
     _edv = 0xab
     # Repeat 'frame_length' to set default.
-    _header_parser = (VDIFBaseHeader._header_parser +
-                      HeaderParser((('frame_length', (2, 0, 24, 1254)),)) +
-                      HeaderParser(tuple(
+    _header_parser = (VDIFBaseHeader._header_parser
+                      + HeaderParser((('frame_length', (2, 0, 24, 1254)),))
+                      + HeaderParser(tuple(
                           ((k if k != 'frame_nr' else 'mark5b_frame_nr'),
                            (v[0] + 4,) + v[1:])
                           for (k, v) in Mark5BHeader._header_parser.items())))
@@ -755,9 +754,9 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         else:
             fraction = (frame_nr / frame_rate).to_value(u.s)
 
-        return (ref_epochs[self['ref_epoch']] +
-                TimeDelta(self['seconds'], fraction,
-                          format='sec', scale='tai'))
+        return (ref_epochs[self['ref_epoch']]
+                + TimeDelta(self['seconds'], fraction,
+                            format='sec', scale='tai'))
 
     def set_time(self, time, frame_rate=None):
         Mark5BHeader.set_time(self, time, frame_rate)

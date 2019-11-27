@@ -201,9 +201,9 @@ class GUPPIPayload(VLBIPayloadBase):
         # Check if the new data spans an entire word and is correctly shaped.
         # If so, skip decoding.  If not, decode appropriate words and insert
         # new data.
-        if not (data_slice == slice(None) and
-                data.shape[-2:] == self.sample_shape and
-                data.dtype.kind == self.dtype.kind):
+        if not (data_slice == slice(None)
+                and data.shape[-2:] == self.sample_shape
+                and data.dtype.kind == self.dtype.kind):
             decoder = self._decoders[self._coder]
             if self.channels_first:
                 decoded_words = decoder(np.ascontiguousarray(

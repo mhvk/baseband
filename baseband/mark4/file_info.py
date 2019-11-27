@@ -70,7 +70,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         <BLANKLINE>
         missing:  decade, ref_time: needed to infer full times.
         <BLANKLINE>
-        errors:  start_time: unsupported operand type(s) for //: 'NoneType' and 'int'
+        errors:  start_time: unsupported operand type(s) for //: ...
         >>> fh.close()
 
         >>> fh = mark4.open(SAMPLE_MARK4, 'rb', decade=2010)

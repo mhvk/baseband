@@ -27,8 +27,8 @@ class TestGSB:
         assert header.mode == 'rawdump'
         assert header['gps'] == '2015 04 27 18 45 00 0.000000240'
         # Includes UTC offset.
-        assert abs(header.time -
-                   Time('2015-04-27T13:15:00.000000240')) < 1.*u.ns
+        assert abs(header.time
+                   - Time('2015-04-27T13:15:00.000000240')) < 1.*u.ns
         header2 = gsb.GSBHeader.fromkeys(**header)
         assert header2 == header
         header3 = gsb.GSBHeader.fromvalues(mode='rawdump', **header2)
@@ -56,11 +56,11 @@ class TestGSB:
         assert header['gps'] == h_raw[29:60]
         assert header['seq_nr'] == 9995
         assert header['mem_block'] == 3
-        assert abs(header.pc_time -
-                   Time('2013-07-27T21:23:55.517535')) < 1.*u.ns
+        assert abs(header.pc_time
+                   - Time('2013-07-27T21:23:55.517535')) < 1.*u.ns
         assert header.gps_time == header.time
-        assert abs(header.time -
-                   Time('2013-07-27T21:23:55.3241088')) < 1.*u.ns
+        assert abs(header.time
+                   - Time('2013-07-27T21:23:55.3241088')) < 1.*u.ns
         assert header.mutable is False
         with pytest.raises(TypeError):
             header['mem_block'] = 0
@@ -115,13 +115,13 @@ class TestGSB:
         # Seek 2nd header.
         fh.seek(header.seek_offset(1))
         header1 = gsb.GSBHeader.fromfile(fh, verify=True)
-        assert abs(header1.time -
-                   Time('2015-04-27T13:15:00.251658480')) < 1.*u.ns
+        assert abs(header1.time
+                   - Time('2015-04-27T13:15:00.251658480')) < 1.*u.ns
 
         fh.seek(header.seek_offset(9))
         header2 = gsb.GSBHeader.fromfile(fh, verify=True)
-        assert abs(header2.time -
-                   Time('2015-04-27T13:15:02.264924400')) < 1.*u.ns
+        assert abs(header2.time
+                   - Time('2015-04-27T13:15:02.264924400')) < 1.*u.ns
 
         fh.close()
 
@@ -137,17 +137,17 @@ class TestGSB:
         offset_to_1000_0 = header1.seek_offset(n_1000_0)
         assert offset_to_1000_0 == n_1000_0 * header_nbytes
         # Go to 1000.
-        assert (header1.seek_offset(n_1000_0 - 1) ==
-                (n_1000_0 - 1) * header_nbytes + 1)
+        assert (header1.seek_offset(n_1000_0 - 1)
+                == (n_1000_0 - 1) * header_nbytes + 1)
         # Go to 100 (header decreases by 1 chr).
-        assert (header1.seek_offset(n_1000_0 - 900) ==
-                (n_1000_0 - 900) * header_nbytes + 900)
+        assert (header1.seek_offset(n_1000_0 - 900)
+                == (n_1000_0 - 900) * header_nbytes + 900)
         # Go to 99 (header decreases by 2 chr).
-        assert (header1.seek_offset(n_1000_0 - 901) ==
-                (n_1000_0 - 901) * header_nbytes + 902)
+        assert (header1.seek_offset(n_1000_0 - 901)
+                == (n_1000_0 - 901) * header_nbytes + 902)
         # Go to 100001.
-        assert (header1.seek_offset(n_1000_0 + 99001) ==
-                (n_1000_0 + 99001) * header_nbytes + 90002)
+        assert (header1.seek_offset(n_1000_0 + 99001)
+                == (n_1000_0 + 99001) * header_nbytes + 90002)
 
         # Try retrieving headers using seek_offset.
         fh.seek(header1.seek_offset(3))
@@ -159,11 +159,11 @@ class TestGSB:
         assert header2['gps'] == h2_raw[29:60]
         assert header2['seq_nr'] == 9998
         assert header2['mem_block'] == 6
-        assert abs(header2.pc_time -
-                   Time('2013-07-27T21:23:56.272643')) < 1.*u.ns
+        assert abs(header2.pc_time
+                   - Time('2013-07-27T21:23:56.272643')) < 1.*u.ns
         assert header2.gps_time == header2.time
-        assert abs(header2.time -
-                   Time('2013-07-27T21:23:56.079083520')) < 1.*u.ns
+        assert abs(header2.time
+                   - Time('2013-07-27T21:23:56.079083520')) < 1.*u.ns
 
         # Retrieve beyond sequence number 10000.
         fh.seek(header1.seek_offset(8))
@@ -175,11 +175,11 @@ class TestGSB:
         assert header3['gps'] == h3_raw[29:60]
         assert header3['seq_nr'] == 10003
         assert header3['mem_block'] == 3
-        assert abs(header3.pc_time -
-                   Time('2013-07-27T21:23:57.530805')) < 1.*u.ns
+        assert abs(header3.pc_time
+                   - Time('2013-07-27T21:23:57.530805')) < 1.*u.ns
         assert header3.gps_time == header3.time
-        assert abs(header3.time -
-                   Time('2013-07-27T21:23:57.337374720')) < 1.*u.ns
+        assert abs(header3.time
+                   - Time('2013-07-27T21:23:57.337374720')) < 1.*u.ns
 
         fh.close()
 
@@ -188,11 +188,11 @@ class TestGSB:
         with open(SAMPLE_PHASED_HEADER, 'rt') as fh:
             header = gsb.GSBHeader.fromfile(fh, verify=True,
                                             utc_offset=0.*u.hr)
-        assert abs(header.pc_time -
-                   Time('2013-07-28T02:53:55.517535')) < 1.*u.ns
+        assert abs(header.pc_time
+                   - Time('2013-07-28T02:53:55.517535')) < 1.*u.ns
         assert header.gps_time == header.time
-        assert abs(header.time -
-                   Time('2013-07-28T02:53:55.3241088')) < 1.*u.ns
+        assert abs(header.time
+                   - Time('2013-07-28T02:53:55.3241088')) < 1.*u.ns
 
     def test_decoding(self):
         """Check that 4-bit encoding works."""
@@ -472,8 +472,8 @@ class TestGSB:
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
             assert fh_r.sample_shape == (1,)
-            assert fh_r.shape == ((10 * fh_r.samples_per_frame,) +
-                                  fh_r.sample_shape)
+            assert fh_r.shape == ((10 * fh_r.samples_per_frame,)
+                                  + fh_r.sample_shape)
             assert fh_r.size == np.prod(fh_r.shape)
             assert fh_r.ndim == len(fh_r.shape)
             assert fh_r.sample_rate == sample_rate
@@ -491,8 +491,8 @@ class TestGSB:
             check = fh_r.read(10)
             assert np.all(check == frame10.data[-10:])
             # Check validity of current and stopping time
-            assert abs(fh_r.stop_time -
-                       Time('2015-04-27T13:15:02.516582640')) < 1.*u.ns
+            assert abs(fh_r.stop_time
+                       - Time('2015-04-27T13:15:02.516582640')) < 1.*u.ns
             assert abs(fh_r.stop_time - fh_r.time) < 1.*u.ns
             fh_r.seek(0)
             data1 = fh_r.read()
@@ -561,8 +561,8 @@ class TestGSB:
 
         with gsb.open(gsbtest_ts, 'rs', raw=gsbtest_raw,
                       sample_rate=sample_rate,
-                      samples_per_frame=(self.payload_nbytes *
-                                         (8 // bps))) as fh_nns:
+                      samples_per_frame=(self.payload_nbytes
+                                         * (8 // bps))) as fh_nns:
             check == fh_nns.read()
             assert np.all(check == data2)
 
@@ -616,8 +616,8 @@ class TestGSB:
     def test_phased_stream(self, tmpdir):
         bps = 8
         nchan = 512
-        sample_rate = (self.frame_rate * self.payload_nbytes *
-                       (8 // bps) / nchan)
+        sample_rate = (self.frame_rate * self.payload_nbytes
+                       * (8 // bps) / nchan)
         # Open here with payloadsize given, below with samples_per_frame.
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
                       sample_rate=sample_rate,
@@ -632,8 +632,8 @@ class TestGSB:
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
             assert fh_r.sample_shape == (2, 512)
-            assert fh_r.shape == ((10 * fh_r.samples_per_frame,) +
-                                  fh_r.sample_shape)
+            assert fh_r.shape == ((10 * fh_r.samples_per_frame,)
+                                  + fh_r.sample_shape)
             assert fh_r.size == np.prod(fh_r.shape)
             assert fh_r.ndim == len(fh_r.shape)
             assert fh_r.sample_rate == sample_rate
@@ -649,8 +649,8 @@ class TestGSB:
             fh_r.seek(-8, 2)
             assert np.all(fh_r.read(8) == frame10.data)
             # Check validity of current and stopping time.
-            assert abs(fh_r.stop_time -
-                       Time('2013-07-27T21:23:57.8406912')) < 1.*u.ns
+            assert abs(fh_r.stop_time
+                       - Time('2013-07-27T21:23:57.8406912')) < 1.*u.ns
             assert abs(fh_r.stop_time - fh_r.time) < 1.*u.ns
             fh_r.seek(0)
             data1 = fh_r.read()
@@ -717,15 +717,15 @@ class TestGSB:
                 frame1 = gsb.GSBFrame.fromfile(
                     ft, fraw, payload_nbytes=self.payload_nbytes, nchan=nchan,
                     bps=bps, complex_data=True)
-            assert np.all(fh_r.read(fh_r.samples_per_frame) ==
-                          frame1.data[:, 0, :256])
+            assert np.all(fh_r.read(fh_r.samples_per_frame)
+                          == frame1.data[:, 0, :256])
             self.close_phased_rawfiles(fraw)
 
         # Try writing to file by passing header keywords into open.
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
                       sample_rate=sample_rate,
-                      samples_per_frame=(self.payload_nbytes //
-                                         nchan)) as fh_r, \
+                      samples_per_frame=(self.payload_nbytes
+                                         // nchan)) as fh_r, \
                 open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
                 open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
                 open(str(tmpdir.join('test1.dat')), 'w+b') as sp1, \
@@ -795,8 +795,8 @@ class TestGSB:
         # Test not passing a sample rate and samples per frame to reader
         # (can't test reading, since the sample file is tiny).
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED) as fh_r:
-            assert fh_r.sample_rate == (fh_r.samples_per_frame *
-                                        (100. / 3. / 2.**23) * u.MHz)
+            assert fh_r.sample_rate == (fh_r.samples_per_frame
+                                        * (100. / 3. / 2.**23) * u.MHz)
             assert fh_r.samples_per_frame == 2**13  # 2**23 / 1024
             assert fh_r._payload_nbytes == 2**22
 

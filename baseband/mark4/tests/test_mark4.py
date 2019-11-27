@@ -78,8 +78,8 @@ class TestMark4:
         assert header.payload_nbytes == header.frame_nbytes - header.nbytes
         assert header.mutable is False
         assert header.nsb == 1
-        assert np.all(header.converters['converter'] ==
-                      [0, 2, 1, 3, 4, 6, 5, 7])
+        assert np.all(header.converters['converter']
+                      == [0, 2, 1, 3, 4, 6, 5, 7])
         assert np.all(header.converters['lsb'])
         assert repr(header).startswith('<Mark4Header bcd_headstack1: [0')
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
@@ -156,8 +156,8 @@ class TestMark4:
         # OK, this is silly, but why not...
         header7.time = header.time + np.arange(64) * 125 * u.ms
         assert len(header7.time) == 64
-        assert np.all(abs(header7.time - header.time -
-                          np.arange(64) * 125 * u.ms) < 1.*u.ns)
+        assert np.all(abs(header7.time - header.time
+                          - np.arange(64) * 125 * u.ms) < 1.*u.ns)
         with pytest.raises(ValueError):  # different decades
             header7.time = header.time - (np.linspace(0, 20, 64) // 4) * 4*u.yr
         # Check slicing.
@@ -211,9 +211,9 @@ class TestMark4:
         o2h = OPTIMAL_2BIT_HIGH
         assert np.all(mark4.payload.lut1bit[0] == 1.)
         assert np.all(mark4.payload.lut1bit[0xff] == -1.)
-        assert np.all(mark4.payload.lut1bit.astype(int) ==
-                      1 - 2 * ((np.arange(256)[:, np.newaxis] >>
-                                np.arange(8)) & 1))
+        assert np.all(mark4.payload.lut1bit.astype(int)
+                      == 1 - 2 * ((np.arange(256)[:, np.newaxis]
+                                   >> np.arange(8)) & 1))
         assert np.all(mark4.payload.lut2bit1[0] == -o2h)
         assert np.all(mark4.payload.lut2bit1[0x55] == 1.)
         assert np.all(mark4.payload.lut2bit1[0xaa] == -1.)
@@ -232,8 +232,8 @@ class TestMark4:
         check = np.array([738811025863578102], dtype='<u8').view('u8')
         expected = np.array([118, 209, 53, 244, 148, 217, 64, 10])
         assert np.all(reorder64(check).view(np.uint8) == expected)
-        assert np.all(reorder32(check.view('u4')).view(np.uint8) ==
-                      expected)
+        assert np.all(reorder32(check.view('u4')).view(np.uint8)
+                      == expected)
 
     def test_payload(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -249,10 +249,10 @@ class TestMark4:
         assert payload.sample_shape == (8,)
         assert payload.sample_shape.nchan == 8
         assert payload.dtype == np.float32
-        assert np.all(payload[0].astype(int) ==
-                      np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(payload[1].astype(int) ==
-                      np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        assert np.all(payload[0].astype(int)
+                      == np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
+        assert np.all(payload[1].astype(int)
+                      == np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
 
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             payload.tofile(s)
@@ -322,8 +322,8 @@ class TestMark4:
             current_pos = fh.tell()
             assert header2 == header
             frame_rate = fh.get_frame_rate()
-            assert abs(frame_rate -
-                       32 * u.MHz / header.samples_per_frame) < 1 * u.nHz
+            assert abs(frame_rate
+                       - 32 * u.MHz / header.samples_per_frame) < 1 * u.nHz
             assert fh.tell() == current_pos
             repr_fh = repr(fh)
 
@@ -349,10 +349,10 @@ class TestMark4:
         assert frame == mark4.Mark4Frame(header, payload)
         data = frame.data
         assert np.all(data[:640] == 0.)
-        assert np.all(data[640].astype(int) ==
-                      np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(data[641].astype(int) ==
-                      np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        assert np.all(data[640].astype(int)
+                      == np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
+        assert np.all(data[641].astype(int)
+                      == np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
         # Check writing and round-trip.
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             frame.tofile(s)
@@ -639,10 +639,10 @@ class TestMark4:
 
         assert record.shape == (642, 8)
         assert np.all(record[:640] == 0.)
-        assert np.all(record.astype(int)[640] ==
-                      np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(record.astype(int)[641] ==
-                      np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        assert np.all(record.astype(int)[640]
+                      == np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
+        assert np.all(record.astype(int)[641]
+                      == np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
         assert record2.shape == (2, 8)
         assert np.all(record2[0] == 0.)
         assert not np.any(record2[1] == 0.)
@@ -755,8 +755,8 @@ class TestMark4:
             assert fh.header0.decade == 2010
             record6 = fh.read()
             assert np.all(record6 == record)
-            assert (abs(fh.time - Time('2020:1:00:00:00.0025', precision=9)) <
-                    1. * u.ns)
+            assert (abs(fh.time - Time('2020:1:00:00:00.0025', precision=9))
+                    < 1. * u.ns)
             assert fh._frame.header.decade == 2020
 
     # Test that writing an incomplete stream is possible, and that frame set is

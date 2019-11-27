@@ -38,6 +38,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
     bps : int, optional
         Bits per elementary sample.  Default: 2.
     """
+
     def __init__(self, fh_raw, kday=None, ref_time=None, nchan=None, bps=2):
         self.kday = kday
         self.ref_time = ref_time
@@ -179,9 +180,9 @@ class Mark5BFileReader(VLBIFileReaderBase):
             except Exception:
                 continue
 
-            if(header2.jday == header1.jday and
-               abs(header2.seconds - header1.seconds) <= 1 and
-               abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
+            if (header2.jday == header1.jday
+                    and abs(header2.seconds - header1.seconds) <= 1
+                    and abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
                 self.seek(frame)
                 return header1
 
@@ -195,6 +196,7 @@ class Mark5BFileWriter(VLBIFileBase):
 
     Adds `write_frame` method to the VLBI binary file wrapper.
     """
+
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
 
@@ -235,8 +237,8 @@ class Mark5BStreamBase(VLBIStreamBase):
             unsliced_shape=(nchan,), bps=bps, complex_data=False,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
-        self._frame_rate = int((self.sample_rate /
-                                self.samples_per_frame).to(u.Hz).round().value)
+        self._frame_rate = int((self.sample_rate / self.samples_per_frame)
+                               .to(u.Hz).round().value)
 
 
 class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
@@ -318,11 +320,11 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         # Set decoded value for invalid data.
         frame.fill_value = self.fill_value
         # TODO: OK to ignore leap seconds? Not sure what writer does.
-        assert (self._frame_rate *
-                (frame.seconds - self.header0.seconds +
-                 86400 * (frame.kday + frame.jday -
-                          self.header0.kday - self.header0.jday)) +
-                frame['frame_nr'] - self.header0['frame_nr']) == index
+        assert (self._frame_rate
+                * (frame.seconds - self.header0.seconds
+                   + 86400 * (frame.kday + frame.jday
+                              - self.header0.kday - self.header0.jday))
+                + frame['frame_nr'] - self.header0['frame_nr']) == index
         return frame
 
 
