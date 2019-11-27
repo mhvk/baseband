@@ -1,5 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-import numpy as np
 
 from ..vlbi_base.file_info import VLBIFileReaderInfo
 

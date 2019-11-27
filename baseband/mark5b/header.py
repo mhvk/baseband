@@ -169,7 +169,8 @@ class Mark5BHeader(VLBIHeaderBase):
         ref_time : `~astropy.time.Time`
             Reference time within 500 days of the observation time.
         """
-        self.kday = np.around(ref_time.mjd - self.jday, decimals=-3).astype(int)
+        self.kday = np.around(ref_time.mjd - self.jday,
+                              decimals=-3).astype(int)
 
     @property
     def payload_nbytes(self):

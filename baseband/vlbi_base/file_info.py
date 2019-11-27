@@ -225,7 +225,8 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         >>> fh.close()
     """
     attr_names = ('format', 'frame_rate', 'sample_rate', 'samples_per_frame',
-                  'sample_shape', 'bps', 'complex_data', 'start_time', 'readable')
+                  'sample_shape', 'bps', 'complex_data', 'start_time',
+                  'readable')
     _header0_attrs = ('bps', 'complex_data', 'samples_per_frame',
                       'sample_shape')
 
@@ -357,7 +358,7 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         self.readable = self._readable()
 
     def _up_to_date(self):
-        # Stream readers cannot change after initialization, so the check is easy.
+        # Stream readers cannot change after initialization, so check is easy.
         return True
 
     def __call__(self):

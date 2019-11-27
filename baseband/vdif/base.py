@@ -288,8 +288,8 @@ class VDIFFileWriter(VLBIFileBase):
             the VDIF frame set.
         header : :class:`~baseband.vdif.VDIFHeader`, list of same
             Can instead give keyword arguments to construct a header.  Ignored
-            if ``data`` is a :class:`~baseband.vdif.VDIFFrameSet` instance.  If a
-            list, should have a length matching the number of threads in
+            if ``data`` is a :class:`~baseband.vdif.VDIFFrameSet` instance.
+            If a list, should have a length matching the number of threads in
             ``data``; if a single header, ``thread_ids`` corresponding
             to the number of threads are generated automatically.
         **kwargs

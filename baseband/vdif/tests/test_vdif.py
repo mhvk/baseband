@@ -715,7 +715,8 @@ class TestVDIF:
             assert fh.start_time == fh.header0.time
             assert abs(fh.time - fh.start_time) < 1. * u.ns
             assert fh.time == fh.tell(unit='time')
-            assert isinstance(fh.dtype, np.dtype) and fh.dtype == np.dtype('f4')
+            assert isinstance(fh.dtype, np.dtype)
+            assert fh.dtype == np.dtype('f4')
             record = fh.read(12)
             assert record.dtype == np.dtype('f4')
             assert fh.tell() == 12
@@ -1212,11 +1213,11 @@ class TestVDIFBPS1:
 
         assert data.shape == (8000, 16)
         assert np.all((data == 1) | (data == -1))
-        assert np.all(data[:4] == np.array(
-            [[+1, -1, -1, -1, +1, -1, -1, +1, -1, +1, -1, +1, -1, -1, -1, +1],
-             [-1, -1, +1, -1, +1, +1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1],
-             [+1, +1, -1, -1, +1, +1, +1, +1, +1, -1, +1, +1, -1, +1, +1, +1],
-             [+1, -1, +1, -1, +1, +1, +1, -1, +1, -1, +1, +1, +1, -1, -1, -1]]))
+        assert np.all(data[:4] == np.array([
+            [+1, -1, -1, -1, +1, -1, -1, +1, -1, +1, -1, +1, -1, -1, -1, +1],
+            [-1, -1, +1, -1, +1, +1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1],
+            [+1, +1, -1, -1, +1, +1, +1, +1, +1, -1, +1, +1, -1, +1, +1, +1],
+            [+1, -1, +1, -1, +1, +1, +1, -1, +1, -1, +1, +1, +1, -1, -1, -1]]))
 
     def test_stream_writer(self, tmpdir):
         filename = str(tmpdir.join('bps1.vdif'))

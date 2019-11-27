@@ -7,7 +7,7 @@ import astropy.units as u
 from .. import open as baseband_open, file_info
 from ..helpers import sequentialfile as sf
 from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
-                    SAMPLE_VDIF, SAMPLE_MWA_VDIF as SAMPLE_MWA, SAMPLE_DADA)
+                    SAMPLE_VDIF, SAMPLE_DADA)
 
 
 @pytest.mark.parametrize(

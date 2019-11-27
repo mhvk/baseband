@@ -7,7 +7,6 @@ the information therein.
 
 For the VDIF specification, see https://www.vlbi.org/vdif
 """
-import operator
 
 import numpy as np
 import astropy.units as u

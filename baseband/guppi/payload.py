@@ -179,8 +179,8 @@ class GUPPIPayload(VLBIPayloadBase):
 
         if self.channels_first:
             # Reshape words so channels fall along first axis, then decode.
-            decoded_words = decoder(
-                self.words.reshape(self.sample_shape.nchan, -1)[:, words_slice])
+            decoded_words = decoder(self.words.reshape(self.sample_shape.nchan,
+                                                       -1)[:, words_slice])
             # Reshape to (nsample, nchan, npol), then use data_slice.
             return (decoded_words.view(self.dtype).T
                     .reshape(-1, *self.sample_shape)[data_slice])

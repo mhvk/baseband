@@ -64,10 +64,11 @@ env:
         # - SETUP_XVFB=True
 
         # If you want to ignore certain flake8 errors, you can list them
-        # in FLAKE8_OPT, for example:
-        # - FLAKE8_OPT='--ignore=E501'
-        - FLAKE8_OPT=''
-
+        # in FLAKE8_OPT, for example
+        # E226: missing whitespace around arithmetic operator
+        # E501: line too long
+        # W504: line break after binary operator
+        - FLAKE8_OPT='--ignore=E226,E501,W504'
 
 matrix:
 
@@ -82,7 +83,7 @@ matrix:
 
         # Do a PEP8/pyflakes test with flake8 (see setup.cfg for options)
         - stage: Initial tests
-          env: MAIN_CMD="flake8 --count baseband" SETUP_CMD=''
+          env: MAIN_CMD="flake8 --count baseband $FLAKE8_OPT" SETUP_CMD=''
 
         # Comprehensive tests.
         # Check for sphinx doc build warnings.
