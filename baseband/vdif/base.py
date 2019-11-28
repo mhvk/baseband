@@ -106,17 +106,35 @@ class VDIFFileReader(VLBIFileReaderBase):
     """
     info = VDIFFileReaderInfo()
 
-    def read_header(self):
+    def read_header(self, edv=None, verify=True):
         """Read a single header from the file.
+
+        Parameters
+        ----------
+        edv : int, optional
+            The expected extended data version for the VDIF Header.  If `None`,
+            use that of the frame.  (Passing it in slightly improves file
+            integrity checking.)
+        verify : bool, optional
+            Whether to do basic checks of header integrity.  Default: `True`.
 
         Returns
         -------
         header : `~baseband.vdif.VDIFHeader`
         """
-        return VDIFHeader.fromfile(self.fh_raw)
+        return VDIFHeader.fromfile(self.fh_raw, edv=edv, verify=verify)
 
-    def read_frame(self):
+    def read_frame(self, edv=None, verify=True):
         """Read a single frame (header plus payload).
+
+        Parameters
+        ----------
+        edv : int, optional
+            The expected extended data version for the VDIF Header.  If `None`,
+            use that of the frame.  (Passing it in slightly improves file
+            integrity checking.)
+        verify : bool, optional
+            Whether to do basic checks of frame integrity.  Default: `True`.
 
         Returns
         -------
@@ -125,7 +143,7 @@ class VDIFFileReader(VLBIFileReaderBase):
             :class:`~baseband.vdif.VDIFHeader` and data encoded in the frame,
             respectively.
         """
-        return VDIFFrame.fromfile(self.fh_raw)
+        return VDIFFrame.fromfile(self.fh_raw, edv=edv, verify=verify)
 
     def read_frameset(self, thread_ids=None, edv=None, verify=True):
         """Read a single frame (header plus payload).
@@ -545,67 +563,121 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                 if header is None:
                     raise exc
 
-            if(frame_index(header1) > index):
+            # Move back to position of last good header (header1).
+            self.fh_raw.seek(raw_pos)
+
+            if frame_index(header1) < index:
                 # Whole frame set missing?
                 self._raw_offsets.add(index, None)
-                self._raw_offsets.add(frame_index(header),
-                                      raw_pos - frame_index(header)
+                self._raw_offsets.add(frame_index(header1),
+                                      raw_pos - frame_index(header1)
                                       * self._frameset_nbytes)
                 warnings.warn(msg + ' The frame seems to be missing.')
                 raise NotImplementedError("Cannot deal with missing frames.")
+
+            assert frame_index(header1) == index, \
+                'at this point, we either errored or have a good header.'
 
             if raw_pos != raw_offset:
                 msg += ' Stream off by {0} bytes.'.format(raw_offset - raw_pos)
                 self._raw_offsets.add(index,
                                       raw_pos - index * self._frameset_nbytes)
 
-            self.fh_raw.seek(raw_pos)
             # Try again to read it, however many threads there are.
-            try:
-                frameset = self.fh_raw.read_frameset(edv=self.header0.edv)
-            except Exception:
-                warnings.warn(msg + ' Retry failed as well. ')
-                # State that there are no good threads.
-                thread_ids = []
-                # Use existing frame set as a template for creating invalid
-                # frame below.
-                frameset = self._frameset
-            else:
-                # Enumerate the threads that could be read.
-                thread_ids = [frame['thread_id'] for frame in frameset.frames]
+            # TODO: this somewhat duplicates FrameSet.fromfile; possibly
+            # move code there.
+            # TODO: remove limitation that threads need to be together.
+            frames = {}
+            previous = None
+            while True:
+                raw_pos = self.fh_raw.tell()
+                try:
+                    frame = self.fh_raw.read_frame(edv=self.header0.edv)
+                except EOFError:
+                    # End of file while reading a frame; we're done here.
+                    next_header = None
+                    break
+                except AssertionError:
+                    # Frame is not OK.
+                    assert previous is not None, \
+                        'first frame should be readable if fully on disk'
+
+                    # Go back to after previous payload and try finding
+                    # next header.
+                    self.fh_raw.seek(raw_pos - header1.payload_nbytes)
+                    next_header = self.fh_raw.find_header(self.header0)
+
+                    # If no header was found, give up.  The previous frame
+                    # was likely bad too, so delete it.
+                    if next_header is None:
+                        del frames[previous]
+                        break
+
+                    # If the next header is not exactly a frame away from
+                    # where we were trying to read, the previous frame was
+                    # likely bad, so discard it.
+                    if self.fh_raw.tell() != raw_pos + header1.frame_nbytes:
+                        del frames[previous]
+
+                    # Stop if the next header is from a different frame.
+                    if next_header['frame_nr'] != frame_nr:
+                        break
+
+                else:
+                    # Successfully read frame.  If it is not of the requested
+                    # set, rewind and break out of the loop.
+                    if frame['frame_nr'] != frame_nr:
+                        next_header = frame.header
+                        self.fh_raw.seek(raw_pos)
+                        break
+
+                    # Do we have a good frame, giving a new thread?
+                    previous = frame['thread_id']
+                    if previous in frames:
+                        msg += (' Duplicate thread {0} found; discarding.'
+                                .format(previous))
+                        del frames[previous]
+                    else:
+                        # Looks like it, though may still be discarded
+                        # if the next frame is not readable.
+                        frames[previous] = frame
+
+            # If the next header is of the next frame, set up the raw
+            # offset (which likely will be needed, saving some time).
+            if (next_header is not None
+                    and frame_index(next_header) == index + 1):
+                self._raw_offsets.add(index + 1,
+                                      self.fh_raw.tell() - (index + 1)
+                                      * self._frameset_nbytes)
 
             # Create invalid frame template, using header1, which is
             # guaranteed to be from this set, as a base.
             # It is copied to make it mutable without any risk of messing up
             # possibly memory mapped data.
-            invalid_frame = frameset.frames[0].__class__(
-                header1.copy(), frameset.frames[0].payload)
+            invalid_frame = self._frameset.frames[0].__class__(
+                header1.copy(), self._frameset.frames[0].payload)
             invalid_frame.valid = False
-            frames = []
-            ok = True
+
+            frame_list = []
+            missing = []
             for thread in self._thread_ids:
-                try:
-                    index = thread_ids.index(thread)
-                except ValueError:
-                    ok = False
-                    msg += (' Thread {0} missing; set to invalid.'
-                            .format(thread))
-                    invalid_frame.header['thread_id'] = thread
-                    frames.append(invalid_frame)
+                if thread in frames:
+                    frame_list.append(frames[thread])
                 else:
-                    frames.append(frameset.frames[index])
+                    missing.append(thread)
+                    invalid_frame.header['thread_id'] = thread
+                    frame_list.append(invalid_frame)
+
+            if missing:
+                if frames == {}:
+                    msg += ' Failed to get any threads; all set to invalid.'
+                else:
+                    msg += (' Thread(s) {0} missing; set to invalid.'
+                            .format(missing))
 
             warnings.warn(msg)
 
-            if not ok:
-                # missing data; set offset for next frame.
-                header = self.fh_raw.find_header(self.header0, maximum=0)
-                if header is not None and frame_index(header) == index+1:
-                    self._raw_offsets.add(index+1,
-                                          self.fh_raw.tell() - (index+1)
-                                          * self._frameset_nbytes)
-
-            frameset = frameset.__class__(frames)
+            frameset = self._frameset.__class__(frame_list)
 
         frameset.fill_value = self.fill_value
         return frameset

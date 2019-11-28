@@ -983,7 +983,8 @@ class TestVDIF:
                 verified = fn.read()
             assert np.all(verified[:20000] == data[:20000])
             assert np.all(verified[20000:, :2] == data[20000:, :2])
-            assert np.all(verified[20000:, 2:] == 0.)
+            assert np.all(verified[20000:, 3:] == data[20000:, 3:])
+            assert np.all(verified[20000:, 2] == 0.)
 
         # Check that we can pass verify=False.
         with vdif.open(testverifyfile, 'rs', verify=False) as fn:
