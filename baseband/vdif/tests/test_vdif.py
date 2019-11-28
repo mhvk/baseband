@@ -977,13 +977,13 @@ class TestVDIF:
 
         with vdif.open(testverifyfile, 'rs') as fn:
             assert fn.verify is True
-            # This should fail at the second frameset.
-            with pytest.raises(AssertionError):
-                fn.read()
-            assert fn.tell() == 20000
-            fn.verify = False
-            assert fn.verify is False
-            assert np.all(fn.read() == data[20000:])
+            # This should ignore the bad frame.
+            # TODO: fix so that things beyond are read as well
+            with pytest.warns(UserWarning, match='Problem loading frame'):
+                verified = fn.read()
+            assert np.all(verified[:20000] == data[:20000])
+            assert np.all(verified[20000:, :2] == data[20000:, :2])
+            assert np.all(verified[20000:, 2:] == 0.)
 
         # Check that we can pass verify=False.
         with vdif.open(testverifyfile, 'rs', verify=False) as fn:
