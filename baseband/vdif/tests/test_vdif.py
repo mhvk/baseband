@@ -651,6 +651,16 @@ class TestVDIF:
             header_end = fh.find_header(template_header=header0,
                                         forward=True)
             assert header_end is None
+            # Just before a header.
+            fh.seek(40254)
+            header_40254f = fh.find_header(template_header=header0,
+                                           forward=True)
+            assert fh.tell() == 8 * header0.frame_nbytes
+            fh.seek(40254)
+            header_40254b = fh.find_header(template_header=header0,
+                                           forward=False)
+            assert fh.tell() == 7 * header0.frame_nbytes
+
         # thread order = 1,3,5,7,0,2,4,6
         assert header_16b == header_0
         # second frame
@@ -662,6 +672,12 @@ class TestVDIF:
         # fifth frame
         assert header_20128f['frame_nr'] == 0
         assert header_20128f['thread_id'] == 0
+        # seventh frame
+        assert header_40254b['frame_nr'] == 0
+        assert header_40254b['thread_id'] == 6
+        # eigth frame
+        assert header_40254f['frame_nr'] == 1
+        assert header_40254f['thread_id'] == 1
         # one but last frame
         assert header_m10000b['frame_nr'] == 1
         assert header_m10000b['thread_id'] == 4

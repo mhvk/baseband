@@ -7,6 +7,9 @@ Bug Fixes
 - Frame rates are now calculated correctly also for Mark 4 data in which the
   first frame is the last within a second. [#341]
 
+- Fixed a bug where a VDIF header was not found correctly if the file pointer
+  was very close to the start of a header already. [#346]
+
 3.0 (2019-08-28)
 ================
 

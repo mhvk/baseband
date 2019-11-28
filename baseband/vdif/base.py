@@ -198,11 +198,8 @@ class VDIFFileReader(VLBIFileReaderBase):
         if maximum is None:
             maximum = 2 * frame_nbytes
 
-        # Determine file size.
-        file_pos = fh.tell()
-        fh.seek(0, 2)
-        nbytes = fh.tell()
         # Generate file pointer positions to test.
+        nbytes = fh.seek(0, 2)
         if forward:
             iterate = range(file_pos, min(file_pos + maximum - 31,
                                           nbytes - frame_nbytes + 1))
