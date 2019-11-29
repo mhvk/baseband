@@ -422,6 +422,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         # Note that frameset keeps the first header, since in some VLBA files
         # not all the headers have the right time.  Hopefully, the first is
         # least likely to have problems...
+        # TODO: possibly just scan the first second to find what threads exist.
         frameset0 = fh_raw.read_frameset()
         # Sometimes the first frameset is incomplete, so read another one,
         # but ignore any errors just in case we have a very short file.
@@ -532,9 +533,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             assert ((frameset['seconds'] - self.header0['seconds'])
                     * self._frame_rate
                     + frameset['frame_nr'] - self.header0['frame_nr']) == index
-        except (IOError, AssertionError) as exc:
+        except (EOFError, IOError, AssertionError) as exc:
             # Something went wrong.
-            dt, frame_nr = divmod(index, self._frameset_nbytes)
+            dt, frame_nr = divmod(index, self.samples_per_frame)
             msg = ('Problem loading frame set at seconds={0}, frame_nr={1}.'
                    .format(self.header0['seconds'] + dt, frame_nr))
             # See if we're in the right place.  First ensure we have a header.
@@ -588,36 +589,47 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             # move code there.
             # TODO: remove limitation that threads need to be together.
             frames = {}
-            previous = None
+            previous = False
             while True:
                 raw_pos = self.fh_raw.tell()
                 try:
                     frame = self.fh_raw.read_frame(edv=self.header0.edv)
+                    assert header1.same_stream(frame.header)
+                    assert header1['seconds'] == frame.header['seconds']
                 except EOFError:
                     # End of file while reading a frame; we're done here.
                     next_header = None
                     break
                 except AssertionError:
                     # Frame is not OK.
-                    assert previous is not None, \
+                    assert previous is not False, \
                         'first frame should be readable if fully on disk'
 
                     # Go back to after previous payload and try finding
-                    # next header.
+                    # next header.  It can be before we tried, if some
+                    # bytes in the previous payload were missing.
                     self.fh_raw.seek(raw_pos - header1.payload_nbytes)
                     next_header = self.fh_raw.find_header(self.header0)
+                    # But sometimes a header is re-found even when
+                    # there isn't one.  Don't ever retry the same one twice!
+                    if self.fh_raw.tell() == raw_pos:
+                        self.fh_raw.seek(1, 1)
+                        next_header = self.fh_raw.find_header(self.header0)
 
                     # If no header was found, give up.  The previous frame
                     # was likely bad too, so delete it.
                     if next_header is None:
-                        del frames[previous]
+                        if previous is not None:
+                            del frames[previous]
                         break
 
                     # If the next header is not exactly a frame away from
                     # where we were trying to read, the previous frame was
                     # likely bad, so discard it.
                     if self.fh_raw.tell() != raw_pos + header1.frame_nbytes:
-                        del frames[previous]
+                        if previous is not None:
+                            del frames[previous]
+                        previous = None
 
                     # Stop if the next header is from a different frame.
                     if next_header['frame_nr'] != frame_nr:
