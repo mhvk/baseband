@@ -213,8 +213,9 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         # the super chain doesn't work well.
         #
         # Some defaults that are not done by setting properties.
-        kwargs.setdefault('legacy_mode', True if edv is False else False)
-        kwargs['edv'] = edv
+        kwargs.setdefault('legacy_mode', edv is False)
+        if edv is not False:
+            kwargs['edv'] = edv
         # For setting time, one normally needs a frame rate.  If headers
         # provide this information, we can just proceed.
         if 'time' not in kwargs or 'frame_rate' in VDIF_HEADER_CLASSES.get(
@@ -490,6 +491,7 @@ class VDIFLegacyHeader(VDIFHeader):
         assert self.edv is False
         assert self['legacy_mode']
         assert len(self.words) == 4
+        assert self['frame_length'] >= 2
 
 
 class VDIFBaseHeader(VDIFHeader):
@@ -504,6 +506,7 @@ class VDIFBaseHeader(VDIFHeader):
         assert not self['legacy_mode']
         assert self.edv is None or self.edv == self['edv']
         assert len(self.words) == 8
+        assert self['frame_length'] >= 4
         # _sync_pattern is added by VDIFHeaderMeta.
         if 'sync_pattern' in self.keys():
             assert self['sync_pattern'] == self._sync_pattern
@@ -517,8 +520,8 @@ class VDIFHeader0(VDIFBaseHeader):
     _edv = 0
 
     def verify(self):
-        assert all(word == 0 for word in self.words[4:])
         super().verify()
+        assert all(word == 0 for word in self.words[4:])
 
 
 class VDIFSampleRateHeader(VDIFBaseHeader):
