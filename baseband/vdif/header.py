@@ -478,7 +478,7 @@ class VDIFLegacyHeader(VDIFHeader):
          ('frame_nr', (1, 0, 24, 0x0)),
          ('vdif_version', (2, 29, 3, 0x1)),
          ('lg2_nchan', (2, 24, 5)),
-         ('frame_length', (2, 0, 24)),
+         ('frame_length', (2, 0, 24, 0x80)),
          ('complex_data', (3, 31, 1)),
          ('bits_per_sample', (3, 26, 5)),
          ('thread_id', (3, 16, 10, 0x0)),
