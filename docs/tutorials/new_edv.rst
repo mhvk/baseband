@@ -143,7 +143,7 @@ For further details, see the documentation of
 Once defined, we can use our new header like any other::
 
     >>> myheader = vdif.header.VDIFHeader.fromvalues(
-    ...     edv=4, seconds=14363767, nchan=1,
+    ...     edv=4, seconds=14363767, nchan=1, samples_per_frame=1024,
     ...     station=65532, bps=2, complex_data=False,
     ...     thread_id=3, validity_mask_length=60,
     ...     validity_mask=(1 << 59) + 1)
@@ -156,7 +156,7 @@ Once defined, we can use our new header like any other::
                  frame_nr: 0,
                  vdif_version: 1,
                  lg2_nchan: 0,
-                 frame_length: 0,
+                 frame_length: 36,
                  complex_data: False,
                  bits_per_sample: 1,
                  thread_id: 3,
@@ -240,7 +240,7 @@ corresponding setter, and add this to the private ``_properties`` attribute,
 so that we can use ``validity`` as a keyword in ``fromvalues``::
 
     >>> myenhancedheader = vdif.header.VDIFHeader.fromvalues(
-    ...     edv=42, seconds=14363767, nchan=1,
+    ...     edv=42, seconds=14363767, nchan=1, samples_per_frame=1024,
     ...     station=65532, bps=2, complex_data=False,
     ...     thread_id=3, validity=[True]+[False]*58+[True])
     >>> myenhancedheader
@@ -252,7 +252,7 @@ so that we can use ``validity`` as a keyword in ``fromvalues``::
                          frame_nr: 0,
                          vdif_version: 1,
                          lg2_nchan: 0,
-                         frame_length: 0,
+                         frame_length: 36,
                          complex_data: False,
                          bits_per_sample: 1,
                          thread_id: 3,
