@@ -10,6 +10,9 @@ Bug Fixes
 - Fixed a bug where a VDIF header was not found correctly if the file pointer
   was very close to the start of a header already. [#346]
 
+- In VDIF header verification, include that the implied payload must have
+  non-negative size. [#348]
+
 3.0 (2019-08-28)
 ================
 
