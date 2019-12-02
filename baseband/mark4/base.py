@@ -400,7 +400,13 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         frame = self.fh_raw.read_frame(verify=self.verify)
         # Set decoded value for invalid data.
         frame.fill_value = self.fill_value
-        # TODO: add check that we got the right frame.
+        # Check that we got the right frame.  (Skip if we're not verifying,
+        # since this is a fairly expensive calculation.)
+        if self.verify:
+            frame_index = round((frame.header.time - self.start_time).sec
+                                * self._frame_rate)
+            assert frame_index == index, \
+                'wrong frame: wanted {}, found {}'.format(index, frame_index)
         return frame
 
 

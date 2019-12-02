@@ -13,6 +13,9 @@ Bug Fixes
 - In VDIF header verification, include that the implied payload must have
   non-negative size. [#348]
 
+- Mark 4 now checks by default (``verify=True``) that frames are ordered
+  correctly. [#349]
+
 3.0 (2019-08-28)
 ================
 

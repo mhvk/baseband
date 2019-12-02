@@ -812,6 +812,28 @@ class TestMark4:
                 with pytest.raises(ValueError):
                     f2._last_header
 
+    def test_corrupt_stream_missing_frame(self, tmpdir):
+        with mark4.open(SAMPLE_FILE, 'rb', decade=2010, ntrack=64) as fh, \
+                open(str(tmpdir.join('test.m4')), 'w+b') as s:
+            fh.seek(0xa88)
+            frame0 = fh.read_frame()
+            frame1 = fh.read_frame()
+            dt = frame1.time - frame0.time
+            frame0.tofile(s)
+            frame1.header.mutable = True
+            for index in (1, 2, 4):
+                frame1.header.time = frame0.header.time + index * dt
+                frame1.tofile(s)
+
+            s.seek(0)
+            with mark4.open(s, 'rs', sample_rate=32*u.MHz,
+                            ntrack=64, decade=2010) as f2:
+                assert f2.start_time == frame0.header.time
+                assert abs(f2.stop_time - frame1.header.time - dt) < 1*u.ns
+                with pytest.raises(AssertionError,
+                                   match='wrong frame: wanted 3, found 4'):
+                    f2.read()
+
     def test_stream_invalid(self):
         with pytest.raises(ValueError):
             mark4.open('ts.dat', 's')
