@@ -254,8 +254,6 @@ class Mark4StreamBase(VLBIStreamBase):
             unsliced_shape=(header0.nchan,),
             bps=header0.bps, complex_data=False, squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
-        self._frame_rate = int((self.sample_rate / self.samples_per_frame)
-                               .to(u.Hz).round().value)
 
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
@@ -337,19 +335,9 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         last_header.infer_decade(self.start_time)
         return last_header
 
-    def _read_frame(self, index):
+    def _seek_frame(self, index):
+        # Override vlbi_base version to include offset.
         self.fh_raw.seek(self._offset0 + index * self.header0.frame_nbytes)
-        frame = self.fh_raw.read_frame(verify=self.verify)
-        # Set decoded value for invalid data.
-        frame.fill_value = self.fill_value
-        # Check that we got the right frame.  (Skip if we're not verifying,
-        # since this is a fairly expensive calculation.)
-        if self.verify:
-            frame_index = round((frame.header.time - self.start_time).sec
-                                * self._frame_rate)
-            assert frame_index == index, \
-                'wrong frame: wanted {}, found {}'.format(index, frame_index)
-        return frame
 
 
 class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
@@ -407,7 +395,7 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
     def _make_frame(self, frame_index):
         header = self.header0.copy()
         header.update(time=self.start_time + frame_index
-                      / self._frame_rate * u.s)
+                      / self._frame_rate)
         # Reuse payload.
         return Mark4Frame(header, self._payload)
 

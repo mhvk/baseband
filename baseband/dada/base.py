@@ -308,21 +308,27 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                 + (self._last_header.samples_per_frame
                    / self.sample_rate).to(u.s))
 
-    def _read_frame(self, index):
-        if index < self._nframes - 1:
-            self.fh_raw.seek(index * self.header0.frame_nbytes)
-            frame = self.fh_raw.read_frame(memmap=True, verify=self.verify)
-        else:
-            self.fh_raw.seek(index * self.header0.frame_nbytes
-                             + self.header0.nbytes)
-            last_header = self._last_header
-            last_payload = DADAPayload.fromfile(self.fh_raw, memmap=True,
-                                                header=last_header)
-            frame = DADAFrame(last_header, last_payload)
+    def _seek_frame(self, index):
+        super()._seek_frame(index)
+        self._iframe = index
 
-        assert (frame.header['OBS_OFFSET'] - self.header0['OBS_OFFSET']
-                == index * self.header0.payload_nbytes)
-        return frame
+    def _fh_raw_read_frame(self):
+        # Override to use memmap, and to special-case last frame, which
+        # may be short.
+        if self._iframe < self._nframes - 1:
+            return super()._fh_raw_read_frame()
+
+        self.fh_raw.seek(self.header0.nbytes, 1)
+        last_header = self._last_header
+        last_payload = DADAPayload.fromfile(self.fh_raw, memmap=True,
+                                            header=last_header)
+        return DADAFrame(last_header, last_payload)
+
+    def _tell_frame(self, frame):
+        # Override for faster calculation of frame index.
+        return int(round((frame.header['OBS_OFFSET']
+                          - self.header0['OBS_OFFSET'])
+                         / self.header0.payload_nbytes))
 
 
 class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):

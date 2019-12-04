@@ -327,7 +327,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         """Whether the file can be read and decoded."""
         return self.info.readable
 
-    def _read_frame(self, index):
+    def _seek_frame(self, index):
         self.fh_ts.seek(self.header0.seek_offset(index))
         if self.header0.mode == 'rawdump':
             self.fh_raw.seek(index * self._payload_nbytes)
@@ -335,15 +335,13 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             for fh_pair in self.fh_raw:
                 for fh in fh_pair:
                     fh.seek(index * self._payload_nbytes)
-        frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
-                                  payload_nbytes=self._payload_nbytes,
-                                  nchan=self._unsliced_shape.nchan,
-                                  bps=self.bps, complex_data=self.complex_data,
-                                  verify=self.verify)
-        assert int(((frame.header.time - self.start_time)
-                    * self.sample_rate / self.samples_per_frame)
-                   .to(u.one).round()) == index
-        return frame
+
+    def _fh_raw_read_frame(self):
+        return GSBFrame.fromfile(self.fh_ts, self.fh_raw,
+                                 payload_nbytes=self._payload_nbytes,
+                                 nchan=self._unsliced_shape.nchan,
+                                 bps=self.bps, complex_data=self.complex_data,
+                                 verify=self.verify)
 
 
 class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
