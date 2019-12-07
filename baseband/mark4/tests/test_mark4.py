@@ -1097,3 +1097,13 @@ def test_start_at_last_frame(tmpdir):
 
     with mark4.open(fl, 'rs', decade=2010) as fr:
         assert fr.sample_rate == sample_rate
+
+
+@pytest.mark.parametrize('sample', [
+    SAMPLE_FILE, SAMPLE_32TRACK, SAMPLE_32TRACK_FANOUT2,
+    SAMPLE_16TRACK])
+def test_file_streamer_continuous(sample):
+    sample_rate = (16 if sample == SAMPLE_32TRACK_FANOUT2 else 32) * u.MHz
+    with mark4.open(sample, 'rs', sample_rate=sample_rate, decade=2010) as fs:
+        assert fs.info.readable
+        assert 'no obvious gaps' in fs.info.checks['continuous']

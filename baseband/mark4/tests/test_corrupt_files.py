@@ -8,17 +8,17 @@ from ... import mark4
 
 
 class TestCorruptFile:
-    def setup(self):
+    def setup_class(cls):
         time = Time('2010-11-12T13:14:15')
-        self.nchan = 2
-        self.header0 = mark4.Mark4Header.fromvalues(
-            time=time, ntrack=16, nchan=self.nchan, fanout=4)
-        self.data = np.zeros((2*self.header0.frame_nbytes, 2))
-        self.data.reshape(-1, 4, 2)[160:] = [
+        cls.nchan = 2
+        cls.header0 = mark4.Mark4Header.fromvalues(
+            time=time, ntrack=16, nchan=cls.nchan, fanout=4)
+        cls.data = np.zeros((2*cls.header0.frame_nbytes, 2))
+        cls.data.reshape(-1, 4, 2)[160:] = [
             [-1, 1], [-3, 3], [1, -1], [3, -3]]
-        self.sample_rate = 100 * u.kHz
-        self.kwargs = dict(sample_rate=self.sample_rate,
-                           ref_time=time)
+        cls.sample_rate = 100 * u.kHz
+        cls.kwargs = dict(sample_rate=cls.sample_rate,
+                          ref_time=time)
 
     def fake_file(self, tmpdir, nframes=8):
         filename = str(tmpdir.join('fake.mark4'))
@@ -53,6 +53,24 @@ class TestCorruptFile:
                         frame_nr.stop * self.header0.frame_nbytes)
         fake_file = self.fake_file(tmpdir)
         corrupt_file = self.corrupt_copy(fake_file, missing)
+
+        # Check that bad frames are found with verify only.
+        with mark4.open(corrupt_file, 'rs', verify=True, **self.kwargs) as fv:
+            assert not fv.info.readable
+            assert not fv.info.checks['continuous']
+            assert 'continuous' in fv.info.errors
+            expected_msg = 'While reading at {}'.format(
+                frame_nr.start * fv.samples_per_frame)
+            assert expected_msg in fv.info.errors['continuous']
+
+        # While only warnings are given when it is fixable.
+        with mark4.open(corrupt_file, 'rs', verify='fix', **self.kwargs) as ff:
+            assert ff.info.readable
+            assert 'fixable' in ff.info.checks['continuous']
+            assert 'continuous' in ff.info.warnings
+            assert expected_msg in ff.info.warnings['continuous']
+            assert 'problem loading frame' in ff.info.warnings['continuous']
+
         with mark4.open(corrupt_file, 'rs', **self.kwargs) as fr:
             with pytest.warns(UserWarning, match='problem loading'):
                 data = fr.read()
@@ -105,6 +123,15 @@ class TestCorruptFile:
         # In all these cases, some data will be missing.
         fake_file = self.fake_file(tmpdir)
         corrupt_file = self.corrupt_copy(fake_file, missing_bytes)
+        # Check that bad frames are found with verify only.
+        with mark4.open(corrupt_file, 'rs', verify=True, **self.kwargs) as fv:
+            assert not fv.info.readable
+            assert not fv.info.checks['continuous']
+            assert 'continuous' in fv.info.errors
+            expected_msg = 'While reading at {}'.format(
+                missing_frames.start * fv.samples_per_frame)
+            assert expected_msg in fv.info.errors['continuous']
+
         with mark4.open(corrupt_file, 'rs', **self.kwargs) as fr:
             assert fr.size == 8 * self.data.size
             with pytest.warns(UserWarning, match='problem loading frame'):

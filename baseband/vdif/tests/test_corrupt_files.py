@@ -116,6 +116,25 @@ class TestCorruptSampleCopy:
         with vdif.open(filename, 'rb') as fr:
             assert 'number_of_frames' in fr.info.warnings
 
+        # Check that bad frames are found with verify only.
+        with vdif.open(filename, 'rs', verify=True) as fv:
+            assert not fv.info.readable
+            assert not fv.info.checks['continuous']
+            assert 'continuous' in fv.info.errors
+            # Reading will fail the frameset *before* the one tested.
+            expected_msg = 'While reading at {}'.format(
+                (bad_start // 8 - 1) * fv.samples_per_frame)
+            assert expected_msg in fv.info.errors['continuous']
+
+        # While only warnings are given when it is fixable.
+        with vdif.open(filename, 'rs', verify='fix') as ff:
+            assert ff.info.readable
+            assert 'fixable' in ff.info.checks['continuous']
+            assert 'continuous' in ff.info.warnings
+            assert expected_msg in ff.info.warnings['continuous']
+            assert 'problem loading frame' in ff.info.warnings['continuous']
+
+        # Now check that data is properly marked as invalid.
         with vdif.open(filename, 'rs') as fr:
             assert fr.start_time == self.start_time
             assert fr.stop_time == self.stop_time

@@ -243,7 +243,8 @@ class TestMark5B:
                     'bps': 2,
                     'complex_data': False,
                     'start_time': start_time,
-                    'readable': True}
+                    'readable': True,
+                    'checks': {'decodable': True}}
         for key, value in expected.items():
             assert getattr(info, key) == value
         assert info() == expected
@@ -285,7 +286,9 @@ class TestMark5B:
                            'bps': 2,
                            'complex_data': False,
                            'readable': True,
-                           'file_info': expected}
+                           'file_info': expected,
+                           'checks': {'decodable': True,
+                                      'continuous': 'no obvious gaps'}}
 
         for key, value in stream_expected.items():
             if key == 'file_info':
@@ -735,6 +738,11 @@ class TestMark5B:
             # Might as well test some other properties
             assert abs(fh.start_time - test_time) < 1.*u.ns
             assert fh.header0['frame_nr'] == 198
+
+    def test_filestreamer_readable(self):
+        with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
+                         ref_time=Time('2015-01-01'), nchan=8, bps=2) as fh:
+            assert fh.info.readable
 
     def test_sequentialfile(self, tmpdir):
         """Tests writing and reading of sequential files.

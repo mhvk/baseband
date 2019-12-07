@@ -41,14 +41,12 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
             self.errors['frame0'] = exc
             return None
 
+    _decodable = VLBIFileReaderInfo._decodable
+
     def _readable(self):
-        # Bit of a hack, but the base reader one suffices here.
+        # Bit of a hack, but the base reader one suffices here with
+        # the _get_frame0 override above.
         return VLBIFileReaderInfo._readable(self)
 
-    def _raw_file_info(self):
-        info = self._parent.fh_ts.info
-        # The timestamp reader info has a built-in missing for the
-        # raw file, but this is incorrect if we're in a stream, which
-        # cannot have been opened without one. (Yes, this is a hack.)
-        info.missing = {}
-        return info
+    def _file_info(self):
+        return self._parent.fh_ts.info

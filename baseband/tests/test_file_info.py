@@ -26,7 +26,7 @@ def test_basic_file_info(sample, format_, missing, readable, error_keys):
     info_dict = info()
     assert info.format == format_
     assert info_dict['format'] == format_
-    assert (info.missing != {}) is missing
+    assert (hasattr(info, 'missing') and info.missing != {}) is missing
     assert ('missing' in info_dict) is missing
     assert info.readable is readable
     assert list(info.errors.keys()) == error_keys
@@ -56,7 +56,6 @@ def test_file_info(sample, format_, used, consistent, inconsistent):
                   'nchan': 8}
     info = file_info(sample, **extra_args)
     assert info.format == format_
-    assert not info.missing
     info_dict = info()
     for attr in info.attr_names:
         assert getattr(info, attr) is not None
@@ -102,7 +101,6 @@ def test_gsb_with_raw_files(sample, raw, mode):
     info = file_info(sample, raw=raw, sample_rate=sample_rate)
     assert info.format == 'gsb'
     assert info.readable is True
-    assert not info.missing
     assert not info.errors
     module = importlib.import_module('.' + info.format, package='baseband')
     # Check we can indeed open a file with the extra arguments.

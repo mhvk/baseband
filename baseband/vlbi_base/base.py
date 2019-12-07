@@ -818,25 +818,28 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         # If we are reading with care, we read also a frame ahead
         # to make sure that is not corrupted.  If such a frame has
         # been kept, we use it now.  Otherwise, we read a new frame.
+        # We always remove the cached copy, since we cannot be sure
+        # it is even the right number.
         if index == self._next_index:
             frame = self._next_frame
             frame_index = index
             self.fh_raw.seek(frame.nbytes, 1)
+            self._next_index = self._next_frame = None
 
         else:
+            self._next_index = self._next_frame = None
             try:
                 frame = self._fh_raw_read_frame()
                 frame_index = self._tell_frame(frame)
             except Exception as exc:
                 return self._bad_frame(index, None, exc)
 
-            # Check whether we actually got the right frame.
-            if frame_index != index:
-                return self._bad_frame(index, frame,
-                                       ValueError('wrong frame number.'))
+        # Check whether we actually got the right frame.
+        if frame_index != index:
+            return self._bad_frame(index, frame,
+                                   ValueError('wrong frame number.'))
 
         # In either case, we check the next frame (if there is one).
-        self._next_index = self._next_frame = None
         try:
             with self.fh_raw.temporary_offset():
                 self._next_frame = self._fh_raw_read_frame()
