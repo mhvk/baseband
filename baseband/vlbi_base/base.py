@@ -11,6 +11,7 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
+from .offsets import RawOffsets
 from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from .utils import byte_array
 
@@ -378,6 +379,12 @@ class VLBIStreamBase:
         # provided in the header.
         return header.time
 
+    def _set_time(self, header, time):
+        """Set time in a header."""
+        # Subclasses can override this if information is needed beyond that
+        # provided in the header.
+        header.time = time
+
     @lazyproperty
     def start_time(self):
         """Start time of the file.
@@ -521,6 +528,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         super().__init__(
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
             bps, complex_data, squeeze, subset, fill_value, verify)
+        self._raw_offsets = RawOffsets()
 
     info = VLBIStreamReaderInfo()
 
@@ -780,18 +788,106 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         This contains multiple pieces which subclasses can override as
         needed (or override the whole thing).
         """
-        self._seek_frame(index)
-        frame = self._fh_raw_read_frame()
-        if self.verify:
-            frame_index = self._tell_frame(frame)
-            assert frame_index == index, \
-                'wrong frame: wanted {}, found {}'.format(index, frame_index)
+        raw_offset = self._seek_frame(index)
+        try:
+            frame = self._fh_raw_read_frame()
+            if self.verify:
+                frame_index = self._tell_frame(frame)
+                assert frame_index == index, \
+                    ('wrong frame: wanted {}, found {}'
+                     .format(index, frame_index))
+
+                # TODO: should read any given header only once!
+                # TODO: Add frame index check?
+                try:
+                    with self.fh_raw.temporary_offset() as fh_raw:
+                        fh_raw.read_header()
+                except EOFError:
+                    pass
+
+        except Exception as exc:
+            # Something went wrong.
+            msg = 'problem loading frame index {}.'.format(index)
+
+            # See if we're in the right place.  First ensure we have a header.
+            # Here, it is more important that it is a good one than that we go
+            # too far, so we insist on two consistent frames after it.  We
+            # increase the maximum a bit to be able to jump over bad bits.
+            self.fh_raw.seek(raw_offset)
+            try:
+                header = self.fh_raw.find_header(
+                    self.header0, forward=True, check=(1, 2),
+                    maximum=3*self.header0.frame_nbytes)
+            except HeaderNotFoundError:
+                exc.args += (msg + ' Cannot find header nearby.',)
+                raise exc from None
+
+            # Don't yet know how to deal with excess data.
+            header_index = self._tell_frame(header)
+            if header_index < index:
+                exc.args += (msg + ' There appears to be excess data.')
+                raise exc
+
+            # Go backward until we find previous frame, storing offsets
+            # as we go.  We again increase the maximum since we may need
+            # to jump over a bad bit.
+            while header_index >= index:
+                raw_pos = self.fh_raw.tell()
+                header1 = header
+                header1_index = header_index
+                self.fh_raw.seek(-1, 1)
+                try:
+                    header = self.fh_raw.find_header(
+                        self.header0, forward=False,
+                        maximum=4*self.header0.frame_nbytes)
+                except HeaderNotFoundError:
+                    exc.args += (msg + ' Could not find previous index.',)
+                    raise exc from None
+
+                header_index = self._tell_frame(header)
+                if header_index < header1_index:
+                    # While we are at it: if we pass an index boundary, update
+                    # the list of known indices.
+                    self._raw_offsets[header1_index] = (
+                        raw_pos - header1_index * self.header0.frame_nbytes)
+
+            # Move back to position of last good header (header1).
+            self.fh_raw.seek(raw_pos)
+
+            if header1_index > index:
+                # Frame is missing!
+                msg += ' The frame seems to be missing.'
+                # Construct a missing frame.
+                header = header1.copy()
+                self._set_time(header, self.time)
+                frame = self._frame.__class__(header, self._frame.payload,
+                                              valid=False)
+
+            else:
+                assert header1_index == index, \
+                    'at this point, we should have a good header.'
+                if raw_pos != raw_offset:
+                    msg += ' Stream off by {0} bytes.'.format(raw_offset
+                                                              - raw_pos)
+                    # Above, we should have added information about
+                    # this index in our offset table.
+                    assert index in self._raw_offsets.frame_nr
+
+                # At this point, reading the frame should always work,
+                # and we know there is a header right after it.
+                frame = self._fh_raw_read_frame()
+                assert self._tell_frame(frame) == index
+
+            warnings.warn(msg)
+
         frame.fill_value = self.fill_value
         return frame
 
     def _seek_frame(self, index):
         """Move the underlying file pointer to the frame of the given index."""
-        self.fh_raw.seek(index * self.header0.frame_nbytes)
+        raw_corr = self._raw_offsets[index]
+        raw_offset = index * self.header0.frame_nbytes + raw_corr
+        return self.fh_raw.seek(raw_offset)
 
     def _fh_raw_read_frame(self):
         """Read a frame at the current position of the underlying file."""
