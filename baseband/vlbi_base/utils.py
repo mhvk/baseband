@@ -5,7 +5,12 @@ from math import gcd
 import numpy as np
 
 
-__all__ = ['bcd_decode', 'bcd_encode', 'CRC']
+__all__ = ['lcm', 'bcd_decode', 'bcd_encode', 'CRC']
+
+
+def lcm(a, b):
+    """Calculate the least common multiple of a and b."""
+    return abs(a * b) // gcd(a, b)
 
 
 def bcd_decode(value):
@@ -73,7 +78,7 @@ class CRC:
     def __init__(self, polynomial):
         self.polynomial = polynomial
         self.pol_bin = np.array(
-            [int(bit) for bit in '{:b}'.format(polynomial)], dtype=np.int8)
+            [int(bit) for bit in '{:b}'.format(polynomial)], dtype=np.uint8)
 
     def __len__(self):
         return self.pol_bin.size - 1
@@ -125,8 +130,3 @@ class CRC:
         for i in range(0, len(stream) - len(self)):
             stream[i:i+pol_bin.size] ^= (pol_bin & stream[i])
         return stream[-len(self):]
-
-
-def lcm(a, b):
-    """Calculate the least common multiple of a and b."""
-    return abs(a * b) // gcd(a, b)
