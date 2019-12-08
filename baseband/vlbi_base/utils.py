@@ -5,7 +5,7 @@ from math import gcd
 import numpy as np
 
 
-__all__ = ['lcm', 'bcd_decode', 'bcd_encode', 'CRC']
+__all__ = ['lcm', 'bcd_decode', 'bcd_encode', 'CRC', 'CRCStack']
 
 
 def lcm(a, b):
@@ -60,6 +60,112 @@ def bcd_encode(value):
 
 
 class CRC:
+    """Cyclic Redundancy Check.
+
+    See https://en.wikipedia.org/wiki/Cyclic_redundancy_check
+
+    Once initialised, the instance can be used as a function that calculates
+    the CRC, or one can use the ``check`` method to verify that the CRC in
+    the lower bits of a value is correct.
+
+    Parameters
+    ----------
+    polynomial : int
+        Binary encoded CRC divisor. For instance, that used by Mark 5B headers
+        is 0x18005, or x^16 + x^15 + x^2 + 1.
+
+    See Also
+    --------
+    CRCStack : for calculating CRC on arrays where each entry represents a bit.
+    """
+
+    def __init__(self, polynomial):
+        self.polynomial = index(polynomial)
+
+    def __len__(self):
+        return self.polynomial.bit_length() - 1
+
+    def __call__(self, stream):
+        """Calculate CRC for the given stream.
+
+        Parameters
+        ----------
+        stream : int or array of unsigned int
+            The integer (or array of integers) to calculate the CRC for.
+
+        Returns
+        -------
+        crc : int or array
+            If an array, the crc will have the same dtype as the input stream.
+        """
+        return self._crc(stream, extend=True)
+
+    def check(self, stream):
+        """Check that the CRC at the end of athe stream is correct.
+
+        Parameters
+        ----------
+        stream : int or array of unsigned int
+            For an integer, the value is the stream to check the CRC for.
+            For arrays, the dimension is treated as the index into the bits.
+            A single stream would thus be of type `bool`. Unsigned integers
+            represent multiple streams. E.g., for a 64-track Mark 4 header,
+            the stream would be an array of ``np.uint64`` words.
+
+        Returns
+        -------
+        ok : bool
+             `True` if the calculated CRC is all zero (which should be the
+             case if the CRC at the end of the stream is correct).
+        """
+        return self._crc(stream) == 0
+
+    def _crc(self, stream, extend=False):
+        try:
+            scalar = index(stream)
+        except TypeError:
+            return self._crc_array(stream, extend=extend)
+        else:
+            return self._crc_scalar(scalar, extend=extend)
+
+    def _crc_scalar(self, scalar, extend=False):
+        """Internal function to calculate the CRC for a scalar."""
+        # This routine uses bit_length() to find where the highest
+        # remaining set bit is, thus skipping all the zeros where nothing
+        # needs to be done.  It is about 15 times faster than a 1-element
+        # array and can handle arbitrarily long integers.
+        nbp = self.polynomial.bit_length()
+        nbs = scalar.bit_length()
+        while nbs >= nbp:
+            scalar ^= self.polynomial << nbs-nbp
+            nbs = scalar.bit_length()
+
+        if extend:
+            # Do the further iterations to *calculate* a CRC.
+            return self._crc_scalar(scalar << nbp-1)
+
+        return scalar
+
+    def _crc_array(self, array, extend=False):
+        """Internal function to calculate the CRC for an array."""
+        # Here, the array contains individual entries for which the
+        # CRC should be calculated.
+        array = np.array(array, copy=True, dtype='u8')
+        nbp = self.polynomial.bit_length()
+        nbs = index(array.max()).bit_length()
+        while nbs >= nbp:
+            mask = (array & (1 << nbs-1)).astype(bool).astype(array.dtype)
+            mask *= self.polynomial << nbs-nbp
+            array ^= mask
+            nbs = int(array.max()).bit_length()
+
+        if extend:
+            return self._crc_array(array << nbp-1)
+
+        return array
+
+
+class CRCStack(CRC):
     """Cyclic Redundancy Check for a bitstream.
 
     See https://en.wikipedia.org/wiki/Cyclic_redundancy_check
@@ -68,65 +174,42 @@ class CRC:
     the CRC, or one can use the ``check`` method to verify that the CRC at
     the end of a stream is correct.
 
+    This class is specifically for arrays in which multiple bit streams
+    occupy different bit levels, and the dimension is treated as the
+    index into the bits.  A single stream would thus be of type `bool`.
+    Unsigned integers represent multiple streams. E.g., for a 64-track
+    Mark 4 header, the stream would be an array of ``np.uint64`` words.
+
     Parameters
     ----------
     polynomial : int
         Binary encoded CRC divisor. For instance, that used by Mark 4 headers
         is 0x180f, or x^12 + x^11 + x^3 + x^2 + x + 1.
+
+    See Also
+    --------
+    CRC : for calculating CRC for a single value or an array of values.
     """
-
     def __init__(self, polynomial):
-        self.polynomial = polynomial
-        self.pol_bin = np.array(
-            [int(bit) for bit in '{:b}'.format(polynomial)], dtype=np.uint8)
-
-    def __len__(self):
-        return self.pol_bin.size - 1
-
-    def __call__(self, stream):
-        """Calculate CRC for the given stream.
-
-        Parameters
-        ----------
-        stream : array of bool or unsigned int
-            The dimension is treated as the index into the bits.  For a single
-            stream, the array should thus be of type `bool`. Integers represent
-            multiple streams. E.g., for a 64-track Mark 4 header, the stream
-            would be an array of ``np.uint64`` words.
-
-        Returns
-        -------
-        crc : array
-            The crc will have the same dtype as the input stream.
-        """
-        stream = np.hstack((stream, np.zeros((len(self),), stream.dtype)))
-        return self._crc(stream)
+        super().__init__(polynomial)
+        binary_str = '{:b}'.format(self.polynomial)
+        self._npol_array = np.array([-int(bit) for bit in binary_str],
+                                    dtype='i1')
 
     def check(self, stream):
-        """Check that the CRC at the end of the stream is correct.
+        return np.all(self._crc(stream) == 0)
 
-        Parameters
-        ----------
-        stream : array of bool or unsigned int
-            The dimension is treated as the index into the bits.  For a single
-            stream, the array should thus be of type `bool`. Integers represent
-            multiple streams. E.g., for a 64-track Mark 4 header, the stream
-            would be an array of ``np.uint64`` words.
+    def _crc(self, stream, extend=False):
+        """Internal function to calculate the CRC for a bit stream."""
+        ncrc = len(self)
+        if extend:
+            stream = np.hstack((stream, np.zeros(ncrc, stream.dtype)))
+        else:
+            stream = stream.copy()
 
-        Returns
-        -------
-        ok : bool
-             `True` if the calculated CRC is all zero (which should be the
-             case if the CRC at the end of the stream is correct).
-        """
-        return np.all(self._crc(stream.copy()) == 0)
+        # Make an all-bits-one for each set item.
+        pol_array = self._npol_array.astype(stream.dtype)
+        for i, bits in enumerate(stream[:-ncrc]):
+            stream[i:i+ncrc+1] ^= (bits & pol_array)
 
-    def _crc(self, stream):
-        """Internal function to calculate the CRC.
-
-        Note that the stream is changed in-place.
-        """
-        pol_bin = (-self.pol_bin).astype(stream.dtype)
-        for i in range(0, len(stream) - len(self)):
-            stream[i:i+pol_bin.size] ^= (pol_bin & stream[i])
-        return stream[-len(self):]
+        return stream[-ncrc:]

@@ -2,7 +2,7 @@
 import pytest
 import numpy as np
 
-from ..utils import bcd_encode, bcd_decode, CRC, lcm
+from ..utils import lcm, bcd_encode, bcd_decode, CRC, CRCStack
 
 
 class TestBCD:
@@ -32,23 +32,77 @@ class TestBCD:
         assert np.all(bcd_decode(bcd_encode(a)) == a)
 
 
-def test_crc():
-    # Test example from age 4 of
-    # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
-    stream = '0000 002D 0330 0000' + 'FFFF FFFF' + '4053 2143 3805 5'
-    crc_expected = '284'
-    crc12 = CRC(0x180f)
-    stream = stream.replace(' ', '').lower()
-    istream = int(stream, base=16)
-    assert '{:037x}'.format(istream) == stream
-    bitstream = np.array([((istream & (1 << bit)) != 0)
-                          for bit in range(37*4-1, -1, -1)], np.bool)
-    crcstream = crc12(bitstream)
-    crc = np.bitwise_or.reduce(crcstream.astype(np.uint32)
-                               << np.arange(11, -1, -1))
-    assert '{:03x}'.format(crc) == crc_expected
-    fullstream = np.hstack((bitstream, crcstream))
-    assert crc12.check(fullstream)
+class TestCRC12:
+
+    @staticmethod
+    def hex_to_stream(string):
+        n = len(string) * 4
+        scalar = int(string, base=16)
+        return np.array([((scalar & (1 << bit)) != 0)
+                         for bit in range(n-1, -1, -1)], np.bool)
+
+    @staticmethod
+    def stream_to_scalar(stream):
+        n = len(stream)
+        result = 0
+        for i, s in enumerate(stream):
+            result += int(s) << (n - i - 1)
+
+        return result
+
+    def setup(self):
+        # Test example from page 4 of
+        # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        stream_hex = '0000 002D 0330 0000' + 'FFFF FFFF' + '4053 2143 3805 5'
+        self.crc_hex = '284'
+        self.crc12 = CRC(0x180f)
+        self.crcstack12 = CRCStack(0x180f)
+
+        self.stream_hex = stream_hex.replace(' ', '').lower()
+
+        self.stream = int(self.stream_hex, base=16)
+        self.bitstream = self.hex_to_stream(self.stream_hex)
+
+        self.crc = int(self.crc_hex, base=16)
+        self.crcstream = self.hex_to_stream(self.crc_hex)
+
+    def test_setup(self):
+        assert '{:037x}'.format(self.stream) == self.stream_hex
+        assert '{:03x}'.format(self.crc) == self.crc_hex
+        assert self.stream_to_scalar(self.bitstream) == self.stream
+        assert self.stream_to_scalar(self.crcstream) == self.crc
+
+    def test_crc_stream(self):
+        crcstream = self.crcstack12(self.bitstream)
+        assert np.all(crcstream == self.crcstream)
+
+    def test_check_crc_stream(self):
+        fullstream = np.hstack((self.bitstream, self.crcstream))
+        assert self.crcstack12.check(fullstream)
+
+    def test_crc_scalar(self):
+        crc = self.crc12(self.stream)
+        assert crc == self.crc
+
+    def test_check_crc_scalar(self):
+        scalar = (self.stream << len(self.crc12)) + self.crc
+        assert self.crc12.check(scalar)
+
+    def test_crc_array(self):
+        scalar = 0x12345678
+        expected = self.crc12(scalar)
+        array = (scalar * np.ones(10, dtype=int)).astype('u8')
+        crc = self.crc12(array)
+        assert crc.shape == array.shape
+        assert np.all(crc == expected)
+
+    def test_check_crc_array(self):
+        scalar = 0x12345678
+        scalar = (scalar << len(self.crc12)) + self.crc12(scalar)
+        array = (scalar * np.ones(10, dtype=int)).astype('u8')
+        check = self.crc12.check(array)
+        assert check.shape == array.shape
+        assert np.all(check)
 
 
 @pytest.mark.parametrize(
