@@ -1,5 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 import numpy as np
+from numpy.lib.stride_tricks import as_strided
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -114,6 +115,74 @@ class Mark5BFileReader(VLBIFileReaderBase):
                 except Exception:
                     pass
             raise exc
+
+    def locate_sync_pattern(self, forward=True, maximum=None, subsequent=1):
+        """Locate the sync pattern nearest to the current position.
+
+        Note that the current position is always included.
+
+        Parameters
+        ----------
+        forward : bool, optional
+            Seek forward if `True` (default), backward if `False`.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default: twice the
+            frame size of 10016 bytes, plus 4 bytes extra for catching a
+            pattern just cut in half.
+        subsequent : int, optional
+            Number of subsequent sync patterns separated by the frame
+            size to insist on.  Ignored if the file does not extend
+            sufficiently in the direction one is searching.
+            Default: 1.
+
+        Returns
+        -------
+        locations : array of int
+            Locations of sync patterns within the range scanned,
+            in order of proximity to the starting position.
+        """
+        pattern = np.array([0xABADDEED], dtype='<u4').view('u1')
+        frame_nbytes = 10016  # This is fixed for Mark 5B.
+        if maximum is None:
+            maximum = 2 * frame_nbytes
+        # Loop over chunks to try to find the frame marker.
+        with self.temporary_offset() as fh:
+            file_pos = fh.tell()
+            file_nbytes = fh.seek(0, 2)
+            size = maximum + subsequent * frame_nbytes + pattern.size - 1
+            if forward:
+                start = file_pos
+                stop = min(start+size, file_nbytes)
+            else:
+                stop = min(file_pos+pattern.size, file_nbytes)
+                start = max(stop-size, 0)
+
+            if stop >= start + pattern.size:
+                fh.seek(start)
+                # Note: np.fromfile doesn't work with SequentialFile.
+                data = np.frombuffer(fh.read(stop-start), dtype='u1')
+                data = as_strided(data, strides=(1, 1),
+                                  shape=(stop-start-pattern.size+1,
+                                         pattern.size))
+                hits = np.all(data == pattern, axis=1)
+                if not forward:
+                    hits = hits[::-1]
+                possibilities = hits[:maximum].nonzero()[0]
+            else:
+                possibilities = []
+
+        locations = [loc for loc in possibilities
+                     if all(hits[check]
+                            for check in range(loc+frame_nbytes,
+                                               loc+subsequent*frame_nbytes+1,
+                                               frame_nbytes)
+                            if check < hits.size)]
+
+        locations = np.array(locations)
+        if forward:
+            return start + locations
+        else:
+            return stop - pattern.size - locations
 
     def find_header(self, forward=True, maximum=None):
         """Find the nearest header from the current position.

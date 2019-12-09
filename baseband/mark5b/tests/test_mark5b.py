@@ -411,10 +411,55 @@ class TestMark5B:
         header.set_time(time=(start_time - 0.9 * u.ns), frame_rate=frame_rate)
         assert header.seconds == header0.seconds
 
+    def test_locate_sync_pattern(self, tmpdir):
+        with mark5b.open(SAMPLE_FILE, 'rb', kday=56000) as fh:
+            header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
+            fh.seek(0)
+            assert np.all(fh.locate_sync_pattern() == [0, 10016])
+            assert np.all(fh.locate_sync_pattern(forward=True) == [0, 10016])
+            assert fh.locate_sync_pattern(forward=False) == [0]
+            assert fh.tell() == 0
+            fh.seek(10000)
+            assert np.all(fh.locate_sync_pattern(forward=True)
+                          == np.array([1, 2]) * header0.frame_nbytes)
+            assert fh.tell() == 10000
+            assert np.all(fh.locate_sync_pattern(forward=False)
+                          == np.array([0]) * header0.frame_nbytes)
+            fh.seek(-10000, 2)
+            assert np.all(fh.locate_sync_pattern(forward=False)
+                          == np.array([3, 2]) * header0.frame_nbytes)
+            fh.seek(-30, 2)
+            assert fh.locate_sync_pattern(forward=True).size == 0
+
+        m5_test = str(tmpdir.join('test.m5b'))
+        # Check a corrupted file.
+        with open(m5_test, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(10040))
+            f.seek(20000)
+            s.write(f.read())
+        shifted_pos = header0.frame_nbytes * 2 - 9960
+        with mark5b.open(m5_test, 'rb', kday=header0.kday) as fh:
+            fh.seek(0)
+            assert np.all(fh.locate_sync_pattern() == [0, shifted_pos])
+            assert np.all(fh.locate_sync_pattern(subsequent=0)
+                          == np.array([0, header0.frame_nbytes, shifted_pos]))
+            fh.seek(10000)
+            assert np.all(fh.locate_sync_pattern(forward=True)
+                          == np.array([shifted_pos,
+                                       shifted_pos+header0.frame_nbytes]))
+            assert np.all(fh.locate_sync_pattern(forward=True, subsequent=0)
+                          == np.array([header0.frame_nbytes, shifted_pos,
+                                       shifted_pos+header0.frame_nbytes]))
+        # For completeness, also check a really short file...
+        with open(m5_test, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(10018))
+        with mark5b.open(m5_test, 'rb') as fh:
+            fh.seek(10)
+            assert fh.locate_sync_pattern(forward=True).size == 0
+            assert fh.tell() == 10
+            assert fh.locate_sync_pattern(forward=False) == [0]
+
     def test_find_header(self, tmpdir):
-        # Below, the tests set the file pointer to very close to a header,
-        # since otherwise they run *very* slow.  This is somehow related to
-        # pytest, since speed is not a big issue running stuff on its own.
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000) as fh:
             header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             fh.seek(0)
@@ -423,6 +468,9 @@ class TestMark5B:
             fh.seek(10000)
             header_10000f = fh.find_header(forward=True)
             assert fh.tell() == header0.frame_nbytes
+            fh.seek(10000)
+            header_10000b = fh.find_header(forward=False)
+            assert fh.tell() == 0
             fh.seek(16)
             header_16b = fh.find_header(forward=False)
             assert fh.tell() == 0
@@ -432,6 +480,7 @@ class TestMark5B:
             fh.seek(-30, 2)
             header_end = fh.find_header(forward=True)
             assert header_end is None
+        assert header_10000b == header_0
         assert header_16b == header_0
         assert header_10000f['frame_nr'] == 1
         assert header_m10000b['frame_nr'] == 3
