@@ -415,21 +415,20 @@ class TestMark5B:
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000) as fh:
             header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             fh.seek(0)
-            assert np.all(fh.locate_sync_pattern() == [0, 10016])
-            assert np.all(fh.locate_sync_pattern(forward=True) == [0, 10016])
+            assert fh.locate_sync_pattern() == [0, 10016]
+            assert fh.locate_sync_pattern(forward=True) == [0, 10016]
             assert fh.locate_sync_pattern(forward=False) == [0]
             assert fh.tell() == 0
             fh.seek(10000)
-            assert np.all(fh.locate_sync_pattern(forward=True)
-                          == np.array([1, 2]) * header0.frame_nbytes)
+            assert (fh.locate_sync_pattern(forward=True)
+                    == [header0.frame_nbytes, 2 * header0.frame_nbytes])
             assert fh.tell() == 10000
-            assert np.all(fh.locate_sync_pattern(forward=False)
-                          == np.array([0]) * header0.frame_nbytes)
+            assert fh.locate_sync_pattern(forward=False) == [0]
             fh.seek(-10000, 2)
-            assert np.all(fh.locate_sync_pattern(forward=False)
-                          == np.array([3, 2]) * header0.frame_nbytes)
+            assert (fh.locate_sync_pattern(forward=False)
+                    == [x * header0.frame_nbytes for x in (3, 2)])
             fh.seek(-30, 2)
-            assert fh.locate_sync_pattern(forward=True).size == 0
+            assert fh.locate_sync_pattern(forward=True) == []
 
         m5_test = str(tmpdir.join('test.m5b'))
         # Check a corrupted file.
@@ -440,22 +439,21 @@ class TestMark5B:
         shifted_pos = header0.frame_nbytes * 2 - 9960
         with mark5b.open(m5_test, 'rb', kday=header0.kday) as fh:
             fh.seek(0)
-            assert np.all(fh.locate_sync_pattern() == [0, shifted_pos])
-            assert np.all(fh.locate_sync_pattern(subsequent=0)
-                          == np.array([0, header0.frame_nbytes, shifted_pos]))
+            assert fh.locate_sync_pattern() == [0, shifted_pos]
+            assert (fh.locate_sync_pattern(check=None)
+                    == [0, header0.frame_nbytes, shifted_pos])
             fh.seek(10000)
-            assert np.all(fh.locate_sync_pattern(forward=True)
-                          == np.array([shifted_pos,
-                                       shifted_pos+header0.frame_nbytes]))
-            assert np.all(fh.locate_sync_pattern(forward=True, subsequent=0)
-                          == np.array([header0.frame_nbytes, shifted_pos,
-                                       shifted_pos+header0.frame_nbytes]))
+            assert (fh.locate_sync_pattern(forward=True)
+                    == [shifted_pos, shifted_pos+header0.frame_nbytes])
+            assert (fh.locate_sync_pattern(forward=True, check=None)
+                    == [header0.frame_nbytes, shifted_pos,
+                        shifted_pos+header0.frame_nbytes])
         # For completeness, also check a really short file...
         with open(m5_test, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
             s.write(f.read(10018))
         with mark5b.open(m5_test, 'rb') as fh:
             fh.seek(10)
-            assert fh.locate_sync_pattern(forward=True).size == 0
+            assert fh.locate_sync_pattern(forward=True) == []
             assert fh.tell() == 10
             assert fh.locate_sync_pattern(forward=False) == [0]
 
