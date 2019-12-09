@@ -76,7 +76,8 @@ class CRC:
 
     See Also
     --------
-    CRCStack : for calculating CRC on arrays where each entry represents a bit.
+    baseband.vlbi_base.utils.CRCStack :
+        for calculating CRC on arrays where each entry represents a bit.
     """
 
     def __init__(self, polynomial):
@@ -188,7 +189,8 @@ class CRCStack(CRC):
 
     See Also
     --------
-    CRC : for calculating CRC for a single value or an array of values.
+    baseband.vlbi_base.utils.CRC :
+        for calculating CRC for a single value or an array of values.
     """
     def __init__(self, polynomial):
         super().__init__(polynomial)
