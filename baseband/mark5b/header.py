@@ -152,12 +152,10 @@ class Mark5BHeader(VLBIHeaderBase):
         super().update(verify=False, **kwargs)
         # Do not use words 2 & 3 directly, so that this works also if part
         # of a VDIF header, where the time information is in words 7 & 8.
-        stream = '{:012b}{:020b}{:016b}'.format(self['bcd_jday'],
-                                                self['bcd_seconds'],
-                                                self['bcd_fraction'])
-        stream = np.array([int(b) for b in stream], dtype=np.uint8)
-        crc = crc16(stream)
-        self['crc'] = int(''.join(['{:1d}'.format(c) for c in crc]), base=2)
+        stream = ((((self['bcd_jday'] << 20)
+                    + self['bcd_seconds']) << 16)
+                  + self['bcd_fraction'])
+        self['crc'] = crc16(stream)
         if verify:
             self.verify()
 

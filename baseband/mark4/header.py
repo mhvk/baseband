@@ -15,7 +15,7 @@ import numpy as np
 from astropy.time import Time
 
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase
-from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
+from ..vlbi_base.utils import bcd_decode, bcd_encode, CRCStack
 
 __all__ = ['CRC12', 'crc12', 'stream2words', 'words2stream',
            'Mark4TrackHeader', 'Mark4Header']
@@ -39,7 +39,7 @@ See page 4 of http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 This is also a 'standard' CRC-12 mentioned in
 https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 """
-crc12 = CRC(CRC12)
+crc12 = CRCStack(CRC12)
 
 
 def stream2words(stream, track=None):
