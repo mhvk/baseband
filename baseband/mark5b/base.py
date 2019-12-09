@@ -184,7 +184,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
         else:
             return stop - pattern.size - locations
 
-    def find_header(self, forward=True, maximum=None):
+    def find_header(self, forward=True, maximum=None, subsequent=1):
         """Find the nearest header from the current position.
 
         If successful, the file pointer is left at the start of the header.
@@ -196,64 +196,28 @@ class Mark5BFileReader(VLBIFileReaderBase):
         maximum : int, optional
             Maximum number of bytes to search through.  Default: twice the
             frame size of 10016 bytes.
+        subsequent : int, optional
+            Number of subsequent sync patterns separated by the frame
+            size to insist on.  Ignored if the file does not extend
+            sufficiently in the direction one is searching.
+            Default: 1.
 
         Returns
         -------
         header : :class:`~baseband.mark5b.Mark5BHeader` or None
             Retrieved Mark 5B header, or `None` if nothing found.
         """
-        frame_nbytes = 10016  # This is fixed for Mark 5B.
-        if maximum is None:
-            maximum = 2 * frame_nbytes
-        # Loop over chunks to try to find the frame marker.
+        locations = self.locate_sync_pattern(forward=forward, maximum=maximum,
+                                             subsequent=subsequent)
         file_pos = self.tell()
-        # First check whether we are right at a frame marker (usually true).
-        try:
-            header = self.read_header()
-            self.seek(-header.nbytes, 1)
-            return header
-        except Exception:
-            pass
-
-        self.seek(0, 2)
-        nbytes = self.tell()
-        if forward:
-            iterate = range(file_pos, min(file_pos + maximum - 16,
-                                          nbytes - frame_nbytes))
-        else:
-            iterate = range(min(file_pos, nbytes - frame_nbytes),
-                            max(file_pos - maximum, -1), -1)
-
-        for frame in iterate:
+        for location in locations:
             try:
-                self.seek(frame)
-                header1 = self.read_header()
+                self.seek(location)
+                header = self.read_header()
+                self.seek(-header.nbytes, 1)
+                return header
             except Exception:
-                continue
-
-            # Get header from a frame up and check it is consistent (we always
-            # check up since this checks that the payload has the right length)
-            next_frame = frame + frame_nbytes
-            if next_frame > nbytes - 16:
-                # If we're too far ahead for there to be another header,
-                # at least the one below should be OK.
-                next_frame = frame - frame_nbytes
-                # Except if there is only one frame in the first place.
-                if next_frame < 0:
-                    self.seek(frame)
-                    return header1
-
-            self.seek(next_frame)
-            try:
-                header2 = self.read_header()
-            except Exception:
-                continue
-
-            if (header2.jday == header1.jday
-                    and abs(header2.seconds - header1.seconds) <= 1
-                    and abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
-                self.seek(frame)
-                return header1
+                pass
 
         # Didn't find any frame.
         self.seek(file_pos)
