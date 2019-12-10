@@ -1,5 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 import numpy as np
+from numpy.lib.stride_tricks import as_strided
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -115,7 +116,92 @@ class Mark5BFileReader(VLBIFileReaderBase):
                     pass
             raise exc
 
-    def find_header(self, forward=True, maximum=None):
+    def locate_sync_pattern(self, forward=True, maximum=None, check=1):
+        """Locate sync patterns near the current position.
+
+        Note that the current position is always included.
+
+        Parameters
+        ----------
+        forward : bool, optional
+            Seek forward if `True` (default), backward if `False`.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default: twice the
+            frame size of 10016 bytes (extra bytes for catching a
+            pattern just cut in half will be included automatically).
+        check : int or tuple of int, optional
+            Frame offsets where another sync pattern should be present.
+            Ignored if the file does not extend sufficiently.
+            Default: 1, i.e., a sync pattern should be present one
+            frame after the one found (independent of ``forward``).
+
+        Returns
+        -------
+        locations : list of int
+            Locations of sync patterns within the range scanned,
+            in order of proximity to the starting position.
+        """
+        pattern = np.array([0xABADDEED], dtype='<u4').view('u1')
+        frame_nbytes = 10016  # This is fixed for Mark 5B.
+
+        if maximum is None:
+            maximum = 2 * frame_nbytes
+
+        if check is None:
+            check = np.array([], dtype=int)
+            check_min = check_max = 0
+        else:
+            check = np.atleast_1d(check) * frame_nbytes
+            check_min = min(check.min(), 0)
+            check_max = max(check.max(), 0)
+
+        with self.temporary_offset() as fh:
+            # Calculate the fiducial start of the region we are looking in.
+            if forward:
+                seek_start = fh.tell()
+            else:
+                seek_start = fh.tell() - maximum + 1
+            # Determine what part of the file to read, including the
+            # extra bits for doing the checking.
+            file_nbytes = fh.seek(0, 2)
+            start = max(seek_start + check_min, 0)
+            stop = min(seek_start + maximum + check_max,
+                       file_nbytes - pattern.size)
+            size = stop - start
+
+            if size < 0:
+                return []
+
+            fh.seek(start)
+            # Note: np.fromfile doesn't work with SequentialFile.
+            data = fh.read(size + pattern.size)
+
+        data = np.frombuffer(data, dtype='u1')
+        matches = np.nonzero(data[:-pattern.size] == pattern[0])[0]
+        # Re-stride so that it looks like each element is
+        # followed by all other, and check those all in one
+        # go (faster than iterating over the pattern).
+        strided = as_strided(data[1:], strides=(1, 1),
+                             shape=(size, pattern.size-1))
+        matches = matches[(strided[matches] == pattern[1:]).all(1)]
+
+        if not forward:
+            # Order by proximity to the file position.
+            matches = matches[::-1]
+
+        matches = matches.tolist()
+        # Keep only matches that are in the base range that was requested,
+        # and for which there are the consistency checks pass.
+        loc_start = max(seek_start-start, 0)
+        loc_stop = min(seek_start+maximum-start, size)
+        locations = [loc+start for loc in matches
+                     if (loc_start <= loc < loc_stop
+                         and all(c in matches for c in loc+check
+                                 if 0 <= c < size))]
+
+        return locations
+
+    def find_header(self, forward=True, maximum=None, check=1):
         """Find the nearest header from the current position.
 
         If successful, the file pointer is left at the start of the header.
@@ -127,64 +213,28 @@ class Mark5BFileReader(VLBIFileReaderBase):
         maximum : int, optional
             Maximum number of bytes to search through.  Default: twice the
             frame size of 10016 bytes.
+        check : int or tuple of int, optional
+            Frame offsets where another sync pattern should be present.
+            Ignored if the file does not extend sufficiently.
+            Default: 1, i.e., a sync pattern should be present one
+            frame after the one found (independent of ``forward``).
 
         Returns
         -------
         header : :class:`~baseband.mark5b.Mark5BHeader` or None
             Retrieved Mark 5B header, or `None` if nothing found.
         """
-        frame_nbytes = 10016  # This is fixed for Mark 5B.
-        if maximum is None:
-            maximum = 2 * frame_nbytes
-        # Loop over chunks to try to find the frame marker.
+        locations = self.locate_sync_pattern(forward=forward, maximum=maximum,
+                                             check=check)
         file_pos = self.tell()
-        # First check whether we are right at a frame marker (usually true).
-        try:
-            header = self.read_header()
-            self.seek(-header.nbytes, 1)
-            return header
-        except Exception:
-            pass
-
-        self.seek(0, 2)
-        nbytes = self.tell()
-        if forward:
-            iterate = range(file_pos, min(file_pos + maximum - 16,
-                                          nbytes - frame_nbytes))
-        else:
-            iterate = range(min(file_pos, nbytes - frame_nbytes),
-                            max(file_pos - maximum, -1), -1)
-
-        for frame in iterate:
+        for location in locations:
             try:
-                self.seek(frame)
-                header1 = self.read_header()
+                self.seek(location)
+                header = self.read_header()
+                self.seek(-header.nbytes, 1)
+                return header
             except Exception:
-                continue
-
-            # Get header from a frame up and check it is consistent (we always
-            # check up since this checks that the payload has the right length)
-            next_frame = frame + frame_nbytes
-            if next_frame > nbytes - 16:
-                # If we're too far ahead for there to be another header,
-                # at least the one below should be OK.
-                next_frame = frame - frame_nbytes
-                # Except if there is only one frame in the first place.
-                if next_frame < 0:
-                    self.seek(frame)
-                    return header1
-
-            self.seek(next_frame)
-            try:
-                header2 = self.read_header()
-            except Exception:
-                continue
-
-            if (header2.jday == header1.jday
-                    and abs(header2.seconds - header1.seconds) <= 1
-                    and abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
-                self.seek(frame)
-                return header1
+                pass
 
         # Didn't find any frame.
         self.seek(file_pos)
