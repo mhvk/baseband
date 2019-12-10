@@ -630,6 +630,32 @@ class TestVDIF:
         frameset2.valid = False
         assert not frameset2.valid
 
+    def test_locate_frames(self, tmpdir):
+        # Below, the tests set the file pointer to very close to a header,
+        # since otherwise they run *very* slow.  This is somehow related to
+        # pytest, since speed is not a big issue running stuff on its own.
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
+            header0 = vdif.VDIFHeader.fromfile(fh)
+            pattern = np.ma.MaskedArray(
+                np.array(header0.words[3:6], 'u4').view('u1'),
+                [False, False, True, True] + [False]*8)
+            offset = 12
+            fh.seek(0)
+            assert (fh.locate_frames(pattern, offset=offset,
+                                     frame_nbytes=header0.frame_nbytes,
+                                     check=0)
+                    == [0, 5032])
+            fh.seek(5000)
+            assert fh.locate_frames(pattern, offset=offset,
+                                    frame_nbytes=header0.frame_nbytes,
+                                    forward=True) == [5032, 10064]
+            # sample file has corrupted time in even threads; check this
+            # doesn't matter
+            fh.seek(15000)
+            assert fh.locate_frames(pattern, offset=offset,
+                                    frame_nbytes=header0.frame_nbytes,
+                                    forward=True) == [15096, 20128]
+
     def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,
         # since otherwise they run *very* slow.  This is somehow related to
