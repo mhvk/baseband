@@ -74,6 +74,35 @@ class VLBIFileBase:
         return "{0}(fh_raw={1})".format(self.__class__.__name__, self.fh_raw)
 
 
+def interpret_pattern(pattern):
+    if not isinstance(pattern, np.ndarray):
+        if isinstance(pattern, (list, tuple)):
+            pattern = np.array(pattern, dtype='u8', copy=False)
+        elif isinstance(pattern, bytes):
+            return np.array([ord(b) for b in pattern], 'u1')
+        else:
+            if not isinstance(pattern, str):
+                pattern = '{:x}'.format(pattern)
+            assert len(pattern) % 2 == 0
+            return np.array([int(pattern[i:i+2], base=16) for
+                             i in range(len(pattern)-2, -1, -2)], 'u1')
+
+    # Now are guaranteed to have an array.
+    if pattern.min() < 0:
+        raise ValueError('cannot have negative pattern entries')
+
+    bit_length = pattern.max().bit_length()
+    if bit_length == 1:
+        return np.packbits(pattern)
+
+    if bit_length <= 8:
+        return pattern.astype('u1', copy=False)
+
+    byte_length = (bit_length + 7) // 8
+    return np.array(pattern, dtype='<u{}'.format(byte_length),
+                    copy=False, ndmin=1).view('u1')
+
+
 class VLBIFileReaderBase(VLBIFileBase):
     """VLBI wrapped file reader base class.
 
@@ -143,18 +172,8 @@ class VLBIFileReaderBase(VLBIFileBase):
             Locations of sync patterns within the range scanned,
             in order of proximity to the starting position.
         """
-        if not isinstance(pattern, (np.ndarray, list, tuple)):
-            if isinstance(pattern, bytes):
-                pattern = list(pattern)
-            else:
-                if not isinstance(pattern, str):
-                    pattern = '{:x}'.format(pattern)
-                assert len(pattern) % 2 == 0
-                pattern = [int(pattern[i:i+2], base=16) for
-                           i in range(len(pattern)-2, -1, -2)]
-
-        pattern = np.array(pattern, dtype='u1', copy=False)
-
+        if not isinstance(pattern, np.ndarray) or pattern.dtype != 'u1':
+            pattern = interpret_pattern(pattern)
         if maximum is None:
             maximum = 2 * frame_nbytes
 
