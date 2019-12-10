@@ -16,6 +16,11 @@ Bug Fixes
 - Mark 4 now checks by default (``verify=True``) that frames are ordered
   correctly. [#349]
 
+Other Changes and Additions
+---------------------------
+
+- Much faster localization of Mark 5B frames. [#351]
+
 3.0 (2019-08-28)
 ================
 
