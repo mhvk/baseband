@@ -114,8 +114,8 @@ class Mark4FileReader(VLBIFileReaderBase):
         * 32*tracks bits set at offset+2500*tracks bytes
 
         This reflects 'sync_pattern' of 0xffffffff for a given header and one
-        a frame ahead, which is in word 2, plus the lsb of word 1, which is
-        'system_id'.
+        a frame ahead, which is in word 2, plus the msb of word 1, which is
+        the highest bit of 2 in 'headerstack_id' (always 0 or 1, so safe).
 
         If the file does not have ntrack is set, it will be auto-determined.
 
@@ -133,92 +133,39 @@ class Mark4FileReader(VLBIFileReaderBase):
             Byte offset of the next frame. `None` if the search was not
             successful.
         """
-        fh = self.fh_raw
-        file_pos = fh.tell()
+        file_pos = self.tell()
         # Use initializer value (determines ntrack if not already given).
         ntrack = self.ntrack
         if ntrack is None:
-            fh.seek(0)
+            self.seek(0)
             ntrack = self.determine_ntrack(maximum=maximum)
             if ntrack is None:
                 raise ValueError("cannot determine ntrack automatically. "
                                  "Try passing in an explicit value.")
-            if forward and fh.tell() >= file_pos:
-                return fh.tell()
+            if forward and self.tell() >= file_pos:
+                return self.tell()
 
-            fh.seek(file_pos)
+            self.seek(file_pos)
 
-        nset = np.ones(32 * ntrack // 8, dtype=np.int16)
-        nunset = np.ones(ntrack // 8, dtype=np.int16)
+        pattern = np.concatenate((np.zeros(ntrack // 8, dtype='u1'),
+                                  np.full(32 * ntrack // 8, 0xff, dtype='u1')))
+        offset = 63 * ntrack // 8
         frame_nbytes = ntrack * 2500
-        fh.seek(0, 2)
-        filesize = fh.tell()
-        if filesize < frame_nbytes:
-            fh.seek(file_pos)
-            return None
+        with self.temporary_offset() as fh:
+            fh.seek(offset, 1)
+            locations = fh.locate_sync_pattern(pattern,
+                                               frame_nbytes=frame_nbytes,
+                                               forward=forward,
+                                               maximum=maximum, check=1)
+            file_nbytes = fh.seek(0, 2)
 
-        if maximum is None:
-            maximum = 2 * frame_nbytes
-        # Loop over chunks to try to find the frame marker.
-        step = frame_nbytes // 2
-        # Read a bit more at every step to ensure we don't miss a "split"
-        # header.
-        block = step + 160 * ntrack // 8
-        if forward:
-            iterate = range(max(min(file_pos, filesize - block), 0),
-                            max(min(file_pos + maximum, filesize - block + 1),
-                                1),
-                            step)
+        for location in locations:
+            location -= offset
+            if 0 <= location <= file_nbytes - frame_nbytes:
+                fh.seek(location)
+                return location
         else:
-            iterate = range(min(max(file_pos - step, 0), filesize - block),
-                            min(max(file_pos - step - maximum - 1, -1),
-                                filesize - block),
-                            -step)
-        for frame in iterate:
-            fh.seek(frame)
-
-            data = np.frombuffer(fh.read(block), dtype=np.uint8)
-            assert len(data) == block
-            # Find header pattern.
-            databits1 = nbits[data]
-            nosync = np.convolve(databits1[len(nunset):] < 6, nset, 'valid')
-            nolow = np.convolve(databits1[:-len(nset)] > 1, nunset, 'valid')
-            wrong = nosync + nolow
-            possibilities = np.where(wrong == 0)[0]
-            # Check candidates by seeing whether there is a sync word
-            # a frame size ahead. (Note: loop can be empty.)
-            for possibility in possibilities[::1 if forward else -1]:
-                # Real start of possible header.
-                frame_start = frame + possibility - 63 * ntrack // 8
-                if (forward and frame_start < file_pos
-                        or not forward and frame_start > file_pos):
-                    continue
-                # Check there is a header following this.
-                check = frame_start + frame_nbytes
-                if check >= filesize - 32 * 2 * ntrack // 8 - len(nunset):
-                    # But do before this one if we're beyond end of file.
-                    check = frame_start - frame_nbytes
-                    if check < 0:  # Assume OK if only one frame fits in file.
-                        if frame_start + frame_nbytes > filesize:
-                            continue
-                        else:
-                            break
-
-                fh.seek(check + 32 * 2 * ntrack // 8)
-                check_data = np.frombuffer(fh.read(len(nunset)),
-                                           dtype=np.uint8)
-                databits2 = nbits[check_data]
-                if np.all(databits2 >= 6):
-                    break  # Got it!
-
-            else:  # None of them worked, so do next block.
-                continue
-
-            fh.seek(frame_start)
-            return frame_start
-
-        fh.seek(file_pos)
-        return None
+            return None
 
     def determine_ntrack(self, maximum=None):
         """Determines the number of tracks, by seeking the next frame.

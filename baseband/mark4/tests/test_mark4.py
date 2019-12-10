@@ -523,7 +523,7 @@ class TestMark4:
             assert fh.tell() == 0xa88
             fh.seek(-10000, 2)
             header_m10000b = fh.find_header(forward=False)
-            assert fh.tell() == 0xa88 + 2*header0.frame_nbytes
+            assert fh.tell() == 0xa88 + header0.frame_nbytes
             fh.seek(-300, 2)
             header_end = fh.find_header(forward=True)
             assert header_end is None
@@ -532,7 +532,7 @@ class TestMark4:
         assert header_0xa88b == header_0
         assert header_0xa89 == header_160000f
         assert abs(header_160000f.time - header_0.time - 2.5*u.ms) < 1.*u.ns
-        assert abs(header_m10000b.time - header_0.time - 5*u.ms) < 1.*u.ns
+        assert abs(header_m10000b.time - header_0.time - 2.5*u.ms) < 1.*u.ns
         # test small file
         with open(SAMPLE_FILE, 'rb') as fh:
             # One that simply is too small altogether

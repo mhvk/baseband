@@ -185,8 +185,8 @@ class VLBIFileReaderBase(VLBIFileBase):
             matches = matches[::-1]
 
         matches = matches.tolist()
-        # Keep only matches that are in the base range that was requested,
-        # and for which there are the consistency checks pass.
+        # Keep only matches which (1) are in the requested base range,
+        # and (2) have patterns at the requested check points.
         loc_start = max(seek_start-start, 0)
         loc_stop = min(seek_start+maximum-start, size)
         locations = [loc+start for loc in matches
