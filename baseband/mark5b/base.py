@@ -149,8 +149,11 @@ class Mark5BFileReader(VLBIFileReaderBase):
 
         if check is None:
             check = np.array([], dtype=int)
+            check_min = check_max = 0
         else:
             check = np.atleast_1d(check) * frame_nbytes
+            check_min = min(check.min(), 0)
+            check_max = max(check.max(), 0)
 
         with self.temporary_offset() as fh:
             # Calculate the fiducial start of the region we are looking in.
@@ -161,8 +164,8 @@ class Mark5BFileReader(VLBIFileReaderBase):
             # Determine what part of the file to read, including the
             # extra bits for doing the checking.
             file_nbytes = fh.seek(0, 2)
-            start = max(seek_start + check.min(initial=0), 0)
-            stop = min(seek_start + maximum + check.max(initial=0),
+            start = max(seek_start + check_min, 0)
+            stop = min(seek_start + maximum + check_max,
                        file_nbytes - pattern.size)
             size = stop - start
 
