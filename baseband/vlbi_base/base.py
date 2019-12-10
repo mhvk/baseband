@@ -1,11 +1,12 @@
 # Licensed under the GPLv3 - see LICENSE
 import io
 import warnings
-import numpy as np
 import operator
 from collections import namedtuple
 from contextlib import contextmanager
 
+import numpy as np
+from numpy.lib.stride_tricks import as_strided
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -91,6 +92,109 @@ class VLBIFileReaderBase(VLBIFileBase):
     """
 
     info = VLBIFileReaderInfo()
+
+    def locate_sync_pattern(self, pattern, frame_nbytes,
+                            forward=True, maximum=None, check=0):
+        """Locate the sync pattern nearest to the current position.
+
+        Note that the current position is always included.
+
+        Parameters
+        ----------
+        pattern : array of byte, bytes, iterable of int, string or int
+            Synchronization pattern to look for.  If a string or int,
+            it is interpreted as hexadecimal, and converted to an array,
+            with least significant byte first.
+        frame_nbytes : int
+            Frame size in bytes.
+        forward : bool, optional
+            Seek forward if `True` (default), backward if `False`.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default: twice the
+            frame size (extra bytes to avoid partial patterns will be added).
+        check : int or tuple of int, optional
+            Frame offsets where another sync pattern should be present.
+            Ignored if the file does not extend sufficiently.
+            Default: 1, i.e., a sync pattern should be present one
+            frame after the one found (independent of ``forward``).
+
+        Returns
+        -------
+        locations : list of int
+            Locations of sync patterns within the range scanned,
+            in order of proximity to the starting position.
+        """
+        if not isinstance(pattern, (np.ndarray, list, tuple)):
+            if isinstance(pattern, bytes):
+                pattern = list(pattern)
+            else:
+                if not isinstance(pattern, str):
+                    pattern = '{:x}'.format(pattern)
+                assert len(pattern) % 2 == 0
+                pattern = [int(pattern[i:i+2], base=16) for
+                           i in range(len(pattern)-2, -1, -2)]
+
+        pattern = np.array(pattern, dtype='u1', copy=False)
+
+        if maximum is None:
+            maximum = 2 * frame_nbytes
+
+        if check is None:
+            check = np.array([], dtype=int)
+            check_min = check_max = 0
+        else:
+            check = np.atleast_1d(check) * frame_nbytes
+            # For Numpy >=1.15, can just be check.min(initial=0) in the
+            # calculation of start, stop below.
+            check_min = min(check.min(), 0)
+            check_max = max(check.max(), 0)
+
+        with self.temporary_offset() as fh:
+            # Calculate the fiducial start of the region we are looking in.
+            if forward:
+                seek_start = fh.tell()
+            else:
+                seek_start = fh.tell() - maximum + 1
+            # Determine what part of the file to read, including the
+            # extra bits for doing the checking.
+            file_nbytes = fh.seek(0, 2)
+            start = max(seek_start + check_min, 0)
+            stop = min(seek_start + maximum + check_max,
+                       file_nbytes - pattern.size)
+            size = stop - start
+
+            if size < 0:
+                return []
+
+            fh.seek(start)
+            # Note: np.fromfile doesn't work with SequentialFile.
+            data = fh.read(size + pattern.size)
+
+        data = np.frombuffer(data, dtype='u1')
+        matches = np.nonzero(data[:-pattern.size] == pattern[0])[0]
+        # Re-stride so that it looks like each element is followed by
+        # all other, and check those all in one go (likely faster than
+        # iterating over the pattern, since we already reduced the
+        # number of options about 256 times).
+        strided = as_strided(data[1:], strides=(1, 1),
+                             shape=(size, pattern.size-1))
+        matches = matches[(strided[matches] == pattern[1:]).all(1)]
+
+        if not forward:
+            # Order by proximity to the file position.
+            matches = matches[::-1]
+
+        matches = matches.tolist()
+        # Keep only matches that are in the base range that was requested,
+        # and for which there are the consistency checks pass.
+        loc_start = max(seek_start-start, 0)
+        loc_stop = min(seek_start+maximum-start, size)
+        locations = [loc+start for loc in matches
+                     if (loc_start <= loc < loc_stop
+                         and all(c in matches for c in loc+check
+                                 if 0 <= c < size))]
+
+        return locations
 
     def get_frame_rate(self):
         """Determine the number of frames per second.
