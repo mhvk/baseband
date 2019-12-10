@@ -104,8 +104,8 @@ class Mark4FileReader(VLBIFileReaderBase):
         tdelta = (header1.fraction[0] - header0.fraction[0]) % 1.
         return u.Quantity(1 / tdelta, u.Hz).round()
 
-    def locate_frame(self, forward=True, maximum=None):
-        """Locate the frame nearest the current position.
+    def locate_frames(self, forward=True, maximum=None, check=1):
+        """Use the sync pattern to locate frames nearest the current position.
 
         The search is for the following pattern:
 
@@ -122,10 +122,15 @@ class Mark4FileReader(VLBIFileReaderBase):
         Parameters
         ----------
         forward : bool, optional
-            Whether to search forwards or backwards.  Default: `True`.
+            Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
-            Maximum number of bytes forward to search through.
-            Default: twice the frame size (``20000 * ntrack // 8``).
+            Maximum number of bytes to search through.  Default: twice the
+            frame size (extra bytes to avoid partial patterns will be added).
+        check : int or tuple of int, optional
+            Frame offsets where another sync pattern should be present.
+            Ignored if the file does not extend sufficiently.
+            Default: 1, i.e., a sync pattern should be present one
+            frame after the one found (independent of ``forward``).
 
         Returns
         -------
@@ -133,39 +138,23 @@ class Mark4FileReader(VLBIFileReaderBase):
             Byte offset of the next frame. `None` if the search was not
             successful.
         """
-        file_pos = self.tell()
         # Use initializer value (determines ntrack if not already given).
         ntrack = self.ntrack
         if ntrack is None:
-            self.seek(0)
-            ntrack = self.determine_ntrack(maximum=maximum)
-            if ntrack is None:
-                raise ValueError("cannot determine ntrack automatically. "
-                                 "Try passing in an explicit value.")
-            if forward and self.tell() >= file_pos:
-                return self.tell()
-
-            self.seek(file_pos)
+            with self.temporary_offset():
+                self.seek(0)
+                ntrack = self.determine_ntrack(maximum=maximum)
+                if ntrack is None:
+                    raise ValueError("cannot determine ntrack automatically. "
+                                     "Try passing in an explicit value.")
 
         pattern = np.concatenate((np.zeros(ntrack // 8, dtype='u1'),
                                   np.full(32 * ntrack // 8, 0xff, dtype='u1')))
         offset = 63 * ntrack // 8
         frame_nbytes = ntrack * 2500
-        with self.temporary_offset() as fh:
-            fh.seek(offset, 1)
-            locations = fh.locate_sync_pattern(pattern,
-                                               frame_nbytes=frame_nbytes,
-                                               forward=forward,
-                                               maximum=maximum, check=1)
-            file_nbytes = fh.seek(0, 2)
-
-        for location in locations:
-            location -= offset
-            if 0 <= location <= file_nbytes - frame_nbytes:
-                fh.seek(location)
-                return location
-        else:
-            return None
+        return super().locate_frames(pattern, frame_nbytes=frame_nbytes,
+                                     offset=offset, forward=forward,
+                                     maximum=maximum, check=1)
 
     def determine_ntrack(self, maximum=None):
         """Determines the number of tracks, by seeking the next frame.

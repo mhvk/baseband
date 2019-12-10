@@ -1,6 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
 import numpy as np
-from numpy.lib.stride_tricks import as_strided
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -116,8 +115,8 @@ class Mark5BFileReader(VLBIFileReaderBase):
                     pass
             raise exc
 
-    def locate_sync_pattern(self, forward=True, maximum=None, check=1):
-        """Locate sync patterns near the current position.
+    def locate_frames(self, forward=True, maximum=None, check=1):
+        """Use the sync pattern to locate frames near the current position.
 
         Note that the current position is always included.
 
@@ -142,9 +141,9 @@ class Mark5BFileReader(VLBIFileReaderBase):
             in order of proximity to the starting position.
         """
         # Note: frame_nbytes is fixed for Mark 5B
-        return super().locate_sync_pattern(
-            pattern=0xABADDEED, frame_nbytes=10016,
-            forward=forward, maximum=maximum, check=check)
+        return super().locate_frames(pattern=0xABADDEED, frame_nbytes=10016,
+                                     forward=forward, maximum=maximum,
+                                     check=check)
 
     def find_header(self, forward=True, maximum=None, check=1):
         """Find the nearest header from the current position.
@@ -169,8 +168,8 @@ class Mark5BFileReader(VLBIFileReaderBase):
         header : :class:`~baseband.mark5b.Mark5BHeader` or None
             Retrieved Mark 5B header, or `None` if nothing found.
         """
-        locations = self.locate_sync_pattern(forward=forward, maximum=maximum,
-                                             check=check)
+        locations = self.locate_frames(forward=forward, maximum=maximum,
+                                       check=check)
         file_pos = self.tell()
         for location in locations:
             try:

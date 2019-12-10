@@ -411,24 +411,24 @@ class TestMark5B:
         header.set_time(time=(start_time - 0.9 * u.ns), frame_rate=frame_rate)
         assert header.seconds == header0.seconds
 
-    def test_locate_sync_pattern(self, tmpdir):
+    def test_locate_frames(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000) as fh:
             header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             fh.seek(0)
-            assert fh.locate_sync_pattern() == [0, 10016]
-            assert fh.locate_sync_pattern(forward=True) == [0, 10016]
-            assert fh.locate_sync_pattern(forward=False) == [0]
+            assert fh.locate_frames() == [0, 10016]
+            assert fh.locate_frames(forward=True) == [0, 10016]
+            assert fh.locate_frames(forward=False) == [0]
             assert fh.tell() == 0
             fh.seek(10000)
-            assert (fh.locate_sync_pattern(forward=True)
+            assert (fh.locate_frames(forward=True)
                     == [header0.frame_nbytes, 2 * header0.frame_nbytes])
             assert fh.tell() == 10000
-            assert fh.locate_sync_pattern(forward=False) == [0]
+            assert fh.locate_frames(forward=False) == [0]
             fh.seek(-10000, 2)
-            assert (fh.locate_sync_pattern(forward=False)
+            assert (fh.locate_frames(forward=False)
                     == [x * header0.frame_nbytes for x in (3, 2)])
             fh.seek(-30, 2)
-            assert fh.locate_sync_pattern(forward=True) == []
+            assert fh.locate_frames(forward=True) == []
 
         m5_test = str(tmpdir.join('test.m5b'))
         # Check a corrupted file.
@@ -439,13 +439,13 @@ class TestMark5B:
         shifted_pos = header0.frame_nbytes * 2 - 9960
         with mark5b.open(m5_test, 'rb', kday=header0.kday) as fh:
             fh.seek(0)
-            assert fh.locate_sync_pattern() == [0, shifted_pos]
-            assert (fh.locate_sync_pattern(check=None)
+            assert fh.locate_frames() == [0, shifted_pos]
+            assert (fh.locate_frames(check=None)
                     == [0, header0.frame_nbytes, shifted_pos])
             fh.seek(10000)
-            assert (fh.locate_sync_pattern(forward=True)
+            assert (fh.locate_frames(forward=True)
                     == [shifted_pos, shifted_pos+header0.frame_nbytes])
-            assert (fh.locate_sync_pattern(forward=True, check=None)
+            assert (fh.locate_frames(forward=True, check=None)
                     == [header0.frame_nbytes, shifted_pos,
                         shifted_pos+header0.frame_nbytes])
         # For completeness, also check a really short file...
@@ -453,9 +453,9 @@ class TestMark5B:
             s.write(f.read(10018))
         with mark5b.open(m5_test, 'rb') as fh:
             fh.seek(10)
-            assert fh.locate_sync_pattern(forward=True) == []
+            assert fh.locate_frames(forward=True) == []
             assert fh.tell() == 10
-            assert fh.locate_sync_pattern(forward=False) == [0]
+            assert fh.locate_frames(forward=False) == [0]
 
     def test_find_header(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000) as fh:

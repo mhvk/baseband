@@ -93,9 +93,26 @@ class VLBIFileReaderBase(VLBIFileBase):
 
     info = VLBIFileReaderInfo()
 
-    def locate_sync_pattern(self, pattern, frame_nbytes,
-                            forward=True, maximum=None, check=0):
-        """Locate the sync pattern nearest to the current position.
+    def locate_frame(self, *args, **kwargs):
+        """Use a pattern to locate the frame nearest the current position.
+
+        Like ``locate_frames``, but selects the closest frame and leaves
+        the file pointer at its position.
+
+        Returns
+        -------
+        location : int or None
+            The location of the file pointer, or `None` if no frame was found.
+        """
+        locations = self.locate_frames(*args, **kwargs)
+        if locations:
+            return self.seek(locations[0])
+        else:
+            return None
+
+    def locate_frames(self, pattern, frame_nbytes, offset=0,
+                      forward=True, maximum=None, check=1):
+        """Use a pattern to locate frame starts near the current position.
 
         Note that the current position is always included.
 
@@ -107,6 +124,8 @@ class VLBIFileReaderBase(VLBIFileBase):
             with least significant byte first.
         frame_nbytes : int
             Frame size in bytes.
+        offset : int, optional
+            Offset from the frame start that the pattern occurs.
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
@@ -158,8 +177,8 @@ class VLBIFileReaderBase(VLBIFileBase):
             # Determine what part of the file to read, including the
             # extra bits for doing the checking.
             file_nbytes = fh.seek(0, 2)
-            start = max(seek_start + check_min, 0)
-            stop = min(seek_start + maximum + check_max,
+            start = max(seek_start + offset + check_min, 0)
+            stop = min(seek_start + offset + maximum + check_max,
                        file_nbytes - pattern.size)
             size = stop - start
 
@@ -185,11 +204,15 @@ class VLBIFileReaderBase(VLBIFileBase):
             matches = matches[::-1]
 
         matches = matches.tolist()
-        # Keep only matches which (1) are in the requested base range,
-        # and (2) have patterns at the requested check points.
-        loc_start = max(seek_start-start, 0)
-        loc_stop = min(seek_start+maximum-start, size)
-        locations = [loc+start for loc in matches
+        # Keep only matches for which
+        # (1) the location is in the requested base range,
+        # (2) the associated frames completely fits in the file, and
+        # (3) the patterns is also present at the requested check points.
+        # Matches are relative to start, with offset included.
+        loc_start = max(seek_start, 0) + offset - start
+        loc_stop = min(seek_start+maximum,
+                       file_nbytes-frame_nbytes+1) + offset - start
+        locations = [loc-offset+start for loc in matches
                      if (loc_start <= loc < loc_stop
                          and all(c in matches for c in loc+check
                                  if 0 <= c < size))]
