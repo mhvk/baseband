@@ -636,25 +636,83 @@ class TestVDIF:
         # pytest, since speed is not a big issue running stuff on its own.
         with vdif.open(SAMPLE_FILE, 'rb') as fh:
             header0 = vdif.VDIFHeader.fromfile(fh)
-            pattern = np.ma.MaskedArray(
-                np.array(header0.words[3:6], 'u4').view('u1'),
-                [False, False, True, True] + [False]*8)
-            offset = 12
             fh.seek(0)
-            assert (fh.locate_frames(pattern, offset=offset,
-                                     frame_nbytes=header0.frame_nbytes,
-                                     check=0)
-                    == [0, 5032])
+            # Just seek forward and backward for the sync patter, without
+            # checks; default maximum of 1000000 includes whole file.
+            assert fh.locate_frames(pattern=header0['sync_pattern'],
+                                    offset=20) == [x*5032 for x in range(16)]
+            fh.seek(0, 2)
+            assert (fh.locate_frames(pattern=header0['sync_pattern'],
+                                     offset=20, forward=False)
+                    == [x*5032 for x in range(15, -1, -1)])
+            # Try with a masked array as well, just because we can
+            fh.seek(0, 2)
+            assert fh.locate_frames(
+                pattern=np.ma.MaskedArray(
+                    np.array(header0.words[3:6], 'u4').view('u1'),
+                    [False, False, True, True] + [False]*8),
+                offset=3*4,
+                forward=False) == [x*5032 for x in range(15, -1, -1)]
+            # Try an explicit mask, and include the frame size.
+            fh.seek(10)
+            assert fh.locate_frames(
+                pattern=header0.words,
+                mask=header0.invariant_mask({
+                    'vdif_version', 'lg2_nchan', 'frame_length',
+                    'complex_data', 'bits_per_sample', 'station_id',
+                    'edv', 'sampling_unit', 'sampling_rate'}),
+                frame_nbytes=5032) == [5032, 10064]
+            # From now on, just rely on information based on the header.
             fh.seek(5000)
-            assert fh.locate_frames(pattern, offset=offset,
-                                    frame_nbytes=header0.frame_nbytes,
-                                    forward=True) == [5032, 10064]
+            assert fh.locate_frames(header0, forward=True) == [5032, 10064]
             # sample file has corrupted time in even threads; check this
             # doesn't matter
             fh.seek(15000)
-            assert fh.locate_frames(pattern, offset=offset,
-                                    frame_nbytes=header0.frame_nbytes,
-                                    forward=True) == [15096, 20128]
+            assert fh.locate_frames(header0, forward=True) == [15096, 20128]
+            fh.seek(20128)
+            assert fh.locate_frames(header0, forward=True) == [20128, 25160]
+            fh.seek(16)
+            assert fh.locate_frames(header0, forward=False) == [0]
+            fh.seek(-10000, 2)
+            assert (fh.locate_frames(header0, forward=False)
+                    == [x * header0.frame_nbytes for x in (14, 13)])
+            fh.seek(-5000, 2)
+            assert (fh.locate_frames(header0, forward=False)
+                    == [x * header0.frame_nbytes for x in (15, 14)])
+            fh.seek(-20, 2)
+            assert fh.locate_frames(header0, forward=True) == []
+            # Just before a header.
+            fh.seek(40254)
+            assert (fh.locate_frames(header0, forward=True)
+                    == [x * header0.frame_nbytes for x in (8, 9)])
+            fh.seek(40254)
+            assert (fh.locate_frames(header0, forward=False)
+                    == [x * header0.frame_nbytes for x in (7, 6)])
+
+        # Make file with missing data.
+        with open(str(tmpdir.join('test.vdif')), 'w+b') as s, \
+                open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(5100))
+            f.seek(10000)
+            s.write(f.read())
+            with vdif.open(s, 'rb') as fh:
+                fh.seek(0)
+                assert fh.locate_frames(header0) == [0, 5164]
+                fh.seek(10)
+                assert fh.locate_frames(header0) == [10064-4900]
+                fh.seek(10064-4900)
+                assert fh.locate_frames(header0) == [10064-4900, 3*5032-4900]
+                fh.seek(10064-4900)
+                assert (fh.locate_frames(header0, forward=False)
+                        == [10064-4900, 0])
+
+        # for completeness, also check a really short file...
+        with open(str(tmpdir.join('test.vdif')), 'w+b') as s, \
+                open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(5064))
+            with vdif.open(s, 'rb') as fh:
+                fh.seek(10)
+                assert fh.locate_frames(header0, forward=False) == [0]
 
     def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,

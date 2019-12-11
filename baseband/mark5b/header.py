@@ -86,6 +86,10 @@ class Mark5BHeader(VLBIHeaderBase):
         if verify:
             self.verify()
 
+    @classmethod
+    def invariants(cls):
+        return super().invariants() | {'sync_pattern', 'user'}
+
     def verify(self):
         """Verify header integrity."""
         assert len(self.words) == 4

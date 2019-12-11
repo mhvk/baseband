@@ -135,11 +135,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
 
     def same_stream(self, other):
         """Whether header is consistent with being from the same stream."""
-        # EDV and most parts of words 2 and 3 should be invariant.
-        return (self.edv == other.edv
-                and all(self[key] == other[key] for key in (
-                    'ref_epoch', 'vdif_version', 'frame_length',
-                    'complex_data', 'bits_per_sample', 'station_id')))
+        return all(self[key] == other[key] for key in self.invariants())
 
     @classmethod
     def fromfile(cls, fh, edv=None, verify=True):
@@ -460,6 +456,14 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
 
     time = property(get_time, set_time)
 
+    @classmethod
+    def invariants(cls):
+        # Normally would add 'ref_epoch' here, but timestamps are broken
+        # for some threads of the EVN 2014 data.
+        return (super().invariants()
+                | {'legacy_mode', 'vdif_version', 'lg2_nchan', 'frame_length',
+                   'complex_data', 'bits_per_sample', 'station_id'})
+
 
 class VDIFLegacyHeader(VDIFHeader):
     """Legacy VDIF header that uses only 4 32-bit words.
@@ -501,6 +505,10 @@ class VDIFBaseHeader(VDIFHeader):
         (('legacy_mode', (0, 30, 1, False)),  # Repeat, to change default.
          ('edv', (4, 24, 8))))
 
+    @classmethod
+    def invariants(cls):
+        return super().invariants() | {'edv'}
+
     def verify(self):
         """Basic checks of header integrity."""
         assert not self['legacy_mode']
@@ -536,6 +544,11 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
     # 'frame_rate', since time setting requires the frame rate.
     _properties = (VDIFBaseHeader._properties[:-1]
                    + ('sample_rate', 'frame_rate', 'time'))
+
+    @classmethod
+    def invariants(cls):
+        return super().invariants() | {'sampling_unit', 'sampling_rate',
+                                       'sync_pattern'}
 
     def same_stream(self, other):
         return (super().same_stream(other)
@@ -652,6 +665,11 @@ class VDIFHeader3(VDIFSampleRateHeader):
          ('minor_rev', (7, 8, 4, 0x0)),
          ('personality', (7, 0, 8))))
 
+    @classmethod
+    def invariants(cls):
+        return super().invariants() | {'frame_length', 'major_rev',
+                                       'minor_rev', 'personality'}
+
     def verify(self):
         super().verify()
         assert self['frame_length'] == 629
@@ -679,6 +697,10 @@ class VDIFHeader2(VDIFBaseHeader):
          ('PIC_status', (5, 0, 32)),
          ('PSN', (6, 0, 64))))
 
+    @classmethod
+    def invariants(cls):
+        return super().invariants() | {'sync_pattern'}
+
     def verify(self):  # pragma: no cover
         super().verify()
         assert self['frame_length'] == 629 or self['frame_length'] == 1004
@@ -698,6 +720,12 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                           ((k if k != 'frame_nr' else 'mark5b_frame_nr'),
                            (v[0] + 4,) + v[1:])
                           for (k, v) in Mark5BHeader._header_parser.items())))
+
+    @classmethod
+    def invariants(cls):
+        return (super().invariants()
+                | {'frame_length'}
+                | Mark5BHeader.invariants())
 
     def verify(self):
         super().verify()
