@@ -19,24 +19,17 @@ def bcd_decode(value):
         return int('{:x}'.format(index(value)))
     except TypeError as exc:  # Might still be an array
         try:
-            assert issubclass(value.dtype.type, np.integer)
+            assert value.dtype.kind in 'iu'
         except Exception:
             raise exc
 
-    bcd = value
-    factor = 1
-    result = np.zeros_like(value)
-    while np.any(bcd > 0):
-        bcd, digit = divmod(bcd, 0x10)
-        if np.any(digit > 9):
-            if not np.isscalar(digit):
-                value = value[digit > 9][0]
-            raise ValueError("invalid BCD encoded value {0}={1}."
-                             .format(value, hex(value)))
-        result += digit * factor
-        factor *= 10
-
-    return result
+    d = np.arange(value.itemsize * 2)
+    digits = (value[:, np.newaxis] >> d*4) & 0xf
+    if digits.max() > 9:
+        bad = value[(digits > 9).any(1)][0]
+        raise ValueError("invalid BCD encoded value {0}={1}."
+                         .format(bad, hex(bad)))
+    return (digits * 10**d).sum(1)
 
 
 def bcd_encode(value):
@@ -45,18 +38,13 @@ def bcd_encode(value):
         return int('{:d}'.format(index(value)), base=16)
     except TypeError as exc:  # Might still be an array
         try:
-            assert issubclass(value.dtype.type, np.integer)
+            assert value.dtype.kind in 'iu'
         except Exception:
             raise exc
 
-    result = np.zeros_like(value)
-    result = 0
-    factor = 1
-    while np.any(value > 0):
-        value, digit = divmod(value, 10)
-        result += digit*factor
-        factor *= 16
-    return result
+    d = np.arange(value.itemsize * 2)
+    digits = (value[:, np.newaxis] // 10**d) % 10
+    return (digits << d*4).sum(1)
 
 
 class CRC:
