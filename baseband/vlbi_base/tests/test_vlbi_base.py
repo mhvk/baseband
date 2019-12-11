@@ -173,6 +173,23 @@ class TestVLBIBase:
         with pytest.raises(Exception):
             self.HeaderParser((('0_2_64', (0, 2, 64, 4)),))
 
+    def test_header_invariants(self):
+        # More elaborate tests implicitly done in locate_frames.
+        assert self.Header.invariants() == set()
+        assert self.header.invariants() == set()
+
+        class SyncHeader(self.Header):
+            _header_parser = self.Header._header_parser + HeaderParser(
+                (('sync_pattern', (1, 0, 32, 0x12345678)),))
+
+        assert SyncHeader.invariants() == {'sync_pattern'}
+        sync_header = SyncHeader.fromvalues(x2_0_64=10)
+        assert sync_header.words == [0, 0x12345678, 10, 0]
+        ones = 0xffffffff
+        assert sync_header.invariant_mask() == [ones, 0, ones, ones]
+        assert (sync_header.invariant_mask({'x0_16_4', 'sync_pattern'})
+                == [0xfff0ffff, 0, ones, ones])
+
     def test_payload_basics(self):
         assert self.payload.complex_data is False
         assert self.payload.sample_shape == (2,)
