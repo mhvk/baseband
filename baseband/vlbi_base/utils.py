@@ -5,7 +5,7 @@ from math import gcd
 import numpy as np
 
 
-__all__ = ['lcm', 'bcd_decode', 'bcd_encode', 'CRC', 'CRCStack']
+__all__ = ['lcm', 'bcd_decode', 'bcd_encode', 'byte_array', 'CRC', 'CRCStack']
 
 
 def lcm(a, b):
@@ -45,6 +45,33 @@ def bcd_encode(value):
     d = np.arange(value.itemsize * 2)
     digits = (value[:, np.newaxis] // 10**d) % 10
     return (digits << d*4).sum(1)
+
+
+def byte_array(pattern):
+    """Convert the pattern to a byte array.
+
+    Parameters
+    ----------
+    pattern : array, bytes, int, or iterable of int
+        Pattern to convert.  If an array or `bytes` instance, a byte array
+        view is taken.  If an (iterable of) int, the integers need to be
+        unsigned 32 bit and will be interpreted as little-endian.
+
+    Returns
+    -------
+    byte_array : `~numpy.ndarray` of byte
+        With any elements of pattern stored in little-endian order.
+    """
+    if isinstance(pattern, (np.ndarray, bytes)):
+        # Quick turn-around for input that is OK already:
+        return np.atleast_1d(pattern).view('u1')
+
+    pattern = np.array(pattern, ndmin=1)
+    if (pattern.dtype.kind not in 'uif'
+            or pattern.min() < 0
+            or pattern.max() >= 1 << 32):
+        raise ValueError('values have to fit in 32 bit unsigned int.')
+    return pattern.astype('<u4').view('u1')
 
 
 class CRC:

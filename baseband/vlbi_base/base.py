@@ -13,6 +13,7 @@ from astropy.utils import lazyproperty
 from ..helpers import sequentialfile as sf
 from .header import VLBIHeaderBase
 from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from .utils import byte_array
 
 
 __all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
@@ -73,35 +74,6 @@ class VLBIFileBase:
 
     def __repr__(self):
         return "{0}(fh_raw={1})".format(self.__class__.__name__, self.fh_raw)
-
-
-def interpret_pattern(pattern):
-    if not isinstance(pattern, np.ndarray):
-        if isinstance(pattern, (list, tuple)):
-            pattern = np.array(pattern, dtype='u8', copy=False)
-        elif isinstance(pattern, bytes):
-            return np.array([ord(b) for b in pattern], 'u1')
-        else:
-            if not isinstance(pattern, str):
-                pattern = '{:x}'.format(pattern)
-            assert len(pattern) % 2 == 0
-            return np.array([int(pattern[i:i+2], base=16) for
-                             i in range(len(pattern)-2, -1, -2)], 'u1')
-
-    # Now are guaranteed to have an array.
-    if pattern.min() < 0:
-        raise ValueError('cannot have negative pattern entries')
-
-    bit_length = int(pattern.max()).bit_length()
-    if bit_length == 1:
-        return np.packbits(pattern)
-
-    if bit_length <= 8:
-        return pattern.astype('u1', copy=False)
-
-    byte_length = (bit_length + 7) // 8
-    return np.array(pattern, dtype='<u{}'.format(byte_length),
-                    copy=False, ndmin=1).view('u1')
 
 
 class VLBIFileReaderBase(VLBIFileBase):
@@ -189,12 +161,10 @@ class VLBIFileReaderBase(VLBIFileBase):
                 frame_nbytes = pattern.frame_nbytes
             pattern = pattern.words
 
-        if not isinstance(pattern, np.ndarray) or pattern.dtype != 'u1':
-            pattern = interpret_pattern(pattern)
+        pattern = byte_array(pattern)
 
         if mask is not None:
-            if not isinstance(mask, np.ndarray) or mask.dtype != 'u1':
-                mask = interpret_pattern(mask)
+            mask = byte_array(mask)
             useful = np.nonzero(mask != 255)[0]
             useful_slice = slice(useful[0], useful[-1]+1)
             mask = mask[useful_slice]
