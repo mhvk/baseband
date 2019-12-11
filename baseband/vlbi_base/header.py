@@ -66,7 +66,7 @@ def make_parser(word_index, bit_index, bit_length, default=None):
         assert bit_index == 0
 
         def parser(words):
-            return words[word_index] + words[word_index + 1] * (1 << 32)
+            return words[word_index] + (words[word_index + 1] << 32)
 
     else:
         bit_mask = (1 << bit_length) - 1  # e.g., bit_length=8 -> 0xff
@@ -308,6 +308,30 @@ class VLBIHeaderBase:
 
     def __copy__(self):
         return self.copy()
+
+    @classmethod
+    def invariants(cls):
+        """Set of header keys which will be shared by all headers in a file."""
+        # Sync pattern is a good default, but otherwise just return an
+        # empty list so that subclasses can use super() and add to it.
+        if 'sync_pattern' in cls._header_parser:
+            return {'sync_pattern'}
+        else:
+            return set()
+
+    def invariant_mask(self, invariants=None):
+        """Words with bits belonging to invariant keys set to 0."""
+        if invariants is None:
+            invariants = self.invariants()
+        mask = self.copy()
+        # Fill words with all ones at first
+        all_ones = self._struct.unpack(b'\xff'*self._struct.size)
+        mask.words = list(all_ones)
+        # Now blank all invariant entries.
+        for invariant in invariants:
+            mask[invariant] = 0
+
+        return mask.words
 
     @property
     def nbytes(self):

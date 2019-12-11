@@ -10,8 +10,9 @@ from numpy.lib.stride_tricks import as_strided
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from ..helpers import sequentialfile as sf
+from .header import VLBIHeaderBase
+from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 
 
 __all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
@@ -91,7 +92,7 @@ def interpret_pattern(pattern):
     if pattern.min() < 0:
         raise ValueError('cannot have negative pattern entries')
 
-    bit_length = pattern.max().bit_length()
+    bit_length = int(pattern.max()).bit_length()
     if bit_length == 1:
         return np.packbits(pattern)
 
@@ -139,32 +140,42 @@ class VLBIFileReaderBase(VLBIFileBase):
         else:
             return None
 
-    def locate_frames(self, pattern, frame_nbytes, offset=0,
-                      forward=True, maximum=None, check=1):
+    def locate_frames(self, pattern, *, mask=None, frame_nbytes=None,
+                      offset=0, forward=True, maximum=None, check=1):
         """Use a pattern to locate frame starts near the current position.
 
         Note that the current position is always included.
 
         Parameters
         ----------
-        pattern : array of byte, bytes, iterable of int, string or int
+        pattern : header, array of byte, bytes, iterable of int, string or int
             Synchronization pattern to look for.  If a string or int,
             it is interpreted as hexadecimal, and converted to an array,
-            with least significant byte first.
-        frame_nbytes : int
-            Frame size in bytes.
+            with least significant byte first.  If a header, the entries that
+            are `~baseband.vlbi_base.VLBIHeaderBase.invariants` are used
+            to create a masked pattern.
+        mask : array of byte, bytes, iterable of int, string or int
+            Bit mask for the pattern, with 1 indicating a given bit will
+            be ignored for the comparison.
+        frame_nbytes : int, optional
+            Frame size in bytes.  Defaults to the frame size in any header
+            pass in.
         offset : int, optional
-            Offset from the frame start that the pattern occurs.
+            Offset from the frame start that the pattern occurs.  Any
+            offsets inferred from masked entries are added to this (hence,
+            no offset needed when a header is passed in as ``pattern``).
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
             Maximum number of bytes to search through.  Default: twice the
-            frame size (extra bytes to avoid partial patterns will be added).
+            frame size if given, otherwise 1 million (extra bytes to avoid
+            partial patterns will be added).
         check : int or tuple of int, optional
-            Frame offsets where another sync pattern should be present.
-            Ignored if the file does not extend sufficiently.
+            Frame offsets where another sync pattern should be present
+            (if inside the file). Ignored if ``frame_nbytes`` is not given.
             Default: 1, i.e., a sync pattern should be present one
-            frame after the one found (independent of ``forward``).
+            frame after the one found (independent of ``forward``),
+            thus helping to guarantee the frame is not corrupted.
 
         Returns
         -------
@@ -172,10 +183,29 @@ class VLBIFileReaderBase(VLBIFileBase):
             Locations of sync patterns within the range scanned,
             in order of proximity to the starting position.
         """
+        if isinstance(pattern, VLBIHeaderBase):
+            mask = pattern.invariant_mask()
+            if frame_nbytes is None:
+                frame_nbytes = pattern.frame_nbytes
+            pattern = pattern.words
+
         if not isinstance(pattern, np.ndarray) or pattern.dtype != 'u1':
             pattern = interpret_pattern(pattern)
+
+        if mask is not None:
+            if not isinstance(mask, np.ndarray) or mask.dtype != 'u1':
+                mask = interpret_pattern(mask)
+            useful = np.nonzero(mask != 255)[0]
+            useful_slice = slice(useful[0], useful[-1]+1)
+            mask = mask[useful_slice]
+            pattern = pattern[useful_slice]
+            offset += useful_slice.start
+
         if maximum is None:
-            maximum = 2 * frame_nbytes
+            maximum = 2 * frame_nbytes if frame_nbytes else 1000000
+
+        if frame_nbytes is None:
+            frame_nbytes = 0
 
         if check is None:
             check = np.array([], dtype=int)
@@ -209,14 +239,23 @@ class VLBIFileReaderBase(VLBIFileBase):
             data = fh.read(size + pattern.size)
 
         data = np.frombuffer(data, dtype='u1')
-        matches = np.nonzero(data[:-pattern.size] == pattern[0])[0]
+
+        if mask is None:
+            match = data[:-pattern.size] == pattern[0]
+        else:
+            match = ((data[:-pattern.size] ^ pattern[0]) & ~mask[0]) == 0
+        matches = np.nonzero(match)[0]
         # Re-stride so that it looks like each element is followed by
         # all other, and check those all in one go (likely faster than
         # iterating over the pattern, since we already reduced the
         # number of options about 256 times).
         strided = as_strided(data[1:], strides=(1, 1),
                              shape=(size, pattern.size-1))
-        matches = matches[(strided[matches] == pattern[1:]).all(1)]
+        if mask is None:
+            match = strided[matches] == pattern[1:]
+        else:
+            match = ((strided[matches] ^ pattern[1:]) & ~mask[1:]) == 0
+        matches = matches[match.all(1)]
 
         if not forward:
             # Order by proximity to the file position.
