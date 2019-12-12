@@ -90,8 +90,9 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         If `None`, set to a tuple of zeros for later initialisation.
     edv : int, False, or None, optional
         Extended data version.  If `False`, a legacy header is used.
-        If `None` (default), it is determined from the header.  (Given it
-        explicitly is mostly useful for a slight speed-up.)
+        If `None` (default), it is determined from the header words;
+        hence, setting it explicitly is useful mostly for a slight speed-up.
+        (Subclasses can override this default with an ``_edv`` attribute.)
     verify : bool
         Whether to do basic verification of integrity.  Default: `True`.
 
@@ -111,13 +112,16 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     def __new__(cls, words, edv=None, verify=True, **kwargs):
         # We use edv to define which class we return.
         if edv is None:
-            # If not given, we extract edv from the header words.  This uses
-            # parsers defined below, in VDIFBaseHeader.
-            base_parsers = VDIFBaseHeader._header_parser.parsers
-            if base_parsers['legacy_mode'](words):
-                edv = False
-            else:
-                edv = base_parsers['edv'](words)
+            # If not given, try the class default.
+            edv = cls._edv
+            # If that is not given either, try to extract edv from the header
+            # words, using parsers defined below, in VDIFBaseHeader.
+            if edv is None and words is not None:
+                base_parsers = VDIFBaseHeader._header_parser.parsers
+                if base_parsers['legacy_mode'](words):
+                    edv = False
+                else:
+                    edv = base_parsers['edv'](words)
 
         # Have to use key "-1" instead of "False" since the dict-lookup treats
         # 0 and False as identical.

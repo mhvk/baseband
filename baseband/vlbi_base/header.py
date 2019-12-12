@@ -272,10 +272,10 @@ class VLBIHeaderBase:
     Parameters
     ----------
     words : tuple or list of int, or None
-        header words (generally, 32 bit unsigned int).  If `None`,
-        set to a list of zeros for later initialisation.  If given as a tuple,
-        the header is immutable.
-    verify : bool
+        header words (generally, 32 bit unsigned int).  If given as a tuple,
+        the header is immutable.  If `None`, set to a list of zeros for
+        later initialisation (and skip any verification).
+    verify : bool, optional
         Whether to do basic verification of integrity.  For the base class,
         checks that the number of words is consistent with the struct size.
     """
@@ -288,8 +288,8 @@ class VLBIHeaderBase:
             self.words = [0] * (self._struct.size // 4)
         else:
             self.words = words
-        if verify:
-            self.verify()
+            if verify:
+                self.verify()
 
     def verify(self):
         """Verify that the length of the words is consistent.
@@ -337,10 +337,8 @@ class VLBIHeaderBase:
         """Words with bits belonging to invariant keys set to 0."""
         if invariants is None:
             invariants = self.invariants()
-        mask = self.copy()
-        # Fill words with all zeros at first (in a way safe for ndarray).
-        for i in range(len(mask.words)):
-            mask.words[i] = 0
+        # Get an all-zero version and set bits for all invariants.
+        mask = self.__class__(None)
         for invariant in invariants:
             mask[invariant] = True
 
