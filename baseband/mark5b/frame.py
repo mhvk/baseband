@@ -72,7 +72,7 @@ class Mark5BFrame(VLBIFrameBase):
         super().__init__(header, payload, valid, verify)
 
     @classmethod
-    def fromfile(cls, fh, kday=None, ref_time=None, nchan=1, bps=3, valid=None,
+    def fromfile(cls, fh, kday=None, ref_time=None, nchan=1, bps=2, valid=None,
                  verify=True):
         """Read a frame from a filehandle.
 
