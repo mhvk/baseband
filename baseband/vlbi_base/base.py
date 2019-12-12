@@ -128,7 +128,7 @@ class VLBIFileReaderBase(VLBIFileBase):
             to create a masked pattern.
         mask : array of byte, bytes, iterable of int, string or int
             Bit mask for the pattern, with 1 indicating a given bit will
-            be ignored for the comparison.
+            be used the comparison.
         frame_nbytes : int, optional
             Frame size in bytes.  Defaults to the frame size in any header
             pass in.
@@ -165,7 +165,7 @@ class VLBIFileReaderBase(VLBIFileBase):
 
         if mask is not None:
             mask = byte_array(mask)
-            useful = np.nonzero(mask != 255)[0]
+            useful = np.nonzero(mask)[0]
             useful_slice = slice(useful[0], useful[-1]+1)
             mask = mask[useful_slice]
             pattern = pattern[useful_slice]
@@ -213,7 +213,7 @@ class VLBIFileReaderBase(VLBIFileBase):
         if mask is None:
             match = data[:-pattern.size] == pattern[0]
         else:
-            match = ((data[:-pattern.size] ^ pattern[0]) & ~mask[0]) == 0
+            match = ((data[:-pattern.size] ^ pattern[0]) & mask[0]) == 0
         matches = np.nonzero(match)[0]
         # Re-stride so that it looks like each element is followed by
         # all other, and check those all in one go (likely faster than
@@ -224,7 +224,7 @@ class VLBIFileReaderBase(VLBIFileBase):
         if mask is None:
             match = strided[matches] == pattern[1:]
         else:
-            match = ((strided[matches] ^ pattern[1:]) & ~mask[1:]) == 0
+            match = ((strided[matches] ^ pattern[1:]) & mask[1:]) == 0
         matches = matches[match.all(1)]
 
         if not forward:

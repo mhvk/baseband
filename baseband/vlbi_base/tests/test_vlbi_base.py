@@ -133,25 +133,35 @@ class TestVLBIBase:
 
     def test_make_setter(self):
         header = self.header.copy()
-        header['x0_16_4'] = 0xf
+        header['x0_16_4'] = 0xe
+        assert header.words[0] == 0x123e5678
+        header['x0_16_4'] = 0
+        assert header.words[0] == 0x12305678
+        header['x0_16_4'] = True  # Special value: fill all bits
         assert header.words[0] == 0x123f5678
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError,
+                           match='cannot be represented with 4 bits'):
             header['x0_16_4'] = 0x10
+        with pytest.raises(ValueError, match='no default value'):
+            header['x0_16_4'] = None
+
         header['x0_31_1'] = True
         assert header.words[0] == 0x923f5678
         header['x1_0_32'] = 0x1234
         assert header.words[:2] == [0x923f5678, 0x1234]
         header['x2_0_64'] = 1
         assert header.words[2:] == [1, 0]
-        header['x2_0_64'] = None
+        header['x2_0_64'] = True  # fill all bits
+        assert header.words[2:] == [0xffffffff, 0xffffffff]
+        header['x2_0_64'] = None  # set to default
         assert header.words[2:] == [0, 1]
         # Also check update method.
         header.update(x1_0_32=0x5678, x2_0_64=1)
         assert header.words == [0x923f5678, 0x5678, 1, 0]
-        with catch_warnings(UserWarning) as w:
+        with pytest.warns(UserWarning, match='unused.*bla'):
             header.update(bla=10)
-        assert 'unused' in str(w[0].message)
-        assert 'bla' in str(w[0].message)
+        with pytest.raises(ValueError, match='cannot be represented'):
+            header.update(x0_16_4=-1)
 
     def test_header_parser_class(self):
         header_parser = self.header_parser
@@ -185,10 +195,9 @@ class TestVLBIBase:
         assert SyncHeader.invariants() == {'sync_pattern'}
         sync_header = SyncHeader.fromvalues(x2_0_64=10)
         assert sync_header.words == [0, 0x12345678, 10, 0]
-        ones = 0xffffffff
-        assert sync_header.invariant_mask() == [ones, 0, ones, ones]
+        assert sync_header.invariant_mask() == [0, 0xffffffff, 0, 0]
         assert (sync_header.invariant_mask({'x0_16_4', 'sync_pattern'})
-                == [0xfff0ffff, 0, ones, ones])
+                == [0xf0000, 0xffffffff, 0, 0])
 
     def test_payload_basics(self):
         assert self.payload.complex_data is False

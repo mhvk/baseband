@@ -106,11 +106,14 @@ def make_setter(word_index, bit_index, bit_length, default=None):
         To be used as ``setter(words, value)``.
     """
     def setter(words, value):
-        if value is None and default is not None:
-            value = default
         bit_mask = (1 << bit_length) - 1
-        # Check that value will fit within the bit limits.
-        if np.any(value & bit_mask != value):
+        if value is None:
+            if default is None:
+                raise ValueError("no default value so cannot set to 'None'.")
+            value = default
+        elif value is True:
+            value = bit_mask
+        elif np.any(value & bit_mask != value):
             raise ValueError("{0} cannot be represented with {1} bits"
                              .format(value, bit_length))
         if bit_length == 64:
@@ -118,13 +121,12 @@ def make_setter(word_index, bit_index, bit_length, default=None):
             word2 = value >> 32
             words[word_index] = word1
             words[word_index + 1] = word2
-            return words
-
-        word = words[word_index]
-        # Zero the part to be set, and add the value.
-        bit_mask <<= bit_index
-        word = ((word | bit_mask) ^ bit_mask) | (value << bit_index)
-        words[word_index] = word
+        else:
+            word = words[word_index]
+            # Zero the part to be set, and add the value.
+            bit_mask <<= bit_index
+            word = ((word | bit_mask) ^ bit_mask) | (value << bit_index)
+            words[word_index] = word
         return words
 
     return setter
@@ -311,7 +313,19 @@ class VLBIHeaderBase:
 
     @classmethod
     def invariants(cls):
-        """Set of header keys which will be shared by all headers in a file."""
+        """Set of header keys which will be shared by all headers in a file.
+
+        Subclasses can and should add invariants by overriding this
+        `classmethod`, possibly using `astropy.utils.sharedmethod` to
+        allow one to distinguish between invariants that hold for
+        every stream of a given type, and for those additional ones
+        that hold for a given stream of that type.  For instance, for
+        a Mark 4 header, 'sync_pattern' will always be present, while
+        'system_id' may change between files.
+
+        To provide a base, if header has 'sync_pattern', it is included
+        here already.
+        """
         # Sync pattern is a good default, but otherwise just return an
         # empty list so that subclasses can use super() and add to it.
         if 'sync_pattern' in cls._header_parser:
@@ -324,12 +338,11 @@ class VLBIHeaderBase:
         if invariants is None:
             invariants = self.invariants()
         mask = self.copy()
-        # Fill words with all ones at first
-        all_ones = self._struct.unpack(b'\xff'*self._struct.size)
-        mask.words = list(all_ones)
-        # Now blank all invariant entries.
+        # Fill words with all zeros at first (in a way safe for ndarray).
+        for i in range(len(mask.words)):
+            mask.words[i] = 0
         for invariant in invariants:
-            mask[invariant] = 0
+            mask[invariant] = True
 
         return mask.words
 
@@ -478,7 +491,11 @@ class VLBIHeaderBase:
                            .format(self.__class__.__name__, item))
 
     def __setitem__(self, item, value):
-        """Set the value of a particular header item in the header words."""
+        """Set the value of a particular header item in the header words.
+
+        If value is `None`, set the item to its default value (if it exists);
+        if `Ttue, set all bits in the item (i.e., set item to its maximum).
+        """
         try:
             self._header_parser.setters[item](self.words, value)
         except KeyError:
