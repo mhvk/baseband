@@ -6,7 +6,7 @@ Implements a Mark4Payload class used to store payload words, and decode to
 or encode from a data array.
 
 For the specification, see
-http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 """
 import sys
 from collections import namedtuple

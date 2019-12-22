@@ -30,7 +30,7 @@ For this tutorial, we'll use two sample files::
 
     >>> from baseband.data import SAMPLE_VDIF, SAMPLE_MARK5B
 
-The first file is a VDIF one created from `EVN <http://www.evlbi.org/>`_/`VLBA
+The first file is a VDIF one created from `EVN <https://www.evlbi.org/>`_/`VLBA
 <https://public.nrao.edu/telescopes/vlba/>`_ observations of `Black Widow
 pulsar PSR B1957+20 <https://en.wikipedia.org/wiki/Black_Widow_Pulsar>`_,
 while the second is a Mark 5B from EVN/`WSRT

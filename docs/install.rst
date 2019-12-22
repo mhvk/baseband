@@ -12,14 +12,14 @@ Requirements
 Baseband requires:
 
     - `Astropy`_ v3.0 or later
-    - `Numpy <http://www.numpy.org/>`_ v1.10 or later
+    - `Numpy <https://www.numpy.org/>`_ v1.10 or later
 
 .. _install_baseband:
 
 Installing Baseband
 ===================
 
-To install Baseband with `pip <http://www.pip-installer.org/en/latest/>`_,
+To install Baseband with `pip <https://pip.pypa.io/>`_,
 run::
 
     pip3 install baseband
@@ -85,7 +85,7 @@ or, inside of Python::
     import baseband
     baseband.test()
 
-These tests require `pytest <http://pytest.org>`_ to be installed. Further
+These tests require `pytest <https://pytest.org>`_ to be installed. Further
 documentation can be found on the `Astropy running tests documentation
 <https://astropy.readthedocs.io/en/stable/development/testguide.html#running-tests>`_
 .
@@ -107,5 +107,5 @@ the root directory::
 
     python3 setup.py build_docs
 
-This requires to have `Sphinx <http://sphinx.pocoo.org>`_ installed (and its
+This requires to have `Sphinx <https://www.sphinx-doc.org>`_ installed (and its
 dependencies).

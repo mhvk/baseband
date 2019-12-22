@@ -6,7 +6,7 @@ Implements a Mark5BFrame class that can be used to hold a header and a
 payload, providing access to the values encoded in both.
 
 For the specification, see
-http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 """
 import numpy as np
 

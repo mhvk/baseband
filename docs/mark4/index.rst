@@ -14,7 +14,7 @@ in the Mark IIIA/IV/VLBA `design specifications`_.
 Baseband currently only supports files that have been parity-stripped and
 corrected for barrel roll and data modulation.
 
-.. _design specifications: http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+.. _design specifications: https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
 .. _mark4_file_structure:
 

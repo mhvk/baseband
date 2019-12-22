@@ -5,7 +5,7 @@ Release Procedure
 *****************
 
 This procedure is based off of `Astropy's
-<http://docs.astropy.org/en/stable/development/releasing.html>`_, and
+<https://docs.astropy.org/en/stable/development/releasing.html>`_, and
 additionally uses information from the `PyPI packaging tutorial
 <https://packaging.python.org/tutorials/packaging-projects/>`_.
 
@@ -24,7 +24,7 @@ To make releases, you will need
   associated with your GitHub account.  While releases do not need to be
   signed, we recommend doing so to ensure they are trustworthy.  To make a GPG
   key and associate it with your GitHub account, see the `Astropy documentation
-  <http://docs.astropy.org/en/stable/development/releasing.html#creating-a-gpg-signing-key-and-a-signed-tag>`_.
+  <https://docs.astropy.org/en/stable/development/releasing.html#creating-a-gpg-signing-key-and-a-signed-tag>`_.
 
 Versioning
 ==========
@@ -95,7 +95,7 @@ main development branch.  Then, for each::
     git cherry-pick -m 1 <SHA-1>
 
 For more information, see `Astropy's documentation
-<http://docs.astropy.org/en/stable/development/releasing.html#backporting-fixes-from-master>`_.
+<https://docs.astropy.org/en/stable/development/releasing.html#backporting-fixes-from-master>`_.
 
 Once you have cherry-picked, check the following:
 
