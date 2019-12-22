@@ -5,8 +5,8 @@ Baseband
 ********
 
 Welcome to the Baseband documentation!  Baseband is a package
-`affiliated <http://www.astropy.org/affiliated/index.html>`_ with the
-`Astropy project <http://www.astropy.org>`_ for reading and
+`affiliated <https://www.astropy.org/affiliated/index.html>`_ with the
+`Astropy project <https://www.astropy.org>`_ for reading and
 writing VLBI and other radio baseband files, with the aim of simplifying and
 streamlining data conversion and standardization.  It provides:
 
@@ -89,8 +89,8 @@ publishing new code releases.
 Project Details
 ===============
 
-.. image:: http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
-    :target: http://www.astropy.org
+.. image:: https://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
+    :target: https://www.astropy.org/
     :alt: Powered by Astropy Badge
 
 .. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214268.svg
@@ -103,7 +103,7 @@ Project Details
    :target: https://coveralls.io/github/mhvk/baseband
 
 .. image:: https://readthedocs.org/projects/baseband/badge/?version=latest
-   :target: http://baseband.readthedocs.io/en/latest/?badge=latest
+   :target: https://baseband.readthedocs.io/en/latest/?badge=latest
    :alt: Documentation Status
 
 .. toctree::

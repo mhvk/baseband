@@ -6,7 +6,7 @@ Implements a Mark5BHeader class used to store header words, and decode/encode
 the information therein.
 
 For the specification, see
-http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 """
 import numpy as np
 import astropy.units as u
@@ -22,7 +22,7 @@ CRC16 = 0x18005
 """CRC polynomial used for Mark 5B Headers, as a check on the time code.
 
 x^16 + x^15 + x^2 + 1, i.e., 0x18005.
-See page 11 of http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+See page 11 of https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 (defined there for VLBA headers).
 
 This is also CRC-16-IBM mentioned in
@@ -35,7 +35,7 @@ class Mark5BHeader(VLBIHeaderBase):
     """Decoder/encoder of a Mark5B Frame Header.
 
     See page 15 of
-    http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+    https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 
     Parameters
     ----------
@@ -241,7 +241,7 @@ class Mark5BHeader(VLBIHeaderBase):
         Calculate time using `jday`, `seconds`, and `fraction` properties
         (which reflect the bcd-encoded 'bcd_jday', 'bcd_seconds' and
         'bcd_fraction' header items), plus `kday` from the initialisation.  See
-        http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+        https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 
         Note that some non-compliant files do not have 'bcd_fraction' set.
         For those, the time can still be calculated using the header's

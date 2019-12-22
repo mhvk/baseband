@@ -52,7 +52,7 @@ class TestCRC12:
 
     def setup(self):
         # Test example from page 4 of
-        # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        # https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         stream_hex = '0000 002D 0330 0000' + 'FFFF FFFF' + '4053 2143 3805 5'
         self.crc_hex = '284'
         self.crc12 = CRC(0x180f)

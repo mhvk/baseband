@@ -5,10 +5,10 @@ Implements a Mark4Header class used to store header words, and decode/encode
 the information therein.
 
 For the specification of tape Mark 4 format, see
-http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
 A little bit on the disk representation is at
-http://adsabs.harvard.edu/abs/2003ASPC..306..123W
+https://ui.adsabs.harvard.edu/abs/2003ASPC..306..123W
 """
 
 import numpy as np
@@ -34,7 +34,7 @@ CRC12 = 0x180f
 """CRC polynomial used for Mark 4 Headers.
 
 x^12 + x^11 + x^3 + x^2 + x + 1, i.e., 0x180f.
-See page 4 of http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+See page 4 of https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
 This is also a 'standard' CRC-12 mentioned in
 https://en.wikipedia.org/wiki/Cyclic_redundancy_check
@@ -89,7 +89,7 @@ def words2stream(words):
 class Mark4TrackHeader(VLBIHeaderBase):
     """Decoder/encoder of a Mark 4 Track Header.
 
-    See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+    See https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
     Parameters
     ----------
@@ -189,7 +189,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
         """Fractional seconds (decoded from 'bcd_fraction')."""
         ms = bcd_decode(self['bcd_fraction'])
         # The last digit encodes a fraction -- see table 2 in
-        # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        # https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         # 0: 0.00      5: 5.00
         # 1: 1.25      6: 6.25
         # 2: 2.50      7: 7.50
@@ -214,7 +214,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
         'bcd_hour', 'bcd_minute', 'bcd_second' header items, as well as
         the ``fraction`` property (inferred from 'bcd_fraction') and
         ``decade`` from the initialisation.  See
-        See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        See https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         """
         return Time('{decade:03d}{uy:1x}:{d:03x}:{h:02x}:{m:02x}:{s:08.5f}'
                     .format(decade=self.decade//10, uy=self['bcd_unit_year'],
@@ -245,7 +245,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
 class Mark4Header(Mark4TrackHeader):
     """Decoder/encoder of a Mark 4 Header, containing all streams.
 
-    See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+    See https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
     Parameters
     ----------
@@ -276,7 +276,7 @@ class Mark4Header(Mark4TrackHeader):
     _dtypes = MARK4_DTYPES
 
     # keyed with bps, fanout; Tables 10-14 in reference documentation:
-    # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+    # https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
     # rows are channels with Sign, Mag for each for bps=2, columns fanout.
     # So for bps=2, fanout=4 (abbreviating channel a Sign, Mag as aS, aM):
     # Channel a has samples (aS, aM) in tracks (2, 10), (4,12), etc.
@@ -361,7 +361,7 @@ class Mark4Header(Mark4TrackHeader):
         """Assignments of tracks to channels and fanout items.
 
         The assignments are inferred from tables 10-14 in
-        http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         except that 2 has been subtracted so that tracks start at 0,
         and that for 64 tracks the arrays are suitably enlarged by adding
         another set of channels.
@@ -681,7 +681,7 @@ class Mark4Header(Mark4TrackHeader):
 
         Uses bcd-encoded 'unit_year', 'day', 'hour', 'minute', 'second' and
         'frac_sec', plus ``decade`` from the initialisation to calculate the
-        time.  See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        time.  See https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         """
         if len(set(self['bcd_fraction'])) == 1:
             return self[0].time

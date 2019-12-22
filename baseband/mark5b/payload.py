@@ -6,7 +6,7 @@ Implements a Mark5BPayload class used to store payload words, and decode to
 or encode from a data array.
 
 For the specification, see
-http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 """
 from collections import namedtuple
 
@@ -47,9 +47,9 @@ def init_luts():
     Note that the sign bit is flipped for 1-bit mode from what one might
     expect from the 2-bit encodings (at least, as implemented in mark5access;
     the docs are rather unclear).  For more details, see Table 13 in
-    http://library.nrao.edu/public/memos/vlba/up/VLBASU_13.pdf
+    https://library.nrao.edu/public/memos/vlba/up/VLBASU_13.pdf
     and
-    http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+    https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
     Appendix A: sign always on even bit stream (0, 2, 4, ...), and magnitude
     on adjacent odd stream (1, 3, 5, ...).
 
