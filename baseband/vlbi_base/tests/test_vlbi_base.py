@@ -6,7 +6,6 @@ from collections import namedtuple
 import pytest
 import numpy as np
 import astropy.units as u
-from astropy.tests.helper import catch_warnings
 
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
@@ -183,21 +182,73 @@ class TestVLBIBase:
         with pytest.raises(Exception):
             self.HeaderParser((('0_2_64', (0, 2, 64, 4)),))
 
-    def test_header_invariants(self):
+    def test_header_without_invariants(self):
         # More elaborate tests implicitly done in locate_frames.
         assert self.Header.invariants() == set()
         assert self.header.invariants() == set()
+        with pytest.raises(ValueError):
+            self.header.invariant_pattern()
+        with pytest.raises(ValueError):
+            self.Header.invariant_pattern()
 
+        # But we can construct one by passing on the invariants ourselves,
+        # if those have defaults.
+        pattern, mask = self.Header.invariant_pattern({'x0_31_1'})
+        assert pattern == [0, 0, 0, 0]
+        assert mask == [0x80000000, 0, 0, 0]
+        # If there is no default, we cannot use a key on the class.
+        with pytest.raises(ValueError):
+            self.Header.invariant_pattern({'x1_0_32'})
+        # But we can on the instance.
+        pattern, mask = self.header.invariant_pattern({'x1_0_32'})
+        assert pattern == self.header.words
+        assert mask == [0, 0xffffffff, 0, 0]
+
+    def test_header_with_implicit_invariants(self):
         class SyncHeader(self.Header):
             _header_parser = self.Header._header_parser + HeaderParser(
                 (('sync_pattern', (1, 0, 32, 0x12345678)),))
 
         assert SyncHeader.invariants() == {'sync_pattern'}
+        pattern, mask = SyncHeader.invariant_pattern()
+        assert pattern == [0, 0x12345678, 0, 0]
+        assert mask == [0, 0xffffffff, 0, 0]
         sync_header = SyncHeader.fromvalues(x2_0_64=10)
-        assert sync_header.words == [0, 0x12345678, 10, 0]
-        assert sync_header.invariant_mask() == [0, 0xffffffff, 0, 0]
-        assert (sync_header.invariant_mask({'x0_16_4', 'sync_pattern'})
-                == [0xf0000, 0xffffffff, 0, 0])
+        assert sync_header.invariants() == {'sync_pattern'}
+        pattern, mask = sync_header.invariant_pattern()
+        assert pattern == [0, 0x12345678, 10, 0]
+        assert mask == [0x00000000, 0xffffffff, 0, 0]
+        pattern, mask = sync_header.invariant_pattern({'x0_16_4',
+                                                       'sync_pattern'})
+        assert pattern == [0, 0x12345678, 10, 0]
+        assert mask == [0xf0000, 0xffffffff, 0, 0]
+        # If given keys have no default, the class version should fail.
+        with pytest.raises(ValueError):
+            SyncHeader.invariant_pattern({'x0_16_4', 'sync_pattern'})
+
+    def test_header_with_explicit_invariants(self):
+        class SyncHeader(self.Header):
+            _header_parser = self.Header._header_parser + HeaderParser(
+                (('sync_pattern', (1, 0, 32, 0x12345678)),))
+            _invariants = {'sync_pattern'}
+            _stream_invariants = _invariants | {'x0_31_1'}
+
+        assert SyncHeader.invariants() == {'sync_pattern'}
+        pattern, mask = SyncHeader.invariant_pattern()
+        assert pattern == [0, 0x12345678, 0, 0]
+        assert mask == [0, 0xffffffff, 0, 0]
+        sync_header = SyncHeader.fromvalues(x2_0_64=10)
+        assert sync_header.invariants() == {'sync_pattern', 'x0_31_1'}
+        pattern, mask = sync_header.invariant_pattern()
+        assert pattern == [0, 0x12345678, 10, 0]
+        assert mask == [0x80000000, 0xffffffff, 0, 0]
+        pattern, mask = sync_header.invariant_pattern({'x0_16_4',
+                                                       'sync_pattern'})
+        assert pattern == [0, 0x12345678, 10, 0]
+        assert mask == [0xf0000, 0xffffffff, 0, 0]
+        # If given keys have no default, the class version should fail.
+        with pytest.raises(ValueError):
+            SyncHeader.invariant_pattern({'x0_16_4', 'sync_pattern'})
 
     def test_payload_basics(self):
         assert self.payload.complex_data is False

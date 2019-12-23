@@ -652,13 +652,16 @@ class TestVDIF:
                 forward=False) == [x*5032 for x in range(15, -1, -1)]
             # Try an explicit mask, and include the frame size.
             fh.seek(10)
-            assert fh.locate_frames(
-                pattern=header0.words,
-                mask=header0.invariant_mask({
-                    'vdif_version', 'lg2_nchan', 'frame_length',
-                    'complex_data', 'bits_per_sample', 'station_id',
-                    'edv', 'sampling_unit', 'sampling_rate'}),
-                frame_nbytes=5032) == [5032, 10064]
+            # All of word 2:
+            #     'vdif_version', 'lg2_nchan', 'frame_length'
+            # All but 'thread_id' of word 3:
+            #     'complex_data', 'bits_per_sample', 'station_id'
+            # All of word 4:
+            #     'edv', 'sampling_unit', 'sampling_rate'
+            # Ignore sync_pattern on purpose.
+            mask = [0, 0, 0xffffffff, 0xfc00ffff, 0xffffffff, 0, 0, 0]
+            assert fh.locate_frames(pattern=header0.words, mask=mask,
+                                    frame_nbytes=5032) == [5032, 10064]
             # From now on, just rely on information based on the header.
             fh.seek(5000)
             assert fh.locate_frames(header0, forward=True) == [5032, 10064]

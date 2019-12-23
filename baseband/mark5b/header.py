@@ -67,6 +67,10 @@ class Mark5BHeader(VLBIHeaderBase):
          ('bcd_fraction', (3, 16, 16)),
          ('crc', (3, 0, 16))))
     _sync_pattern = _header_parser.defaults['sync_pattern']
+    _invariants = {'sync_pattern'}
+    """Keys of invariant parts in all Mark 5B headers."""
+    _stream_invariants = _invariants | {'user'}
+    """Keys of invariant parts in a given Mark 5B stream."""
 
     _struct = four_word_struct
 
@@ -85,10 +89,6 @@ class Mark5BHeader(VLBIHeaderBase):
             self.infer_kday(ref_time)
         if verify:
             self.verify()
-
-    @classmethod
-    def invariants(cls):
-        return super().invariants() | {'sync_pattern', 'user'}
 
     def verify(self):
         """Verify header integrity."""

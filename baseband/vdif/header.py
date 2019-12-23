@@ -102,6 +102,16 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         As appropriate for the extended data version.
     """
 
+    _invariants = set()
+    """Keys of invariant parts in all VDIF headers (none)."""
+    _stream_invariants = {'legacy_mode', 'vdif_version', 'lg2_nchan',
+                          'frame_length', 'complex_data', 'bits_per_sample',
+                          'station_id'}
+    """Keys of invariant parts in a given VDIF stream."""
+    # One would think one could add 'ref_epoch' here, but timestamps
+    # are broken for some threads of the EVN 2014 data, so apparently
+    # that is not a safe bet.
+
     _properties = ('frame_nbytes', 'payload_nbytes', 'bps', 'nchan',
                    'samples_per_frame', 'station', 'time')
     """Properties accessible/usable in initialisation for all VDIF headers."""
@@ -460,14 +470,6 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
 
     time = property(get_time, set_time)
 
-    @classmethod
-    def invariants(cls):
-        # Normally would add 'ref_epoch' here, but timestamps are broken
-        # for some threads of the EVN 2014 data.
-        return (super().invariants()
-                | {'legacy_mode', 'vdif_version', 'lg2_nchan', 'frame_length',
-                   'complex_data', 'bits_per_sample', 'station_id'})
-
 
 class VDIFLegacyHeader(VDIFHeader):
     """Legacy VDIF header that uses only 4 32-bit words.
@@ -509,9 +511,13 @@ class VDIFBaseHeader(VDIFHeader):
         (('legacy_mode', (0, 30, 1, False)),  # Repeat, to change default.
          ('edv', (4, 24, 8))))
 
-    @classmethod
-    def invariants(cls):
-        return super().invariants() | {'edv'}
+    _invariants = (VDIFHeader._invariants
+                   | {'legacy_mode'})
+    """Keys of invariant parts in all VDIF non-legacy headers."""
+    _stream_invariants = (_invariants
+                          | VDIFHeader._stream_invariants
+                          | {'edv'})
+    """Keys of invariant parts in a given VDIF non-legacy stream."""
 
     def verify(self):
         """Basic checks of header integrity."""
@@ -544,20 +550,18 @@ class VDIFSampleRateHeader(VDIFBaseHeader):
          ('sampling_rate', (4, 0, 23)),
          ('sync_pattern', (5, 0, 32, 0xACABFEED))))
 
+    _invariants = (VDIFBaseHeader._invariants
+                   | {'sync_pattern'})
+    """Keys of invariant parts in VDIF headers with sample rate."""
+    _stream_invariants = (_invariants
+                          | VDIFBaseHeader._stream_invariants
+                          | {'sampling_unit', 'sampling_rate'})
+    """Keys of invariant parts in a given VDIF sample-rate stream."""
+
     # Add extra properties, ensuring 'time' comes after 'sample_rate' and
     # 'frame_rate', since time setting requires the frame rate.
     _properties = (VDIFBaseHeader._properties[:-1]
                    + ('sample_rate', 'frame_rate', 'time'))
-
-    @classmethod
-    def invariants(cls):
-        return super().invariants() | {'sampling_unit', 'sampling_rate',
-                                       'sync_pattern'}
-
-    def same_stream(self, other):
-        return (super().same_stream(other)
-                and self.words[4] == other.words[4]
-                and self.words[5] == other.words[5])
 
     @property
     def sample_rate(self):
@@ -650,6 +654,10 @@ class VDIFHeader1(VDIFSampleRateHeader):
     _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
         (('das_id', (6, 0, 64, 0x0)),))
 
+    _invariants = (VDIFSampleRateHeader._invariants
+                   | {'edv'})
+    """Keys of invariant parts in all VDIF EDV=1 headers."""
+
 
 class VDIFHeader3(VDIFSampleRateHeader):
     """VDIF Header for EDV=3.
@@ -669,10 +677,13 @@ class VDIFHeader3(VDIFSampleRateHeader):
          ('minor_rev', (7, 8, 4, 0x0)),
          ('personality', (7, 0, 8))))
 
-    @classmethod
-    def invariants(cls):
-        return super().invariants() | {'frame_length', 'major_rev',
-                                       'minor_rev', 'personality'}
+    _invariants = (VDIFSampleRateHeader._invariants
+                   | {'edv', 'frame_length'})
+    """Keys of invariant parts in all VDIF EDV=3 headers."""
+    _stream_invariants = (_invariants
+                          | VDIFSampleRateHeader._stream_invariants
+                          | {'major_rev', 'minor_rev', 'personality'})
+    """Keys of invariant parts in a given VDIF EDV=3 stream."""
 
     def verify(self):
         super().verify()
@@ -701,9 +712,12 @@ class VDIFHeader2(VDIFBaseHeader):
          ('PIC_status', (5, 0, 32)),
          ('PSN', (6, 0, 64))))
 
-    @classmethod
-    def invariants(cls):
-        return super().invariants() | {'sync_pattern'}
+    _invariants = (VDIFBaseHeader._invariants
+                   | {'edv', 'sync_pattern'})
+    """Keys of invariant parts in all VDIF EDV=2 headers."""
+    _stream_invariants = (_invariants
+                          | VDIFBaseHeader._stream_invariants)
+    """Keys of invariant parts in a given VDIF EDV=2 stream."""
 
     def verify(self):  # pragma: no cover
         super().verify()
@@ -725,11 +739,14 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
                            (v[0] + 4,) + v[1:])
                           for (k, v) in Mark5BHeader._header_parser.items())))
 
-    @classmethod
-    def invariants(cls):
-        return (super().invariants()
-                | {'frame_length'}
-                | Mark5BHeader.invariants())
+    _invariants = (VDIFBaseHeader._invariants
+                   | {'frame_length'}
+                   | Mark5BHeader._invariants)
+    """Keys of invariant parts in all VDIF-Mark5B headers."""
+    _stream_invariants = (_invariants
+                          | VDIFBaseHeader._stream_invariants
+                          | Mark5BHeader._stream_invariants)
+    """Keys of invariant parts in a given VDIF-Mark5B stream."""
 
     def verify(self):
         super().verify()

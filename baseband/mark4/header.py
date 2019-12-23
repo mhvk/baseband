@@ -138,6 +138,13 @@ class Mark4TrackHeader(VLBIHeaderBase):
          ('bcd_fraction', (4, 12, 12)),
          ('crc', (4, 0, 12))))
     _sync_pattern = _header_parser.defaults['sync_pattern']
+    _invariants = {'sync_pattern'}
+    """Keys of invariant parts in all Mark 4 headers."""
+    _stream_invariants = (_invariants
+                          | {'bcd_headstack1', 'bcd_headstack2',
+                             'track_roll_enabled', 'sequence_suspended',
+                             'system_id'})
+    """Keys of invariant parts in a given Mark 4 stream."""
 
     _properties = ('decade', 'track_id', 'fraction', 'time')
     """Properties accessible/usable in initialisation."""

@@ -11,7 +11,6 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from .header import VLBIHeaderBase
 from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from .utils import byte_array
 
@@ -123,15 +122,16 @@ class VLBIFileReaderBase(VLBIFileBase):
         pattern : header, array of byte, bytes, iterable of int, string or int
             Synchronization pattern to look for.  If a string or int,
             it is interpreted as hexadecimal, and converted to an array,
-            with least significant byte first.  If a header, the entries that
-            are `~baseband.vlbi_base.VLBIHeaderBase.invariants` are used
-            to create a masked pattern.
+            with least significant byte first.  If a header or header class,
+            :meth:`~baseband.vlbi_base.VLBIHeaderBase.invariant_pattern`
+            is used to create a masked pattern, using invariant keys from
+            :meth:`~baseband.vlbi_base.VLBIHeaderBase.invariants`.
         mask : array of byte, bytes, iterable of int, string or int
             Bit mask for the pattern, with 1 indicating a given bit will
             be used the comparison.
         frame_nbytes : int, optional
             Frame size in bytes.  Defaults to the frame size in any header
-            pass in.
+            passed in.
         offset : int, optional
             Offset from the frame start that the pattern occurs.  Any
             offsets inferred from masked entries are added to this (hence,
@@ -155,11 +155,10 @@ class VLBIFileReaderBase(VLBIFileBase):
             Locations of sync patterns within the range scanned,
             in order of proximity to the starting position.
         """
-        if isinstance(pattern, VLBIHeaderBase):
-            mask = pattern.invariant_mask()
+        if hasattr(pattern, 'invariant_pattern'):
             if frame_nbytes is None:
                 frame_nbytes = pattern.frame_nbytes
-            pattern = pattern.words
+            pattern, mask = pattern.invariant_pattern()
 
         pattern = byte_array(pattern)
 

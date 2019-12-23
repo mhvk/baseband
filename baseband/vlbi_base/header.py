@@ -7,12 +7,13 @@ corresponding to a frame header, providing access to the values encoded in
 via a dict-like interface.  Definitions for headers are constructed using
 the HeaderParser class.
 """
-from copy import copy
 import struct
 import warnings
+from copy import copy
 from collections import OrderedDict
 
 import numpy as np
+from astropy.utils import sharedmethod
 
 
 __all__ = ['four_word_struct', 'eight_word_struct',
@@ -254,11 +255,15 @@ class VLBIHeaderBase:
 
     Generally, the actual class should define:
 
-      _struct: `~struct.Struct` instance that can pack/unpack header words.
+      _struct : `~struct.Struct` instance that can pack/unpack header words.
 
-      _header_parser: `HeaderParser` instance corresponding to this class.
+      _header_parser : `HeaderParser` instance corresponding to this class.
 
-      _properties: tuple of properties accessible/usable in initialisation
+      _properties : tuple of properties accessible/usable in initialisation
+
+      _invariants : set of keys of invariant header parts for a given type.
+
+      _stream_invarants : set of keys of invariant header parts for a stream.
 
     It also should define properties (getters *and* setters):
 
@@ -279,6 +284,9 @@ class VLBIHeaderBase:
         Whether to do basic verification of integrity.  For the base class,
         checks that the number of words is consistent with the struct size.
     """
+
+    # TODO: should [_stream]_invarants be defined through some subclass init??
+    # TODO: perhaps from some hints in the headerparser definition?
 
     _properties = ('payload_nbytes', 'frame_nbytes', 'time')
     """Properties accessible/usable in initialisation for all headers."""
@@ -311,38 +319,79 @@ class VLBIHeaderBase:
     def __copy__(self):
         return self.copy()
 
-    @classmethod
-    def invariants(cls):
-        """Set of header keys which will be shared by all headers in a file.
+    @sharedmethod
+    def invariants(self):
+        """Set of keys of invariant header parts.
 
-        Subclasses can and should add invariants by overriding this
-        `classmethod`, possibly using `astropy.utils.sharedmethod` to
-        allow one to distinguish between invariants that hold for
-        every stream of a given type, and for those additional ones
-        that hold for a given stream of that type.  For instance, for
-        a Mark 4 header, 'sync_pattern' will always be present, while
-        'system_id' may change between files.
+        On the class, this returns keys of parts that are shared by
+        all headers for the type, on an instance, those that are
+        shared with other headers in the same file.
 
-        To provide a base, if header has 'sync_pattern', it is included
-        here already.
+        If neither are defined, returns 'sync_pattern' if the header
+        containts that key.
         """
-        # Sync pattern is a good default, but otherwise just return an
-        # empty list so that subclasses can use super() and add to it.
-        if 'sync_pattern' in cls._header_parser:
+
+        if not isinstance(self, type) and hasattr(self, '_stream_invariants'):
+            return self._stream_invariants
+
+        elif hasattr(self, '_invariants'):
+            return self._invariants
+
+        elif 'sync_pattern' in getattr(self, '_header_parser', {}):
             return {'sync_pattern'}
+
         else:
             return set()
 
-    def invariant_mask(self, invariants=None):
-        """Words with bits belonging to invariant keys set to 0."""
+    @sharedmethod
+    def invariant_pattern(self, invariants=None):
+        """Pattern and mask shared between headers of a type or stream.
+
+        This is mostly for use inside
+        :meth:`~baseband.vlbi_base.VLBIFileReaderBase.locate_frames`.
+
+        Parameters
+        ----------
+        invariants : set of str, optional
+            Set of keys to header parts that are shared between all headers
+            of a given type or within a given stream/file.  Default: from
+            `~baseband.vlbi_base.header.VLBIHeaderBase.invariants()`.
+
+        Returns
+        -------
+        pattern : list of int
+            The pattern that is shared between headers. If called on
+            an instance, just the header words; if called on a class,
+            words with defaults for the relevant parts set.
+        mask : list of int
+            For each entry in ``pattern`` a bit mask with bits set for
+            the parts that are invariant.
+        """
+
         if invariants is None:
             invariants = self.invariants()
-        # Get an all-zero version and set bits for all invariants.
+
+        if not invariants:
+            raise ValueError("cannot create an invariant_mask without "
+                             "some invariants")
+
+        if isinstance(self, type):
+            # If we are called as a classmethod, first get an instance
+            # with all defaults set.  This will be our pattern.
+            self = self(None)
+            for invariant in invariants:
+                value = self._header_parser.defaults[invariant]
+                if value is None:
+                    raise ValueError('can only set as invariant a header '
+                                     'part that has a default.')
+                self[invariant] = value
+
+        # Create an all-zero version and set bits for all invariants.
         mask = self.__class__(None)
         for invariant in invariants:
             mask[invariant] = True
 
-        return mask.words
+        return self.words, mask.words
 
     @property
     def nbytes(self):
