@@ -21,6 +21,9 @@ Other Changes and Additions
 
 - Much faster localization of Mark 5B frames. [#351]
 
+- For file readers, ``locate_frame`` and ``find_header`` now raise an
+  exception if no frame is found (rather than return `None`). [#354]
+
 3.0 (2019-08-28)
 ================
 
