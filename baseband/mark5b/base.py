@@ -347,7 +347,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
 
     def __init__(self, fh_raw, header0=None, sample_rate=None, nchan=1, bps=2,
                  squeeze=True, **kwargs):
-        samples_per_frame = Mark5BHeader._payload_nbytes * 8 // bps // nchan
+        samples_per_frame = Mark5BHeader.payload_nbytes * 8 // bps // nchan
         if header0 is None:
             if 'time' in kwargs:
                 kwargs['frame_rate'] = sample_rate / samples_per_frame

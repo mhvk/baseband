@@ -13,7 +13,7 @@ import astropy.units as u
 from astropy.time import Time, TimeDelta
 
 from ..vlbi_base.header import (four_word_struct, eight_word_struct,
-                                HeaderParser, VLBIHeaderBase)
+                                fixedvalue, HeaderParser, VLBIHeaderBase)
 from ..mark5b.header import Mark5BHeader
 
 
@@ -689,6 +689,14 @@ class VDIFHeader3(VDIFSampleRateHeader):
         super().verify()
         assert self['frame_length'] == 629
 
+    @fixedvalue
+    def payload_nbytes(cls):
+        return 5000
+
+    @fixedvalue
+    def frame_nbytes(cls):
+        return cls.nbytes + cls.payload_nbytes
+
 
 class VDIFHeader2(VDIFBaseHeader):
     """VDIF Header for EDV=2.
@@ -758,6 +766,14 @@ class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
         assert seconds == self.seconds  # Latter decodes 'bcd_seconds'
         ref_mjd = ref_epochs[self['ref_epoch']].mjd + day
         assert ref_mjd % 1000 == self.jday  # Latter decodes 'bcd_jday'
+
+    @fixedvalue
+    def payload_nbytes(cls):
+        return Mark5BHeader.payload_nbytes
+
+    @fixedvalue
+    def frame_nbytes(cls):
+        return cls.nbytes + cls.payload_nbytes
 
     def __setitem__(self, item, value):
         super().__setitem__(item, value)

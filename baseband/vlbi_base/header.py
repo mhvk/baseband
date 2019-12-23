@@ -13,7 +13,7 @@ from copy import copy
 from collections import OrderedDict
 
 import numpy as np
-from astropy.utils import sharedmethod
+from astropy.utils import sharedmethod, classproperty
 
 
 __all__ = ['four_word_struct', 'eight_word_struct',
@@ -25,6 +25,20 @@ four_word_struct = struct.Struct('<4I')
 """Struct instance that packs/unpacks 4 unsigned 32-bit integers."""
 eight_word_struct = struct.Struct('<8I')
 """Struct instance that packs/unpacks 8 unsigned 32-bit integers."""
+
+
+class fixedvalue(classproperty):
+    """Property that is fixed for all instances of a class.
+
+    Based on `astropy.utils.decorators.classproperty`, but with
+    a setter that passes if the value is identical to the fixed
+    value, and otherwise raises a `ValueError`.
+    """
+    def __set__(self, instance, value):
+        fixed_value = self.__get__(instance, type(instance))
+        if value != fixed_value:
+            raise ValueError('fixed property can only be set to {}.'
+                             .format(fixed_value))
 
 
 def make_parser(word_index, bit_index, bit_length, default=None):
@@ -265,13 +279,15 @@ class VLBIHeaderBase:
 
       _stream_invarants : set of keys of invariant header parts for a stream.
 
-    It also should define properties (getters *and* setters):
+    It also should define properties that tell the size (getters *and*
+    setters, or use a `baseband.vlbi_base.header.fixedvalue` if the
+    value is the same for all instances):
 
-      payload_nbytes: number of bytes used by payload
+      payload_nbytes : number of bytes used by payload
 
-      frame_nbytes: total number of bytes for header + payload
+      frame_nbytes : total number of bytes for header + payload
 
-      get_time, set_time, and a corresponding time property:
+      get_time, set_time, and a corresponding time property :
            time at start of payload
 
     Parameters
@@ -393,10 +409,10 @@ class VLBIHeaderBase:
 
         return self.words, mask.words
 
-    @property
-    def nbytes(self):
+    @fixedvalue
+    def nbytes(cls):
         """Size of the header in bytes."""
-        return self._struct.size
+        return cls._struct.size
 
     @property
     def mutable(self):

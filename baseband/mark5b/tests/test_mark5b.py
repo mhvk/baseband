@@ -92,7 +92,7 @@ class TestMark5B:
         # Check payload and frame size setters.
         header6 = mark5b.Mark5BHeader(header.words, kday=56000)
         header6.time == header.time
-        header6.payload = 10000
+        header6.payload_nbytes = 10000
         header6.frame_nbytes = 10016
         with pytest.raises(ValueError):
             header6.payload_nbytes = 9999

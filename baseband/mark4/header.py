@@ -10,6 +10,7 @@ https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 A little bit on the disk representation is at
 https://ui.adsabs.harvard.edu/abs/2003ASPC..306..123W
 """
+import struct
 
 import numpy as np
 from astropy.time import Time
@@ -146,22 +147,19 @@ class Mark4TrackHeader(VLBIHeaderBase):
                              'system_id'})
     """Keys of invariant parts in a given Mark 4 stream."""
 
+    _struct = struct.Struct('<5I')
+
     _properties = ('decade', 'track_id', 'fraction', 'time')
     """Properties accessible/usable in initialisation."""
 
     decade = None
 
     def __init__(self, words, decade=None, ref_time=None, verify=True):
-        if words is None:
-            self.words = [0, 0, 0, 0, 0]
-        else:
-            self.words = words
         if decade is not None:
             self.decade = decade
-        elif ref_time is not None:
+        super().__init__(words, verify=verify)
+        if decade is None and ref_time is not None:
             self.infer_decade(ref_time)
-        if verify:
-            self.verify()
 
     def verify(self):
         """Verify header integrity."""
