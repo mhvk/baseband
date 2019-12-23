@@ -15,8 +15,15 @@ from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from .utils import byte_array
 
 
-__all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
-           'VLBIStreamReaderBase', 'VLBIStreamWriterBase', 'make_opener']
+__all__ = ['HeaderNotFoundError',
+           'VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
+           'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
+           'make_opener']
+
+
+class HeaderNotFoundError(LookupError):
+    """Error in finding a header in a stream."""
+    pass
 
 
 class VLBIFileBase:
@@ -102,14 +109,19 @@ class VLBIFileReaderBase(VLBIFileBase):
 
         Returns
         -------
-        location : int or None
-            The location of the file pointer, or `None` if no frame was found.
+        location : int
+            The location of the file pointer.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no frame was found.
         """
         locations = self.locate_frames(*args, **kwargs)
-        if locations:
-            return self.seek(locations[0])
-        else:
-            return None
+        if not locations:
+            raise HeaderNotFoundError('could not locate a a nearby frame.')
+
+        return self.seek(locations[0])
 
     def locate_frames(self, pattern, *, mask=None, frame_nbytes=None,
                       offset=0, forward=True, maximum=None, check=1):

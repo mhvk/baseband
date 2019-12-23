@@ -7,6 +7,7 @@ from astropy.tests.helper import catch_warnings
 
 from ... import mark5b
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
+from ...vlbi_base.base import HeaderNotFoundError
 from ...data import SAMPLE_MARK5B as SAMPLE_FILE
 
 
@@ -476,8 +477,8 @@ class TestMark5B:
             header_m10000b = fh.find_header(forward=False)
             assert fh.tell() == 3 * header0.frame_nbytes
             fh.seek(-30, 2)
-            header_end = fh.find_header(forward=True)
-            assert header_end is None
+            with pytest.raises(HeaderNotFoundError):
+                fh.find_header(forward=True)
         assert header_10000b == header_0
         assert header_16b == header_0
         assert header_10000f['frame_nr'] == 1

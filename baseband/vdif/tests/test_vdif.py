@@ -6,6 +6,7 @@ import astropy.units as u
 from astropy.tests.helper import catch_warnings
 
 from ... import vdif, vlbi_base
+from ...vlbi_base.base import HeaderNotFoundError
 from ...helpers import sequentialfile as sf
 from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_VLBI_VDIF as
                      SAMPLE_VLBI, SAMPLE_MWA_VDIF as SAMPLE_MWA,
@@ -750,9 +751,8 @@ class TestVDIF:
                                            forward=False)
             assert fh.tell() == 15 * header0.frame_nbytes
             fh.seek(-20, 2)
-            header_end = fh.find_header(template_header=header0,
-                                        forward=True)
-            assert header_end is None
+            with pytest.raises(HeaderNotFoundError):
+                fh.find_header(template_header=header0, forward=True)
             # Just before a header.
             fh.seek(40254)
             header_40254f = fh.find_header(template_header=header0,

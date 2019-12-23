@@ -6,6 +6,7 @@ from astropy.time import Time
 from astropy.tests.helper import catch_warnings
 
 from ... import mark4
+from ...vlbi_base.base import HeaderNotFoundError
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
 from ..header import Mark4TrackHeader
 from ..payload import reorder32, reorder64
@@ -509,8 +510,8 @@ class TestMark4:
             header_160000f = fh.find_header(forward=True)
             assert fh.tell() == 0xa88 + header0.frame_nbytes
             fh.seek(0xa87)
-            header_0xa87b = fh.find_header(forward=False)
-            assert header_0xa87b is None
+            with pytest.raises(HeaderNotFoundError):
+                fh.find_header(forward=False)
             assert fh.tell() == 0xa87
             fh.seek(0xa88)
             header_0xa88f = fh.find_header()
@@ -525,8 +526,9 @@ class TestMark4:
             header_m10000b = fh.find_header(forward=False)
             assert fh.tell() == 0xa88 + header0.frame_nbytes
             fh.seek(-300, 2)
-            header_end = fh.find_header(forward=True)
-            assert header_end is None
+            with pytest.raises(HeaderNotFoundError):
+                fh.find_header(forward=True)
+
         assert header_100b == header_0
         assert header_0xa88f == header_0
         assert header_0xa88b == header_0
@@ -541,9 +543,11 @@ class TestMark4:
                                                        ntrack=64) as fh_short:
                 s.write(fh.read(80000))
                 fh_short.seek(100)
-                assert fh_short.find_header() is None
+                with pytest.raises(HeaderNotFoundError):
+                    fh_short.find_header()
                 assert fh_short.tell() == 100
-                assert fh_short.find_header(forward=False) is None
+                with pytest.raises(HeaderNotFoundError):
+                    fh_short.find_header(forward=False)
                 assert fh_short.tell() == 100
 
             # And one that could fit one frame, but doesn't.
@@ -552,9 +556,11 @@ class TestMark4:
                 fh.seek(0)
                 s.write(fh.read(162690))
                 fh_short.seek(200)
-                assert fh_short.find_header() is None
+                with pytest.raises(HeaderNotFoundError):
+                    fh_short.find_header()
                 assert fh_short.tell() == 200
-                assert fh_short.find_header(forward=False) is None
+                with pytest.raises(HeaderNotFoundError):
+                    fh_short.find_header(forward=False)
                 assert fh_short.tell() == 200
 
             # now add enough that the file does include a complete header.
@@ -791,7 +797,7 @@ class TestMark4:
             s.seek(0)
             # With too many payload samples for one frame, f2.locate_frame
             # will fail.
-            with pytest.raises(AssertionError):
+            with pytest.raises(HeaderNotFoundError):
                 f2 = mark4.open(s, 'rs', sample_rate=32*u.MHz,
                                 ntrack=64, decade=2010)
 
@@ -809,7 +815,7 @@ class TestMark4:
             with mark4.open(s, 'rs', sample_rate=32*u.MHz,
                             ntrack=64, decade=2010) as f2:
                 assert f2.header0 == frame0.header
-                with pytest.raises(ValueError):
+                with pytest.raises(HeaderNotFoundError):
                     f2._last_header
 
     def test_corrupt_stream_missing_frame(self, tmpdir):

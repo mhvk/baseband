@@ -168,21 +168,9 @@ class Mark5BFileReader(VLBIFileReaderBase):
         header : :class:`~baseband.mark5b.Mark5BHeader` or None
             Retrieved Mark 5B header, or `None` if nothing found.
         """
-        locations = self.locate_frames(forward=forward, maximum=maximum,
-                                       check=check)
-        file_pos = self.tell()
-        for location in locations:
-            try:
-                self.seek(location)
-                header = self.read_header()
-                self.seek(-header.nbytes, 1)
-                return header
-            except Exception:
-                pass
-
-        # Didn't find any frame.
-        self.seek(file_pos)
-        return None
+        self.locate_frame(forward=forward, maximum=maximum, check=check)
+        with self.temporary_offset():
+            return self.read_header()
 
 
 class Mark5BFileWriter(VLBIFileBase):

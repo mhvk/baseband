@@ -5,7 +5,7 @@ import astropy.units as u
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase)
+                              VLBIStreamWriterBase, HeaderNotFoundError)
 from .header import Mark4Header
 from .payload import Mark4Payload
 from .frame import Mark4Frame
@@ -144,9 +144,6 @@ class Mark4FileReader(VLBIFileReaderBase):
             with self.temporary_offset():
                 self.seek(0)
                 ntrack = self.determine_ntrack(maximum=maximum)
-                if ntrack is None:
-                    raise ValueError("cannot determine ntrack automatically. "
-                                     "Try passing in an explicit value.")
 
         pattern = np.concatenate((np.zeros(ntrack // 8, dtype='u1'),
                                   np.full(32 * ntrack // 8, 0xff, dtype='u1')))
@@ -174,21 +171,28 @@ class Mark4FileReader(VLBIFileReaderBase):
         Returns
         -------
         ntrack : int or None
-            Number of Mark 4 bitstreams.  `None` if no frame was found.
+            Number of Mark 4 bitstreams.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no frame was found for any value of ntrack.
         """
         # Currently only 16, 32 and 64-track frames supported.
         old_ntrack = self.ntrack
-        for ntrack in 16, 32, 64:
+        trials = 16, 32, 64
+        for ntrack in trials:
+            self.ntrack = ntrack
             try:
-                self.ntrack = ntrack
-                if self.locate_frame(maximum=maximum) is not None:
-                    return ntrack
+                self.locate_frame(maximum=maximum)
+                return ntrack
             except Exception:
-                self.ntrack = old_ntrack
-                raise
+                pass
 
         self.ntrack = old_ntrack
-        return None
+        raise HeaderNotFoundError("cannot determine ntrack automatically. "
+                                  "(tried {}). Try passing in an "
+                                  "explicit value.".format(trials))
 
     def find_header(self, forward=True, maximum=None):
         """Find the nearest header from the current position.
@@ -205,15 +209,19 @@ class Mark4FileReader(VLBIFileReaderBase):
 
         Returns
         -------
-        header : :class:`~baseband.mark4.Mark4Header` or None
-            Retrieved Mark 4 header, or `None` if nothing found.
+        header : :class:`~baseband.mark4.Mark4Header`
+            Retrieved Mark 4 header.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no header could be located.
+        AssertionError
+            If the header did not pass verification.
         """
-        offset = self.locate_frame(forward=forward)
-        if offset is None:
-            return None
-        header = self.read_header()
-        self.fh_raw.seek(offset)
-        return header
+        self.locate_frame(forward=forward)
+        with self.temporary_offset():
+            return self.read_header()
 
 
 class Mark4FileWriter(VLBIFileBase):
@@ -308,10 +316,15 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         fh_raw = Mark4FileReader(fh_raw, ntrack=ntrack, decade=decade,
                                  ref_time=ref_time)
         # Find first header, determining ntrack if needed.
-        header0 = fh_raw.find_header()
-        assert header0 is not None, (
-            "could not find a first frame using ntrack={}. Perhaps "
-            "try ntrack=None for auto-determination.".format(ntrack))
+        try:
+            header0 = fh_raw.find_header()
+        except Exception as exc:
+            if ntrack is not None:
+                exc.args += ("could not find a first frame using ntrack={}. "
+                             "Perhaps try ntrack=None for auto-determination."
+                             .format(ntrack),)
+            raise exc
+
         self._offset0 = fh_raw.tell()
         super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
