@@ -194,35 +194,6 @@ class Mark4FileReader(VLBIFileReaderBase):
                                   "(tried {}). Try passing in an "
                                   "explicit value.".format(trials))
 
-    def find_header(self, forward=True, maximum=None):
-        """Find the nearest header from the current position.
-
-        If successful, the file pointer is left at the start of the header.
-
-        Parameters
-        ----------
-        forward : bool, optional
-            Seek forward if `True` (default), backward if `False`.
-        maximum : int, optional
-            Maximum number of bytes forward to search through.
-            Default: twice the frame size (``20000 * ntrack // 8``).
-
-        Returns
-        -------
-        header : :class:`~baseband.mark4.Mark4Header`
-            Retrieved Mark 4 header.
-
-        Raises
-        ------
-        ~baseband.vlbi_base.base.HeaderNotFoundError
-            If no header could be located.
-        AssertionError
-            If the header did not pass verification.
-        """
-        self.locate_frame(forward=forward)
-        with self.temporary_offset():
-            return self.read_header()
-
 
 class Mark4FileWriter(VLBIFileBase):
     """Simple writer for Mark 4 files.

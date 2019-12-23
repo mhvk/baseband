@@ -258,6 +258,29 @@ class VLBIFileReaderBase(VLBIFileBase):
 
         return locations
 
+    def find_header(self, *args, **kwargs):
+        """Find the nearest header from the current position.
+
+        If successful, the file pointer is left at the start of the header.
+
+        Parameters are as for ``locate_frames``.
+
+        Returns
+        -------
+        header
+            Retrieved header.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no header could be located.
+        AssertionError
+            If the header did not pass verification.
+        """
+        self.locate_frame(*args, **kwargs)
+        with self.temporary_offset():
+            return self.read_header()
+
     def get_frame_rate(self):
         """Determine the number of frames per second.
 

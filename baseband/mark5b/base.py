@@ -115,62 +115,18 @@ class Mark5BFileReader(VLBIFileReaderBase):
                     pass
             raise exc
 
-    def locate_frames(self, forward=True, maximum=None, check=1):
-        """Use the sync pattern to locate frames near the current position.
+    def locate_frames(self, pattern=None, **kwargs):
+        """Use a pattern to locate frame starts near the current position.
 
         Note that the current position is always included.
 
-        Parameters
-        ----------
-        forward : bool, optional
-            Seek forward if `True` (default), backward if `False`.
-        maximum : int, optional
-            Maximum number of bytes to search through.  Default: twice the
-            frame size of 10016 bytes (extra bytes for catching a
-            pattern just cut in half will be included automatically).
-        check : int or tuple of int, optional
-            Frame offsets where another sync pattern should be present.
-            Ignored if the file does not extend sufficiently.
-            Default: 1, i.e., a sync pattern should be present one
-            frame after the one found (independent of ``forward``).
-
-        Returns
-        -------
-        locations : list of int
-            Locations of sync patterns within the range scanned,
-            in order of proximity to the starting position.
+        Parameters are as for
+        `baseband.vlbi_base.base.VLBIFileReaderBase.locate_frames`
+        except that by default the Mark 5B sync pattern is used.
         """
-        # Note: frame_nbytes is fixed for Mark 5B
-        return super().locate_frames(pattern=0xABADDEED, frame_nbytes=10016,
-                                     forward=forward, maximum=maximum,
-                                     check=check)
-
-    def find_header(self, forward=True, maximum=None, check=1):
-        """Find the nearest header from the current position.
-
-        If successful, the file pointer is left at the start of the header.
-
-        Parameters
-        ----------
-        forward : bool, optional
-            Seek forward if `True` (default), backward if `False`.
-        maximum : int, optional
-            Maximum number of bytes to search through.  Default: twice the
-            frame size of 10016 bytes.
-        check : int or tuple of int, optional
-            Frame offsets where another sync pattern should be present.
-            Ignored if the file does not extend sufficiently.
-            Default: 1, i.e., a sync pattern should be present one
-            frame after the one found (independent of ``forward``).
-
-        Returns
-        -------
-        header : :class:`~baseband.mark5b.Mark5BHeader` or None
-            Retrieved Mark 5B header, or `None` if nothing found.
-        """
-        self.locate_frame(forward=forward, maximum=maximum, check=check)
-        with self.temporary_offset():
-            return self.read_header()
+        if pattern is None:
+            pattern = Mark5BHeader
+        return super().locate_frames(pattern, **kwargs)
 
 
 class Mark5BFileWriter(VLBIFileBase):

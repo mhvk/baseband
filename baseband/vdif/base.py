@@ -7,7 +7,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase)
+                              VLBIStreamWriterBase, HeaderNotFoundError)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 from .file_info import VDIFFileReaderInfo
@@ -157,13 +157,16 @@ class VDIFFileReader(VLBIFileReaderBase):
                     pass
             raise exc
 
-    def find_header(self, template_header=None, frame_nbytes=None, edv=None,
-                    maximum=None, forward=True, check=1):
+    def find_header(self, template_header=None, *, edv=None, frame_nbytes=None,
+                    forward=True, maximum=None, check=1):
         """Find the nearest header from the current position.
 
         Search for a valid header at a given position which is consistent with
-        ``template_header`` or with a header a frame size ahead.   Note that
-        the latter turns out to be an unexpectedly weak check on real data!
+        ``template_header`` and/or with a header a frame size ahead.  Note
+        that the search is much slower if no template is given, as at every
+        position it is tried to read a header, and then check for another one
+        one frame ahead.  It helps to pass in ``edv`` and ``frame_nbytes``
+        (if known).
 
         If successful, the file pointer is left at the start of the header.
 
@@ -171,35 +174,37 @@ class VDIFFileReader(VLBIFileReaderBase):
         ----------
         template_header : `~baseband.vdif.VDIFHeader`
             If given, used to infer the frame size and EDV.
-        frame_nbytes : int
-            Frame size in bytes, used if ``template_header`` is not given.
         edv : int
             EDV of the header, used if ``template_header`` is not given.
-        maximum : int, optional
-            Maximum number of bytes forward to search through.
-            Default: twice the frame size (if given), otherwise 1000000
-            if a template_header is present, and 10000 if not.
+        frame_nbytes : int, optional
+            Frame size in bytes.  Defaults to the frame size in any header
+            passed in.
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default: twice the
+            frame size if given, otherwise 10000.
         check : int or tuple of int, optional
-            Frame offsets where another header should be present
-            (if inside the file).  Default: 1, i.e., a sync pattern should
-            be present one frame after the one found (independent of
-            ``forward``), thus helping to guarantee the frame is OK.
+            Frame offsets where another header should be present.
+            Default: 1, i.e., a sync pattern should be present one
+            frame after the one found (independent of ``forward``),
+            thus helping to guarantee the frame is not corrupted.
 
         Returns
         -------
-        header : :class:`~baseband.vdif.VDIFHeader` or None
-            Retrieved VDIF header, or `None` if nothing found.
-        """
-        if template_header is not None:
-            pos = self.locate_frame(template_header, forward=forward,
-                                    maximum=maximum, check=check)
-            if pos is None:
-                return None
+        header : :class:`~baseband.vdif.VDIFHeader`
+            Retrieved VDIF header.
 
-            with self.temporary_offset():
-                return self.read_header()
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no header could be located.
+        AssertionError
+            If the header did not pass verification.
+        """
+        if isinstance(template_header, VDIFHeader):
+            return super().find_header(template_header, forward=forward,
+                                       maximum=maximum, check=check)
 
         if maximum is None:
             maximum = 10000 if frame_nbytes is None else 2 * frame_nbytes
@@ -227,12 +232,13 @@ class VDIFFileReader(VLBIFileReaderBase):
 
             # Possible hit!
             self.seek(frame)
-            if frame in self.locate_frames(header, maximum=1):
-                # Keep offset at header location
-                return header
+            try:
+                return super().find_header(header, maximum=1, check=check)
+            except Exception:
+                continue
 
         self.seek(file_pos)
-        return None
+        raise HeaderNotFoundError("could not locate a nearby header.")
 
 
 class VDIFFileWriter(VLBIFileBase):
