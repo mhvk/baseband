@@ -96,8 +96,9 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         try:
             with self._parent.temporary_offset() as fh:
                 fh.seek(0)
-                self.offset0 = fh.locate_frame()
-                return fh.read_header()
+                header = fh.find_header()
+                self.offset0 = fh.tell()
+                return header
 
         except Exception as exc:
             self.errors['header0'] = exc

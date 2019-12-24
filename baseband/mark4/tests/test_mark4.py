@@ -315,8 +315,9 @@ class TestMark4:
 
     def test_binary_file_reader(self):
         with mark4.open(SAMPLE_FILE, 'rb', decade=2010, ntrack=64) as fh:
-            fh.locate_frame()
-            assert fh.tell() == 0xa88
+            locations = fh.locate_frames()
+            assert locations == [0xa88, 0xa88+64*2500]
+            fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, decade=2010, ntrack=64)
             fh.seek(0xa88)
             header2 = fh.read_header()
@@ -580,31 +581,31 @@ class TestMark4:
 
     def test_determine_ntrack(self):
         with mark4.open(SAMPLE_FILE, 'rb', ntrack=64) as fh:
-            offset0 = fh.locate_frame()
-            assert offset0 == 2696
+            offsets = fh.locate_frames()
+            assert offsets[0] == 2696
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             assert fh.ntrack is None
             ntrack = fh.determine_ntrack()
             assert ntrack == fh.ntrack == 64
-            assert fh.fh_raw.tell() == offset0
+            assert fh.fh_raw.tell() == offsets[0]
 
         with mark4.open(SAMPLE_32TRACK, 'rb', ntrack=32) as fh:
             # Seek past first frame header; find second frame.
             fh.seek(10000)
-            offset0 = fh.locate_frame()
-            assert offset0 == 89656
+            offsets = fh.locate_frames()
+            assert offsets[0] == 89656
         with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
             fh.seek(10000)
             ntrack = fh.determine_ntrack()
-            assert fh.fh_raw.tell() == offset0
+            assert fh.fh_raw.tell() == offsets[0]
             assert ntrack == fh.ntrack == 32
 
         with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb', ntrack=32) as fh:
-            offset0 = fh.locate_frame()
-            assert offset0 == 17436
+            offsets = fh.locate_frames()
+            assert offsets[0] == 17436
         with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
             ntrack = fh.determine_ntrack()
-            assert fh.fh_raw.tell() == offset0
+            assert fh.fh_raw.tell() == offsets[0]
             assert ntrack == fh.ntrack == 32
             assert fh.ntrack == 32
 
@@ -850,9 +851,9 @@ class TestMark4:
 
 
 class Test32TrackFanout4():
-    def test_locate_frame(self):
+    def test_locate_frames(self):
         with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
-            assert fh.locate_frame() == 9656
+            assert fh.locate_frames() == [9656, 9656+32*2500]
             assert fh.ntrack == 32
 
     def test_header(self):
@@ -913,9 +914,9 @@ class Test32TrackFanout4():
 
 
 class Test32TrackFanout2():
-    def test_locate_frame(self):
+    def test_locate_frames(self):
         with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
-            assert fh.locate_frame() == 17436
+            assert fh.locate_frames() == [17436, 17436+32*2500]
             assert fh.ntrack == 32
 
     def test_header(self):
@@ -976,9 +977,9 @@ class Test32TrackFanout2():
 
 
 class Test16TrackFanout4():
-    def test_locate_frame(self):
+    def test_locate_frames(self):
         with mark4.open(SAMPLE_16TRACK, 'rb') as fh:
-            assert fh.locate_frame() == 22124
+            assert fh.locate_frames() == [22124, 22124+16*2500]
             assert fh.ntrack == 16
 
     def test_header(self):

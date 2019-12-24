@@ -101,28 +101,6 @@ class VLBIFileReaderBase(VLBIFileBase):
 
     info = VLBIFileReaderInfo()
 
-    def locate_frame(self, *args, **kwargs):
-        """Use a pattern to locate the frame nearest the current position.
-
-        Like ``locate_frames``, but selects the closest frame and leaves
-        the file pointer at its position.
-
-        Returns
-        -------
-        location : int
-            The location of the file pointer.
-
-        Raises
-        ------
-        ~baseband.vlbi_base.base.HeaderNotFoundError
-            If no frame was found.
-        """
-        locations = self.locate_frames(*args, **kwargs)
-        if not locations:
-            raise HeaderNotFoundError('could not locate a a nearby frame.')
-
-        return self.seek(locations[0])
-
     def locate_frames(self, pattern, *, mask=None, frame_nbytes=None,
                       offset=0, forward=True, maximum=None, check=1):
         """Use a pattern to locate frame starts near the current position.
@@ -131,14 +109,15 @@ class VLBIFileReaderBase(VLBIFileBase):
 
         Parameters
         ----------
-        pattern : header, array of byte, bytes, iterable of int, string or int
-            Synchronization pattern to look for.  If a string or int,
-            it is interpreted as hexadecimal, and converted to an array,
-            with least significant byte first.  If a header or header class,
+        pattern : header, ~numpy.ndaray, bytes, int, or iterable of int
+            Synchronization pattern to look for.  If a header or header class,
             :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariant_pattern`
             is used to create a masked pattern, using invariant keys from
             :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariants`.
-        mask : array of byte, bytes, iterable of int, string or int
+            If an `~numpy.ndarray` or `bytes` instance, a byte array view is
+            taken. If an (iterable of) int, the integers need to be unsigned
+            32 bit and will be interpreted as little-endian.
+        mask : ~numpy.ndarray, bytes, int, or iterable of int.
             Bit mask for the pattern, with 1 indicating a given bit will
             be used the comparison.
         frame_nbytes : int, optional
@@ -153,7 +132,8 @@ class VLBIFileReaderBase(VLBIFileBase):
         maximum : int, optional
             Maximum number of bytes to search through.  Default: twice the
             frame size if given, otherwise 1 million (extra bytes to avoid
-            partial patterns will be added).
+            partial patterns will be added). Use 1 to check only at the
+            current position.
         check : int or tuple of int, optional
             Frame offsets where another sync pattern should be present
             (if inside the file). Ignored if ``frame_nbytes`` is not given.
@@ -184,6 +164,9 @@ class VLBIFileReaderBase(VLBIFileBase):
 
         if maximum is None:
             maximum = 2 * frame_nbytes if frame_nbytes else 1000000
+
+        if maximum <= 0:
+            raise ValueError('maximum must be at least 1.')
 
         if frame_nbytes is None:
             frame_nbytes = 0
@@ -246,7 +229,7 @@ class VLBIFileReaderBase(VLBIFileBase):
         # Keep only matches for which
         # (1) the location is in the requested base range,
         # (2) the associated frames completely fits in the file, and
-        # (3) the patterns is also present at the requested check points.
+        # (3) the pattern is also present at the requested check points.
         # Matches are relative to start, with offset included.
         loc_start = max(seek_start, 0) + offset - start
         loc_stop = min(seek_start+maximum,
@@ -277,7 +260,10 @@ class VLBIFileReaderBase(VLBIFileBase):
         AssertionError
             If the header did not pass verification.
         """
-        self.locate_frame(*args, **kwargs)
+        locations = self.locate_frames(*args, **kwargs)
+        if not locations:
+            raise HeaderNotFoundError('could not locate a a nearby frame.')
+        self.seek(locations[0])
         with self.temporary_offset():
             return self.read_header()
 

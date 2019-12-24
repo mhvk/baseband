@@ -157,13 +157,14 @@ class VDIFFileReader(VLBIFileReaderBase):
                     pass
             raise exc
 
-    def find_header(self, template_header=None, *, edv=None, frame_nbytes=None,
+    def find_header(self, pattern=None, *, edv=None, mask=None,
+                    frame_nbytes=None, offset=0,
                     forward=True, maximum=None, check=1):
         """Find the nearest header from the current position.
 
         Search for a valid header at a given position which is consistent with
-        ``template_header`` and/or with a header a frame size ahead.  Note
-        that the search is much slower if no template is given, as at every
+        ``pattern`` and/or with a header a frame size ahead.  Note
+        that the search is much slower if no pattern is given, as at every
         position it is tried to read a header, and then check for another one
         one frame ahead.  It helps to pass in ``edv`` and ``frame_nbytes``
         (if known).
@@ -172,13 +173,22 @@ class VDIFFileReader(VLBIFileReaderBase):
 
         Parameters
         ----------
-        template_header : `~baseband.vdif.VDIFHeader`
-            If given, used to infer the frame size and EDV.
+        pattern : `~baseband.vdif.VDIFHeader`, array of byte, or compatible
+            If given, used for a direct search.
         edv : int
-            EDV of the header, used if ``template_header`` is not given.
+            EDV of the header, used if ``pattern`` is not given.
+        mask : array of byte, bytes, iterable of int, string or int
+            Bit mask for the pattern, with 1 indicating a given bit will
+            be used the comparison.  Only used with ``pattern`` and not
+            needed if ``pattern`` is a header.
         frame_nbytes : int, optional
             Frame size in bytes.  Defaults to the frame size in any header
             passed in.
+        offset : int, optional
+            Offset from the frame start that the pattern occurs.  Any
+            offsets inferred from masked entries are added to this (hence,
+            no offset needed when a header is passed in as ``pattern``,
+            nor is an offset needed for a full search).
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
@@ -202,10 +212,12 @@ class VDIFFileReader(VLBIFileReaderBase):
         AssertionError
             If the header did not pass verification.
         """
-        if isinstance(template_header, VDIFHeader):
-            return super().find_header(template_header, forward=forward,
-                                       maximum=maximum, check=check)
+        if pattern is not None:
+            return super().find_header(
+                pattern, mask=mask, frame_nbytes=frame_nbytes, offset=offset,
+                forward=forward, maximum=maximum, check=check)
 
+        # Try reading headers at a set of locations.
         if maximum is None:
             maximum = 10000 if frame_nbytes is None else 2 * frame_nbytes
 
@@ -218,7 +230,7 @@ class VDIFFileReader(VLBIFileReaderBase):
         else:
             iterate = range(min(file_pos, file_nbytes-31),
                             max(file_pos-maximum, -1), -1)
-        # Loop over chunks to try to find the frame marker.
+        # Loop over all of them to try to find the frame marker.
         for frame in iterate:
             self.seek(frame)
             try:
@@ -230,7 +242,7 @@ class VDIFFileReader(VLBIFileReaderBase):
                     and frame_nbytes != header.frame_nbytes):
                 continue
 
-            # Possible hit!
+            # Possible hit!  Try if there are other headers right around.
             self.seek(frame)
             try:
                 return super().find_header(header, maximum=1, check=check)
@@ -427,8 +439,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             while not found:
                 fh_raw.seek(-self.header0.frame_nbytes, 1)
                 last_header = fh_raw.find_header(
-                    template_header=self.header0,
-                    maximum=maximum, forward=False)
+                    self.header0, maximum=maximum, forward=False)
                 if last_header is None or (raw_size - fh_raw.tell() > maximum):
                     raise ValueError("corrupt VDIF? No thread_id={0} frame "
                                      "in last {1} bytes."

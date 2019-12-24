@@ -52,10 +52,10 @@ def byte_array(pattern):
 
     Parameters
     ----------
-    pattern : array, bytes, int, or iterable of int
-        Pattern to convert.  If an array or `bytes` instance, a byte array
-        view is taken.  If an (iterable of) int, the integers need to be
-        unsigned 32 bit and will be interpreted as little-endian.
+    pattern : ~numpy.ndarray, bytes, int, or iterable of int
+        Pattern to convert.  If a `~numpy.ndarray` or `bytes` instance,
+        a byte array view is taken.  If an (iterable of) int, the integers
+        need to be unsigned 32 bit and will be interpreted as little-endian.
 
     Returns
     -------

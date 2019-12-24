@@ -1,6 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 import numpy as np
-from astropy.utils import lazyproperty
+from astropy.utils import lazyproperty, deprecated
 import astropy.units as u
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
@@ -94,9 +94,8 @@ class Mark4FileReader(VLBIFileReaderBase):
         """
         with self.temporary_offset():
             self.seek(0)
-            self.locate_frame()
-            header0 = self.read_header()
-            self.seek(header0.payload_nbytes, 1)
+            header0 = self.find_header()
+            self.seek(header0.frame_nbytes, 1)
             header1 = self.read_header()
 
         # Mark 4 specification states frames-lengths range from 1.25 ms
@@ -115,7 +114,7 @@ class Mark4FileReader(VLBIFileReaderBase):
 
         This reflects 'sync_pattern' of 0xffffffff for a given header and one
         a frame ahead, which is in word 2, plus the msb of word 1, which is
-        the highest bit of 2 in 'headerstack_id' (always 0 or 1, so safe).
+        the highest bit of 2 in 'headstack_id' (always 0 or 1, so safe).
 
         If the file does not have ntrack is set, it will be auto-determined.
 
@@ -184,7 +183,7 @@ class Mark4FileReader(VLBIFileReaderBase):
         for ntrack in trials:
             self.ntrack = ntrack
             try:
-                self.locate_frame(maximum=maximum)
+                self.find_header(maximum=maximum)
                 return ntrack
             except Exception:
                 pass
@@ -193,6 +192,29 @@ class Mark4FileReader(VLBIFileReaderBase):
         raise HeaderNotFoundError("cannot determine ntrack automatically. "
                                   "(tried {}). Try passing in an "
                                   "explicit value.".format(trials))
+
+    @deprecated(since='3.1', alternative='locate_frames or find_header')
+    def locate_frame(self, *args, **kwargs):
+        """Use a pattern to locate the frame nearest the current position.
+
+        Like ``locate_frames``, but selects the closest frame and leaves
+        the file pointer at its position.
+
+        Returns
+        -------
+        location : int
+            The location of the file pointer.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no frame was found.
+        """
+        locations = self.locate_frames(*args, **kwargs)
+        if not locations:
+            raise HeaderNotFoundError('could not locate a a nearby frame.')
+
+        return self.seek(locations[0])
 
 
 class Mark4FileWriter(VLBIFileBase):

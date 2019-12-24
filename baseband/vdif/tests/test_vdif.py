@@ -735,8 +735,7 @@ class TestVDIF:
                                            forward=True)
             assert fh.tell() == 3 * header0.frame_nbytes
             fh.seek(20128)
-            header_20128f = fh.find_header(template_header=header0,
-                                           forward=True)
+            header_20128f = fh.find_header(header0, forward=True)
             assert fh.tell() == 4 * header0.frame_nbytes
             fh.seek(16)
             header_16b = fh.find_header(frame_nbytes=header0.frame_nbytes,
@@ -752,15 +751,13 @@ class TestVDIF:
             assert fh.tell() == 15 * header0.frame_nbytes
             fh.seek(-20, 2)
             with pytest.raises(HeaderNotFoundError):
-                fh.find_header(template_header=header0, forward=True)
+                fh.find_header(header0, forward=True)
             # Just before a header.
             fh.seek(40254)
-            header_40254f = fh.find_header(template_header=header0,
-                                           forward=True)
+            header_40254f = fh.find_header(header0, forward=True)
             assert fh.tell() == 8 * header0.frame_nbytes
             fh.seek(40254)
-            header_40254b = fh.find_header(template_header=header0,
-                                           forward=False)
+            header_40254b = fh.find_header(header0, forward=False)
             assert fh.tell() == 7 * header0.frame_nbytes
 
         # thread order = 1,3,5,7,0,2,4,6
@@ -794,11 +791,10 @@ class TestVDIF:
             s.write(f.read())
             with vdif.open(s, 'rb') as fh:
                 fh.seek(0)
-                header_0 = fh.find_header(template_header=header0)
+                header_0 = fh.find_header(header0)
                 assert fh.tell() == 0
                 fh.seek(5000)
-                header_5000ft = fh.find_header(template_header=header0,
-                                               forward=True)
+                header_5000ft = fh.find_header(header0, forward=True)
                 assert fh.tell() == header0.frame_nbytes * 2 - 4900
                 header_5000f = fh.find_header(
                     frame_nbytes=header0.frame_nbytes, forward=True)

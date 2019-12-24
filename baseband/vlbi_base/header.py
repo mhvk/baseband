@@ -561,7 +561,7 @@ class VLBIHeaderBase:
         """Set the value of a particular header item in the header words.
 
         If value is `None`, set the item to its default value (if it exists);
-        if `Ttue, set all bits in the item (i.e., set item to its maximum).
+        if `True`, set all bits in the item (i.e., set item to its maximum).
         """
         try:
             self._header_parser.setters[item](self.words, value)
