@@ -16,7 +16,7 @@ import numpy as np
 from astropy.utils import sharedmethod, classproperty
 
 
-__all__ = ['four_word_struct', 'eight_word_struct',
+__all__ = ['fixedvalue', 'four_word_struct', 'eight_word_struct',
            'make_parser', 'make_setter',
            'HeaderProperty', 'HeaderPropertyGetter',
            'HeaderParser', 'VLBIHeaderBase']
@@ -304,6 +304,10 @@ class VLBIHeaderBase:
     # TODO: should [_stream]_invarants be defined through some subclass init??
     # TODO: perhaps from some hints in the headerparser definition?
 
+    # Define a bare _struct to avoid sphinx complaints about nbytes.
+    _struct = struct.Struct('')
+    """Structure for the header words.  To be overridden by subclasses."""
+
     _properties = ('payload_nbytes', 'frame_nbytes', 'time')
     """Properties accessible/usable in initialisation for all headers."""
 
@@ -364,7 +368,7 @@ class VLBIHeaderBase:
         """Pattern and mask shared between headers of a type or stream.
 
         This is mostly for use inside
-        :meth:`~baseband.vlbi_base.VLBIFileReaderBase.locate_frames`.
+        :meth:`~baseband.vlbi_base.base.VLBIFileReaderBase.locate_frames`.
 
         Parameters
         ----------
@@ -572,6 +576,7 @@ class VLBIHeaderBase:
                 raise
 
     def keys(self):
+        """All keys defined for this header."""
         return self._header_parser.keys()
 
     def _ipython_key_completions_(self):

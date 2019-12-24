@@ -135,9 +135,9 @@ class VLBIFileReaderBase(VLBIFileBase):
             Synchronization pattern to look for.  If a string or int,
             it is interpreted as hexadecimal, and converted to an array,
             with least significant byte first.  If a header or header class,
-            :meth:`~baseband.vlbi_base.VLBIHeaderBase.invariant_pattern`
+            :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariant_pattern`
             is used to create a masked pattern, using invariant keys from
-            :meth:`~baseband.vlbi_base.VLBIHeaderBase.invariants`.
+            :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariants`.
         mask : array of byte, bytes, iterable of int, string or int
             Bit mask for the pattern, with 1 indicating a given bit will
             be used the comparison.

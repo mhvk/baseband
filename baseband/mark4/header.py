@@ -153,6 +153,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
     """Properties accessible/usable in initialisation."""
 
     decade = None
+    """Decade of year, to complement 'bcd_unit_year' from header."""
 
     def __init__(self, words, decade=None, ref_time=None, verify=True):
         if decade is not None:
@@ -183,6 +184,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
 
     @property
     def track_id(self):
+        """Track identifier (decoded from 'bcd_track_id')."""
         return bcd_decode(self['bcd_track_id'])
 
     @track_id.setter
@@ -229,6 +231,13 @@ class Mark4TrackHeader(VLBIHeaderBase):
                     format='yday', scale='utc', precision=5)
 
     def set_time(self, time):
+        """Convert Time object to BCD timestamp elements.
+
+        Parameters
+        ----------
+        time : `~astropy.time.Time`
+            The time to use for this header.
+        """
         old_precision = time.precision
         try:
             time.precision = 5

@@ -80,6 +80,7 @@ class Mark5BHeader(VLBIHeaderBase):
     """Properties accessible/usable in initialisation."""
 
     kday = None
+    """Thousands of MJD, to complement ``jday`` from header."""
 
     def __init__(self, words, kday=None, ref_time=None, verify=True):
         if kday is not None:
