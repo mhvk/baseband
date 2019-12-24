@@ -318,17 +318,13 @@ class VDIFStreamBase(VLBIStreamBase):
             complex_data=header0['complex_data'], squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
 
-        self._frame_rate = int((self.sample_rate / self.samples_per_frame)
-                               .to(u.Hz).round().value)
-
     def _get_time(self, header):
         """Get time from a header.
 
         This passes on sample rate, since not all VDIF headers can calculate
         it.
         """
-        return header.get_time(frame_rate=self.sample_rate
-                               / self.samples_per_frame)
+        return header.get_time(frame_rate=self._frame_rate)
 
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
@@ -461,16 +457,19 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
         return data
 
-    def _read_frame(self, index):
+    # Overrides to deal with framesets instead of frames.
+    def _seek_frame(self, index):
         self.fh_raw.seek(index * self._frameset_nbytes)
-        frameset = self.fh_raw.read_frameset(self._thread_ids,
-                                             edv=self.header0.edv,
-                                             verify=self.verify)
-        frameset.fill_value = self.fill_value
-        assert ((frameset['seconds'] - self.header0['seconds'])
-                * self._frame_rate
-                + frameset['frame_nr'] - self.header0['frame_nr']) == index
-        return frameset
+
+    def _fh_raw_read_frame(self):
+        return self.fh_raw.read_frameset(self._thread_ids,
+                                         edv=self.header0.edv,
+                                         verify=self.verify)
+
+    def _tell_frame(self, frame):
+        return int(round((frame['seconds'] - self.header0['seconds'])
+                         * self._frame_rate.to_value(u.Hz)
+                         + frame['frame_nr'] - self.header0['frame_nr']))
 
 
 class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
@@ -558,7 +557,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
 
     def _make_frame(self, index):
         dt, frame_nr = divmod(index + self.header0['frame_nr'],
-                              self._frame_rate)
+                              int(self._frame_rate.to_value(u.Hz)))
         seconds = self.header0['seconds'] + dt
         # Reuse frameset.
         self._frameset['seconds'] = seconds

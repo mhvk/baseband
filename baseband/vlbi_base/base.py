@@ -314,6 +314,7 @@ class VLBIStreamBase:
         self._complex_data = complex_data
         self.samples_per_frame = samples_per_frame
         self.sample_rate = sample_rate
+        self._frame_rate = (sample_rate / samples_per_frame).to(u.Hz)
         self.offset = 0
         self._fill_value = fill_value
 
@@ -760,6 +761,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 self._frame_index = frame_index
 
             frame = self._frame
+
             nsample = min(count, len(frame) - sample_offset)
             data = frame[sample_offset:sample_offset + nsample]
             data = self._squeeze_and_subset(data)
@@ -771,6 +773,34 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             count -= nsample
 
         return out
+
+    def _read_frame(self, index):
+        """Base implementation of reading a frame.
+
+        This contains multiple pieces which subclasses can override as
+        needed (or override the whole thing).
+        """
+        self._seek_frame(index)
+        frame = self._fh_raw_read_frame()
+        if self.verify:
+            frame_index = self._tell_frame(frame)
+            assert frame_index == index, \
+                'wrong frame: wanted {}, found {}'.format(index, frame_index)
+        frame.fill_value = self.fill_value
+        return frame
+
+    def _seek_frame(self, index):
+        """Move the underlying file pointer to the frame of the given index."""
+        self.fh_raw.seek(index * self.header0.frame_nbytes)
+
+    def _fh_raw_read_frame(self):
+        """Read a frame at the current position of the underlying file."""
+        return self.fh_raw.read_frame(verify=self.verify)
+
+    def _tell_frame(self, frame):
+        """Get the index of the frame relative to the first frame."""
+        dt = self._get_time(frame) - self.start_time
+        return int(round((dt * self._frame_rate).to_value(u.one)))
 
 
 class VLBIStreamWriterBase(VLBIStreamBase):

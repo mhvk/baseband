@@ -33,6 +33,8 @@ Other Changes and Additions
 - The the Mark 4 file reader's ``locate_frame`` has been deprecated. Its
   functionality is replaced by ``locate_frames`` and ``find_header``. [#354]
 
+- Custom stream readers can now override only part of reading a given frame
+  and testing that it is the right one. [#355]
 
 3.0 (2019-08-28)
 ================
