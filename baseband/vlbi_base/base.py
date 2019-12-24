@@ -236,7 +236,7 @@ class VLBIFileReaderBase(VLBIFileBase):
             match = strided[matches] == pattern[1:]
         else:
             match = ((strided[matches] ^ pattern[1:]) & mask[1:]) == 0
-        matches = matches[match.all(1)]
+        matches = matches[match.all(-1)]
 
         if not forward:
             # Order by proximity to the file position.
