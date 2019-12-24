@@ -7,15 +7,16 @@ corresponding to a frame header, providing access to the values encoded in
 via a dict-like interface.  Definitions for headers are constructed using
 the HeaderParser class.
 """
-from copy import copy
 import struct
 import warnings
+from copy import copy
 from collections import OrderedDict
 
 import numpy as np
+from astropy.utils import sharedmethod, classproperty
 
 
-__all__ = ['four_word_struct', 'eight_word_struct',
+__all__ = ['fixedvalue', 'four_word_struct', 'eight_word_struct',
            'make_parser', 'make_setter',
            'HeaderProperty', 'HeaderPropertyGetter',
            'HeaderParser', 'VLBIHeaderBase']
@@ -24,6 +25,20 @@ four_word_struct = struct.Struct('<4I')
 """Struct instance that packs/unpacks 4 unsigned 32-bit integers."""
 eight_word_struct = struct.Struct('<8I')
 """Struct instance that packs/unpacks 8 unsigned 32-bit integers."""
+
+
+class fixedvalue(classproperty):
+    """Property that is fixed for all instances of a class.
+
+    Based on `astropy.utils.decorators.classproperty`, but with
+    a setter that passes if the value is identical to the fixed
+    value, and otherwise raises a `ValueError`.
+    """
+    def __set__(self, instance, value):
+        fixed_value = self.__get__(instance, type(instance))
+        if value != fixed_value:
+            raise ValueError('fixed property can only be set to {}.'
+                             .format(fixed_value))
 
 
 def make_parser(word_index, bit_index, bit_length, default=None):
@@ -66,7 +81,7 @@ def make_parser(word_index, bit_index, bit_length, default=None):
         assert bit_index == 0
 
         def parser(words):
-            return words[word_index] + words[word_index + 1] * (1 << 32)
+            return words[word_index] + (words[word_index + 1] << 32)
 
     else:
         bit_mask = (1 << bit_length) - 1  # e.g., bit_length=8 -> 0xff
@@ -106,11 +121,14 @@ def make_setter(word_index, bit_index, bit_length, default=None):
         To be used as ``setter(words, value)``.
     """
     def setter(words, value):
-        if value is None and default is not None:
-            value = default
         bit_mask = (1 << bit_length) - 1
-        # Check that value will fit within the bit limits.
-        if np.any(value & bit_mask != value):
+        if value is None:
+            if default is None:
+                raise ValueError("no default value so cannot set to 'None'.")
+            value = default
+        elif value is True:
+            value = bit_mask
+        elif np.any(value & bit_mask != value):
             raise ValueError("{0} cannot be represented with {1} bits"
                              .format(value, bit_length))
         if bit_length == 64:
@@ -118,13 +136,12 @@ def make_setter(word_index, bit_index, bit_length, default=None):
             word2 = value >> 32
             words[word_index] = word1
             words[word_index + 1] = word2
-            return words
-
-        word = words[word_index]
-        # Zero the part to be set, and add the value.
-        bit_mask <<= bit_index
-        word = ((word | bit_mask) ^ bit_mask) | (value << bit_index)
-        words[word_index] = word
+        else:
+            word = words[word_index]
+            # Zero the part to be set, and add the value.
+            bit_mask <<= bit_index
+            word = ((word | bit_mask) ^ bit_mask) | (value << bit_index)
+            words[word_index] = word
         return words
 
     return setter
@@ -252,31 +269,44 @@ class VLBIHeaderBase:
 
     Generally, the actual class should define:
 
-      _struct: `~struct.Struct` instance that can pack/unpack header words.
+      _struct : `~struct.Struct` instance that can pack/unpack header words.
 
-      _header_parser: `HeaderParser` instance corresponding to this class.
+      _header_parser : `HeaderParser` instance corresponding to this class.
 
-      _properties: tuple of properties accessible/usable in initialisation
+      _properties : tuple of properties accessible/usable in initialisation
 
-    It also should define properties (getters *and* setters):
+      _invariants : set of keys of invariant header parts for a given type.
 
-      payload_nbytes: number of bytes used by payload
+      _stream_invarants : set of keys of invariant header parts for a stream.
 
-      frame_nbytes: total number of bytes for header + payload
+    It also should define properties that tell the size (getters *and*
+    setters, or use a `baseband.vlbi_base.header.fixedvalue` if the
+    value is the same for all instances):
 
-      get_time, set_time, and a corresponding time property:
+      payload_nbytes : number of bytes used by payload
+
+      frame_nbytes : total number of bytes for header + payload
+
+      get_time, set_time, and a corresponding time property :
            time at start of payload
 
     Parameters
     ----------
     words : tuple or list of int, or None
-        header words (generally, 32 bit unsigned int).  If `None`,
-        set to a list of zeros for later initialisation.  If given as a tuple,
-        the header is immutable.
-    verify : bool
+        header words (generally, 32 bit unsigned int).  If given as a tuple,
+        the header is immutable.  If `None`, set to a list of zeros for
+        later initialisation (and skip any verification).
+    verify : bool, optional
         Whether to do basic verification of integrity.  For the base class,
         checks that the number of words is consistent with the struct size.
     """
+
+    # TODO: should [_stream]_invarants be defined through some subclass init??
+    # TODO: perhaps from some hints in the headerparser definition?
+
+    # Define a bare _struct to avoid sphinx complaints about nbytes.
+    _struct = struct.Struct('')
+    """Structure for the header words.  To be overridden by subclasses."""
 
     _properties = ('payload_nbytes', 'frame_nbytes', 'time')
     """Properties accessible/usable in initialisation for all headers."""
@@ -286,8 +316,8 @@ class VLBIHeaderBase:
             self.words = [0] * (self._struct.size // 4)
         else:
             self.words = words
-        if verify:
-            self.verify()
+            if verify:
+                self.verify()
 
     def verify(self):
         """Verify that the length of the words is consistent.
@@ -309,10 +339,84 @@ class VLBIHeaderBase:
     def __copy__(self):
         return self.copy()
 
-    @property
-    def nbytes(self):
+    @sharedmethod
+    def invariants(self):
+        """Set of keys of invariant header parts.
+
+        On the class, this returns keys of parts that are shared by
+        all headers for the type, on an instance, those that are
+        shared with other headers in the same file.
+
+        If neither are defined, returns 'sync_pattern' if the header
+        containts that key.
+        """
+
+        if not isinstance(self, type) and hasattr(self, '_stream_invariants'):
+            return self._stream_invariants
+
+        elif hasattr(self, '_invariants'):
+            return self._invariants
+
+        elif 'sync_pattern' in getattr(self, '_header_parser', {}):
+            return {'sync_pattern'}
+
+        else:
+            return set()
+
+    @sharedmethod
+    def invariant_pattern(self, invariants=None):
+        """Pattern and mask shared between headers of a type or stream.
+
+        This is mostly for use inside
+        :meth:`~baseband.vlbi_base.base.VLBIFileReaderBase.locate_frames`.
+
+        Parameters
+        ----------
+        invariants : set of str, optional
+            Set of keys to header parts that are shared between all headers
+            of a given type or within a given stream/file.  Default: from
+            `~baseband.vlbi_base.header.VLBIHeaderBase.invariants()`.
+
+        Returns
+        -------
+        pattern : list of int
+            The pattern that is shared between headers. If called on
+            an instance, just the header words; if called on a class,
+            words with defaults for the relevant parts set.
+        mask : list of int
+            For each entry in ``pattern`` a bit mask with bits set for
+            the parts that are invariant.
+        """
+
+        if invariants is None:
+            invariants = self.invariants()
+
+        if not invariants:
+            raise ValueError("cannot create an invariant_mask without "
+                             "some invariants")
+
+        if isinstance(self, type):
+            # If we are called as a classmethod, first get an instance
+            # with all defaults set.  This will be our pattern.
+            self = self(None)
+            for invariant in invariants:
+                value = self._header_parser.defaults[invariant]
+                if value is None:
+                    raise ValueError('can only set as invariant a header '
+                                     'part that has a default.')
+                self[invariant] = value
+
+        # Create an all-zero version and set bits for all invariants.
+        mask = self.__class__(None)
+        for invariant in invariants:
+            mask[invariant] = True
+
+        return self.words, mask.words
+
+    @fixedvalue
+    def nbytes(cls):
         """Size of the header in bytes."""
-        return self._struct.size
+        return cls._struct.size
 
     @property
     def mutable(self):
@@ -454,7 +558,11 @@ class VLBIHeaderBase:
                            .format(self.__class__.__name__, item))
 
     def __setitem__(self, item, value):
-        """Set the value of a particular header item in the header words."""
+        """Set the value of a particular header item in the header words.
+
+        If value is `None`, set the item to its default value (if it exists);
+        if `True`, set all bits in the item (i.e., set item to its maximum).
+        """
         try:
             self._header_parser.setters[item](self.words, value)
         except KeyError:
@@ -468,6 +576,7 @@ class VLBIHeaderBase:
                 raise
 
     def keys(self):
+        """All keys defined for this header."""
         return self._header_parser.keys()
 
     def _ipython_key_completions_(self):

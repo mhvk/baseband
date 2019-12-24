@@ -10,6 +10,7 @@ https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 A little bit on the disk representation is at
 https://ui.adsabs.harvard.edu/abs/2003ASPC..306..123W
 """
+import struct
 
 import numpy as np
 from astropy.time import Time
@@ -138,23 +139,28 @@ class Mark4TrackHeader(VLBIHeaderBase):
          ('bcd_fraction', (4, 12, 12)),
          ('crc', (4, 0, 12))))
     _sync_pattern = _header_parser.defaults['sync_pattern']
+    _invariants = {'sync_pattern'}
+    """Keys of invariant parts in all Mark 4 headers."""
+    _stream_invariants = (_invariants
+                          | {'bcd_headstack1', 'bcd_headstack2',
+                             'track_roll_enabled', 'sequence_suspended',
+                             'system_id'})
+    """Keys of invariant parts in a given Mark 4 stream."""
+
+    _struct = struct.Struct('<5I')
 
     _properties = ('decade', 'track_id', 'fraction', 'time')
     """Properties accessible/usable in initialisation."""
 
     decade = None
+    """Decade of year, to complement 'bcd_unit_year' from header."""
 
     def __init__(self, words, decade=None, ref_time=None, verify=True):
-        if words is None:
-            self.words = [0, 0, 0, 0, 0]
-        else:
-            self.words = words
         if decade is not None:
             self.decade = decade
-        elif ref_time is not None:
+        super().__init__(words, verify=verify)
+        if decade is None and ref_time is not None:
             self.infer_decade(ref_time)
-        if verify:
-            self.verify()
 
     def verify(self):
         """Verify header integrity."""
@@ -178,6 +184,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
 
     @property
     def track_id(self):
+        """Track identifier (decoded from 'bcd_track_id')."""
         return bcd_decode(self['bcd_track_id'])
 
     @track_id.setter
@@ -224,6 +231,13 @@ class Mark4TrackHeader(VLBIHeaderBase):
                     format='yday', scale='utc', precision=5)
 
     def set_time(self, time):
+        """Convert Time object to BCD timestamp elements.
+
+        Parameters
+        ----------
+        time : `~astropy.time.Time`
+            The time to use for this header.
+        """
         old_precision = time.precision
         try:
             time.precision = 5

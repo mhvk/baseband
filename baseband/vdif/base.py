@@ -7,7 +7,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase)
+                              VLBIStreamWriterBase, HeaderNotFoundError)
 from .header import VDIFHeader
 from .frame import VDIFFrame, VDIFFrameSet
 from .file_info import VDIFFileReaderInfo
@@ -77,14 +77,23 @@ class VDIFFileReader(VLBIFileReaderBase):
     """
     info = VDIFFileReaderInfo()
 
-    def read_header(self):
+    def read_header(self, edv=None, verify=True):
         """Read a single header from the file.
+
+        Parameters
+        ----------
+        edv : int, False, or None, optional
+            Extended data version.  If `False`, a legacy header is used.
+            If `None` (default), it is determined from the header.  (Given it
+            explicitly is mostly useful for a slight speed-up.)
+        verify : bool, optional
+            Whether to do basic verification of integrity.  Default: `True`.
 
         Returns
         -------
         header : `~baseband.vdif.VDIFHeader`
         """
-        return VDIFHeader.fromfile(self.fh_raw)
+        return VDIFHeader.fromfile(self.fh_raw, edv=edv, verify=verify)
 
     def read_frame(self):
         """Read a single frame (header plus payload).
@@ -148,105 +157,100 @@ class VDIFFileReader(VLBIFileReaderBase):
                     pass
             raise exc
 
-    def find_header(self, template_header=None, frame_nbytes=None, edv=None,
-                    maximum=None, forward=True):
+    def find_header(self, pattern=None, *, edv=None, mask=None,
+                    frame_nbytes=None, offset=0,
+                    forward=True, maximum=None, check=1):
         """Find the nearest header from the current position.
 
         Search for a valid header at a given position which is consistent with
-        ``template_header`` or with a header a frame size ahead.   Note that
-        the latter turns out to be an unexpectedly weak check on real data!
+        ``pattern`` and/or with a header a frame size ahead.  Note
+        that the search is much slower if no pattern is given, as at every
+        position it is tried to read a header, and then check for another one
+        one frame ahead.  It helps to pass in ``edv`` and ``frame_nbytes``
+        (if known).
 
         If successful, the file pointer is left at the start of the header.
 
         Parameters
         ----------
-        template_header : `~baseband.vdif.VDIFHeader`
-            If given, used to infer the frame size and EDV.
-        frame_nbytes : int
-            Frame size in bytes, used if ``template_header`` is not given.
+        pattern : `~baseband.vdif.VDIFHeader`, array of byte, or compatible
+            If given, used for a direct search.
         edv : int
-            EDV of the header, used if ``template_header`` is not given.
-        maximum : int, optional
-            Maximum number of bytes forward to search through.
-            Default: twice the frame size.
+            EDV of the header, used if ``pattern`` is not given.
+        mask : array of byte, bytes, iterable of int, string or int
+            Bit mask for the pattern, with 1 indicating a given bit will
+            be used the comparison.  Only used with ``pattern`` and not
+            needed if ``pattern`` is a header.
+        frame_nbytes : int, optional
+            Frame size in bytes.  Defaults to the frame size in any header
+            passed in.
+        offset : int, optional
+            Offset from the frame start that the pattern occurs.  Any
+            offsets inferred from masked entries are added to this (hence,
+            no offset needed when a header is passed in as ``pattern``,
+            nor is an offset needed for a full search).
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default: twice the
+            frame size if given, otherwise 10000.
+        check : int or tuple of int, optional
+            Frame offsets where another header should be present.
+            Default: 1, i.e., a sync pattern should be present one
+            frame after the one found (independent of ``forward``),
+            thus helping to guarantee the frame is not corrupted.
 
         Returns
         -------
-        header : :class:`~baseband.vdif.VDIFHeader` or None
-            Retrieved VDIF header, or `None` if nothing found.
+        header : :class:`~baseband.vdif.VDIFHeader`
+            Retrieved VDIF header.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no header could be located.
+        AssertionError
+            If the header did not pass verification.
         """
-        fh = self.fh_raw
-        # Obtain current pointer position.
-        file_pos = fh.tell()
-        if template_header is not None:
-            edv = template_header.edv
-            # First check whether we are right at a frame marker (often true).
-            try:
-                header = VDIFHeader.fromfile(fh, edv=edv, verify=True)
-            except(AssertionError, OSError, EOFError):
-                pass
-            else:
-                if template_header.same_stream(header):
-                    fh.seek(file_pos)
-                    return header
-            # If we're not at frame marker, obtain frame size and get
-            # searching.
-            frame_nbytes = template_header.frame_nbytes
+        if pattern is not None:
+            return super().find_header(
+                pattern, mask=mask, frame_nbytes=frame_nbytes, offset=offset,
+                forward=forward, maximum=maximum, check=check)
 
+        # Try reading headers at a set of locations.
         if maximum is None:
-            maximum = 2 * frame_nbytes
+            maximum = 10000 if frame_nbytes is None else 2 * frame_nbytes
 
+        file_pos = self.tell()
         # Generate file pointer positions to test.
-        nbytes = fh.seek(0, 2)
+        file_nbytes = self.seek(0, 2)
         if forward:
-            iterate = range(file_pos, min(file_pos + maximum - 31,
-                                          nbytes - frame_nbytes + 1))
+            iterate = range(file_pos,
+                            min(file_pos+maximum-32, file_nbytes-31))
         else:
-            iterate = range(min(file_pos, nbytes - frame_nbytes),
-                            max(file_pos - maximum, -1), -1)
-        # Loop over chunks to try to find the frame marker.
+            iterate = range(min(file_pos, file_nbytes-31),
+                            max(file_pos-maximum, -1), -1)
+        # Loop over all of them to try to find the frame marker.
         for frame in iterate:
-            fh.seek(frame)
+            self.seek(frame)
             try:
-                header = VDIFHeader.fromfile(fh, edv=edv, verify=True)
-            except AssertionError:
+                header = self.read_header(edv=edv)
+            except Exception:
                 continue
 
-            if (header.frame_nbytes != frame_nbytes
-                    or (template_header
-                        and not template_header.same_stream(header))):
-                # CPython optimizations will mark this as uncovered, even
-                # though it is. See
-                # https://bitbucket.org/ned/coveragepy/issues/198/continue-marked-as-not-covered
-                continue  # pragma: no cover
-
-            # Also check header from a frame up or down.
-            if ((forward or frame < frame_nbytes)
-                    and frame < nbytes - frame_nbytes - 32):
-                next_frame = frame + frame_nbytes
-            elif frame > frame_nbytes:
-                next_frame = frame - frame_nbytes
-            else:
-                # No choice, there are no other frames.
-                fh.seek(frame)
-                return header
-
-            fh.seek(next_frame)
-            try:
-                comparison = VDIFHeader.fromfile(fh, edv=header.edv,
-                                                 verify=True)
-            except AssertionError:
+            if (frame_nbytes is not None
+                    and frame_nbytes != header.frame_nbytes):
                 continue
 
-            if header.same_stream(comparison):
-                fh.seek(frame)
-                return header
+            # Possible hit!  Try if there are other headers right around.
+            self.seek(frame)
+            try:
+                return super().find_header(header, maximum=1, check=check)
+            except Exception:
+                continue
 
-        # Didn't find any frame.
-        fh.seek(file_pos)
-        return None
+        self.seek(file_pos)
+        raise HeaderNotFoundError("could not locate a nearby header.")
 
 
 class VDIFFileWriter(VLBIFileBase):
@@ -435,8 +439,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             while not found:
                 fh_raw.seek(-self.header0.frame_nbytes, 1)
                 last_header = fh_raw.find_header(
-                    template_header=self.header0,
-                    maximum=maximum, forward=False)
+                    self.header0, maximum=maximum, forward=False)
                 if last_header is None or (raw_size - fh_raw.tell() > maximum):
                     raise ValueError("corrupt VDIF? No thread_id={0} frame "
                                      "in last {1} bytes."

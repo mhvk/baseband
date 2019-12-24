@@ -16,10 +16,23 @@ Bug Fixes
 - Mark 4 now checks by default (``verify=True``) that frames are ordered
   correctly. [#349]
 
+- ``find_header`` will now always check that the frame corresponding to
+  a header is complete (i.e., fits within the file). [#354]
+
 Other Changes and Additions
 ---------------------------
 
 - Much faster localization of Mark 5B frames. [#351]
+
+- VLBI file readers have gained a new method ``locate_frames`` that finds
+  frame starts near the current location. [#354]
+
+- For VLBI file readers, ``find_header`` now raises an exception if no
+  frame is found (rather than return `None`).
+
+- The the Mark 4 file reader's ``locate_frame`` has been deprecated. Its
+  functionality is replaced by ``locate_frames`` and ``find_header``. [#354]
+
 
 3.0 (2019-08-28)
 ================

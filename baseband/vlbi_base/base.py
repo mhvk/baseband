@@ -1,20 +1,29 @@
 # Licensed under the GPLv3 - see LICENSE
 import io
 import warnings
-import numpy as np
 import operator
 from collections import namedtuple
 from contextlib import contextmanager
 
+import numpy as np
+from numpy.lib.stride_tricks import as_strided
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from ..helpers import sequentialfile as sf
+from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from .utils import byte_array
 
 
-__all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
-           'VLBIStreamReaderBase', 'VLBIStreamWriterBase', 'make_opener']
+__all__ = ['HeaderNotFoundError',
+           'VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
+           'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
+           'make_opener']
+
+
+class HeaderNotFoundError(LookupError):
+    """Error in finding a header in a stream."""
+    pass
 
 
 class VLBIFileBase:
@@ -91,6 +100,172 @@ class VLBIFileReaderBase(VLBIFileBase):
     """
 
     info = VLBIFileReaderInfo()
+
+    def locate_frames(self, pattern, *, mask=None, frame_nbytes=None,
+                      offset=0, forward=True, maximum=None, check=1):
+        """Use a pattern to locate frame starts near the current position.
+
+        Note that the current position is always included.
+
+        Parameters
+        ----------
+        pattern : header, ~numpy.ndaray, bytes, int, or iterable of int
+            Synchronization pattern to look for.  If a header or header class,
+            :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariant_pattern`
+            is used to create a masked pattern, using invariant keys from
+            :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariants`.
+            If an `~numpy.ndarray` or `bytes` instance, a byte array view is
+            taken. If an (iterable of) int, the integers need to be unsigned
+            32 bit and will be interpreted as little-endian.
+        mask : ~numpy.ndarray, bytes, int, or iterable of int.
+            Bit mask for the pattern, with 1 indicating a given bit will
+            be used the comparison.
+        frame_nbytes : int, optional
+            Frame size in bytes.  Defaults to the frame size in any header
+            passed in.
+        offset : int, optional
+            Offset from the frame start that the pattern occurs.  Any
+            offsets inferred from masked entries are added to this (hence,
+            no offset needed when a header is passed in as ``pattern``).
+        forward : bool, optional
+            Seek forward if `True` (default), backward if `False`.
+        maximum : int, optional
+            Maximum number of bytes to search through.  Default: twice the
+            frame size if given, otherwise 1 million (extra bytes to avoid
+            partial patterns will be added). Use 1 to check only at the
+            current position.
+        check : int or tuple of int, optional
+            Frame offsets where another sync pattern should be present
+            (if inside the file). Ignored if ``frame_nbytes`` is not given.
+            Default: 1, i.e., a sync pattern should be present one
+            frame after the one found (independent of ``forward``),
+            thus helping to guarantee the frame is not corrupted.
+
+        Returns
+        -------
+        locations : list of int
+            Locations of sync patterns within the range scanned,
+            in order of proximity to the starting position.
+        """
+        if hasattr(pattern, 'invariant_pattern'):
+            if frame_nbytes is None:
+                frame_nbytes = pattern.frame_nbytes
+            pattern, mask = pattern.invariant_pattern()
+
+        pattern = byte_array(pattern)
+
+        if mask is not None:
+            mask = byte_array(mask)
+            useful = np.nonzero(mask)[0]
+            useful_slice = slice(useful[0], useful[-1]+1)
+            mask = mask[useful_slice]
+            pattern = pattern[useful_slice]
+            offset += useful_slice.start
+
+        if maximum is None:
+            maximum = 2 * frame_nbytes if frame_nbytes else 1000000
+
+        if maximum <= 0:
+            raise ValueError('maximum must be at least 1.')
+
+        if frame_nbytes is None:
+            frame_nbytes = 0
+
+        if check is None:
+            check = np.array([], dtype=int)
+            check_min = check_max = 0
+        else:
+            check = np.atleast_1d(check) * frame_nbytes
+            # For Numpy >=1.15, can just be check.min(initial=0) in the
+            # calculation of start, stop below.
+            check_min = min(check.min(), 0)
+            check_max = max(check.max(), 0)
+
+        with self.temporary_offset() as fh:
+            # Calculate the fiducial start of the region we are looking in.
+            if forward:
+                seek_start = fh.tell()
+            else:
+                seek_start = fh.tell() - maximum + 1
+            # Determine what part of the file to read, including the
+            # extra bits for doing the checking.
+            file_nbytes = fh.seek(0, 2)
+            start = max(seek_start + offset + check_min, 0)
+            stop = min(seek_start + offset + maximum + check_max,
+                       file_nbytes - pattern.size)
+            size = stop - start
+
+            if size < 0:
+                return []
+
+            fh.seek(start)
+            # Note: np.fromfile doesn't work with SequentialFile.
+            data = fh.read(size + pattern.size)
+
+        data = np.frombuffer(data, dtype='u1')
+
+        if mask is None:
+            match = data[:-pattern.size] == pattern[0]
+        else:
+            match = ((data[:-pattern.size] ^ pattern[0]) & mask[0]) == 0
+        matches = np.nonzero(match)[0]
+        # Re-stride so that it looks like each element is followed by
+        # all other, and check those all in one go (likely faster than
+        # iterating over the pattern, since we already reduced the
+        # number of options about 256 times).
+        strided = as_strided(data[1:], strides=(1, 1),
+                             shape=(size, pattern.size-1))
+        if mask is None:
+            match = strided[matches] == pattern[1:]
+        else:
+            match = ((strided[matches] ^ pattern[1:]) & mask[1:]) == 0
+        matches = matches[match.all(-1)]
+
+        if not forward:
+            # Order by proximity to the file position.
+            matches = matches[::-1]
+
+        matches = matches.tolist()
+        # Keep only matches for which
+        # (1) the location is in the requested base range,
+        # (2) the associated frames completely fits in the file, and
+        # (3) the pattern is also present at the requested check points.
+        # Matches are relative to start, with offset included.
+        loc_start = max(seek_start, 0) + offset - start
+        loc_stop = min(seek_start+maximum,
+                       file_nbytes-frame_nbytes+1) + offset - start
+        locations = [loc-offset+start for loc in matches
+                     if (loc_start <= loc < loc_stop
+                         and all(c in matches for c in loc+check
+                                 if 0 <= c < size))]
+
+        return locations
+
+    def find_header(self, *args, **kwargs):
+        """Find the nearest header from the current position.
+
+        If successful, the file pointer is left at the start of the header.
+
+        Parameters are as for ``locate_frames``.
+
+        Returns
+        -------
+        header
+            Retrieved header.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no header could be located.
+        AssertionError
+            If the header did not pass verification.
+        """
+        locations = self.locate_frames(*args, **kwargs)
+        if not locations:
+            raise HeaderNotFoundError('could not locate a a nearby frame.')
+        self.seek(locations[0])
+        with self.temporary_offset():
+            return self.read_header()
 
     def get_frame_rate(self):
         """Determine the number of frames per second.

@@ -12,7 +12,8 @@ import numpy as np
 import astropy.units as u
 from astropy.time import Time
 
-from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, four_word_struct
+from ..vlbi_base.header import (HeaderParser, VLBIHeaderBase,
+                                four_word_struct, fixedvalue)
 from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
 
 
@@ -67,6 +68,10 @@ class Mark5BHeader(VLBIHeaderBase):
          ('bcd_fraction', (3, 16, 16)),
          ('crc', (3, 0, 16))))
     _sync_pattern = _header_parser.defaults['sync_pattern']
+    _invariants = {'sync_pattern'}
+    """Keys of invariant parts in all Mark 5B headers."""
+    _stream_invariants = _invariants | {'user'}
+    """Keys of invariant parts in a given Mark 5B stream."""
 
     _struct = four_word_struct
 
@@ -75,16 +80,14 @@ class Mark5BHeader(VLBIHeaderBase):
     """Properties accessible/usable in initialisation."""
 
     kday = None
-    _payload_nbytes = 10000  # 2500 words
+    """Thousands of MJD, to complement ``jday`` from header."""
 
-    def __init__(self, words, kday=None, ref_time=None, verify=True, **kwargs):
-        super().__init__(words, verify=False, **kwargs)
+    def __init__(self, words, kday=None, ref_time=None, verify=True):
         if kday is not None:
             self.kday = kday
-        elif ref_time is not None:
+        super().__init__(words, verify=verify)
+        if kday is None and ref_time is not None:
             self.infer_kday(ref_time)
-        if verify:
-            self.verify()
 
     def verify(self):
         """Verify header integrity."""
@@ -170,27 +173,15 @@ class Mark5BHeader(VLBIHeaderBase):
         self.kday = np.around(ref_time.mjd - self.jday,
                               decimals=-3).astype(int)
 
-    @property
-    def payload_nbytes(self):
-        """Size of the payload in bytes."""
-        return self._payload_nbytes    # Hardcoded in class definition.
+    @fixedvalue
+    def payload_nbytes(cls):
+        """Size of the payload in bytes (10000 for Mark5B)."""
+        return 10000  # 2500 words
 
-    @payload_nbytes.setter
-    def payload_nbytes(self, payload_nbytes):
-        if payload_nbytes != self._payload_nbytes:  # 2500 words.
-            raise ValueError("Mark 5B payload has a fixed size of 10000 bytes "
-                             "(2500 words).")
-
-    @property
-    def frame_nbytes(self):
+    @fixedvalue
+    def frame_nbytes(cls):
         """Size of the frame in bytes."""
-        return self.nbytes + self.payload_nbytes
-
-    @frame_nbytes.setter
-    def frame_nbytes(self, frame_nbytes):
-        if frame_nbytes != self.nbytes + self.payload_nbytes:
-            raise ValueError("Mark 5B frame has a fixed size of 10016 bytes "
-                             "(4 header words plus 2500 payload words).")
+        return cls.nbytes + cls.payload_nbytes
 
     @property
     def jday(self):

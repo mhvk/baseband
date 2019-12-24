@@ -6,6 +6,7 @@ import astropy.units as u
 from astropy.tests.helper import catch_warnings
 
 from ... import vdif, vlbi_base
+from ...vlbi_base.base import HeaderNotFoundError
 from ...helpers import sequentialfile as sf
 from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_VLBI_VDIF as
                      SAMPLE_VLBI, SAMPLE_MWA_VDIF as SAMPLE_MWA,
@@ -630,6 +631,90 @@ class TestVDIF:
         frameset2.valid = False
         assert not frameset2.valid
 
+    def test_locate_frames(self, tmpdir):
+        with vdif.open(SAMPLE_FILE, 'rb') as fh:
+            header0 = vdif.VDIFHeader.fromfile(fh)
+            fh.seek(0)
+            # Just seek forward and backward for the sync pattern, without
+            # checks; default maximum of 1000000 includes whole file.
+            assert fh.locate_frames(pattern=header0['sync_pattern'],
+                                    offset=20) == [x*5032 for x in range(16)]
+            fh.seek(0, 2)
+            assert (fh.locate_frames(pattern=header0['sync_pattern'],
+                                     offset=20, forward=False)
+                    == [x*5032 for x in range(15, -1, -1)])
+            # Try with a masked array as well, just because we can.
+            fh.seek(0, 2)
+            assert fh.locate_frames(
+                pattern=np.ma.MaskedArray(
+                    np.array(header0.words[3:6], 'u4').view('u1'),
+                    [False, False, True, True] + [False]*8),
+                offset=3*4,
+                forward=False) == [x*5032 for x in range(15, -1, -1)]
+            # Try an explicit mask, and include the frame size.
+            fh.seek(10)
+            # All of word 2:
+            #     'vdif_version', 'lg2_nchan', 'frame_length'
+            # All but 'thread_id' of word 3:
+            #     'complex_data', 'bits_per_sample', 'station_id'
+            # All of word 4:
+            #     'edv', 'sampling_unit', 'sampling_rate'
+            # Ignore sync_pattern on purpose.
+            mask = [0, 0, 0xffffffff, 0xfc00ffff, 0xffffffff, 0, 0, 0]
+            assert fh.locate_frames(pattern=header0.words, mask=mask,
+                                    frame_nbytes=5032) == [5032, 10064]
+            # From now on, just rely on information based on the header.
+            fh.seek(5000)
+            assert fh.locate_frames(header0, forward=True) == [5032, 10064]
+            # sample file has corrupted time in even threads; check this
+            # doesn't matter.
+            fh.seek(15000)
+            assert fh.locate_frames(header0, forward=True) == [15096, 20128]
+            fh.seek(20128)
+            assert fh.locate_frames(header0, forward=True) == [20128, 25160]
+            fh.seek(16)
+            assert fh.locate_frames(header0, forward=False) == [0]
+            fh.seek(-10000, 2)
+            assert (fh.locate_frames(header0, forward=False)
+                    == [x * header0.frame_nbytes for x in (14, 13)])
+            fh.seek(-5000, 2)
+            assert (fh.locate_frames(header0, forward=False)
+                    == [x * header0.frame_nbytes for x in (15, 14)])
+            fh.seek(-20, 2)
+            assert fh.locate_frames(header0, forward=True) == []
+            # Just before a header.
+            fh.seek(40254)
+            assert (fh.locate_frames(header0, forward=True)
+                    == [x * header0.frame_nbytes for x in (8, 9)])
+            fh.seek(40254)
+            assert (fh.locate_frames(header0, forward=False)
+                    == [x * header0.frame_nbytes for x in (7, 6)])
+
+        # Make file with missing data.
+        with open(str(tmpdir.join('test.vdif')), 'w+b') as s, \
+                open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(5100))
+            f.seek(10000)
+            s.write(f.read())
+            with vdif.open(s, 'rb') as fh:
+                fh.seek(0)
+                assert fh.locate_frames(header0) == [0, 5164]
+                fh.seek(10)
+                assert fh.locate_frames(header0) == [10064-4900]
+                fh.seek(10064-4900)
+                assert fh.locate_frames(header0) == [10064-4900, 3*5032-4900]
+                fh.seek(10064-4900)
+                assert (fh.locate_frames(header0, forward=False)
+                        == [10064-4900, 0])
+
+        # For completeness, also check a really short file...
+        with open(str(tmpdir.join('test.vdif')), 'w+b') as s, \
+                open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(5064))
+            with vdif.open(s, 'rb') as fh:
+                fh.seek(10)
+                assert fh.locate_frames(header0, forward=False) == [0]
+
     def test_find_header(self, tmpdir):
         # Below, the tests set the file pointer to very close to a header,
         # since otherwise they run *very* slow.  This is somehow related to
@@ -650,8 +735,7 @@ class TestVDIF:
                                            forward=True)
             assert fh.tell() == 3 * header0.frame_nbytes
             fh.seek(20128)
-            header_20128f = fh.find_header(template_header=header0,
-                                           forward=True)
+            header_20128f = fh.find_header(header0, forward=True)
             assert fh.tell() == 4 * header0.frame_nbytes
             fh.seek(16)
             header_16b = fh.find_header(frame_nbytes=header0.frame_nbytes,
@@ -666,17 +750,14 @@ class TestVDIF:
                                            forward=False)
             assert fh.tell() == 15 * header0.frame_nbytes
             fh.seek(-20, 2)
-            header_end = fh.find_header(template_header=header0,
-                                        forward=True)
-            assert header_end is None
+            with pytest.raises(HeaderNotFoundError):
+                fh.find_header(header0, forward=True)
             # Just before a header.
             fh.seek(40254)
-            header_40254f = fh.find_header(template_header=header0,
-                                           forward=True)
+            header_40254f = fh.find_header(header0, forward=True)
             assert fh.tell() == 8 * header0.frame_nbytes
             fh.seek(40254)
-            header_40254b = fh.find_header(template_header=header0,
-                                           forward=False)
+            header_40254b = fh.find_header(header0, forward=False)
             assert fh.tell() == 7 * header0.frame_nbytes
 
         # thread order = 1,3,5,7,0,2,4,6
@@ -710,11 +791,10 @@ class TestVDIF:
             s.write(f.read())
             with vdif.open(s, 'rb') as fh:
                 fh.seek(0)
-                header_0 = fh.find_header(template_header=header0)
+                header_0 = fh.find_header(header0)
                 assert fh.tell() == 0
                 fh.seek(5000)
-                header_5000ft = fh.find_header(template_header=header0,
-                                               forward=True)
+                header_5000ft = fh.find_header(header0, forward=True)
                 assert fh.tell() == header0.frame_nbytes * 2 - 4900
                 header_5000f = fh.find_header(
                     frame_nbytes=header0.frame_nbytes, forward=True)
@@ -1299,3 +1379,35 @@ def test_bad_file_info(tmpdir):
 
     with vdif.open(filename, 'rs') as fh:
         assert fh.info.readable is False
+
+
+class TestFindHeader:
+    @pytest.mark.parametrize(
+        'filename,edv',
+        [(SAMPLE_FILE, 3),
+         (SAMPLE_VLBI, 3),
+         (SAMPLE_MWA, 0),
+         (SAMPLE_AROCHIME, 0),
+         (SAMPLE_BPS1, 0)])
+    def test_find_header_via_edv(self, filename, edv):
+        with vdif.open(filename, 'rb') as fh:
+            header = fh.find_header()
+        assert header is not None
+        assert header.edv == edv
+
+    @pytest.mark.parametrize(
+        'filename',
+        [SAMPLE_FILE, SAMPLE_VLBI, SAMPLE_MWA, SAMPLE_AROCHIME, SAMPLE_BPS1])
+    def test_find_header_lost_start(self, filename, tmpdir):
+        corrupted = str(tmpdir.join('corrupted.vdif'))
+        with vdif.open(filename, 'rb') as fh, open(corrupted, 'wb') as fw:
+            h0 = fh.read_header()
+            fh.seek(h0.frame_nbytes)
+            h1 = fh.read_header()
+            fh.seek(h0.frame_nbytes-100)
+            fw.write(fh.read())
+
+        with vdif.open(corrupted, 'rb') as fc:
+            header = fc.find_header()
+            assert header is not None
+            assert header == h1

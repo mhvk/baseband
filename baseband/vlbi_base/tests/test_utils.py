@@ -1,8 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE
 import pytest
 import numpy as np
+from numpy.testing import assert_array_equal
 
-from ..utils import lcm, bcd_encode, bcd_decode, CRC, CRCStack
+from ..utils import lcm, bcd_encode, bcd_decode, byte_array, CRC, CRCStack
 
 
 class TestBCD:
@@ -114,3 +115,18 @@ class TestCRC12:
      (-4, -12, 12)))
 def test_lcm(a, b, lcm_out):
     assert lcm(a, b) == lcm_out
+
+
+@pytest.mark.parametrize(
+    ('pattern', 'expected'),
+    [(b'\xa0\x55', [160, 85]),
+     (0x55a0, [160, 85, 0, 0]),
+     ([0x55, 0xa0], [85, 0, 0, 0, 160, 0, 0, 0]),
+     (np.array([0xa0, 0x55], 'u1'), [160, 85]),
+     (np.array(0x55a0, '<u4'), [160, 85, 0, 0]),
+     (np.array(0x55a0, '<u8'), [160, 85, 0, 0, 0, 0, 0, 0]),
+     (np.array([0x55, 0xa0], '<u4'), [85, 0, 0, 0, 160, 0, 0, 0])])
+def test_byte_array(pattern, expected):
+    result = byte_array(pattern)
+    expected = np.array(expected, 'u1')
+    assert_array_equal(result, expected)

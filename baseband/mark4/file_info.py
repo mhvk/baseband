@@ -96,13 +96,10 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         try:
             with self._parent.temporary_offset() as fh:
                 fh.seek(0)
-                offset0 = fh.locate_frame()
-                if offset0 is None:
-                    self.errors['header0'] = 'Cannot find start of frame'
-                    return None
+                header = fh.find_header()
+                self.offset0 = fh.tell()
+                return header
 
-                self.offset0 = offset0
-                return fh.read_header()
         except Exception as exc:
             self.errors['header0'] = exc
             return None
