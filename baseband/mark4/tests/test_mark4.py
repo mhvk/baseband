@@ -3,7 +3,6 @@ import pytest
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from astropy.tests.helper import catch_warnings
 
 from ... import mark4
 from ...vlbi_base.base import HeaderNotFoundError
@@ -771,15 +770,14 @@ class TestMark4:
     @pytest.mark.parametrize('fill_value', (0., -999.))
     def test_incomplete_stream(self, tmpdir, fill_value):
         m4_incomplete = str(tmpdir.join('incomplete.m4'))
-        with catch_warnings(UserWarning) as w:
-            with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fr:
-                record = fr.read(10)
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fr:
+            record = fr.read(10)
+            with pytest.warns(UserWarning, match='partial buffer'):
                 with mark4.open(m4_incomplete, 'ws', header0=fr.header0,
                                 sample_rate=32*u.MHz,
                                 ntrack=64, decade=2010) as fw:
                     fw.write(record)
-        assert len(w) == 1
-        assert 'partial buffer' in str(w[0].message)
+
         with mark4.open(m4_incomplete, 'rs', sample_rate=32*u.MHz,
                         ntrack=64, decade=2010, fill_value=fill_value) as fwr:
             assert np.all(fwr.read() == fill_value)

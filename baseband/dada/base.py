@@ -322,6 +322,9 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         self.fh_raw.seek(self.header0.nbytes, 1)
         last_payload = DADAPayload.fromfile(self.fh_raw, memmap=True,
                                             header=self._last_header)
+        # Ensure we skip all the way to the end of the file, to indicate
+        # there is no use in trying to check for the next header.
+        self.fh_raw.seek(0, 2)
         return DADAFrame(self._last_header, last_payload)
 
     def _tell_frame(self, frame):

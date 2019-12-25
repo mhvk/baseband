@@ -4,7 +4,6 @@ import copy
 import pytest
 import numpy as np
 import astropy.units as u
-from astropy.tests.helper import catch_warnings
 
 from ... import guppi
 from ...helpers import sequentialfile as sf
@@ -47,7 +46,7 @@ class TestGUPPI:
         with pytest.raises(AttributeError):
             header.python
 
-        with open(str(tmpdir.join('testguppi.raw')), 'w+b') as s:
+        with open(str(tmpdir.join('testguppi1.raw')), 'w+b') as s:
             header.tofile(s)
             assert s.tell() == header.nbytes
             s.seek(0)
@@ -56,9 +55,19 @@ class TestGUPPI:
             assert header2.mutable is False
             assert s.tell() == header.nbytes
 
+        # A short header raises EOFError
+        with open(SAMPLE_FILE, 'rb') as fh, \
+                open(str(tmpdir.join('testguppi2.raw')), 'w+b') as s:
+            # Create file without "END" in first header.
+            s.write(fh.read(6320))
+            s.seek(0)
+            # Try reading in file.
+            with pytest.raises(EOFError):
+                guppi.GUPPIHeader.fromfile(s)
+
         # A header missing "END" raises a decoding error.
         with open(SAMPLE_FILE, 'rb') as fh, \
-                open(str(tmpdir.join('testguppi.raw')), 'w+b') as s:
+                open(str(tmpdir.join('testguppi3.raw')), 'w+b') as s:
             # Create file without "END" in first header.
             s.write(fh.read(6320))
             fh.seek(6400)
@@ -66,7 +75,7 @@ class TestGUPPI:
             s.seek(0)
             # Try reading in file.
             with pytest.raises(UnicodeDecodeError):
-                header = guppi.GUPPIHeader.fromfile(s)
+                guppi.GUPPIHeader.fromfile(s)
 
         # Note that this is not guaranteed to preserve order!
         header3 = guppi.GUPPIHeader.fromkeys(**header)
@@ -197,6 +206,7 @@ class TestGUPPI:
             payload2 = guppi.GUPPIPayload.fromfile(s, payload_nbytes=16384,
                                                    sample_shape=(2, 4), bps=8,
                                                    complex_data=True)
+            assert s.tell() == 16384
             assert payload2 == payload
             with pytest.raises(EOFError):
                 # Too few bytes.
@@ -273,6 +283,7 @@ class TestGUPPI:
     def test_frame(self, tmpdir):
         with guppi.open(SAMPLE_FILE, 'rb') as fh:
             frame = fh.read_frame(memmap=False)
+            assert fh.tell() == frame.nbytes
         header, payload = frame.header, frame.payload
         assert header == self.header
         assert payload == self.payload
@@ -511,12 +522,11 @@ class TestGUPPI:
         set is valid but invalid samples use the fill value.
         """
         filename = str(tmpdir.join('testguppi.raw'))
-        with catch_warnings(UserWarning) as w:
+        with pytest.warns(UserWarning, match='partial buffer'):
             with guppi.open(filename, 'ws', header0=self.header_w,
                             squeeze=False) as fw:
                 fw.write(self.payload[:10])
-        assert len(w) == 1
-        assert 'partial buffer' in str(w[0].message)
+
         with guppi.open(filename, 'rs', squeeze=False) as fwr:
             data = fwr.read()
             assert np.all(data[:10] == self.payload[:10])

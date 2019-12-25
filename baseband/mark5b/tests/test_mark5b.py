@@ -3,7 +3,6 @@ import pytest
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from astropy.tests.helper import catch_warnings
 
 from ... import mark5b
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
@@ -769,15 +768,14 @@ class TestMark5B:
     @pytest.mark.parametrize('fill_value', (0., -999.))
     def test_incomplete_stream(self, tmpdir, fill_value):
         m5_incomplete = str(tmpdir.join('incomplete.m5'))
-        with catch_warnings(UserWarning) as w:
-            with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
-                             kday=56000, nchan=8, bps=2) as fr:
-                record = fr.read(10)
+        with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
+                         kday=56000, nchan=8, bps=2) as fr:
+            record = fr.read(10)
+            with pytest.warns(UserWarning, match='partial buffer'):
                 with mark5b.open(m5_incomplete, 'ws', header0=fr.header0,
                                  sample_rate=32*u.MHz, nchan=8) as fw:
                     fw.write(record)
-        assert len(w) == 1
-        assert 'partial buffer' in str(w[0].message)
+
         with mark5b.open(m5_incomplete, 'rs', sample_rate=32*u.MHz, kday=56000,
                          nchan=8, bps=2, fill_value=fill_value) as fwr:
             assert fwr.fill_value == fill_value

@@ -173,7 +173,10 @@ class DADAHeader(OrderedDict):
         lines = []
         while fh.tell() - start_pos < hdr_size:
             line = fh.readline().decode('ascii')
-            if line == '' or line[0] == '#' and 'end of header' in line:
+            if line == '':  # empty lines are '\n'
+                raise EOFError
+
+            if line[0] == '#' and 'end of header' in line:
                 break
 
             if line.startswith('HDR_SIZE'):

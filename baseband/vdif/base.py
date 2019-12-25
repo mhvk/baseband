@@ -459,7 +459,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
     # Overrides to deal with framesets instead of frames.
     def _seek_frame(self, index):
-        self.fh_raw.seek(index * self._frameset_nbytes)
+        return self.fh_raw.seek(index * self._frameset_nbytes)
 
     def _fh_raw_read_frame(self):
         return self.fh_raw.read_frameset(self._thread_ids,

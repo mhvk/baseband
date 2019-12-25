@@ -4,7 +4,6 @@ import copy
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from astropy.tests.helper import catch_warnings
 from ... import dada
 from ...helpers import sequentialfile as sf
 from ..base import DADAFileNameSequencer
@@ -57,9 +56,16 @@ class TestDADA:
                 s.write((line + '\n').encode('ascii'))
             s.write('# end of header\n'.encode('ascii'))
             s.seek(0)
-            with catch_warnings(UserWarning) as w:
+            with pytest.warns(UserWarning, match='Odd'):
                 dada.DADAHeader.fromfile(s)
-            assert 'Odd' in str(w[0].message)
+
+        with open(SAMPLE_FILE, 'rb') as fh, \
+                open(str(tmpdir.join('test2.dada')), 'w+b') as s:
+            # And an incomplete header for completeness.
+            s.write(fh.read(1000))
+            s.seek(0)
+            with pytest.raises(EOFError):
+                dada.DADAHeader.fromfile(s)
 
         # Note that this is not guaranteed to preserve order!
         header3 = dada.DADAHeader.fromkeys(**header)
@@ -167,6 +173,7 @@ class TestDADA:
                                                  sample_shape=(2, 1), bps=8,
                                                  complex_data=True)
             assert payload2 == payload
+            assert s.tell() == 64000
             with pytest.raises(EOFError):
                 # Too few bytes.
                 s.seek(100)
@@ -176,6 +183,7 @@ class TestDADA:
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(4096)
             payload4 = dada.DADAPayload.fromfile(fh, self.header, memmap=True)
+            assert fh.tell() == 4096+payload4.nbytes
         assert isinstance(payload4.words, np.memmap)
         assert not isinstance(payload.words, np.memmap)
         assert payload == payload4
@@ -208,6 +216,7 @@ class TestDADA:
             frame.tofile(s)
             s.seek(0)
             frame2 = dada.DADAFrame.fromfile(s, memmap=False)
+            assert s.tell() == frame.nbytes
         assert frame2 == frame
         frame3 = dada.DADAFrame.fromdata(payload.data, header)
         assert frame3 == frame
@@ -455,12 +464,11 @@ class TestDADA:
         set is valid but invalid samples use the fill value.
         """
         filename = str(tmpdir.join('a.dada'))
-        with catch_warnings(UserWarning) as w:
+        with pytest.warns(UserWarning, match='partial buffer'):
             with dada.open(filename, 'ws', header0=self.header,
                            squeeze=False) as fw:
                 fw.write(self.payload[:10])
-        assert len(w) == 1
-        assert 'partial buffer' in str(w[0].message)
+
         with dada.open(filename, 'rs', squeeze=False) as fwr:
             data = fwr.read()
             assert np.all(data[:10] == self.payload[:10])
