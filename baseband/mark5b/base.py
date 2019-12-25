@@ -250,6 +250,9 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         last_header.infer_kday(self.start_time)
         return last_header
 
+    def _set_time(self, header, time):
+        header.set_time(time, frame_rate=self._frame_rate)
+
     def _tell_frame(self, frame):
         # Override to provide index faster, without calculating times.
         # TODO: OK to ignore leap seconds? Not sure what writer does.
