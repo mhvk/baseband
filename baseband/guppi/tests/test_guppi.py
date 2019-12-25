@@ -4,7 +4,6 @@ import copy
 import pytest
 import numpy as np
 import astropy.units as u
-from astropy.tests.helper import catch_warnings
 
 from ... import guppi
 from ...helpers import sequentialfile as sf
@@ -523,12 +522,11 @@ class TestGUPPI:
         set is valid but invalid samples use the fill value.
         """
         filename = str(tmpdir.join('testguppi.raw'))
-        with catch_warnings(UserWarning) as w:
+        with pytest.warns(UserWarning, match='partial buffer'):
             with guppi.open(filename, 'ws', header0=self.header_w,
                             squeeze=False) as fw:
                 fw.write(self.payload[:10])
-        assert len(w) == 1
-        assert 'partial buffer' in str(w[0].message)
+
         with guppi.open(filename, 'rs', squeeze=False) as fwr:
             data = fwr.read()
             assert np.all(data[:10] == self.payload[:10])

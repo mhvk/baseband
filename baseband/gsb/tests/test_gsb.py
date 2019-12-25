@@ -3,7 +3,6 @@ import pytest
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from astropy.tests.helper import catch_warnings
 
 from ... import gsb
 from ..payload import decode_4bit, encode_4bit
@@ -590,10 +589,8 @@ class TestGSB:
                       sample_rate=sample_rate,
                       payload_nbytes=self.payload_nbytes,
                       squeeze=False) as fh_r:
-            with catch_warnings(UserWarning) as w:
+            with pytest.warns(UserWarning, match='second-to-last entry'):
                 fh_r._last_header
-            assert len(w) == 1
-            assert 'second-to-last entry' in str(w[0].message)
             assert fh_r.shape[0] == 9 * fh_r.samples_per_frame
         with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
                 open(filename_incompletehead, 'wt') as fw:
@@ -602,10 +599,8 @@ class TestGSB:
                       sample_rate=sample_rate,
                       payload_nbytes=self.payload_nbytes,
                       squeeze=False) as fh_r:
-            with catch_warnings(UserWarning) as w:
+            with pytest.warns(UserWarning, match='second-to-last entry'):
                 fh_r._last_header
-            assert len(w) == 1
-            assert 'second-to-last entry' in str(w[0].message)
             assert fh_r.shape[0] == fh_r.samples_per_frame
             assert fh_r._last_header == fh_r.header0
 
@@ -776,10 +771,8 @@ class TestGSB:
                       sample_rate=sample_rate,
                       payload_nbytes=self.payload_nbytes,
                       squeeze=False) as fh_r:
-            with catch_warnings(UserWarning) as w:
+            with pytest.warns(UserWarning, match='second-to-last entry'):
                 fh_r._last_header
-            assert len(w) == 1
-            assert 'second-to-last entry' in str(w[0].message)
             assert fh_r.shape[0] == 9 * fh_r.samples_per_frame
         with open(SAMPLE_PHASED_HEADER, 'rt') as fh, \
                 open(filename_incompletehead, 'wt') as fw:
@@ -788,10 +781,8 @@ class TestGSB:
                       sample_rate=sample_rate,
                       payload_nbytes=self.payload_nbytes,
                       squeeze=False) as fh_r:
-            with catch_warnings(UserWarning) as w:
+            with pytest.warns(UserWarning, match='second-to-last entry'):
                 fh_r._last_header
-            assert len(w) == 1
-            assert 'second-to-last entry' in str(w[0].message)
             assert fh_r.shape[0] == fh_r.samples_per_frame
             assert fh_r._last_header == fh_r.header0
 

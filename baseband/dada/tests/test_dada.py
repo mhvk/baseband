@@ -4,7 +4,6 @@ import copy
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from astropy.tests.helper import catch_warnings
 from ... import dada
 from ...helpers import sequentialfile as sf
 from ..base import DADAFileNameSequencer

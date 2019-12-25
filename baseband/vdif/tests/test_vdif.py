@@ -3,7 +3,6 @@ import pytest
 import numpy as np
 from astropy.time import Time
 import astropy.units as u
-from astropy.tests.helper import catch_warnings
 
 from ... import vdif, vlbi_base
 from ...vlbi_base.base import HeaderNotFoundError
@@ -1093,14 +1092,12 @@ class TestVDIF:
     @pytest.mark.parametrize('fill_value', (0., -999.))
     def test_incomplete_stream(self, tmpdir, fill_value):
         vdif_incomplete = str(tmpdir.join('incomplete.vdif'))
-        with catch_warnings(UserWarning) as w:
-            with vdif.open(SAMPLE_FILE, 'rs') as fr:
-                record = fr.read(10)
+        with vdif.open(SAMPLE_FILE, 'rs') as fr:
+            record = fr.read(10)
+            with pytest.warns(UserWarning, match='partial buffer'):
                 with vdif.open(vdif_incomplete, 'ws', header0=fr.header0,
                                sample_rate=32*u.MHz, nthread=8) as fw:
                     fw.write(record)
-        assert len(w) == 1
-        assert 'partial buffer' in str(w[0].message)
         with vdif.open(vdif_incomplete, 'rs', fill_value=fill_value) as fwr:
             assert all([not frame.valid for frame in fwr._frameset.frames])
             assert fwr.fill_value == fill_value
