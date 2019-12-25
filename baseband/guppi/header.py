@@ -120,6 +120,8 @@ class GUPPIHeader(fits.Header):
             line = fh.read(80).decode('ascii')
             if line[:3] == 'END':
                 break
+            if line == '':
+                raise EOFError
 
         header_end = fh.tell()
         fh.seek(header_start)
