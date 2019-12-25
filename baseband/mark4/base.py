@@ -347,11 +347,11 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
                              .format(ntrack),)
             raise exc
 
-        self._offset0 = fh_raw.tell()
         super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
+        self._raw_offsets[0] = fh_raw.tell()
         # Use reference time in preference to decade so that a stream wrapping
         # a decade will work.
         self.fh_raw.decade = None
@@ -365,11 +365,6 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         # 4 years away from the start.
         last_header.infer_decade(self.start_time)
         return last_header
-
-    def _seek_frame(self, index):
-        # Override vlbi_base version to include offset.
-        return self.fh_raw.seek(self._offset0
-                                + index*self.header0.frame_nbytes)
 
 
 class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
