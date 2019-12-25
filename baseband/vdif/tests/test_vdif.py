@@ -1143,7 +1143,10 @@ class TestVDIF:
             assert f2.header0 == f1.header0
             assert f2.stop_time == f1.stop_time
             d1 = f1.read()
-            d2 = f2.read()
+            with pytest.warns(UserWarning,
+                              match='problem loading frame index 1'):
+                d2 = f2.read()
+
             assert np.all(d1 == d2)
 
     def test_io_invalid(self, tmpdir):
