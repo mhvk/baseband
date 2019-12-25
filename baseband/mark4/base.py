@@ -103,10 +103,12 @@ class Mark4FileReader(VLBIFileReaderBase):
         tdelta = (header1.fraction[0] - header0.fraction[0]) % 1.
         return u.Quantity(1 / tdelta, u.Hz).round()
 
-    def locate_frames(self, forward=True, maximum=None, check=1):
-        """Use the sync pattern to locate frames nearest the current position.
+    def locate_frames(self, pattern=None, *, mask=None, frame_nbytes=None,
+                      offset=0, forward=True, maximum=None, check=1):
+        """Use a pattern to locate frame starts near the current position.
+        Note that the current position is always included.
 
-        The search is for the following pattern:
+        If pattern is not given,the search is for the following:
 
         * 32*tracks bits set at offset bytes
         * 1*tracks bits unset before offset
@@ -120,6 +122,17 @@ class Mark4FileReader(VLBIFileReaderBase):
 
         Parameters
         ----------
+        pattern : header, ~numpy.ndaray, bytes, or (iterable of) int, optional
+            Synchronization pattern to look for.  See above for the default.
+        mask : ~numpy.ndarray, bytes, int, or iterable of int.
+            Bit mask for the pattern, with 1 indicating a given bit will
+            be used the comparison.  Only used if ``pattern`` is given.
+        frame_nbytes : int, optional
+            Frame size in bytes.  Defaults to the frame size for
+            ``ntrack``.  If given, overrides ``self.ntrack``.
+        offset : int, optional
+            Offset from the frame start that the pattern occurs.  Only
+            used if ``pattern`` is given.
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
@@ -138,19 +151,37 @@ class Mark4FileReader(VLBIFileReaderBase):
             successful.
         """
         # Use initializer value (determines ntrack if not already given).
-        ntrack = self.ntrack
-        if ntrack is None:
-            with self.temporary_offset():
-                self.seek(0)
-                ntrack = self.determine_ntrack(maximum=maximum)
+        if isinstance(pattern, Mark4Header):
+            # TODO: get invariant_pattern() to work for Mark4Header!!
+            frame_nbytes = pattern.frame_nbytes
+            ntrack = pattern.ntrack
+            pattern = None
 
-        pattern = np.concatenate((np.zeros(ntrack // 8, dtype='u1'),
-                                  np.full(32 * ntrack // 8, 0xff, dtype='u1')))
-        offset = 63 * ntrack // 8
-        frame_nbytes = ntrack * 2500
-        return super().locate_frames(pattern, frame_nbytes=frame_nbytes,
-                                     offset=offset, forward=forward,
-                                     maximum=maximum, check=1)
+        elif frame_nbytes is None:
+            ntrack = self.ntrack
+            if ntrack is None:
+                with self.temporary_offset():
+                    self.seek(0)
+                    ntrack = self.determine_ntrack(maximum=maximum)
+
+            frame_nbytes = ntrack * 2500
+
+        else:
+            ntrack, resid = divmod(frame_nbytes, 2500)
+            if resid:
+                raise ValueError('frame_nbytes must be a multiple of '
+                                 '2500 bytes for Mark 4 data.')
+
+        if pattern is None:
+            pattern = np.concatenate(
+                (np.zeros(ntrack // 8, dtype='u1'),
+                 np.full(32 * ntrack // 8, 0xff, dtype='u1')))
+            offset = 63 * ntrack // 8
+            mask = None
+
+        return super().locate_frames(
+            pattern, mask=mask, frame_nbytes=frame_nbytes, offset=offset,
+            forward=forward, maximum=maximum, check=check)
 
     def determine_ntrack(self, maximum=None):
         """Determines the number of tracks, by seeking the next frame.
@@ -337,7 +368,8 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
 
     def _seek_frame(self, index):
         # Override vlbi_base version to include offset.
-        self.fh_raw.seek(self._offset0 + index * self.header0.frame_nbytes)
+        return self.fh_raw.seek(self._offset0
+                                + index*self.header0.frame_nbytes)
 
 
 class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
