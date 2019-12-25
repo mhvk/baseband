@@ -71,6 +71,9 @@ class TestGSB:
             assert s.readline().strip() == h_raw
             s.seek(0)
             header2 = gsb.GSBHeader.fromfile(s)
+            with pytest.raises(EOFError):
+                gsb.GSBHeader.fromfile(s)
+
         assert header == header2
         assert header2.mutable is False
         header3 = gsb.GSBHeader.fromkeys(**header)

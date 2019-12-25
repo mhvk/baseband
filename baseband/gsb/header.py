@@ -185,6 +185,8 @@ class GSBHeader(VLBIHeaderBase):
         """
         start_pos = fh.tell()
         s = fh.readline()
+        if s == '':
+            raise EOFError
         nbytes = fh.tell() - start_pos
         return cls(tuple(s.split()), mode=None, nbytes=nbytes, *args, **kwargs)
 
