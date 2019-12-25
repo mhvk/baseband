@@ -792,11 +792,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         try:
             frame = self._fh_raw_read_frame()
             if self.verify:
-                frame_index = self._tell_frame(frame)
-                assert frame_index == index, \
-                    ('wrong frame: wanted {}, found {}'
-                     .format(index, frame_index))
-
                 # TODO: should read any given header only once!
                 # TODO: Add frame index check?
                 try:
@@ -804,83 +799,98 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                         fh_raw.read_header()
                 except EOFError:
                     pass
-
         except Exception as exc:
-            # Something went wrong.
-            msg = 'problem loading frame index {}.'.format(index)
+            # Try possible recovery.
+            frame = self._bad_frame(raw_offset, index, exc)
 
-            # See if we're in the right place.  First ensure we have a header.
-            # Here, it is more important that it is a good one than that we go
-            # too far, so we insist on two consistent frames after it.  We
-            # increase the maximum a bit to be able to jump over bad bits.
-            self.fh_raw.seek(raw_offset)
-            try:
-                header = self.fh_raw.find_header(
-                    self.header0, forward=True, check=(1, 2),
-                    maximum=3*self.header0.frame_nbytes)
-            except HeaderNotFoundError:
-                exc.args += (msg + ' Cannot find header nearby.',)
-                raise exc from None
-
-            # Don't yet know how to deal with excess data.
-            header_index = self._tell_frame(header)
-            if header_index < index:
-                exc.args += (msg + ' There appears to be excess data.')
-                raise exc
-
-            # Go backward until we find previous frame, storing offsets
-            # as we go.  We again increase the maximum since we may need
-            # to jump over a bad bit.
-            while header_index >= index:
-                raw_pos = self.fh_raw.tell()
-                header1 = header
-                header1_index = header_index
-                self.fh_raw.seek(-1, 1)
-                try:
-                    header = self.fh_raw.find_header(
-                        self.header0, forward=False,
-                        maximum=4*self.header0.frame_nbytes)
-                except HeaderNotFoundError:
-                    exc.args += (msg + ' Could not find previous index.',)
-                    raise exc from None
-
-                header_index = self._tell_frame(header)
-                if header_index < header1_index:
-                    # While we are at it: if we pass an index boundary, update
-                    # the list of known indices.
-                    self._raw_offsets[header1_index] = (
-                        raw_pos - header1_index * self.header0.frame_nbytes)
-
-            # Move back to position of last good header (header1).
-            self.fh_raw.seek(raw_pos)
-
-            if header1_index > index:
-                # Frame is missing!
-                msg += ' The frame seems to be missing.'
-                # Construct a missing frame.
-                header = header1.copy()
-                self._set_time(header, self.time)
-                frame = self._frame.__class__(header, self._frame.payload,
-                                              valid=False)
-
-            else:
-                assert header1_index == index, \
-                    'at this point, we should have a good header.'
-                if raw_pos != raw_offset:
-                    msg += ' Stream off by {0} bytes.'.format(raw_offset
-                                                              - raw_pos)
-                    # Above, we should have added information about
-                    # this index in our offset table.
-                    assert index in self._raw_offsets.frame_nr
-
-                # At this point, reading the frame should always work,
-                # and we know there is a header right after it.
-                frame = self._fh_raw_read_frame()
-                assert self._tell_frame(frame) == index
-
-            warnings.warn(msg)
+        else:
+            if self.verify:
+                frame_index = self._tell_frame(frame)
+                if frame_index != index:
+                    frame = self._wrong_frame(raw_offset, index, frame_index)
 
         frame.fill_value = self.fill_value
+        return frame
+
+    def _wrong_frame(self, raw_offset, index, frame_index):
+        exc = ValueError('wrong frame number found.')
+        return self._bad_frame(raw_offset, index, exc)
+
+    def _bad_frame(self, raw_offset, index, exc):
+        """Deal with a bad frame."""
+        # Either the frame itself or the header after failed to read.
+        msg = 'problem loading frame index {}.'.format(index)
+
+        # See if we're in the right place.  First ensure we have a header.
+        # Here, it is more important that it is a good one than that we go
+        # too far, so we insist on two consistent frames after it.  We
+        # increase the maximum a bit to be able to jump over bad bits.
+        self.fh_raw.seek(raw_offset)
+        try:
+            header = self.fh_raw.find_header(
+                self.header0, forward=True, check=(1, 2),
+                maximum=3*self.header0.frame_nbytes)
+        except HeaderNotFoundError:
+            exc.args += (msg + ' Cannot find header nearby.',)
+            raise exc
+
+        # Don't yet know how to deal with excess data.
+        header_index = self._tell_frame(header)
+        if header_index < index:
+            exc.args += (msg + ' There appears to be excess data.')
+            raise exc
+
+        # Go backward until we find previous frame, storing offsets
+        # as we go.  We again increase the maximum since we may need
+        # to jump over a bad bit.
+        while header_index >= index:
+            raw_pos = self.fh_raw.tell()
+            header1 = header
+            header1_index = header_index
+            self.fh_raw.seek(-1, 1)
+            try:
+                header = self.fh_raw.find_header(
+                    self.header0, forward=False,
+                    maximum=4*self.header0.frame_nbytes)
+            except HeaderNotFoundError:
+                exc.args += (msg + ' Could not find previous index.',)
+                raise exc
+
+            header_index = self._tell_frame(header)
+            if header_index < header1_index:
+                # While we are at it: if we pass an index boundary, update
+                # the list of known indices.
+                self._raw_offsets[header1_index] = (
+                    raw_pos - header1_index * self.header0.frame_nbytes)
+
+        # Move back to position of last good header (header1).
+        self.fh_raw.seek(raw_pos)
+
+        if header1_index > index:
+            # Frame is missing!
+            msg += ' The frame seems to be missing.'
+            # Construct a missing frame.
+            header = header1.copy()
+            self._set_time(header, self.time)
+            frame = self._frame.__class__(header, self._frame.payload,
+                                          valid=False)
+
+        else:
+            assert header1_index == index, \
+                'at this point, we should have a good header.'
+            if raw_pos != raw_offset:
+                msg += ' Stream off by {0} bytes.'.format(raw_offset
+                                                          - raw_pos)
+                # Above, we should have added information about
+                # this index in our offset table.
+                assert index in self._raw_offsets.frame_nr
+
+            # At this point, reading the frame should always work,
+            # and we know there is a header right after it.
+            frame = self._fh_raw_read_frame()
+            assert self._tell_frame(frame) == index
+
+        warnings.warn(msg)
         return frame
 
     def _seek_frame(self, index):
