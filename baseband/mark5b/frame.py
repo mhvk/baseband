@@ -10,7 +10,7 @@ https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 """
 import numpy as np
 
-from ..vlbi_base.frame import VLBIFrameBase
+from ..vlbi_base.frame import FrameBase
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 
@@ -18,7 +18,7 @@ from .payload import Mark5BPayload
 __all__ = ['Mark5BFrame']
 
 
-class Mark5BFrame(VLBIFrameBase):
+class Mark5BFrame(FrameBase):
     """Representation of a Mark 5B frame, consisting of a header and payload.
 
     Parameters

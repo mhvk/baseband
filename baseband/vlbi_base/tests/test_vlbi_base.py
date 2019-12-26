@@ -10,7 +10,7 @@ import astropy.units as u
 
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import PayloadBase
-from ..frame import VLBIFrameBase
+from ..frame import FrameBase
 from ..base import (FileBase, VLBIFileReaderBase, VLBIStreamBase,
                     VLBIStreamReaderBase, VLBIStreamWriterBase)
 
@@ -62,7 +62,7 @@ class TestVLBIBase:
                                             dtype=Payload._dtype_word),
                                    sample_shape=(5,), bps=1, complex_data=True)
 
-        class Frame(VLBIFrameBase):
+        class Frame(FrameBase):
             _header_class = Header
             _payload_class = Payload
 

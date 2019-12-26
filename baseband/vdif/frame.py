@@ -10,7 +10,7 @@ For the VDIF specification, see https://www.vlbi.org/vdif
 """
 import numpy as np
 
-from ..vlbi_base.frame import VLBIFrameBase
+from ..vlbi_base.frame import FrameBase
 from .header import VDIFHeader, VDIFBaseHeader
 from .payload import VDIFPayload
 
@@ -18,7 +18,7 @@ from .payload import VDIFPayload
 __all__ = ['VDIFFrame', 'VDIFFrameSet']
 
 
-class VDIFFrame(VLBIFrameBase):
+class VDIFFrame(FrameBase):
     """Representation of a VDIF data frame, consisting of a header and payload.
 
     Parameters

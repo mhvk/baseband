@@ -1,5 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..vlbi_base.frame import VLBIFrameBase
+from ..vlbi_base.frame import FrameBase
 from .header import GSBHeader
 from .payload import GSBPayload
 
@@ -7,7 +7,7 @@ from .payload import GSBPayload
 __all__ = ['GSBFrame']
 
 
-class GSBFrame(VLBIFrameBase):
+class GSBFrame(FrameBase):
     """Frame encapsulating GSB rawdump or phased data.
 
     For rawdump data, lines in the timestamp file are associated with single

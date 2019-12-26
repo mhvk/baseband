@@ -1,18 +1,18 @@
 # Licensed under the GPLv3 - see LICENSE
 """
-Base definitions for VLBI frames, used for VDIF and Mark 5B.
+Base definitions for baseband frames.
 
-Defines a frame class VLBIFrameBase that can be used to hold a header and a
+Defines a frame class FrameBase that can be used to hold a header and a
 payload, providing access to the values encoded in both.
 """
 import numpy as np
 
 
-__all__ = ['VLBIFrameBase']
+__all__ = ['FrameBase']
 
 
-class VLBIFrameBase:
-    """Representation of a VLBI data frame, consisting of a header and payload.
+class FrameBase:
+    """Representation of a baseaband frame, consisting of a header and payload.
 
     Parameters
     ----------
