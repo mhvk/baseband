@@ -3,16 +3,16 @@
 
 Includes information about threads and frame sets.
 """
-from ..vlbi_base.file_info import VLBIFileReaderInfo, info_item
+from ..vlbi_base.file_info import FileReaderInfo, info_item
 
 
 __all__ = ['VDIFFileReaderInfo']
 
 
-class VDIFFileReaderInfo(VLBIFileReaderInfo):
+class VDIFFileReaderInfo(FileReaderInfo):
     attr_names = (('format', 'edv', 'number_of_frames', 'thread_ids',
                    'number_of_framesets')
-                  + VLBIFileReaderInfo.attr_names[2:])
+                  + FileReaderInfo.attr_names[2:])
     """Attributes that the container provides."""
 
     _header0_attrs = ('edv', 'bps', 'samples_per_frame')

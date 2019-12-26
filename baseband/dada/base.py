@@ -12,6 +12,7 @@ from ..vlbi_base.base import (
     VLBIFileBase, VLBIFileReaderBase,
     VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
+from ..vlbi_base.file_info import FileReaderInfo
 from ..vlbi_base.utils import lcm
 from .header import DADAHeader
 from .payload import DADAPayload
@@ -107,6 +108,7 @@ class DADAFileReader(VLBIFileReaderBase):
     fh_raw : filehandle
         Filehandle of the raw binary data file.
     """
+    info = FileReaderInfo()
 
     def read_header(self):
         """Read a single header from the file.

@@ -3,13 +3,13 @@
 
 Includes information about what is needed to calcuate times.
 """
-from ..vlbi_base.file_info import VLBIFileReaderInfo, info_item
+from ..vlbi_base.file_info import FileReaderInfo, info_item
 
 
 __all__ = ['Mark5BFileReaderInfo']
 
 
-class Mark5BFileReaderInfo(VLBIFileReaderInfo):
+class Mark5BFileReaderInfo(FileReaderInfo):
     _header0_attrs = ('complex_data',)
     _parent_attrs = ('nchan', 'bps', 'ref_time', 'kday')
 

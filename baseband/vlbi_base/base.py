@@ -15,7 +15,7 @@ from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
 from .offsets import RawOffsets
-from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from .file_info import FileReaderInfo, StreamReaderInfo
 from .utils import byte_array
 
 
@@ -138,7 +138,7 @@ class VLBIFileReaderBase(VLBIFileBase):
         Filehandle of the raw binary data file.
     """
 
-    info = VLBIFileReaderInfo()
+    info = FileReaderInfo()
 
     def locate_frames(self, pattern, *, mask=None, frame_nbytes=None,
                       offset=0, forward=True, maximum=None, check=1):
@@ -570,7 +570,7 @@ class VLBIStreamBase:
 
 class VLBIStreamReaderBase(VLBIStreamBase):
 
-    info = VLBIStreamReaderInfo()
+    info = StreamReaderInfo()
 
     def __init__(self, fh_raw, header0, *,
                  squeeze=True, subset=(), fill_value=0., verify=True,
@@ -599,6 +599,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                              "corrupted.  Try passing in an explicit "
                              "`sample_rate`.",)
                 raise
+
         return sample_rate
 
     def _squeeze_and_subset(self, data):
@@ -1135,7 +1136,7 @@ class FileInfo:
 
         Returns
         -------
-        info : `~baseband.vlbi_base.file_info.VLBIFileReaderInfo`
+        info : `~baseband.vlbi_base.file_info.FileReaderInfo`
             Information on the file.  Will evaluate as `False` if the
             file was not in the right format.
 
@@ -1166,7 +1167,7 @@ class FileInfo:
         ----------
         name : str or filehandle
             Item to be opened for reading in stream mode.
-        file_info : `~baseband.vlbi_base.file_info.VLBIFileReaderInfo`
+        file_info : `~baseband.vlbi_base.file_info.FileReaderInfo`
             Information gleaned from opening in binary mode.
         **kwargs
             Any keyword arguments that might be required to open the
@@ -1174,7 +1175,7 @@ class FileInfo:
 
         Returns
         -------
-        info : `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
+        info : `~baseband.vlbi_base.file_info.StreamReaderInfo`
             Information on the file.  Will evaluate as `False` if the
             file was not in the right format. Will return `None` if no
             sample rate information was present, or an `Exception` if
@@ -1214,8 +1215,8 @@ class FileInfo:
         Returns
         -------
         info
-            :class:`~baseband.vlbi_base.file_info.VLBIFileReaderInfo` or
-            :class:`~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`.
+            :class:`~baseband.vlbi_base.file_info.FileReaderInfo` or
+            :class:`~baseband.vlbi_base.file_info.StreamReaderInfo`.
             In addition to the normal ``info`` attributes, also stored
             are attributes about what happened to the keyword arguments:
             ``used_kwargs``, ``consistent_kwargs``, ``inconsistent_kwargs``
@@ -1250,7 +1251,7 @@ class FileInfo:
 
         Parameters
         ----------
-        info : `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
+        info : `~baseband.vlbi_base.file_info.StreamReaderInfo`
             Information gleaned from a file opened in stream reading mode.
         **kwargs
             Keyword arguments passed to the opener.
@@ -1284,7 +1285,7 @@ class FileInfo:
             Name of the key.
         value : object
             Corresponding value.
-        info : `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
+        info : `~baseband.vlbi_base.file_info.StreamReaderInfo`
             Information collected by opening a file in stream reader mode.
 
         Returns

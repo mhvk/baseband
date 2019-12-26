@@ -13,8 +13,8 @@ from astropy import units as u
 from astropy.time import Time
 
 
-__all__ = ['info_item', 'VLBIInfoMeta', 'VLBIInfoBase',
-           'VLBIFileReaderInfo', 'VLBIStreamReaderInfo']
+__all__ = ['info_item', 'InfoMeta', 'InfoBase',
+           'FileReaderInfo', 'StreamReaderInfo']
 
 
 class info_item:
@@ -116,7 +116,7 @@ class info_item:
         return value
 
 
-class VLBIInfoMeta(type):
+class InfoMeta(type):
     # Set any default attributes according to where they are mentioned
     # (if not explicitly defined already).
     def __init__(cls, name, bases, dct):
@@ -128,7 +128,7 @@ class VLBIInfoMeta(type):
             setattr(cls, attr, info_item(attr, needs='_parent'))
 
 
-class VLBIInfoBase(metaclass=VLBIInfoMeta):
+class InfoBase(metaclass=InfoMeta):
     """Container providing a standardized interface to file information.
 
     In order to ensure that information is always returned, all access
@@ -248,7 +248,7 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
         return result
 
 
-class VLBIFileReaderInfo(VLBIInfoBase):
+class FileReaderInfo(InfoBase):
     """Standardized information on file readers.
 
     The ``info`` descriptor has a number of standard attributes, which are
@@ -421,7 +421,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         return result
 
 
-class VLBIStreamReaderInfo(VLBIInfoBase):
+class StreamReaderInfo(InfoBase):
     """Standardized information on stream readers.
 
     The ``info`` descriptor provides a few standard attributes, most of which
