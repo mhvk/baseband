@@ -176,6 +176,14 @@ class Mark5BStreamBase(VLBIStreamBase):
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
 
+    def _get_time(self, header):
+        return header.get_time(frame_rate=self._frame_rate)
+
+    def _set_time(self, header, time):
+        """Update time and frame_nr, as well as the CRC."""
+        header.set_time(time, frame_rate=self._frame_rate)
+        header.update()
+
 
 class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
     """VLBI Mark 5B format reader.
@@ -251,9 +259,6 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         last_header.infer_kday(self.start_time)
         return last_header
 
-    def _set_time(self, header, time):
-        header.set_time(time, frame_rate=self._frame_rate)
-
     def _tell_frame(self, frame):
         # Override to provide index faster, without calculating times.
         # TODO: OK to ignore leap seconds? Not sure what writer does.
@@ -311,21 +316,11 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate, nchan=nchan,
             bps=bps, squeeze=squeeze)
-        # Initial payload, reused for every frame.
-        self._payload = Mark5BPayload(np.zeros((2500,), '<u4'),
-                                      nchan=self._unsliced_shape.nchan,
-                                      bps=self.bps)
-
-    def _make_frame(self, index):
-        # Set up header for new frame.
-        header = self.header0.copy()
-        # Update time and frame_nr in one go.
-        header.set_time(time=self.start_time + index / self._frame_rate,
-                        frame_rate=self._frame_rate)
-        # Recalculate CRC.
-        header.update()
-        # Reuse payload.
-        return Mark5BFrame(header, self._payload, valid=True)
+        # Initial frame, reused for every other one.
+        payload = Mark5BPayload(np.zeros((2500,), np.uint32),
+                                nchan=self._unsliced_shape.nchan,
+                                bps=self.bps)
+        self._frame = Mark5BFrame(header0.copy(), payload)
 
 
 open = make_opener('Mark5B', globals(), doc="""

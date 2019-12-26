@@ -122,6 +122,8 @@ class Mark5BHeader(VLBIHeaderBase):
         bcd_fraction : from ``fraction`` or ``time`` (may need ``frame_rate``)
         frame_nr : from ``time`` (may need ``frame_rate``)
         """
+        # TODO: maybe more logical to get the frame-rate in an override
+        # of update? That would also help Mark5BStreamBase._set_time.
         time = kwargs.pop('time', None)
         frame_rate = kwargs.pop('frame_rate', None)
         # Pop verify and pass on False so verify happens after time is set.

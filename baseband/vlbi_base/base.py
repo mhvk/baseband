@@ -1014,14 +1014,17 @@ class VLBIStreamWriterBase(VLBIStreamBase):
                                                          sample + nsample]
             if sample_end == self.samples_per_frame:
                 self._write_frame(self._frame, valid=self._valid)
-                # Be sure we do not reuse this frame (might also be needed
-                # to write memmaps to disk).
-                del self._frame
-                self._frame_index = None
 
             sample += nsample
             # Explicitly set offset (just in case write_frame adjusts it too).
             self.offset = offset0 + sample
+
+    def _make_frame(self, index):
+        # Default implementation assumes that an initial _frame was
+        # set up and just re-uses it with a new time.
+        self._set_time(self._frame.header,
+                       self.start_time + index / self._frame_rate)
+        return self._frame
 
     def _write_frame(self, frame, valid=True):
         # Default implementation is to assume this is a frame that can write
