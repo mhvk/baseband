@@ -13,7 +13,7 @@ import numpy as np
 from astropy import units as u, _erfa as erfa
 from astropy.time import Time, TimeString
 
-from ..vlbi_base.header import VLBIHeaderBase, HeaderParser
+from ..vlbi_base.header import ParsedHeaderBase, HeaderParser
 
 
 __all__ = ['TimeGSB', 'GSBHeader', 'GSBRawdumpHeader', 'GSBPhasedHeader']
@@ -98,7 +98,7 @@ def get_default(index, length, forward, backward, default=None):
     return default
 
 
-class GSBHeader(VLBIHeaderBase):
+class GSBHeader(ParsedHeaderBase):
     """GSB Header, based on a line from a timestamp file.
 
     Parameters
@@ -136,22 +136,19 @@ class GSBHeader(VLBIHeaderBase):
 
             cls = cls._gsb_header_classes.get(mode)
 
-        # We intialise VDIFHeader subclasses, so their __init__ will be called.
+        # We intialise GSBHeader subclasses, so their __init__ will be called.
         return super().__new__(cls)
 
     def __init__(self, words, mode=None, nbytes=None, utc_offset=5.5*u.hr,
                  verify=True):
         if words is None:
-            self.words = [''] * self._number_of_words
-        else:
-            self.words = words
+            words = [''] * self._number_of_words
         if nbytes is not None:
             self._nbytes = nbytes
         if mode is not None:
             self._mode = mode
         self.utc_offset = utc_offset
-        if verify:
-            self.verify()
+        super().__init__(words, verify=verify)
 
     def verify(self):
         assert self.mode == self.__class__._mode
@@ -235,10 +232,6 @@ class GSBHeader(VLBIHeaderBase):
         if nbytes is None:
             nbytes = self.nbytes
         return n * nbytes
-
-    def __eq__(self, other):
-        return (type(self) is type(other)
-                and tuple(self.words) == tuple(other.words))
 
 
 class GSBRawdumpHeader(GSBHeader):
