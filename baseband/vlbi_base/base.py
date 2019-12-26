@@ -782,29 +782,55 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         return out
 
+    _next_index = None
+
+    @lazyproperty
+    def _last_index(self):
+        return self._tell_frame(self._last_header)
+
     def _read_frame(self, index):
         """Base implementation of reading a frame.
 
-        This contains multiple pieces which subclasses can override as
-        needed (or override the whole thing).
+        This contains two pieces which subclasses can override as needed
+        (or override the whole thing).
         """
+
         raw_offset = self._seek_frame(index)
-        try:
+        if not self.verify:
             frame = self._fh_raw_read_frame()
-            if self.verify:
-                # TODO: should read any given header only once!
-                # TODO: Add frame index check?
-                try:
-                    with self.fh_raw.temporary_offset() as fh_raw:
-                        fh_raw.read_header()
-                except EOFError:
-                    pass
-        except Exception as exc:
-            # Try possible recovery.
-            frame = self._bad_frame(raw_offset, index, exc)
 
         else:
-            if self.verify:
+            # If we are reading with care, we read also a frame ahead
+            # to make sure that is not corrupted.  Since that frame will
+            # generally be needed next, we keep it and can use it now.
+            try:
+                if index == self._next_index:
+                    frame = self._next_frame
+                    self.fh_raw.seek(frame.nbytes, 1)
+                else:
+                    frame = self._fh_raw_read_frame()
+
+                # Check next frame (if there is one).
+                if index < self._last_index:
+                    with self.fh_raw.temporary_offset():
+                        next_frame = self._fh_raw_read_frame()
+
+                else:
+                    next_frame = None
+
+            except Exception as exc:
+                # Try possible recovery.
+                frame = self._bad_frame(raw_offset, index, exc)
+
+            else:
+                # Keep any next frame for next call.
+                if next_frame is None:
+                    self._next_index = self._next_frame = None
+                else:
+                    self._next_index = self._tell_frame(next_frame)
+                    self._next_frame = next_frame
+
+                # Check whether we actually got the right frame.
                 frame_index = self._tell_frame(frame)
                 if frame_index != index:
                     frame = self._wrong_frame(raw_offset, index, frame_index)
