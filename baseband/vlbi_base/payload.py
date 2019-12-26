@@ -1,10 +1,10 @@
 # Licensed under the GPLv3 - see LICENSE
 """
-Base definitions for VLBI payloads, used for VDIF and Mark 5B.
+Base definitions for payloads.
 
-Defines a payload class VLBIPayloadBase that can be used to hold the words
-corresponding to a frame payload, providing access to the values encoded in
-it as a numpy array.
+Defines a payload class PayloadBase that can be used to hold the words
+corresponding to a frame payload, providing access to the values encoded
+in it as a numpy array.
 """
 import operator
 from functools import reduce
@@ -12,11 +12,11 @@ from functools import reduce
 import numpy as np
 
 
-__all__ = ['VLBIPayloadBase']
+__all__ = ['PayloadBase']
 
 
-class VLBIPayloadBase:
-    """Container for decoding and encoding VLBI payloads.
+class PayloadBase:
+    """Container for decoding and encoding baseband payloads.
 
     Any subclass should define dictionaries ``_decoders`` and ``_encoders``,
     which hold functions that decode/encode the payload words to/from ndarray.

@@ -4,7 +4,7 @@ from collections import namedtuple
 
 import numpy as np
 
-from ..vlbi_base.payload import VLBIPayloadBase
+from ..vlbi_base.payload import PayloadBase
 
 
 __all__ = ['DADAPayload']
@@ -18,7 +18,7 @@ def encode_8bit(values):
     return np.clip(np.rint(values), -128, 127).astype(np.int8)
 
 
-class DADAPayload(VLBIPayloadBase):
+class DADAPayload(PayloadBase):
     """Container for decoding and encoding DADA payloads.
 
     Parameters

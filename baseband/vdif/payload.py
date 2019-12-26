@@ -12,7 +12,7 @@ from collections import namedtuple
 
 import numpy as np
 
-from ..vlbi_base.payload import VLBIPayloadBase
+from ..vlbi_base.payload import PayloadBase
 from ..vlbi_base.encoding import (
     encode_1bit_base, encode_2bit_base, encode_4bit_base,
     decoder_levels, decode_8bit, encode_8bit)
@@ -114,7 +114,7 @@ def encode_4bit(values):
     return b[:, 0] | b[:, 1]
 
 
-class VDIFPayload(VLBIPayloadBase):
+class VDIFPayload(PayloadBase):
     """Container for decoding and encoding VDIF payloads.
 
     Parameters

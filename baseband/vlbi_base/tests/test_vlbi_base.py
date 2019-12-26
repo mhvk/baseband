@@ -9,7 +9,7 @@ import numpy as np
 import astropy.units as u
 
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
-from ..payload import VLBIPayloadBase
+from ..payload import PayloadBase
 from ..frame import VLBIFrameBase
 from ..base import (FileBase, VLBIFileReaderBase, VLBIStreamBase,
                     VLBIStreamReaderBase, VLBIStreamWriterBase)
@@ -32,7 +32,7 @@ def decode_8bit(values):
     return values.view(np.int8).astype(np.float32)
 
 
-class Payload(VLBIPayloadBase):
+class Payload(PayloadBase):
     _encoders = {1: encode_1bit,
                  8: encode_8bit}
     _decoders = {1: decode_1bit,

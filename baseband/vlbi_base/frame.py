@@ -19,7 +19,7 @@ class VLBIFrameBase:
     header : `baseband.vlbi_base.header.VLBIHeaderBase`
         Wrapper around the encoded header words, providing access to the
         header information.
-    payload : `~baseband.vlbi_base.payload.VLBIPayloadBase`
+    payload : `~baseband.vlbi_base.payload.PayloadBase`
         Wrapper around the payload, provding mechanisms to decode it.
     valid : bool
         Whether the data are valid.  Default: `True`.
