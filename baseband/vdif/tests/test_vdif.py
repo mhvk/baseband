@@ -1073,18 +1073,19 @@ class TestVDIF:
             fr.tofile(fw)
 
         with vdif.open(testverifyfile, 'rs') as fn:
-            assert fn.verify is True
-            # This should fail at the second frameset.
+            assert fn.verify
+            # This should fail at the first frameset, since its following
+            # one is corrupt.
             with pytest.raises(AssertionError):
                 fn.read()
-            assert fn.tell() == 20000
+            assert fn.tell() == 0
             fn.verify = False
-            assert fn.verify is False
-            assert np.all(fn.read() == data[20000:])
+            assert not fn.verify
+            assert np.all(fn.read() == data)
 
         # Check that we can pass verify=False.
         with vdif.open(testverifyfile, 'rs', verify=False) as fn:
-            assert fn.verify is False
+            assert not fn.verify
             assert np.all(fn.read() == data)
 
     # Test that writing an incomplete stream is possible, and that frame set is
@@ -1143,9 +1144,7 @@ class TestVDIF:
             assert f2.header0 == f1.header0
             assert f2.stop_time == f1.stop_time
             d1 = f1.read()
-            with pytest.warns(UserWarning,
-                              match='problem loading frame index 1'):
-                d2 = f2.read()
+            d2 = f2.read()
 
             assert np.all(d1 == d2)
 
