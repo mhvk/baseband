@@ -203,10 +203,6 @@ class GUPPIHeader(fits.Header):
         if not self.mutable:
             raise TypeError("immutable {0} does not support assignment."
                             .format(type(self).__name__))
-        if isinstance(value, tuple):
-            value, comment = value
-            self.comments[key.upper()] = comment
-
         super().__setitem__(key.upper(), value)
 
     @property

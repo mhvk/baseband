@@ -18,7 +18,237 @@ from astropy.utils import sharedmethod, classproperty
 
 __all__ = ['fixedvalue', 'four_word_struct', 'eight_word_struct',
            'make_parser', 'make_setter', 'get_default',
-           'ParserDict', 'HeaderParser', 'VLBIHeaderBase']
+           'ParserDict', 'HeaderParser', 'HeaderBase', 'VLBIHeaderBase']
+
+
+class HeaderBase:
+    """Base class for all baseband headers.
+
+    Defines a number of common routines.
+
+    Generally, the actual class should define:
+
+      _header_parser : `HeaderParser` instance corresponding to this class.
+
+      _properties : tuple of properties accessible/usable in initialisation
+
+    It also should define properties that tell the size (getters *and*
+    setters, or use a `baseband.vlbi_base.header.fixedvalue` if the
+    value is the same for all instances):
+
+      payload_nbytes : number of bytes used by payload
+
+      frame_nbytes : total number of bytes for header + payload
+
+      get_time, set_time, and a corresponding time property :
+           time at start of payload
+
+    Parameters
+    ----------
+    words : tuple or list
+        Header words.  If given as a tuple, the header is immutable.
+    verify : bool, optional
+        Whether to do basic verification of integrity.
+
+    """
+
+    _properties = ('payload_nbytes', 'frame_nbytes', 'time')
+    """Properties accessible/usable in initialisation for all headers."""
+
+    def __init__(self, words, verify=True):
+        self.words = words
+        if verify:
+            self.verify()
+
+    def verify(self):
+        """Base verification always passes.
+
+        Only here for subclasses to be able to do super().
+        """
+        pass
+
+    def copy(self, **kwargs):
+        """Create a mutable and independent copy of the header.
+
+        Keyword arguments can be passed on as needed by possible subclasses.
+        """
+        kwargs.setdefault('verify', False)
+        new = self.__class__(copy(self.words), **kwargs)
+        new.mutable = True
+        return new
+
+    def __copy__(self):
+        return self.copy()
+
+    @property
+    def mutable(self):
+        """Whether the header can be modified."""
+        if isinstance(self.words, tuple):
+            return False
+        word0 = self.words[0]
+        try:
+            self.words[0] = 0
+        except Exception:
+            return False
+        else:
+            self.words[0] = word0
+            return True
+
+    @mutable.setter
+    def mutable(self, mutable):
+        if isinstance(self.words, np.ndarray):
+            self.words.flags['WRITEABLE'] = mutable
+        elif isinstance(self.words, tuple):
+            if mutable:
+                self.words = list(self.words)
+        elif isinstance(self.words, list):
+            if not mutable:
+                self.words = tuple(self.words)
+        else:
+            raise TypeError("do not know how to set mutability of '.words' "
+                            "of class {0}".format(type(self.words)))
+
+    @classmethod
+    def fromvalues(cls, *args, **kwargs):
+        """Initialise a header from parsed values.
+
+        Here, the parsed values must be given as keyword arguments, i.e., for
+        any ``header = cls(<words>)``, ``cls.fromvalues(**header) == header``.
+
+        However, unlike for the `fromkeys` class method, data can also be set
+        using arguments named after header methods, such as ``time``.
+
+        Parameters
+        ----------
+        *args
+            Possible arguments required to initialize an empty header.
+        **kwargs
+            Values used to initialize header keys or methods.
+        """
+        # Initialize an empty header, and update it with the keyword arguments.
+        self = cls(None, *args, verify=False)
+        # Set defaults in keyword arguments.
+        for key in set(self.keys()).difference(kwargs.keys()):
+            default = self._header_parser.defaults[key]
+            if default is not None:
+                kwargs[key] = default
+
+        self.update(**kwargs)
+        return self
+
+    @classmethod
+    def fromkeys(cls, *args, **kwargs):
+        """Initialise a header from parsed values.
+
+        Like fromvalues, but without any interpretation of keywords.
+
+        Raises
+        ------
+        KeyError : if not all keys required are present in ``kwargs``
+        """
+        self = cls(None, *args, verify=False)
+        not_in_both = (set(self.keys()).symmetric_difference(kwargs)
+                       - {'verify'})
+        if not_in_both:
+            not_in_kwarg = set(self.keys()).difference(kwargs)
+            not_in_self = set(kwargs).difference(self.keys()) - {'verify'}
+            msg_parts = []
+            for item, msg in ((not_in_kwarg, "is missing keywords ({0})"),
+                              (not_in_self, "contains extra keywords ({0})")):
+                if item:
+                    msg_parts.append(msg.format(item))
+
+            raise KeyError("input list " + " and ".join(msg_parts))
+
+        self.update(**kwargs)
+        return self
+
+    def update(self, *, verify=True, **kwargs):
+        """Update the header by setting keywords or properties.
+
+        Here, any keywords matching header keys are applied first, and any
+        remaining ones are used to set header properties, in the order set
+        by the class (in ``_properties``).
+
+        Parameters
+        ----------
+        verify : bool, optional
+            If `True` (default), verify integrity after updating.
+        **kwargs
+            Arguments used to set keywords and properties.
+        """
+        # First use keywords which are also keys into self.
+        for key in set(kwargs.keys()).intersection(self.keys()):
+            self[key] = kwargs.pop(key)
+
+        # Next, use remaining keyword arguments to set properties.
+        # Order is important, so we cannot use an intersection as above.
+        if kwargs:
+            for key in self._properties:
+                if key in kwargs:
+                    setattr(self, key, kwargs.pop(key))
+
+            if kwargs:
+                warnings.warn("some keywords unused in header update: {0}"
+                              .format(kwargs))
+
+        if verify:
+            self.verify()
+
+    def __getitem__(self, item):
+        """Get the value of a particular header item from the header words."""
+        try:
+            return self._header_parser.parsers[item](self.words)
+        except KeyError:
+            raise KeyError("{0} header does not contain {1}"
+                           .format(self.__class__.__name__, item))
+
+    def __setitem__(self, item, value):
+        """Set the value of a particular header item in the header words.
+
+        If value is `None`, set the item to its default value (if it exists);
+        if `True`, set all bits in the item (i.e., set item to its maximum).
+        """
+        try:
+            self._header_parser.setters[item](self.words, value)
+        except KeyError:
+            raise KeyError("{0} header does not contain {1}"
+                           .format(self.__class__.__name__, item))
+        except(TypeError, ValueError):
+            if not self.mutable:
+                raise TypeError("header is immutable. Set '.mutable` attribute"
+                                " or make a copy.")
+            else:
+                raise
+
+    def keys(self):
+        """All keys defined for this header."""
+        return self._header_parser.keys()
+
+    def _ipython_key_completions_(self):
+        # Enables tab-completion of header keys in IPython.
+        return self.keys()
+
+    def __contains__(self, key):
+        return key in self.keys()
+
+    def __eq__(self, other):
+        return (type(self) is type(other)
+                and np.all(np.array(self.words, copy=False)
+                           == np.array(other.words, copy=False)))
+
+    @staticmethod
+    def _repr_as_hex(key):
+        return (key.startswith('bcd') or key.startswith('crc')
+                or key == 'sync_pattern')
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return ("<{0} {1}>".format(name, (",\n  " + len(name) * " ").join(
+            ["{0}: {1}".format(k, hex(self[k]) if self._repr_as_hex(k)
+                               else self[k])
+             for k in self.keys()])))
+
 
 four_word_struct = struct.Struct('<4I')
 """Struct instance that packs/unpacks 4 unsigned 32-bit integers."""
@@ -259,7 +489,7 @@ class HeaderParser(OrderedDict):
     defaults = ParserDict('get_default')
 
 
-class VLBIHeaderBase:
+class VLBIHeaderBase(HeaderBase):
     """Base class for all VLBI headers.
 
     Defines a number of common routines.
@@ -305,16 +535,12 @@ class VLBIHeaderBase:
     _struct = struct.Struct('')
     """Structure for the header words.  To be overridden by subclasses."""
 
-    _properties = ('payload_nbytes', 'frame_nbytes', 'time')
-    """Properties accessible/usable in initialisation for all headers."""
-
     def __init__(self, words, verify=True):
         if words is None:
-            self.words = [0] * (self._struct.size // 4)
-        else:
-            self.words = words
-            if verify:
-                self.verify()
+            words = [0] * (self._struct.size // 4)
+            verify = False
+
+        super().__init__(words, verify=verify)
 
     def verify(self):
         """Verify that the length of the words is consistent.
@@ -322,19 +548,6 @@ class VLBIHeaderBase:
         Subclasses should override this to do more thorough checks.
         """
         assert len(self.words) == (self._struct.size // 4)
-
-    def copy(self, **kwargs):
-        """Create a mutable and independent copy of the header.
-
-        Keyword arguments can be passed on as needed by possible subclasses.
-        """
-        kwargs.setdefault('verify', False)
-        new = self.__class__(copy(self.words), **kwargs)
-        new.mutable = True
-        return new
-
-    def __copy__(self):
-        return self.copy()
 
     @sharedmethod
     def invariants(self):
@@ -418,34 +631,6 @@ class VLBIHeaderBase:
         """Size of the header in bytes."""
         return cls._struct.size
 
-    @property
-    def mutable(self):
-        """Whether the header can be modified."""
-        if isinstance(self.words, tuple):
-            return False
-        word0 = self.words[0]
-        try:
-            self.words[0] = 0
-        except Exception:
-            return False
-        else:
-            self.words[0] = word0
-            return True
-
-    @mutable.setter
-    def mutable(self, mutable):
-        if isinstance(self.words, np.ndarray):
-            self.words.flags['WRITEABLE'] = mutable
-        elif isinstance(self.words, tuple):
-            if mutable:
-                self.words = list(self.words)
-        elif isinstance(self.words, list):
-            if not mutable:
-                self.words = tuple(self.words)
-        else:
-            raise TypeError("do not know how to set mutability of '.words' "
-                            "of class {0}".format(type(self.words)))
-
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
         """Read VLBI Header from file.
@@ -461,144 +646,3 @@ class VLBIHeaderBase:
     def tofile(self, fh):
         """Write VLBI frame header to filehandle."""
         return fh.write(self._struct.pack(*self.words))
-
-    @classmethod
-    def fromvalues(cls, *args, **kwargs):
-        """Initialise a header from parsed values.
-
-        Here, the parsed values must be given as keyword arguments, i.e., for
-        any ``header = cls(<words>)``, ``cls.fromvalues(**header) == header``.
-
-        However, unlike for the `fromkeys` class method, data can also be set
-        using arguments named after header methods, such as ``time``.
-
-        Parameters
-        ----------
-        *args
-            Possible arguments required to initialize an empty header.
-        **kwargs
-            Values used to initialize header keys or methods.
-        """
-        # Initialize an empty header, and update it with the keyword arguments.
-        self = cls(None, *args, verify=False)
-        # Set defaults in keyword arguments.
-        for key in set(self.keys()).difference(kwargs.keys()):
-            default = self._header_parser.defaults[key]
-            if default is not None:
-                kwargs[key] = default
-
-        self.update(**kwargs)
-        return self
-
-    @classmethod
-    def fromkeys(cls, *args, **kwargs):
-        """Initialise a header from parsed values.
-
-        Like fromvalues, but without any interpretation of keywords.
-
-        Raises
-        ------
-        KeyError : if not all keys required are present in ``kwargs``
-        """
-        self = cls(None, *args, verify=False)
-        not_in_both = (set(self.keys()).symmetric_difference(kwargs)
-                       - {'verify'})
-        if not_in_both:
-            not_in_kwarg = set(self.keys()).difference(kwargs)
-            not_in_self = set(kwargs).difference(self.keys()) - {'verify'}
-            msg_parts = []
-            for item, msg in ((not_in_kwarg, "is missing keywords ({0})"),
-                              (not_in_self, "contains extra keywords ({0})")):
-                if item:
-                    msg_parts.append(msg.format(item))
-
-            raise KeyError("input list " + " and ".join(msg_parts))
-
-        self.update(**kwargs)
-        return self
-
-    def update(self, *, verify=True, **kwargs):
-        """Update the header by setting keywords or properties.
-
-        Here, any keywords matching header keys are applied first, and any
-        remaining ones are used to set header properties, in the order set
-        by the class (in ``_properties``).
-
-        Parameters
-        ----------
-        verify : bool, optional
-            If `True` (default), verify integrity after updating.
-        **kwargs
-            Arguments used to set keywords and properties.
-        """
-        # First use keywords which are also keys into self.
-        for key in set(kwargs.keys()).intersection(self.keys()):
-            self[key] = kwargs.pop(key)
-
-        # Next, use remaining keyword arguments to set properties.
-        # Order is important, so we cannot use an intersection as above.
-        if kwargs:
-            for key in self._properties:
-                if key in kwargs:
-                    setattr(self, key, kwargs.pop(key))
-
-            if kwargs:
-                warnings.warn("some keywords unused in header update: {0}"
-                              .format(kwargs))
-
-        if verify:
-            self.verify()
-
-    def __getitem__(self, item):
-        """Get the value a particular header item from the header words."""
-        try:
-            return self._header_parser.parsers[item](self.words)
-        except KeyError:
-            raise KeyError("{0} header does not contain {1}"
-                           .format(self.__class__.__name__, item))
-
-    def __setitem__(self, item, value):
-        """Set the value of a particular header item in the header words.
-
-        If value is `None`, set the item to its default value (if it exists);
-        if `True`, set all bits in the item (i.e., set item to its maximum).
-        """
-        try:
-            self._header_parser.setters[item](self.words, value)
-        except KeyError:
-            raise KeyError("{0} header does not contain {1}"
-                           .format(self.__class__.__name__, item))
-        except(TypeError, ValueError):
-            if not self.mutable:
-                raise TypeError("header is immutable. Set '.mutable` attribute"
-                                " or make a copy.")
-            else:
-                raise
-
-    def keys(self):
-        """All keys defined for this header."""
-        return self._header_parser.keys()
-
-    def _ipython_key_completions_(self):
-        # Enables tab-completion of header keys in IPython.
-        return self.keys()
-
-    def __contains__(self, key):
-        return key in self.keys()
-
-    def __eq__(self, other):
-        return (type(self) is type(other)
-                and np.all(np.array(self.words, copy=False)
-                           == np.array(other.words, copy=False)))
-
-    @staticmethod
-    def _repr_as_hex(key):
-        return (key.startswith('bcd') or key.startswith('crc')
-                or key == 'sync_pattern')
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        return ("<{0} {1}>".format(name, (",\n  " + len(name) * " ").join(
-            ["{0}: {1}".format(k, hex(self[k]) if self._repr_as_hex(k)
-                               else self[k])
-             for k in self.keys()])))
