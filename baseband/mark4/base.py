@@ -319,16 +319,17 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         squeezing).  If an empty tuple (default), all channels are read.
     fill_value : float or complex, optional
         Value to use for invalid or missing data. Default: 0.
-    verify : bool, optional
-        Whether to do basic checks of frame integrity when reading.  The first
-        frame of the stream is always checked.  Default: `True`.
+    verify : bool or str, optional
+        Whether to do basic checks of frame integrity when reading.
+        Default: 'fix', which implies basic verification and replacement
+        of gaps with zeros.
     """
 
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, ntrack=None, decade=None,
                  ref_time=None, squeeze=True, subset=(), fill_value=0.,
-                 verify=True):
+                 verify='fix'):
 
         if decade is None and ref_time is None:
             raise TypeError("Mark 4 stream reader requires either decade or "
@@ -452,9 +453,10 @@ subset : indexing object, optional
     squeezing).  If an empty tuple (default), all channels are read.
 fill_value : float or complex, optional
     Value to use for invalid or missing data. Default: 0.
-verify : bool, optional
-    Whether to do basic checks of frame integrity when reading.  The first
-    frame of the stream is always checked.  Default: `True`.
+verify : bool or 'fix', optional
+    Whether to do basic checks of frame integrity when reading.
+    Default: 'fix', which implies basic verification and replacement
+    of gaps with zeros.
 
 --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
 

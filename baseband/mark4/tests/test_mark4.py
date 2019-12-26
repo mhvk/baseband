@@ -844,6 +844,13 @@ class TestMark4:
                                    np.zeros_like(frame1.data), frame1.data))
         assert_array_equal(data, expected)
 
+        with mark4.open(corrupt_file, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010, verify=True) as f3:
+            assert f3.start_time == frame0.header.time
+            assert abs(f3.stop_time - frame1.header.time - dt) < 1*u.ns
+            with pytest.raises(ValueError, match='wrong frame number'):
+                data = f3.read()
+
     def test_stream_invalid(self):
         with pytest.raises(ValueError):
             mark4.open('ts.dat', 's')
