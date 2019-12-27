@@ -393,11 +393,13 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         frameset = fh_raw.read_frameset()
         header0 = frameset.header0
         thread_ids = [fr['thread_id'] for fr in frameset.frames]
-        self._frameset_nbytes = fh_raw.tell()
+        frameset_nbytes = fh_raw.tell()
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
             nthread=len(frameset.frames), squeeze=squeeze, subset=subset,
             fill_value=fill_value, verify=verify)
+        self._raw_offsets.frame_nbytes = frameset_nbytes
+
         # Check whether we are reading only some threads.  This is somewhat
         # messy since normally we apply the whole subset to the whole data,
         # but here we need to split it up in the part that selects specific
@@ -441,11 +443,11 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         """Last header of the file."""
         # Go to end of file.
         with self.fh_raw.temporary_offset() as fh_raw:
+            maximum = 2 * self._raw_offsets.frame_nbytes
             # Find first header with same thread_id going backward.
             fh_raw.seek(-self.header0.frame_nbytes, 2)
             locations = fh_raw.locate_frames(self.header0, forward=False,
-                                             maximum=2*self._frameset_nbytes,
-                                             check=(-1, 1))
+                                             maximum=maximum, check=(-1, 1))
             for location in locations:
                 fh_raw.seek(location)
                 try:
@@ -456,10 +458,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                 if header['thread_id'] == self.header0['thread_id']:
                     return header
 
-            raise HeaderNotFoundError("corrupt VDIF? No thread_id={0} frame "
-                                      "in last {1} bytes."
-                                      .format(self.header0['thread_id'],
-                                              2*self._frameset_nbytes))
+            raise HeaderNotFoundError(
+                "corrupt VDIF? No thread_id={0} frame in last {1} bytes."
+                .format(self.header0['thread_id'], maximum))
 
     def _squeeze_and_subset(self, data):
         # Overwrite VLBIStreamReaderBase version, since the threads part of
@@ -473,11 +474,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         return data
 
     # Overrides to deal with framesets instead of frames.
-    def _seek_frame(self, index):
-        raw_corr = self._raw_offsets[index]
-        raw_offset = index * self._frameset_nbytes + raw_corr
-        return self.fh_raw.seek(raw_offset)
-
     def _fh_raw_read_frame(self):
         return self.fh_raw.read_frameset(self._thread_ids,
                                          edv=self.header0.edv,
@@ -549,8 +545,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             if header_index < header1_index:
                 # While we are at it: if we pass an index boundary,
                 # update the list of known indices.
-                self._raw_offsets[header1_index] = (
-                    raw_pos - header1_index * self._frameset_nbytes)
+                self._raw_offsets[header1_index] = raw_pos
 
         # Move back to position of last good header (header1).
         self.fh_raw.seek(raw_pos)
@@ -582,8 +577,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                                                           - raw_pos)
                 # Above, we should have added information about
                 # this index in our offset table.
-                assert raw_pos == (index*self._frameset_nbytes
-                                   + self._raw_offsets[index])
+                assert raw_pos == self._raw_offsets[index]
 
             # Try again to read it, however many threads there are.
             # TODO: this somewhat duplicates FrameSet.fromfile; possibly
@@ -668,8 +662,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             # offset (which likely will be needed, saving some time).
             if (next_header is not None
                     and self._tell_frame(next_header) == index + 1):
-                self._raw_offsets[index+1] = (
-                    self.fh_raw.tell() - (index+1) * self._frameset_nbytes)
+                self._raw_offsets[index+1] = self.fh_raw.tell()
 
         # Create invalid frame template,
         invalid_frame = self._frameset.frames[0].__class__(

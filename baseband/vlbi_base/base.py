@@ -528,7 +528,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         super().__init__(
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
             bps, complex_data, squeeze, subset, fill_value, verify)
-        self._raw_offsets = RawOffsets()
+
+        if hasattr(header0, 'frame_nbytes'):
+            self._raw_offsets = RawOffsets(frame_nbytes=header0.frame_nbytes)
 
     info = VLBIStreamReaderInfo()
 
@@ -891,8 +893,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
             header_index = self._tell_frame(header)
             # While we are at it, update the list of known indices.
-            self._raw_offsets[header1_index] = (
-                raw_pos - header1_index * self.header0.frame_nbytes)
+            self._raw_offsets[header1_index] = raw_pos
 
         # Move back to position of last good header (header1).
         self.fh_raw.seek(raw_pos)
@@ -926,9 +927,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
     def _seek_frame(self, index):
         """Move the underlying file pointer to the frame of the given index."""
-        raw_corr = self._raw_offsets[index]
-        raw_offset = index * self.header0.frame_nbytes + raw_corr
-        return self.fh_raw.seek(raw_offset)
+        return self.fh_raw.seek(self._raw_offsets[index])
 
     def _fh_raw_read_frame(self):
         """Read a frame at the current position of the underlying file."""

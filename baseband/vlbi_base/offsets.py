@@ -1,5 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 import bisect
+import operator
 
 
 class RawOffsets:
@@ -19,6 +20,9 @@ class RawOffsets:
         Frame number for which one has offsets.
     offset : list
         Corresponding offsets.
+    frame_nbytes : int
+        Possible frame size to include in all returned offsets, i.e.,
+        output will be ``offset + index * frame_nbytes``.  Default: 0.
 
     Examples
     --------
@@ -39,14 +43,30 @@ class RawOffsets:
       >>> offsets[9]  # Then 9 is the same.
       9
       >>> offsets  # And the list is kept minimal.
-      RawOffsets(frame_nr=[6, 8], offset=[5, 9])
+      RawOffsets(frame_nr=[6, 8], offset=[5, 9], frame_nbytes=0)
       >>> offsets[9] = 9  # This is a no-op.
       >>> offsets[10] = 10  # But this is not.
       >>> offsets
-      RawOffsets(frame_nr=[6, 8, 10], offset=[5, 9, 10])
+      RawOffsets(frame_nr=[6, 8, 10], offset=[5, 9, 10], frame_nbytes=0)
+
+    Similarly, if a frame size is passed in::
+
+      >>> offsets = RawOffsets([6, 8, 10], [5, 9, 10], frame_nbytes=1000)
+      >>> offsets
+      RawOffsets(frame_nr=[6, 8, 10], offset=[5, 9, 10], frame_nbytes=1000)
+      >>> offsets[1]
+      1000
+      >>> offsets[8]
+      8009
+      >>> offsets[8] = 8005  # This removes the offset for 9.
+      >>> offsets[8]
+      8005
+      >>> offsets
+      RawOffsets(frame_nr=[6, 10], offset=[5, 10], frame_nbytes=1000)
+
     """
 
-    def __init__(self, frame_nr=None, offset=None):
+    def __init__(self, frame_nr=None, offset=None, frame_nbytes=0):
         if frame_nr is None:
             frame_nr = []
         if offset is None:
@@ -56,17 +76,21 @@ class RawOffsets:
                              'and offsets.')
         self.frame_nr = frame_nr
         self.offset = offset
+        self.frame_nbytes = operator.index(frame_nbytes)
 
     def __getitem__(self, frame_nr):
         # Keep default case of no offsets as fast as possible.
+        base = frame_nr * self.frame_nbytes
         if not self.frame_nr:
-            return 0
+            return base
         # Find first index for which frame_nr < value-at-index,
         # hence the offset at the previous index is the one we need.
         index = bisect.bisect_right(self.frame_nr, frame_nr)
-        return 0 if index == 0 else self.offset[index - 1]
+        return base if index == 0 else base + self.offset[index - 1]
 
     def __setitem__(self, frame_nr, offset):
+        # Get the offset from expected.
+        offset -= frame_nr * self.frame_nbytes
         # Find first index for which frame_nr < value-at-index.
         # Hence, this is where we should be if we do not yet exist.
         index = bisect.bisect_right(self.frame_nr, frame_nr)
@@ -97,5 +121,6 @@ class RawOffsets:
         return len(self.frame_nr)
 
     def __repr__(self):
-        return ('{0}(frame_nr={1}, offset={2})'
-                .format(type(self).__name__, self.frame_nr, self.offset))
+        return ('{0}(frame_nr={1}, offset={2}, frame_nbytes={3})'
+                .format(type(self).__name__, self.frame_nr, self.offset,
+                        self.frame_nbytes))
