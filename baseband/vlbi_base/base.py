@@ -613,7 +613,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                                           check=(-1, 1))
             except HeaderNotFoundError as exc:
                 exc.args += ("corrupt VLBI frame? No frame in last {0} bytes."
-                             .format(10 * self.header0.frame_nbytes),)
+                             .format(2 * self.header0.frame_nbytes),)
                 raise
 
     # Override the following so we can refer to stop_time in the docstring.
@@ -787,10 +787,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
     _next_index = None
 
-    @lazyproperty
-    def _last_index(self):
-        return self._tell_frame(self._last_header)
-
     def _read_frame(self, index):
         """Base implementation of reading a frame.
 
@@ -823,13 +819,12 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         # In either case, we check the next frame (if there is one).
         self._next_index = self._next_frame = None
-        if frame_index < self._last_index:
-            try:
-                with self.fh_raw.temporary_offset():
-                    self._next_frame = self._fh_raw_read_frame()
-                    self._next_index = self._tell_frame(self._next_frame)
-            except Exception as exc:
-                return self._bad_frame(index, None, exc)
+        try:
+            with self.fh_raw.temporary_offset():
+                self._next_frame = self._fh_raw_read_frame()
+                self._next_index = self._tell_frame(self._next_frame)
+        except Exception as exc:
+            return self._bad_frame(index, frame, exc)
 
         return frame
 
@@ -846,6 +841,12 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         exc : Exception
             Exception that led to the call.
         """
+        if (frame is not None and self._tell_frame(frame) == index
+                and index == self._tell_frame(self._last_header)):
+            # If we got an exception because we're trying to read beyond the
+            # last frame, the frame is almost certainly OK, so keep it.
+            return frame
+
         if self.verify != 'fix':
             raise exc
 

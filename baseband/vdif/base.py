@@ -442,7 +442,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         # Go to end of file.
         with self.fh_raw.temporary_offset() as fh_raw:
             # Find first header with same thread_id going backward.
-            fh_raw.seek(0, 2)
+            fh_raw.seek(-self.header0.frame_nbytes, 2)
             locations = fh_raw.locate_frames(self.header0, forward=False,
                                              maximum=2*self._frameset_nbytes,
                                              check=(-1, 1))
@@ -491,8 +491,11 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     def _bad_frame(self, index, frameset, exc):
         # Duplication of base class, but able to deal with missing
         # frames inside a frame set.
-        if self.verify != 'fix':
-            raise exc
+        if (frameset is not None and self._tell_frame(frameset) == index
+                and index == self._tell_frame(self._last_header)):
+            # If we got an exception because we're trying to read beyond the
+            # last frame, the frame is almost certainly OK, so keep it.
+            return frameset
 
         if self.verify != 'fix':
             raise exc
@@ -553,10 +556,10 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         self.fh_raw.seek(raw_pos)
 
         # Create the header we will use below for constructing the
-        # frameset.  Usually, this guaranteed to be from this set, but we
-        # also use it to create a new header for a completely messed up
-        # frameset below.  It is copied to make it mutable without any
-        # risk of messing up possibly memory mapped data.
+        # frameset.  Usually, this is guaranteed to be from this set,
+        # but we also use it to create a new header for a completely
+        # messed up frameset below.  It is copied to make it mutable
+        # without any risk of messing up possibly memory mapped data.
         header = header1.copy()
 
         if header1_index > index:
@@ -564,6 +567,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             msg += ' The frame set seems to be missing altogether.'
             # Set up to construct a complete missing frame
             # (after the very long else clause).
+            # TODO: just use the writer's _make_frame??
             frames = {}
             dt, frame_nr = divmod(index + self.header0['frame_nr'],
                                   int(self._frame_rate.to_value(u.Hz)))
