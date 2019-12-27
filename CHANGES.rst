@@ -36,6 +36,10 @@ Other Changes and Additions
 - Custom stream readers can now override only part of reading a given frame
   and testing that it is the right one. [#355]
 
+- The ``HeaderParser`` class was refactored and simplified, making setting
+  keys faster. [#356]
+
+
 3.0 (2019-08-28)
 ================
 
