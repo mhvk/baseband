@@ -451,7 +451,7 @@ class VLBIStreamBase:
 
     @verify.setter
     def verify(self, verify):
-        self._verify = bool(verify)
+        self._verify = bool(verify) if verify != 'fix' else verify
 
     def tell(self, unit=None):
         """Current offset in the file.
@@ -766,6 +766,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                                                 self.samples_per_frame)
             if frame_index != self._frame_index:
                 self._frame = self._read_frame(frame_index)
+                self._frame.fill_value = self.fill_value
                 self._frame_index = frame_index
 
             frame = self._frame
@@ -794,59 +795,62 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         This contains two pieces which subclasses can override as needed
         (or override the whole thing).
         """
-
-        raw_offset = self._seek_frame(index)
+        self._seek_frame(index)
         if not self.verify:
-            frame = self._fh_raw_read_frame()
+            return self._fh_raw_read_frame()
+
+        # If we are reading with care, we read also a frame ahead
+        # to make sure that is not corrupted.  If such a frame has
+        # been kept, we use it now.  Otherwise, we read a new frame.
+        if index == self._next_index:
+            frame = self._next_frame
+            frame_index = index
+            self.fh_raw.seek(frame.nbytes, 1)
 
         else:
-            # If we are reading with care, we read also a frame ahead
-            # to make sure that is not corrupted.  Since that frame will
-            # generally be needed next, we keep it and can use it now.
             try:
-                if index == self._next_index:
-                    frame = self._next_frame
-                    self.fh_raw.seek(frame.nbytes, 1)
-                else:
-                    frame = self._fh_raw_read_frame()
-
-                # Check next frame (if there is one).
-                if index < self._last_index:
-                    with self.fh_raw.temporary_offset():
-                        next_frame = self._fh_raw_read_frame()
-
-                else:
-                    next_frame = None
-
-            except Exception as exc:
-                # Try possible recovery.
-                frame = self._bad_frame(raw_offset, index, exc)
-
-            else:
-                # Keep any next frame for next call.
-                if next_frame is None:
-                    self._next_index = self._next_frame = None
-                else:
-                    self._next_index = self._tell_frame(next_frame)
-                    self._next_frame = next_frame
-
-                # Check whether we actually got the right frame.
+                frame = self._fh_raw_read_frame()
                 frame_index = self._tell_frame(frame)
-                if frame_index != index:
-                    frame = self._wrong_frame(raw_offset, index, frame_index)
+            except Exception as exc:
+                return self._bad_frame(index, None, exc)
 
-        frame.fill_value = self.fill_value
+            # Check whether we actually got the right frame.
+            if frame_index != index:
+                return self._bad_frame(index, frame,
+                                       ValueError('wrong frame number.'))
+
+        # In either case, we check the next frame (if there is one).
+        self._next_index = self._next_frame = None
+        if frame_index < self._last_index:
+            try:
+                with self.fh_raw.temporary_offset():
+                    self._next_frame = self._fh_raw_read_frame()
+                    self._next_index = self._tell_frame(self._next_frame)
+            except Exception as exc:
+                return self._bad_frame(index, None, exc)
+
         return frame
 
-    def _wrong_frame(self, raw_offset, index, frame_index):
-        exc = ValueError('wrong frame number found.')
-        return self._bad_frame(raw_offset, index, exc)
+    def _bad_frame(self, index, frame, exc):
+        """Deal with a bad frame.
 
-    def _bad_frame(self, raw_offset, index, exc):
-        """Deal with a bad frame."""
-        # Either the frame itself or the header after failed to read.
-        msg = 'problem loading frame index {}.'.format(index)
+        Parameters
+        ----------
+        index : int
+            Frame index that is to be read.
+        frame : `~baseband.vlbi_base.frame.VLBIFrameBase` or None
+            Frame that was read without failure.  If not `None`, either
+            the frame index is wrong or the next frame could not be read.
+        exc : Exception
+            Exception that led to the call.
+        """
+        if self.verify != 'fix':
+            raise exc
 
+        msg = 'problem loading frame {}.'.format(index)
+
+        # Where should we be?
+        raw_offset = self._seek_frame(index)
         # See if we're in the right place.  First ensure we have a header.
         # Here, it is more important that it is a good one than that we go
         # too far, so we insist on two consistent frames after it.  We
