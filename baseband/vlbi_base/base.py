@@ -608,11 +608,12 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """Last header of the file."""
         with self.fh_raw.temporary_offset() as fh_raw:
             fh_raw.seek(-self.header0.frame_nbytes, 2)
-            last_header = fh_raw.find_header(forward=False)
-        if last_header is None:
-            raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
-                             .format(10 * self.header0.frame_nbytes))
-        return last_header
+            try:
+                return fh_raw.find_header(forward=False)
+            except HeaderNotFoundError as exc:
+                exc.args += ("corrupt VLBI frame? No frame in last {0} bytes."
+                             .format(10 * self.header0.frame_nbytes),)
+                raise
 
     # Override the following so we can refer to stop_time in the docstring.
     @property
@@ -887,11 +888,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 raise exc
 
             header_index = self._tell_frame(header)
-            if header_index < header1_index:
-                # While we are at it: if we pass an index boundary, update
-                # the list of known indices.
-                self._raw_offsets[header1_index] = (
-                    raw_pos - header1_index * self.header0.frame_nbytes)
+            # While we are at it, update the list of known indices.
+            self._raw_offsets[header1_index] = (
+                raw_pos - header1_index * self.header0.frame_nbytes)
 
         # Move back to position of last good header (header1).
         self.fh_raw.seek(raw_pos)
