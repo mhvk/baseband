@@ -1072,19 +1072,20 @@ class TestVDIF:
             fr.frames[2].header['sync_pattern'] = 0xabbaabba
             fr.tofile(fw)
 
-        with vdif.open(testverifyfile, 'rs') as fn:
-            assert fn.verify is True
-            # This should fail at the second frameset.
+        with vdif.open(testverifyfile, 'rs', verify=True) as fn:
+            assert fn.verify
+            # This should fail at the first frameset, since its following
+            # one is corrupt.
             with pytest.raises(AssertionError):
                 fn.read()
-            assert fn.tell() == 20000
+            assert fn.tell() == 0
             fn.verify = False
-            assert fn.verify is False
-            assert np.all(fn.read() == data[20000:])
+            assert not fn.verify
+            assert np.all(fn.read() == data)
 
         # Check that we can pass verify=False.
         with vdif.open(testverifyfile, 'rs', verify=False) as fn:
-            assert fn.verify is False
+            assert not fn.verify
             assert np.all(fn.read() == data)
 
     # Test that writing an incomplete stream is possible, and that frame set is
@@ -1117,7 +1118,7 @@ class TestVDIF:
             s.seek(0)
             with vdif.open(s, 'rs') as f2:
                 assert f2.header0 == frame.header
-                with pytest.raises(ValueError):
+                with pytest.raises(HeaderNotFoundError):
                     f2._last_header
 
     def test_invalid_last_frame(self, tmpdir):
@@ -1144,6 +1145,7 @@ class TestVDIF:
             assert f2.stop_time == f1.stop_time
             d1 = f1.read()
             d2 = f2.read()
+
             assert np.all(d1 == d2)
 
     def test_io_invalid(self, tmpdir):

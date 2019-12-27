@@ -260,14 +260,15 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
         """Header of the last file for this stream."""
         # Seek forward rather than backward, as last frame often has missing
         # bytes.
-        nframes, fframe = divmod(self.fh_raw.seek(0, 2),
-                                 self.header0.frame_nbytes)
-        self.fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
-        return self.fh_raw.read_header()
+        with self.fh_raw.temporary_offset() as fh_raw:
+            nframes, fframe = divmod(fh_raw.seek(0, 2),
+                                     self.header0.frame_nbytes)
+            fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
+            return fh_raw.read_header()
 
     def _tell_frame(self, frame):
         # Override to avoid calculating index from time.
-        return int(round((frame.header['PKTIDX'] - self.header0['PKTIDX'])
+        return int(round((frame['PKTIDX'] - self.header0['PKTIDX'])
                          / self._packets_per_frame))
 
 

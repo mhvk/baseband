@@ -94,6 +94,7 @@ object::
                  track_roll_enabled: [False]*64,
                  sequence_suspended: [False]*64,
                  system_id: [108]*64,
+                 _1_0_1_sync: [False]*64,
                  sync_pattern: [0xffffffff]*64,
                  bcd_unit_year: [0x4]*64,
                  bcd_day: [0x167]*64,

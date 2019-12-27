@@ -86,7 +86,7 @@ matrix:
 
         # Comprehensive tests.
         # Check for sphinx doc build warnings.
-        - env: SETUP_CMD='build_sphinx -w'
+        - env: SETUP_CMD='build_docs -w'
                CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES_DOC
 
         # Check everything, including coverage, with oldest supported versions.

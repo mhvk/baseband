@@ -283,7 +283,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         with self.fh_raw.temporary_offset() as fh_raw:
             self._seek_frame(self._nframes - 1)
             header = fh_raw.read_header()
-            payload_nbytes = self._raw_file_size - self.fh_raw.tell()
+            payload_nbytes = self._raw_file_size - fh_raw.tell()
             assert payload_nbytes > 0, 'setup failed: no payload in last frame'
             if header.payload_nbytes > payload_nbytes:
                 # Truncated last frame.  Adjust header to give the actual
@@ -329,7 +329,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
 
     def _tell_frame(self, frame):
         # Override for faster calculation of frame index.
-        return int(round((frame.header['OBS_OFFSET']
+        return int(round((frame['OBS_OFFSET']
                           - self.header0['OBS_OFFSET'])
                          / self.header0.payload_nbytes))
 

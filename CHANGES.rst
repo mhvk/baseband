@@ -22,6 +22,11 @@ Bug Fixes
 Other Changes and Additions
 ---------------------------
 
+- The Mark 4, Mark 5B, and VDIF stream readers are now able to replace
+  missing pieces of files with zeros using ``verify='fix'``. This is
+  also the new default; use ``verify=True`` for the old behaviour of
+  raising an error on any inconsistency. [#357]
+
 - Much faster localization of Mark 5B frames. [#351]
 
 - VLBI file readers have gained a new method ``locate_frames`` that finds
@@ -30,7 +35,7 @@ Other Changes and Additions
 - For VLBI file readers, ``find_header`` now raises an exception if no
   frame is found (rather than return `None`).
 
-- The the Mark 4 file reader's ``locate_frame`` has been deprecated. Its
+- The Mark 4 file reader's ``locate_frame`` has been deprecated. Its
   functionality is replaced by ``locate_frames`` and ``find_header``. [#354]
 
 - Custom stream readers can now override only part of reading a given frame

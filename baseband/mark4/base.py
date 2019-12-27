@@ -106,33 +106,23 @@ class Mark4FileReader(VLBIFileReaderBase):
     def locate_frames(self, pattern=None, *, mask=None, frame_nbytes=None,
                       offset=0, forward=True, maximum=None, check=1):
         """Use a pattern to locate frame starts near the current position.
-        Note that the current position is always included.
-
-        If pattern is not given,the search is for the following:
-
-        * 32*tracks bits set at offset bytes
-        * 1*tracks bits unset before offset
-        * 32*tracks bits set at offset+2500*tracks bytes
-
-        This reflects 'sync_pattern' of 0xffffffff for a given header and one
-        a frame ahead, which is in word 2, plus the msb of word 1, which is
-        the highest bit of 2 in 'headstack_id' (always 0 or 1, so safe).
-
-        If the file does not have ntrack is set, it will be auto-determined.
 
         Parameters
         ----------
         pattern : header, ~numpy.ndaray, bytes, or (iterable of) int, optional
-            Synchronization pattern to look for.  See above for the default.
+            Synchronization pattern to look for.  The default uses the
+            Mark 4 sync pattern, plus that the bit before is 0. See
+            `~baseband.mark4.header.Mark4Header.invariant_pattern`.
         mask : ~numpy.ndarray, bytes, int, or iterable of int.
             Bit mask for the pattern, with 1 indicating a given bit will
-            be used the comparison.  Only used if ``pattern`` is given.
+            be used the comparison.  Only used if ``pattern`` is given
+            and is not a header.
         frame_nbytes : int, optional
             Frame size in bytes.  Defaults to the frame size for
             ``ntrack``.  If given, overrides ``self.ntrack``.
         offset : int, optional
             Offset from the frame start that the pattern occurs.  Only
-            used if ``pattern`` is given.
+            used if ``pattern`` is given and not a header.
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
@@ -146,18 +136,12 @@ class Mark4FileReader(VLBIFileReaderBase):
 
         Returns
         -------
-        offset : int or `None`
-            Byte offset of the next frame. `None` if the search was not
-            successful.
+        locations : list of int
+            Locations of sync patterns within the range scanned,
+            in order of proximity to the starting position.
         """
         # Use initializer value (determines ntrack if not already given).
-        if isinstance(pattern, Mark4Header):
-            # TODO: get invariant_pattern() to work for Mark4Header!!
-            frame_nbytes = pattern.frame_nbytes
-            ntrack = pattern.ntrack
-            pattern = None
-
-        elif frame_nbytes is None:
+        if frame_nbytes is None:
             ntrack = self.ntrack
             if ntrack is None:
                 with self.temporary_offset():
@@ -173,12 +157,7 @@ class Mark4FileReader(VLBIFileReaderBase):
                                  '2500 bytes for Mark 4 data.')
 
         if pattern is None:
-            pattern = np.concatenate(
-                (np.zeros(ntrack // 8, dtype='u1'),
-                 np.full(32 * ntrack // 8, 0xff, dtype='u1')))
-            offset = 63 * ntrack // 8
-            mask = None
-
+            pattern, mask = Mark4Header.invariant_pattern(ntrack=self.ntrack)
         return super().locate_frames(
             pattern, mask=mask, frame_nbytes=frame_nbytes, offset=offset,
             forward=forward, maximum=maximum, check=check)
@@ -319,16 +298,17 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         squeezing).  If an empty tuple (default), all channels are read.
     fill_value : float or complex, optional
         Value to use for invalid or missing data. Default: 0.
-    verify : bool, optional
-        Whether to do basic checks of frame integrity when reading.  The first
-        frame of the stream is always checked.  Default: `True`.
+    verify : bool or str, optional
+        Whether to do basic checks of frame integrity when reading.
+        Default: 'fix', which implies basic verification and replacement
+        of gaps with zeros.
     """
 
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, ntrack=None, decade=None,
                  ref_time=None, squeeze=True, subset=(), fill_value=0.,
-                 verify=True):
+                 verify='fix'):
 
         if decade is None and ref_time is None:
             raise TypeError("Mark 4 stream reader requires either decade or "
@@ -347,11 +327,11 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
                              .format(ntrack),)
             raise exc
 
-        self._offset0 = fh_raw.tell()
         super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
+        self._raw_offsets[0] = fh_raw.tell()
         # Use reference time in preference to decade so that a stream wrapping
         # a decade will work.
         self.fh_raw.decade = None
@@ -365,11 +345,6 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         # 4 years away from the start.
         last_header.infer_decade(self.start_time)
         return last_header
-
-    def _seek_frame(self, index):
-        # Override vlbi_base version to include offset.
-        return self.fh_raw.seek(self._offset0
-                                + index*self.header0.frame_nbytes)
 
 
 class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
@@ -457,9 +432,10 @@ subset : indexing object, optional
     squeezing).  If an empty tuple (default), all channels are read.
 fill_value : float or complex, optional
     Value to use for invalid or missing data. Default: 0.
-verify : bool, optional
-    Whether to do basic checks of frame integrity when reading.  The first
-    frame of the stream is always checked.  Default: `True`.
+verify : bool or 'fix', optional
+    Whether to do basic checks of frame integrity when reading.
+    Default: 'fix', which implies basic verification and replacement
+    of gaps with zeros.
 
 --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
 

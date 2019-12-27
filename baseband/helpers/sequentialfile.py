@@ -212,6 +212,13 @@ class SequentialFileReader(SequentialFileBase):
         Function to open a single file (default: `io.open`).
     """
 
+    def __getattr__(self, attr):
+        if attr.startswith('read'):
+            # Ensure we skip to the next file if needed.
+            self.seek(0, 1)
+
+        return super().__getattr__(attr)
+
     @property
     def file_size(self):
         """Size of the underlying file currently open for reading."""
@@ -277,6 +284,8 @@ class SequentialFileReader(SequentialFileBase):
 
         data = b''
         while count > 0:
+            # Go to current offset, possibly opening new file.
+            self.seek(0, 1)
             extra = self.fh.read(count)
             if not extra:
                 break
@@ -285,8 +294,6 @@ class SequentialFileReader(SequentialFileBase):
                 data = extra
             else:
                 data += extra
-            # Go to current offset, possibly opening new file.
-            self.seek(0, 1)
 
         return data
     read.__doc__ = io.BufferedIOBase.read.__doc__

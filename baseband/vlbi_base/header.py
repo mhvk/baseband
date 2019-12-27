@@ -361,7 +361,7 @@ class VLBIHeaderBase:
             return set()
 
     @sharedmethod
-    def invariant_pattern(self, invariants=None):
+    def invariant_pattern(self, invariants=None, **kwargs):
         """Pattern and mask shared between headers of a type or stream.
 
         This is mostly for use inside
@@ -373,6 +373,9 @@ class VLBIHeaderBase:
             Set of keys to header parts that are shared between all headers
             of a given type or within a given stream/file.  Default: from
             `~baseband.vlbi_base.header.VLBIHeaderBase.invariants()`.
+        **kwargs
+            Keyword arguments needed to instantiate an empty header.
+            (Mostly for Mark 4).
 
         Returns
         -------
@@ -395,7 +398,7 @@ class VLBIHeaderBase:
         if isinstance(self, type):
             # If we are called as a classmethod, first get an instance
             # with all defaults set.  This will be our pattern.
-            self = self(None)
+            self = self(None, **kwargs)
             for invariant in invariants:
                 value = self._header_parser.defaults[invariant]
                 if value is None:
@@ -404,7 +407,7 @@ class VLBIHeaderBase:
                 self[invariant] = value
 
         # Create an all-zero version and set bits for all invariants.
-        mask = self.__class__(None)
+        mask = self.__class__(None, **kwargs)
         for invariant in invariants:
             mask[invariant] = True
 
