@@ -609,7 +609,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         with self.fh_raw.temporary_offset() as fh_raw:
             fh_raw.seek(-self.header0.frame_nbytes, 2)
             try:
-                return fh_raw.find_header(forward=False)
+                return fh_raw.find_header(self.header0, forward=False,
+                                          check=(-1, 1))
             except HeaderNotFoundError as exc:
                 exc.args += ("corrupt VLBI frame? No frame in last {0} bytes."
                              .format(10 * self.header0.frame_nbytes),)
