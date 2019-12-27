@@ -1072,7 +1072,7 @@ class TestVDIF:
             fr.frames[2].header['sync_pattern'] = 0xabbaabba
             fr.tofile(fw)
 
-        with vdif.open(testverifyfile, 'rs') as fn:
+        with vdif.open(testverifyfile, 'rs', verify=True) as fn:
             assert fn.verify
             # This should fail at the first frameset, since its following
             # one is corrupt.

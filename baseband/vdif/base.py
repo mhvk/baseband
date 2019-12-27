@@ -368,7 +368,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     """
 
     def __init__(self, fh_raw, sample_rate=None, squeeze=True, subset=(),
-                 fill_value=0., verify=True):
+                 fill_value=0., verify='fix'):
         fh_raw = VDIFFileReader(fh_raw)
         # We read the first frameset, since we need to know how many threads
         # there are, and what the frameset size is.
