@@ -77,7 +77,7 @@ class TestVLBIBase:
         assert len(new.keys()) == 5
         with pytest.raises(TypeError):
             self.header_parser + {'x4_0_32': (4, 0, 32)}
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             self.header_parser.copy().update(('x4_0_32', (4, 0, 32)))
 
     def test_header_basics(self):

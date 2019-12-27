@@ -17,9 +17,8 @@ from astropy.utils import sharedmethod, classproperty
 
 
 __all__ = ['fixedvalue', 'four_word_struct', 'eight_word_struct',
-           'make_parser', 'make_setter',
-           'HeaderProperty', 'HeaderPropertyGetter',
-           'HeaderParser', 'VLBIHeaderBase']
+           'make_parser', 'make_setter', 'get_default',
+           'ParserDict', 'HeaderParser', 'VLBIHeaderBase']
 
 four_word_struct = struct.Struct('<4I')
 """Struct instance that packs/unpacks 4 unsigned 32-bit integers."""
@@ -148,45 +147,64 @@ def make_setter(word_index, bit_index, bit_length, default=None):
 
 
 def get_default(word_index, bit_index, bit_length, default=None):
+    """Return the default value from a header keyword.
+
+    Since it is called with the full description, it just returns
+    the last item, defaulted to `None`.
+    """
     return default
 
 
-class HeaderProperty:
-    """Mimic a dictionary, calculating entries from header words.
+class ParserDict:
+    """Create a lazily evaluated dictionary of parsers, setters, or defaults.
 
-    Used to calculate setter functions and extract default values.
+    Implemented as a non-data descriptor.  When first called on an
+    instance, it will create a dict under its own name in the instance's
+    ``__dict__``, which means that any further attribute access will return
+    that dict instead of this descriptor.
 
     Parameters
     ----------
-    header_parser : `HeaderParser`
-        A dict with header encoding information.
-    getter : function
-        Function that uses the encoding information to calculate a result.
+    method : str
+        Name of the method on the instance that can be used to create
+        a parser or setter, or get the default, based on a header keyword
+        description.  Typically one of 'make_parser', 'make_setter', or
+        'get_default'.
+    name : str, optional
+        If not given, inferred from the method name.  Typically, 'parsers',
+        'setters', or 'default'.  It *must* match the name the descriptor
+        is assigned to.
+    doc : str, optional
+        Docstring for the instance.  Defaults to 'Lazily evaluated dict of
+        ``name``'.
     """
 
-    def __init__(self, header_parser, getter, doc=None):
-        self.header_parser = header_parser
-        self.getter = getter
-        if doc is not None:
-            self.__doc__ = doc
+    def __init__(self, method, name=None, doc=None):
+        self.method = method
+        if name is None:
+            if 'parser' in method:
+                name = 'parsers'
+            elif 'setter' in method:
+                name = 'setters'
+            elif 'default' in method:
+                name = 'defaults'
+            else:
+                raise ValueError('cannot infer name automatically.')
+        self.name = name
+        if doc is None:
+            doc = 'Lazily evaluated dict of {}'.format(name)
+        self.__doc__ = doc
 
-    def __getitem__(self, item):
-        definition = self.header_parser[item]
-        return self.getter(*definition)
-
-
-class HeaderPropertyGetter:
-    """Special property for attaching HeaderProperty."""
-
-    def __init__(self, getter, doc=None):
-        self.getter = getter
-        self.__doc__ = doc or getter.__doc__
-
-    def __get__(self, instance, owner_cls=None):
-        if instance is None:  # pragma: no cover
+    def __get__(self, instance, cls=None):
+        if instance is None:
             return self
-        return HeaderProperty(instance, getattr(instance, self.getter),
-                              doc=self.__doc__)
+        # Create dict of functions/defaults.
+        getter = getattr(instance, self.method)
+        d = {key: getter(*definition)
+             for key, definition in instance.items()}
+        # Override ourselves on the instance.
+        setattr(instance, self.name, d)
+        return d
 
 
 class HeaderParser(OrderedDict):
@@ -208,26 +226,26 @@ class HeaderParser(OrderedDict):
     The class provides dict-like properties ``parsers``, ``setters``, and
     ``defaults``, which return functions that get a given keyword from header
     words, set the corresponding part of the header words to a value, or
-    return the default value (if defined).
+    return the default value (if defined).  To speed up access to those,
+    they are precalculated on first access rather than calculated on the fly.
 
-    Note that while in principle, parsers and setters could be calculated on
-    the fly, we precalculate the parsers to speed up header keyword access.
+    By default, the parsers and setters are calculated from the header
+    definitions using `~baseband.vlbi_base.header.make_parser` and
+    `~baseband.vlbi_base.header.make_setter`, and the defaults inferred
+    using `~baseband.vlbi_base.header.get_default`.  Those can be overridden
+    by passing other functions in as keyword arguments with the same name.
+
     """
 
     def __init__(self, *args, **kwargs):
-        self._make_parser = kwargs.pop('make_parser', make_parser)
-        self._make_setter = kwargs.pop('make_setter', make_setter)
-        self._get_default = kwargs.pop('get_default', get_default)
-        # Use a dict rather than OrderedDict for the parsers for better speed.
-        # Note that this gets filled by calls to __setitem__.
-        self._parsers = {}
+        self.make_parser = kwargs.pop('make_parser', make_parser)
+        self.make_setter = kwargs.pop('make_setter', make_setter)
+        self.get_default = kwargs.pop('get_default', get_default)
         super().__init__(*args, **kwargs)
 
     def copy(self):
         """Make an independent copy."""
-        return self.__class__(self, make_parser=self._make_parser,
-                              make_setter=self._make_setter,
-                              get_default=self._get_default)
+        return self.__class__(self)
 
     def __add__(self, other):
         if not isinstance(other, HeaderParser):
@@ -236,30 +254,9 @@ class HeaderParser(OrderedDict):
         result.update(other)
         return result
 
-    def __setitem__(self, item, value):
-        self._parsers[item] = self._make_parser(*value)
-        super().__setitem__(item, value)
-
-    @property
-    def parsers(self):
-        """Dict with functions to get specific header values."""
-        return self._parsers
-
-    defaults = HeaderPropertyGetter(
-        '_get_default',
-        doc="Dict-like allowing access to default header values.")
-
-    setters = HeaderPropertyGetter(
-        '_make_setter',
-        doc="Dict-like returning function to set specific header value.")
-
-    def update(self, other):
-        """Update the parser with the information from another one."""
-        if not isinstance(other, HeaderParser):
-            raise TypeError("can only update using a HeaderParser instance.")
-        super().update(other)
-        # Update the parsers rather than recalculate all the functions.
-        self._parsers.update(other._parsers)
+    parsers = ParserDict('make_parser')
+    setters = ParserDict('make_setter')
+    defaults = ParserDict('get_default')
 
 
 class VLBIHeaderBase:
@@ -552,7 +549,7 @@ class VLBIHeaderBase:
     def __getitem__(self, item):
         """Get the value a particular header item from the header words."""
         try:
-            return self._header_parser._parsers[item](self.words)
+            return self._header_parser.parsers[item](self.words)
         except KeyError:
             raise KeyError("{0} header does not contain {1}"
                            .format(self.__class__.__name__, item))
