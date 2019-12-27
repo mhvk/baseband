@@ -106,6 +106,7 @@ class Mark4FileReader(VLBIFileReaderBase):
     def locate_frames(self, pattern=None, *, mask=None, frame_nbytes=None,
                       offset=0, forward=True, maximum=None, check=1):
         """Use a pattern to locate frame starts near the current position.
+
         Parameters
         ----------
         pattern : header, ~numpy.ndaray, bytes, or (iterable of) int, optional
