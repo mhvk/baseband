@@ -1118,7 +1118,7 @@ class TestVDIF:
             s.seek(0)
             with vdif.open(s, 'rs') as f2:
                 assert f2.header0 == frame.header
-                with pytest.raises(ValueError):
+                with pytest.raises(HeaderNotFoundError):
                     f2._last_header
 
     def test_invalid_last_frame(self, tmpdir):

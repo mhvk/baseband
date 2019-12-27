@@ -248,13 +248,8 @@ class VDIFFrameSet:
 
             try:
                 header = VDIFHeader.fromfile(fh, edv, verify)
-            except EOFError:
+            except (EOFError, AssertionError):
                 if thread_ids is None or len(frames) == len(thread_ids):
-                    break
-                else:
-                    raise
-            except AssertionError:
-                if len(frames) == len(thread_ids):
                     break
                 else:
                     raise

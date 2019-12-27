@@ -1,4 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
+import warnings
 from collections import namedtuple
 
 import numpy as np
@@ -95,8 +96,17 @@ class VDIFFileReader(VLBIFileReaderBase):
         """
         return VDIFHeader.fromfile(self.fh_raw, edv=edv, verify=verify)
 
-    def read_frame(self):
+    def read_frame(self, edv=None, verify=True):
         """Read a single frame (header plus payload).
+
+        Parameters
+        ----------
+        edv : int, optional
+            The expected extended data version for the VDIF Header.  If `None`,
+            use that of the first frame.  (Passing it in slightly improves file
+            integrity checking.)
+        verify : bool, optional
+            Whether to do basic checks of frame integrity.  Default: `True`.
 
         Returns
         -------
@@ -105,7 +115,7 @@ class VDIFFileReader(VLBIFileReaderBase):
             :class:`~baseband.vdif.VDIFHeader` and data encoded in the frame,
             respectively.
         """
-        return VDIFFrame.fromfile(self.fh_raw)
+        return VDIFFrame.fromfile(self.fh_raw, edv=edv, verify=verify)
 
     def read_frameset(self, thread_ids=None, edv=None, verify=True):
         """Read a single frame (header plus payload).
@@ -213,9 +223,14 @@ class VDIFFileReader(VLBIFileReaderBase):
             If the header did not pass verification.
         """
         if pattern is not None:
-            return super().find_header(
+            locations = self.locate_frames(
                 pattern, mask=mask, frame_nbytes=frame_nbytes, offset=offset,
                 forward=forward, maximum=maximum, check=check)
+            if not locations:
+                raise HeaderNotFoundError('could not locate a a nearby frame.')
+            self.seek(locations[0])
+            with self.temporary_offset():
+                return self.read_header(edv=getattr(pattern, 'edv', None))
 
         # Try reading headers at a set of locations.
         if maximum is None:
@@ -245,7 +260,7 @@ class VDIFFileReader(VLBIFileReaderBase):
             # Possible hit!  Try if there are other headers right around.
             self.seek(frame)
             try:
-                return super().find_header(header, maximum=1, check=check)
+                return self.find_header(header, maximum=1, check=check)
             except Exception:
                 continue
 
@@ -426,25 +441,25 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         """Last header of the file."""
         # Go to end of file.
         with self.fh_raw.temporary_offset() as fh_raw:
-            fh_raw.seek(0, 2)
-            raw_size = fh_raw.tell()
             # Find first header with same thread_id going backward.
-            found = False
-            # Set maximum as twice number of frames in frameset.
-            maximum = 2 * self._frameset_nbytes
-            while not found:
-                fh_raw.seek(-self.header0.frame_nbytes, 1)
-                last_header = fh_raw.find_header(
-                    self.header0, maximum=maximum, forward=False)
-                if last_header is None or (raw_size - fh_raw.tell() > maximum):
-                    raise ValueError("corrupt VDIF? No thread_id={0} frame "
-                                     "in last {1} bytes."
-                                     .format(self.header0['thread_id'],
-                                             maximum))
+            fh_raw.seek(0, 2)
+            locations = fh_raw.locate_frames(self.header0, forward=False,
+                                             maximum=2*self._frameset_nbytes,
+                                             check=(-1, 1))
+            for location in locations:
+                fh_raw.seek(location)
+                try:
+                    header = fh_raw.read_header(edv=self.header0.edv)
+                except Exception:
+                    continue
 
-                found = last_header['thread_id'] == self.header0['thread_id']
+                if header['thread_id'] == self.header0['thread_id']:
+                    return header
 
-        return last_header
+            raise HeaderNotFoundError("corrupt VDIF? No thread_id={0} frame "
+                                      "in last {1} bytes."
+                                      .format(self.header0['thread_id'],
+                                              2*self._frameset_nbytes))
 
     def _squeeze_and_subset(self, data):
         # Overwrite VLBIStreamReaderBase version, since the threads part of
@@ -459,7 +474,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
 
     # Overrides to deal with framesets instead of frames.
     def _seek_frame(self, index):
-        return self.fh_raw.seek(index * self._frameset_nbytes)
+        raw_corr = self._raw_offsets[index]
+        raw_offset = index * self._frameset_nbytes + raw_corr
+        return self.fh_raw.seek(raw_offset)
 
     def _fh_raw_read_frame(self):
         return self.fh_raw.read_frameset(self._thread_ids,
@@ -470,6 +487,211 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         return int(round((frame['seconds'] - self.header0['seconds'])
                          * self._frame_rate.to_value(u.Hz)
                          + frame['frame_nr'] - self.header0['frame_nr']))
+
+    def _bad_frame(self, index, frameset, exc):
+        # Duplication of base class, but able to deal with missing
+        # frames inside a frame set.
+        if self.verify != 'fix':
+            raise exc
+
+        if self.verify != 'fix':
+            raise exc
+
+        msg = 'problem loading frame set {}.'.format(index)
+
+        # Where should we be?
+        raw_offset = self._seek_frame(index)
+
+        # See if we're in the right place.  First ensure we have a header.
+        # Here, it is more important that it is a good one than that we go
+        # too far, so we insist on two consistent frames after it, as well
+        # as a good one before to guard against corruption of the start of
+        # the VDIF header.
+        self.fh_raw.seek(raw_offset)
+        try:
+            header = self.fh_raw.find_header(
+                self.header0, forward=True, check=(-1, 1, 2),
+                maximum=3*self.header0.frame_nbytes)
+        except HeaderNotFoundError:
+            exc.args += (msg + ' Cannot find header nearby.',)
+            raise exc
+
+        # Don't yet know how to deal with excess data.
+        header_index = self._tell_frame(header)
+        if header_index < index:
+            exc.args += (msg + ' There appears to be excess data.',)
+            raise exc
+
+        # Go backward until we find previous frame, storing offsets
+        # as we go.  We again increase the maximum since we may need
+        # to jump over a bad bit.  We slightly relax our search pattern.
+        while header_index >= index:
+            raw_pos = self.fh_raw.tell()
+            header1 = header
+            header1_index = header_index
+            if raw_pos <= 0:
+                break
+
+            self.fh_raw.seek(-1, 1)
+            try:
+                header = self.fh_raw.find_header(
+                    self.header0, forward=False,
+                    maximum=4*self.header0.frame_nbytes,
+                    check=(-1, 1))
+            except HeaderNotFoundError:
+                exc.args += (msg + ' Could not find previous index.',)
+                raise exc
+
+            header_index = self._tell_frame(header)
+            if header_index < header1_index:
+                # While we are at it: if we pass an index boundary,
+                # update the list of known indices.
+                self._raw_offsets[header1_index] = (
+                    raw_pos - header1_index * self._frameset_nbytes)
+
+        # Move back to position of last good header (header1).
+        self.fh_raw.seek(raw_pos)
+
+        # Create the header we will use below for constructing the
+        # frameset.  Usually, this guaranteed to be from this set, but we
+        # also use it to create a new header for a completely messed up
+        # frameset below.  It is copied to make it mutable without any
+        # risk of messing up possibly memory mapped data.
+        header = header1.copy()
+
+        if header1_index > index:
+            # Ouch, whole frame set missing!
+            msg += ' The frame set seems to be missing altogether.'
+            # Set up to construct a complete missing frame
+            # (after the very long else clause).
+            frames = {}
+            dt, frame_nr = divmod(index + self.header0['frame_nr'],
+                                  int(self._frame_rate.to_value(u.Hz)))
+            header['frame_nr'] = frame_nr
+            header['seconds'] = self.header0['seconds'] + dt
+        else:
+            assert header1_index == index, \
+                'at this point, we should have a good header.'
+            # This header is the first one of its set.
+            if raw_pos != raw_offset:
+                msg += ' Stream off by {0} bytes.'.format(raw_offset
+                                                          - raw_pos)
+                # Above, we should have added information about
+                # this index in our offset table.
+                assert raw_pos == (index*self._frameset_nbytes
+                                   + self._raw_offsets[index])
+
+            # Try again to read it, however many threads there are.
+            # TODO: this somewhat duplicates FrameSet.fromfile; possibly
+            #       move code there.
+            # TODO: Or keep track of header locations above.
+            # TODO: remove limitation that threads need to be together.
+            frames = {}
+            previous = False
+            frame_nr = header1['frame_nr']
+            while True:
+                raw_pos = self.fh_raw.tell()
+                try:
+                    frame = self.fh_raw.read_frame(edv=self.header0.edv)
+                    assert header.same_stream(frame.header)
+                    # Check seconds as well, as a sanity check this is
+                    # a real header. (We do allow at this point it to be
+                    # the next frame, hence the second can increase by 1.
+                    assert 0 <= (frame['seconds'] - header['seconds']) <= 1
+                except EOFError:
+                    # End of file while reading a frame; we're done here.
+                    next_header = None
+                    break
+                except AssertionError:
+                    # Frame is not OK.
+                    assert previous is not False, \
+                        ('first frame should be readable if fully on disk,'
+                         ' since we found one correct header.')
+
+                    # Go back to after previous payload and try finding
+                    # next header.  It can be before where we tried above,
+                    # if some bytes in the previous payload were missing.
+                    self.fh_raw.seek(raw_pos - header.payload_nbytes)
+                    try:
+                        next_header = self.fh_raw.find_header(self.header0)
+                        # But sometimes a header is re-found even when
+                        # there isn't really one (e.g., because one of the
+                        # first bytes, defining seconds, is missing).
+                        # Don't ever retry the same one!
+                        if self.fh_raw.tell() == raw_pos:
+                            self.fh_raw.seek(1, 1)
+                            next_header = self.fh_raw.find_header(self.header0)
+                    except HeaderNotFoundError:
+                        # If no header was found, give up.  The previous frame
+                        # was likely bad too, so delete it.
+                        if previous is not None:
+                            del frames[previous]
+                        next_header = None
+                        break
+
+                    # If the next header is not exactly a frame away from
+                    # where we were trying to read, the previous frame was
+                    # likely bad, so discard it.
+                    if self.fh_raw.tell() != raw_pos + header.frame_nbytes:
+                        if previous is not None:
+                            del frames[previous]
+                        previous = None
+
+                    # Stop if the next header is from a different frame.
+                    if next_header['frame_nr'] != frame_nr:
+                        break
+
+                else:
+                    # Successfully read frame.  If not of the requested
+                    # set, rewind and break out of the loop.
+                    if frame['frame_nr'] != frame_nr:
+                        next_header = frame.header
+                        self.fh_raw.seek(raw_pos)
+                        break
+
+                    # Do we have a good frame, giving a new thread?
+                    previous = frame['thread_id']
+                    if previous in frames:
+                        msg += (' Duplicate thread {0} found; discarding.'
+                                .format(previous))
+                        del frames[previous]
+                    else:
+                        # Looks like it, though may still be discarded
+                        # if the next frame is not readable.
+                        frames[previous] = frame
+
+            # If the next header is of the next frame, set up the raw
+            # offset (which likely will be needed, saving some time).
+            if (next_header is not None
+                    and self._tell_frame(next_header) == index + 1):
+                self._raw_offsets[index+1] = (
+                    self.fh_raw.tell() - (index+1) * self._frameset_nbytes)
+
+        # Create invalid frame template,
+        invalid_frame = self._frameset.frames[0].__class__(
+            header, self._frameset.frames[0].payload)
+        invalid_frame.valid = False
+
+        frame_list = []
+        missing = []
+        for thread in self._thread_ids:
+            if thread in frames:
+                frame_list.append(frames[thread])
+            else:
+                missing.append(thread)
+                invalid_frame.header['thread_id'] = thread
+                frame_list.append(invalid_frame)
+
+        if missing:
+            if frames == {}:
+                msg += ' All threads set to invalid.'
+            else:
+                msg += (' Thread(s) {0} missing; set to invalid.'
+                        .format(missing))
+
+        warnings.warn(msg)
+        frameset = self._frameset.__class__(frame_list)
+        return frameset
 
 
 class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
