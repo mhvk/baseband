@@ -192,6 +192,34 @@ class TestMark4:
         assert header13.ntrack == 53
         assert abs(header13.time - header.time) < 1. * u.ns
 
+    def test_invariant_pattern(self):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            header0 = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+            fh.seek(0xa88)
+            h0w = np.fromfile(fh, '<u8', header0.nbytes // 8)
+            fh.seek(0xa88+header0.frame_nbytes)
+            h1w = np.fromfile(fh, '<u8', header0.nbytes // 8)
+
+        p, m = header0.invariant_pattern()
+
+        assert np.all(p == h0w)
+        assert not np.all(p == h1w)
+        assert np.all((h1w & m) == (p & m))
+
+        p, m = mark4.Mark4Header.invariant_pattern(ntrack=64)
+        # Check it is the same as what mark5access looked for.
+        assert p[63] == 0
+        assert np.all(p[64:96] == 0xffffffffffffffff)
+        assert np.all(p[:63] == 0)
+        assert np.all(p[96:] == 0)
+        assert np.all(m[63:96] == 0xffffffffffffffff)
+        assert np.all(m[:63] == 0)
+        assert np.all(m[96:] == 0)
+
+        assert np.all((h0w ^ p) & m == 0)
+        assert np.all((h1w ^ p) & m == 0)
+
     @pytest.mark.parametrize(('unit_year', 'ref_time', 'decade'),
                              [(5, Time('2014:1:12:00:00'), 2010),
                               (5, Time('2009:362:19:27:33'), 2000),

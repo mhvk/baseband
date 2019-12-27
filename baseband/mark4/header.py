@@ -14,6 +14,7 @@ import struct
 
 import numpy as np
 from astropy.time import Time
+from astropy.utils import sharedmethod
 
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase
 from ..vlbi_base.utils import bcd_decode, bcd_encode, CRCStack
@@ -130,6 +131,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
          ('track_roll_enabled', (1, 9, 1, False)),
          ('sequence_suspended', (1, 8, 1, False)),
          ('system_id', (1, 0, 8)),
+         ('_1_0_1_sync', (1, 0, 1, 0)),  # Lowest bit of system ID is 0.
          ('sync_pattern', (2, 0, 32, 0xffffffff)),
          ('bcd_unit_year', (3, 28, 4)),
          ('bcd_day', (3, 16, 12)),
@@ -139,8 +141,12 @@ class Mark4TrackHeader(VLBIHeaderBase):
          ('bcd_fraction', (4, 12, 12)),
          ('crc', (4, 0, 12))))
     _sync_pattern = _header_parser.defaults['sync_pattern']
-    _invariants = {'sync_pattern'}
-    """Keys of invariant parts in all Mark 4 headers."""
+    _invariants = {'sync_pattern', '_1_0_1_sync'}
+    """Keys of invariant parts in all Mark 4 headers.
+
+    This includes the lowest bit of 'system_id', which is apparently
+    always 0 (at least, mark5access assumes so too).
+    """
     _stream_invariants = (_invariants
                           | {'bcd_headstack1', 'bcd_headstack2',
                              'track_roll_enabled', 'sequence_suspended',
@@ -325,6 +331,7 @@ class Mark4Header(Mark4TrackHeader):
                  verify=True):
         if words is None:
             words = np.zeros((5, ntrack), dtype=np.uint32)
+            verify = False
         super().__init__(words, decade=decade, ref_time=ref_time,
                          verify=verify)
 
@@ -334,6 +341,36 @@ class Mark4Header(Mark4TrackHeader):
         assert (len(set((c, l) for (c, l) in zip(self['converter_id'],
                                                  self['lsb_output'])))
                 == self.nchan)
+
+    @sharedmethod
+    def invariant_pattern(self, invariants=None, ntrack=None):
+        """Invariant pattern to help search for headers.
+
+        On the class, like mark5access, we use use one bit more than the sync
+        pattern in word 2, viz., lsb of word 1, which we assume is always 0
+        (it is the lowest bit of eight of 'system_id').
+
+        Parameters
+        ----------
+        invariants : set of str, optional
+            Set of keys to header parts that are shared between all headers
+            of a given type or within a given stream/file.  Default: from
+            `~baseband.vlbi_base.header.VLBIHeaderBase.invariants()`.
+        ntrack : int, optional
+            Number of tracks.  Required for getting class invariants,
+            ignored for instances.
+        """
+
+        if not isinstance(self, type):
+            ntrack = self.ntrack
+
+        elif ntrack is None:
+            raise ValueError("need to pass in ``ntrack`` to "
+                             "get Mark 4 generic invariants.")
+
+        pattern, mask = super().invariant_pattern(invariants=invariants,
+                                                  ntrack=ntrack)
+        return words2stream(pattern), words2stream(mask)
 
     def infer_decade(self, ref_time):
         super().infer_decade(ref_time)
