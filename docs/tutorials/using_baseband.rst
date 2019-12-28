@@ -54,6 +54,7 @@ files can all be found in the `baseband.data` module)::
     <BLANKLINE>
     File information:
     edv = 3
+    thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)
@@ -222,6 +223,7 @@ Basic information about the file is obtained by either by ``fh.info`` or simply
     <BLANKLINE>
     File information:
     edv = 3
+    thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)
