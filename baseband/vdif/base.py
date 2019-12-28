@@ -167,6 +167,52 @@ class VDIFFileReader(VLBIFileReaderBase):
                     pass
             raise exc
 
+    def get_thread_ids(self, check=2):
+        """Determine the number of threads in the VDIF file.
+
+        The file is presumed to be positioned at the start of a header.
+        Usually, it suffices to just seek to the start of the file, but
+        if not, use `~baseband.vdif.base.VDIFFileReader.find_header`.
+
+        Parameters
+        ----------
+        check : int, optional
+            Number of extra frames to check.  Frame sets are scanned until
+            the number of thread IDs found no longer increases for ``check``
+            frames.
+
+        Returns
+        -------
+        thread_ids : list
+            Sorted list of all thread ids encountered in the frames scanned.
+        """
+        with self.temporary_offset():
+            header = header0 = self.read_header()
+            try:
+                thread_ids = set()
+                n_check = 1
+                while n_check > 0:
+                    frame_nr = header['frame_nr']
+                    n_thread = len(thread_ids)
+                    while header['frame_nr'] == frame_nr:
+                        thread_ids.add(header['thread_id'])
+                        self.seek(header.payload_nbytes, 1)
+                        header = self.read_header(edv=header0.edv)
+                        assert header0.same_stream(header)
+
+                    if len(thread_ids) > n_thread:
+                        n_check = check
+                    else:
+                        n_check -= 1
+
+            except EOFError:
+                # Hack: let through very short files (like our samples).
+                if self.seek(0, 2) > ((check+2) * len(thread_ids)
+                                      * header0.frame_nbytes):
+                    raise
+
+        return sorted(thread_ids)
+
     def find_header(self, pattern=None, *, edv=None, mask=None,
                     frame_nbytes=None, offset=0,
                     forward=True, maximum=None, check=1):

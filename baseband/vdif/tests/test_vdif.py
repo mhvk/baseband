@@ -434,6 +434,15 @@ class TestVDIF:
             assert abs(frame_rate
                        - 32. * u.MHz / header.samples_per_frame) < 1. * u.nHz
             assert fh.tell() == current_pos
+            # Test getting thread IDs.
+            fh.seek(0)
+            thread_ids = fh.get_thread_ids()
+            assert thread_ids == list(range(8))
+            assert fh.tell() == 0
+            fh.seek(5032*2)
+            thread_ids = fh.get_thread_ids()
+            assert thread_ids == list(range(8))
+            assert fh.tell() == 5032*2
             # The read_frame method is tested below, as is mode='wb'.
 
     def test_frame(self, tmpdir):
