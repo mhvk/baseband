@@ -37,6 +37,34 @@ class TestCorruptSampleCopy:
             data = fs.read()
         assert np.all(data == self.data)
 
+    # Have 6 framesets, so 48 frames.
+    @pytest.mark.parametrize('missing', (
+        36, slice(46, 48), [30, 45], slice(8, 16), 0, slice(4, 12)))
+    def test_missing_frames(self, missing):
+        """Purely missing frames should just be marked invalid."""
+        # Even at the very start; gh-359
+        sample = np.frombuffer(self.sample_bytes, 'u1').reshape(-1, 5032)
+        use = np.ones(len(sample), bool)
+        use[missing] = False
+        reduced = sample[use]
+        with io.BytesIO() as s:
+            s.write(reduced.tostring())
+            s.seek(0)
+            with vdif.open(s, 'rs') as fh:
+                with pytest.warns(UserWarning,
+                                  match='problem loading frame'):
+                    data = fh.read()
+
+        # Get data in frame order to zero expected bad frames.
+        expected = (self.data.copy().reshape(-1, 20000, 8)
+                    .transpose(0, 2, 1).reshape(-1, 20000))
+        expected[missing] = 0.
+        # Back into regular order
+        expected = (expected.reshape(-1, 8, 20000)
+                    .transpose(0, 2, 1).reshape(-1, 8))
+
+        assert np.all(expected == data)
+
     def expected_bad_frames(self, missing):
         (start_f, start_r), (stop_f, stop_i) = [
             divmod(s, self.frame_nbytes)
@@ -59,7 +87,7 @@ class TestCorruptSampleCopy:
         assert bad_start == expected_bad_start
         assert bad_stop == expected_bad_stop
 
-    # Have to keep first three frameset intact for get_thread_ids()
+    # Keep frames in first three frame sets intact for get_thread_ids()
     @pytest.mark.parametrize('missing', [
         (slice(5032*26, 5032*26+1)),  # First byte of header of frame 26.
         (slice(5032*26+50, 5032*26+60)),  # Part of payload of frame 26.

@@ -1057,10 +1057,10 @@ class TestVDIF:
         subset_md = (np.array([5, 3])[:, np.newaxis], np.array([0, 2]))
         with vdif.open(test_file, 'rs', subset=subset_md) as fhn:
             assert fhn.sample_shape == (2, 2)
-            thread_ids = [frame.header['thread_id'] for frame in
-                          fhn._frameset.frames]
-            assert thread_ids == [5, 3]
             check = fhn.read()
+            thread_ids = [frame.header['thread_id'] for frame in
+                          fhn._frame.frames]
+            assert thread_ids == [5, 3]
             assert np.all(check == data4x[(slice(None),) + subset_md])
 
     def test_stream_verify(self, tmpdir):

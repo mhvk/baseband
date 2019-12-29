@@ -10,6 +10,7 @@ from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase, HeaderNotFoundError)
 from .header import VDIFHeader
+from .payload import VDIFPayload
 from .frame import VDIFFrame, VDIFFrameSet
 from .file_info import VDIFFileReaderInfo
 
@@ -478,9 +479,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             self._frameset_subset = self.subset
             self._thread_ids = thread_ids
 
-        fh_raw.seek(0)
-        self._frameset = fh_raw.read_frameset(self._thread_ids)
-
     @lazyproperty
     def _last_header(self):
         """Last header of the file."""
@@ -708,9 +706,9 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                 self._raw_offsets[index+1] = self.fh_raw.tell()
 
         # Create invalid frame template,
-        invalid_frame = self._frameset.frames[0].__class__(
-            header, self._frameset.frames[0].payload)
-        invalid_frame.valid = False
+        invalid_payload = VDIFPayload(
+            np.zeros(header.payload_nbytes // 4, '<u4'), header)
+        invalid_frame = VDIFFrame(header, invalid_payload, valid=False)
 
         frame_list = []
         missing = []
@@ -730,7 +728,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                         .format(missing))
 
         warnings.warn(msg)
-        frameset = self._frameset.__class__(frame_list)
+        frameset = VDIFFrameSet(frame_list)
         return frameset
 
 
