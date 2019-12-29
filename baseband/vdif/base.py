@@ -248,8 +248,10 @@ class VDIFFileReader(VLBIFileReaderBase):
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
-            Maximum number of bytes to search through.  Default: twice the
-            frame size if given, otherwise 10000.
+            Maximum number of bytes to search away from the present location.
+            Default: search twice the frame size if given, otherwise 10000
+            (extra bytes to avoid partial patterns will be added).
+            Use 0 to check only at the current position.
         check : int or tuple of int, optional
             Frame offsets where another header should be present.
             Default: 1, i.e., a sync pattern should be present one
@@ -287,10 +289,10 @@ class VDIFFileReader(VLBIFileReaderBase):
         file_nbytes = self.seek(0, 2)
         if forward:
             iterate = range(file_pos,
-                            min(file_pos+maximum, file_nbytes-31))
+                            min(file_pos+maximum+1, file_nbytes-31))
         else:
             iterate = range(min(file_pos, file_nbytes-31),
-                            max(file_pos-maximum, -1), -1)
+                            max(file_pos-maximum-1, -1), -1)
         # Loop over all of them to try to find the frame marker.
         for frame in iterate:
             self.seek(frame)
@@ -306,7 +308,7 @@ class VDIFFileReader(VLBIFileReaderBase):
             # Possible hit!  Try if there are other headers right around.
             self.seek(frame)
             try:
-                return self.find_header(header, maximum=1, check=check)
+                return self.find_header(header, maximum=0, check=check)
             except Exception:
                 continue
 
