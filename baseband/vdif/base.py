@@ -204,7 +204,6 @@ class VDIFFileReader(VLBIFileReaderBase):
                         n_check = check
                     else:
                         n_check -= 1
-
             except EOFError:
                 # Hack: let through very short files (like our samples).
                 if self.seek(0, 2) > ((check+2) * len(thread_ids)
@@ -287,7 +286,7 @@ class VDIFFileReader(VLBIFileReaderBase):
         file_nbytes = self.seek(0, 2)
         if forward:
             iterate = range(file_pos,
-                            min(file_pos+maximum-32, file_nbytes-31))
+                            min(file_pos+maximum, file_nbytes-31))
         else:
             iterate = range(min(file_pos, file_nbytes-31),
                             max(file_pos-maximum, -1), -1)
@@ -431,36 +430,33 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     def __init__(self, fh_raw, sample_rate=None, squeeze=True, subset=(),
                  fill_value=0., verify='fix'):
         fh_raw = VDIFFileReader(fh_raw)
-        # We read the first frameset, since we need to know how many threads
-        # there are, and what the frameset size is.
-        # Note that frameset keeps the first header, since in some VLBA files
-        # not all the headers have the right time.  Hopefully, the first is
-        # least likely to have problems...
-        frameset = fh_raw.read_frameset()
-        header0 = frameset.header0
-        thread_ids = [fr['thread_id'] for fr in frameset.frames]
-        frameset_nbytes = fh_raw.tell()
+        # We read the very first header, hoping this is the right one
+        # (in some VLBA files not all the headers have the right time).
+        header0 = fh_raw.read_header()
+        # Next, we determine how many threads there are, and use those
+        # to calculate the frameset size.  We on purpose do *not* just read
+        # a frame set, since sometimes the first one is short (see gh-359).
+        fh_raw.seek(0)
+        thread_ids = fh_raw.get_thread_ids()
+        nthread = len(thread_ids)
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
-            nthread=len(frameset.frames), squeeze=squeeze, subset=subset,
+            nthread=nthread, squeeze=squeeze, subset=subset,
             fill_value=fill_value, verify=verify)
-        self._raw_offsets.frame_nbytes = frameset_nbytes
+        self._raw_offsets.frame_nbytes *= nthread
 
         # Check whether we are reading only some threads.  This is somewhat
         # messy since normally we apply the whole subset to the whole data,
         # but here we need to split it up in the part that selects specific
         # threads, which we use to selectively read, and the rest, which we
         # do post-decoding.
-        if self.subset and (len(thread_ids) > 1 or not self.squeeze):
+        if self.subset and (nthread > 1 or not self.squeeze):
             # Select the thread ids we want using first part of subset.
             thread_ids = np.array(thread_ids)[self.subset[0]]
             # Use squeese in case subset[0] uses broadcasting, and
             # atleast_1d to ensure single threads get upgraded to a list,
             # which is needed by the VDIFFrameSet reader.
             self._thread_ids = np.atleast_1d(thread_ids.squeeze()).tolist()
-            # Reload the frame set, now only including the requested threads.
-            fh_raw.seek(0)
-            frameset = fh_raw.read_frameset(self._thread_ids)
             # Since we have subset the threads already, we now need to
             # determine a new subset that takes this into account.
             if thread_ids.shape == ():
@@ -482,7 +478,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             self._frameset_subset = self.subset
             self._thread_ids = thread_ids
 
-        self._frameset = frameset
+        fh_raw.seek(0)
+        self._frameset = fh_raw.read_frameset(self._thread_ids)
 
     @lazyproperty
     def _last_header(self):
