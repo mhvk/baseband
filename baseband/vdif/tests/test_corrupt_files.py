@@ -31,29 +31,32 @@ class TestCorruptSampleCopy:
             cls.start_time = fw.start_time
             cls.stop_time = fw.tell('time')
 
-    def test_sample_bytes(self):
-        with io.BytesIO(self.sample_bytes) as s, \
-                vdif.open(s, 'rs') as fs:
+    def test_sample_bytes(self, tmpdir):
+        test_file = str(tmpdir.join('test.vdif'))
+        with open(test_file, 'wb') as fh:
+            fh.write(self.sample_bytes)
+        with vdif.open(test_file, 'rs') as fs:
             data = fs.read()
         assert np.all(data == self.data)
 
     # Have 6 framesets, so 48 frames.
     @pytest.mark.parametrize('missing', (
         36, slice(46, 48), [30, 45], slice(8, 16), 0, slice(4, 12)))
-    def test_missing_frames(self, missing):
+    def test_missing_frames(self, missing, tmpdir):
         """Purely missing frames should just be marked invalid."""
         # Even at the very start; gh-359
         sample = np.frombuffer(self.sample_bytes, 'u1').reshape(-1, 5032)
         use = np.ones(len(sample), bool)
         use[missing] = False
         reduced = sample[use]
-        with io.BytesIO() as s:
+        corrupt_file = str(tmpdir.join('missing_frames.vdif'))
+        with open(corrupt_file, 'wb') as s:
             s.write(reduced.tostring())
-            s.seek(0)
-            with vdif.open(s, 'rs') as fh:
-                with pytest.warns(UserWarning,
-                                  match='problem loading frame'):
-                    data = fh.read()
+
+        with vdif.open(corrupt_file, 'rs') as fh:
+            with pytest.warns(UserWarning,
+                              match='problem loading frame'):
+                data = fh.read()
 
         # Get data in frame order to zero expected bad frames.
         expected = (self.data.copy().reshape(-1, 20000, 8)
