@@ -4,6 +4,11 @@ Definitions for DADA pulsar baseband headers.
 
 Implements a DADAHeader class used to store header definitions in a FITS
 header, and read & write these from files.
+
+The DADA headers are described in the DADA software specification, at
+http://psrdada.sourceforge.net/manuals/Specification.pdf
+
+See also :ref:`dada_header`.
 """
 import io
 import warnings
