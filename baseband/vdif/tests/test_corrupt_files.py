@@ -106,6 +106,9 @@ class TestCorruptSampleCopy:
         with open(filename, 'wb') as fw:
             fw.write(corrupted)
 
+        with vdif.open(filename, 'rb') as fr:
+            assert 'number_of_frames' in fr.info.warnings
+
         with vdif.open(filename, 'rs') as fr:
             assert fr.start_time == self.start_time
             assert fr.stop_time == self.stop_time

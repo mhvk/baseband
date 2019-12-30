@@ -53,6 +53,7 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
         # __getattr__ to allow us to look for changes.
         self.missing = {}
         self.errors = OrderedDict()
+        self.warnings = OrderedDict()
         for attr in self._parent_attrs:
             setattr(self, attr, self._getattr(self._parent, attr))
 
@@ -141,11 +142,11 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
                 result += "{} {}: {}\n".format(prefix, ', '.join(keys), msg)
                 prefix = ' ' * len(prefix)
 
-        if self.errors:
+        for items, prefix in ((self.errors.items(), 'errors: '),
+                              (self.warnings.items(), 'warnings: ')):
             result += '\n'
-            prefix = 'errors: '
-            for item, error in self.errors.items():
-                result += "{} {}: {}\n".format(prefix, item, str(error))
+            for key, value in items:
+                result += "{} {}: {}\n".format(prefix, key, str(value))
                 prefix = ' ' * len(prefix)
 
         return result
@@ -163,6 +164,8 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     ----------
     format : str or `None`
         File format, or `None` if the underlying file cannot be parsed.
+    number_of_frames : int
+        Number of frames in the file.
     frame_rate : `~astropy.units.Quantity`
         Number of data frames per unit of time.
     sample_rate : `~astropy.units.Quantity`
@@ -186,6 +189,8 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     errors : dict
         Any exceptions raised while trying to determine attributes.  Keyed
         by the attributes.
+    warnings : dict
+        Any warnings about the attributes.  Keyed by the attributes.
 
     Examples
     --------
@@ -197,6 +202,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         >>> fh.info
         File information:
         format = mark5b
+        number_of_frames = 4
         frame_rate = 6400.0 Hz
         bps = 2
         complex_data = False
@@ -214,6 +220,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         >>> fh.info
         File information:
         format = mark5b
+        number_of_frames = 4
         frame_rate = 6400.0 Hz
         sample_rate = 32.0 MHz
         samples_per_frame = 5000
@@ -224,9 +231,9 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         readable = True
         >>> fh.close()
     """
-    attr_names = ('format', 'frame_rate', 'sample_rate', 'samples_per_frame',
-                  'sample_shape', 'bps', 'complex_data', 'start_time',
-                  'readable')
+    attr_names = ('format', 'number_of_frames', 'frame_rate', 'sample_rate',
+                  'samples_per_frame', 'sample_shape', 'bps', 'complex_data',
+                  'start_time', 'readable')
     _header0_attrs = ('bps', 'complex_data', 'samples_per_frame',
                       'sample_shape')
 
@@ -283,6 +290,18 @@ class VLBIFileReaderInfo(VLBIInfoBase):
             self.errors['frame_rate'] = exc
             return None
 
+    def _get_number_of_frames(self):
+        with self._parent.temporary_offset() as fh:
+            number_of_frames = fh.seek(0, 2) / self.header0.frame_nbytes
+
+        if number_of_frames % 1 == 0:
+            return int(number_of_frames)
+        else:
+            self.warnings['number_of_frames'] = (
+                'file contains non-integer number ({}) of frames'
+                .format(number_of_frames))
+            return None
+
     def _get_start_time(self):
         try:
             return self.header0.time
@@ -302,6 +321,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                     and self.frame_rate is not None
                     and self.samples_per_frame is not None):
                 self.sample_rate = self.frame_rate * self.samples_per_frame
+            self.number_of_frames = self._get_number_of_frames()
             self.start_time = self._get_start_time()
             self.readable = self._readable()
 

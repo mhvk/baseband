@@ -231,9 +231,11 @@ class TestMark5B:
             header = fh.read_header()
             start_time = header.time
             frame_rate = fh.get_frame_rate()
+            number_of_frames = fh.seek(0, 2) // header.frame_nbytes
             info = fh.info
 
         expected = {'format': 'mark5b',
+                    'number_of_frames': number_of_frames,
                     'frame_rate': frame_rate,
                     'sample_rate': 32 * u.MHz,
                     'samples_per_frame': 5000,
