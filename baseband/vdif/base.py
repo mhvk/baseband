@@ -286,13 +286,10 @@ class VDIFFileReader(VLBIFileReaderBase):
 
         file_pos = self.tell()
         # Generate file pointer positions to test.
-        file_nbytes = self.seek(0, 2)
         if forward:
-            iterate = range(file_pos,
-                            min(file_pos+maximum+1, file_nbytes-31))
+            iterate = range(file_pos, file_pos+maximum+1)
         else:
-            iterate = range(min(file_pos, file_nbytes-31),
-                            max(file_pos-maximum-1, -1), -1)
+            iterate = range(file_pos, max(file_pos-maximum-1, -1), -1)
         # Loop over all of them to try to find the frame marker.
         for frame in iterate:
             self.seek(frame)
