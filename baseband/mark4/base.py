@@ -126,13 +126,13 @@ class Mark4FileReader(VLBIFileReaderBase):
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
-            Maximum number of bytes to search through.  Default: twice the
-            frame size (extra bytes to avoid partial patterns will be added).
+            Maximum number of bytes to search away from the present location.
+            Use 0 to check only at the current position.
         check : int or tuple of int, optional
-            Frame offsets where another sync pattern should be present.
-            Ignored if the file does not extend sufficiently.
-            Default: 1, i.e., a sync pattern should be present one
-            frame after the one found (independent of ``forward``).
+            Frame offsets where another sync pattern should be present (if
+            inside the file). Default: 1, i.e., a sync pattern should be
+            present one frame after the one found (independent of
+            ``forward``), thus helping to guarantee the frame is OK.
 
         Returns
         -------

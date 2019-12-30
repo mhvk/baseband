@@ -131,10 +131,10 @@ class VLBIFileReaderBase(VLBIFileBase):
         forward : bool, optional
             Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
-            Maximum number of bytes to search through.  Default: twice the
-            frame size if given, otherwise 1 million (extra bytes to avoid
-            partial patterns will be added). Use 1 to check only at the
-            current position.
+            Maximum number of bytes to search away from the present location.
+            Default: search twice the frame size if given, otherwise 1 million
+            (extra bytes to avoid partial patterns will be added).
+            Use 0 to check only at the current position.
         check : int or tuple of int, optional
             Frame offsets where another sync pattern should be present
             (if inside the file). Ignored if ``frame_nbytes`` is not given.
@@ -164,15 +164,9 @@ class VLBIFileReaderBase(VLBIFileBase):
             offset += useful_slice.start
 
         if maximum is None:
-            maximum = 2 * frame_nbytes if frame_nbytes else 1000000
+            maximum = (2 * frame_nbytes if frame_nbytes else 1000000) - 1
 
-        if maximum <= 0:
-            raise ValueError('maximum must be at least 1.')
-
-        if frame_nbytes is None:
-            frame_nbytes = 0
-
-        if check is None:
+        if check is None or frame_nbytes is None:
             check = np.array([], dtype=int)
             check_min = check_max = 0
         else:
@@ -182,38 +176,54 @@ class VLBIFileReaderBase(VLBIFileBase):
             check_min = min(check.min(), 0)
             check_max = max(check.max(), 0)
 
+        if frame_nbytes is None:
+            # If not set, we just let it stand in for the extra bytes
+            # that should be read to ensure we can even see a pattern.
+            frame_nbytes = offset + pattern.size
+
         with self.temporary_offset() as fh:
             # Calculate the fiducial start of the region we are looking in.
             if forward:
                 seek_start = fh.tell()
             else:
-                seek_start = fh.tell() - maximum + 1
-            # Determine what part of the file to read, including the
-            # extra bits for doing the checking.
-            file_nbytes = fh.seek(0, 2)
+                seek_start = fh.tell() - maximum
+            # Determine what part of the file to read, including the extra
+            # bits for doing the checking.  Note that we ensure not to start
+            # before the start of the file, but we do not check for ending
+            # after the end of the file, as we want to avoid a possibly
+            # expensive seek (e.g., if the file is a SequentialFile of a lot
+            # of individual files).  We rely instead on reading fewer bytes
+            # than requested if we are close to the end.
             start = max(seek_start + offset + check_min, 0)
-            stop = min(seek_start + offset + maximum + check_max,
-                       file_nbytes - pattern.size)
-            size = stop - start
-
-            if size < 0:
-                return []
+            stop = max(seek_start + maximum + 1 + check_max + frame_nbytes,
+                       start)
 
             fh.seek(start)
-            # Note: np.fromfile doesn't work with SequentialFile.
-            data = fh.read(size + pattern.size)
+            data = fh.read(stop-start)
 
-        data = np.frombuffer(data, dtype='u1')
+        # Since we may have hit the end of the file, check what the actual
+        # stop position was (needed at end).
+        stop = start + len(data)
+        # We normally have read more than really needed (to check for EOF);
+        # select what we actually want and convert to an array of bytes.
+        size = min(maximum + 1 + check_max - check_min,
+                   stop - start - pattern.size)
+        if size <= 0:
+            return []
+        data = np.frombuffer(data, dtype='u1', count=size+pattern.size)
 
+        # We match in two steps, first matching just the first pattern byte,
+        # and then matching the rest in one step using a strided array.
+        # The hope is that this gives a good compromise in speed: not
+        # iterate in python for each pattern byte, yet not doing pattern
+        # size times more comparisons than needed in C.
         if mask is None:
             match = data[:-pattern.size] == pattern[0]
         else:
             match = ((data[:-pattern.size] ^ pattern[0]) & mask[0]) == 0
         matches = np.nonzero(match)[0]
-        # Re-stride so that it looks like each element is followed by
-        # all other, and check those all in one go (likely faster than
-        # iterating over the pattern, since we already reduced the
-        # number of options about 256 times).
+        # Re-stride data so that it looks like each element is followed by
+        # all others, and check those all in one go.
         strided = as_strided(data[1:], strides=(1, 1),
                              shape=(size, pattern.size-1))
         if mask is None:
@@ -226,19 +236,25 @@ class VLBIFileReaderBase(VLBIFileBase):
             # Order by proximity to the file position.
             matches = matches[::-1]
 
+        # Convert matches to a list of actual file positions.
+        matches += start - offset
         matches = matches.tolist()
         # Keep only matches for which
-        # (1) the location is in the requested base range,
-        # (2) the associated frames completely fits in the file, and
+        # (1) the location is in the requested range of current +/- maximum,
+        # (2) the associated frames completely fit in the file, and
         # (3) the pattern is also present at the requested check points.
-        # Matches are relative to start, with offset included.
-        loc_start = max(seek_start, 0) + offset - start
-        loc_stop = min(seek_start+maximum,
-                       file_nbytes-frame_nbytes+1) + offset - start
-        locations = [loc-offset+start for loc in matches
+        # The range in positions actually wanted. Here, we guarantee not
+        # only (1) but also (2) by using the recalculated `stop` from above,
+        # which is limited by the file size.
+        loc_start = max(seek_start, 0)
+        loc_stop = min(seek_start+maximum+1, stop-frame_nbytes+1)
+        # And the range in which it was possible to check positions.
+        check_start = start
+        check_stop = stop-offset-pattern.size
+        locations = [loc for loc in matches
                      if (loc_start <= loc < loc_stop
                          and all(c in matches for c in loc+check
-                                 if 0 <= c < size))]
+                                 if check_start <= c < check_stop))]
 
         return locations
 
