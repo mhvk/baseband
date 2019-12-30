@@ -27,6 +27,12 @@ Other Changes and Additions
   also the new default; use ``verify=True`` for the old behaviour of
   raising an error on any inconsistency. [#357]
 
+- The ``VDIFFileReader`` gained a new ``get_thread_ids()`` method, which
+  will scan through frames to determine the threads present in the file.
+  This is now used inside ``VDIFStreamReader`` and, combined with the above,
+  allows reading of files that have missing threads in their first frame
+  set. [#361]
+
 - Much faster localization of Mark 5B frames. [#351]
 
 - VLBI file readers have gained a new method ``locate_frames`` that finds

@@ -434,6 +434,15 @@ class TestVDIF:
             assert abs(frame_rate
                        - 32. * u.MHz / header.samples_per_frame) < 1. * u.nHz
             assert fh.tell() == current_pos
+            # Test getting thread IDs.
+            fh.seek(0)
+            thread_ids = fh.get_thread_ids()
+            assert thread_ids == list(range(8))
+            assert fh.tell() == 0
+            fh.seek(5032*2)
+            thread_ids = fh.get_thread_ids()
+            assert thread_ids == list(range(8))
+            assert fh.tell() == 5032*2
             # The read_frame method is tested below, as is mode='wb'.
 
     def test_frame(self, tmpdir):
@@ -1048,10 +1057,10 @@ class TestVDIF:
         subset_md = (np.array([5, 3])[:, np.newaxis], np.array([0, 2]))
         with vdif.open(test_file, 'rs', subset=subset_md) as fhn:
             assert fhn.sample_shape == (2, 2)
-            thread_ids = [frame.header['thread_id'] for frame in
-                          fhn._frameset.frames]
-            assert thread_ids == [5, 3]
             check = fhn.read()
+            thread_ids = [frame.header['thread_id'] for frame in
+                          fhn._frame.frames]
+            assert thread_ids == [5, 3]
             assert np.all(check == data4x[(slice(None),) + subset_md])
 
     def test_stream_verify(self, tmpdir):
@@ -1062,31 +1071,33 @@ class TestVDIF:
             data = fh.read()
 
         testverifyfile = str(tmpdir.join('testverify.vdif'))
-        # Make a file with a sync pattern error in the second set of frames.
+        # Make a file with a sync pattern error in the sixth set of frames.
         with vdif.open(SAMPLE_FILE, 'rb') as fh, \
                 vdif.open(testverifyfile, 'wb') as fw:
             fr = fh.read_frameset()
-            fr.tofile(fw)
-            fr = fh.read_frameset()
-            fr.frames[2].header.mutable = True
-            fr.frames[2].header['sync_pattern'] = 0xabbaabba
-            fr.tofile(fw)
+            # Make mutable copy.
+            fr = fr.fromdata(fr.data, fr.frames[0].header)
+            for i in range(8):
+                fr['frame_nr'] = fr['frame_nr'] + 1
+                if i == 6:
+                    fr.frames[2].header['sync_pattern'] = 0xabbaabba
+                fr.tofile(fw)
 
         with vdif.open(testverifyfile, 'rs', verify=True) as fn:
             assert fn.verify
-            # This should fail at the first frameset, since its following
+            # This should fail at the fifth frameset, since its following
             # one is corrupt.
             with pytest.raises(AssertionError):
                 fn.read()
-            assert fn.tell() == 0
+            assert fn.tell() == 100000
             fn.verify = False
             assert not fn.verify
-            assert np.all(fn.read() == data)
+            assert np.all(fn.read().reshape(-1, 20000, 8) == data[:20000])
 
         # Check that we can pass verify=False.
         with vdif.open(testverifyfile, 'rs', verify=False) as fn:
             assert not fn.verify
-            assert np.all(fn.read() == data)
+            assert np.all(fn.read().reshape(-1, 20000, 8) == data[:20000])
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
@@ -1094,30 +1105,36 @@ class TestVDIF:
     def test_incomplete_stream(self, tmpdir, fill_value):
         vdif_incomplete = str(tmpdir.join('incomplete.vdif'))
         with vdif.open(SAMPLE_FILE, 'rs') as fr:
-            record = fr.read(10)
+            record = fr.read(20010)
             with pytest.warns(UserWarning, match='partial buffer'):
                 with vdif.open(vdif_incomplete, 'ws', header0=fr.header0,
                                sample_rate=32*u.MHz, nthread=8) as fw:
                     fw.write(record)
         with vdif.open(vdif_incomplete, 'rs', fill_value=fill_value) as fwr:
-            assert all([not frame.valid for frame in fwr._frameset.frames])
+            valid = fwr.read(20000)
+            assert np.all(valid == record[:20000])
             assert fwr.fill_value == fill_value
-            assert np.all(fwr.read() == fill_value)
+            invalid = fwr.read()
+            assert invalid.shape == valid.shape
+            assert np.all(invalid == fill_value)
 
     def test_corrupt_stream(self, tmpdir):
+        corrupt_file = str(tmpdir.join('test.vdif'))
         with vdif.open(SAMPLE_FILE, 'rb') as fh, \
-                open(str(tmpdir.join('test.vdif')), 'w+b') as s:
-            frame = fh.read_frame()
-            frame.tofile(s)
-            # Now add lots of the next frame, i.e., with a different thread_id
-            # and different frame_nr
-            fh.seek(-frame.header.frame_nbytes, 2)
+                open(corrupt_file, 'w+b') as s:
+            frameset = fh.read_frameset()
+            header0 = frameset.frames[0].header
+            frameset.tofile(s)
+            frameset = fh.read_frameset()
+            frameset.tofile(s)
+            # Now add lots of the final frame, i.e., with the wrong thread_id.
+            fh.seek(-5032, 2)
             frame2 = fh.read_frame()
             for i in range(15):
                 frame2.tofile(s)
             s.seek(0)
             with vdif.open(s, 'rs') as f2:
-                assert f2.header0 == frame.header
+                assert f2.header0 == header0
                 with pytest.raises(HeaderNotFoundError):
                     f2._last_header
 
@@ -1126,27 +1143,31 @@ class TestVDIF:
         # header which is mostly zeros and marked invalid.  Check that we
         # properly ignore such a frame.  See gh-271.
         test_file = str(tmpdir.join('test2.vdif'))
-        with vdif.open(SAMPLE_FILE, 'rb') as fh, \
-                open(test_file, 'w+b') as s:
-            allbytes = fh.read()
-            s.write(allbytes)
+        with vdif.open(SAMPLE_FILE, 'rs') as fh, \
+                open(test_file, 'ab') as s, \
+                vdif.open(s, 'ws', header0=fh.header0, nthread=8) as fw:
+            data = fh.read()
+            for _ in range(5):
+                fw.write(data)
+
+            assert s.seek(0, 2) == 5032 * 8 * 2 * 5
             bad_header = vdif.VDIFHeader.fromvalues(edv=0, frame_nbytes=5032,
                                                     invalid_data=True)
             bad_header.tofile(s)
             s.write(b'\0' * 5000)
-            assert s.tell() == fh.tell() + 5032
+            assert s.tell() == 5032 * (8 * 2 * 5 + 1)
 
         # For this short test file, one gets the wrong sample rate by
         # looking for the frame number returning to zero; so we pass
-        # we pass the correct one in.
-        with vdif.open(SAMPLE_FILE, 'rs') as f1, \
-                vdif.open(test_file, 'rs', sample_rate=32*u.MHz) as f2:
-            assert f2.header0 == f1.header0
-            assert f2.stop_time == f1.stop_time
-            d1 = f1.read()
+        # the correct one in.
+        with vdif.open(test_file, 'rs', sample_rate=32*u.MHz) as f2:
+            assert f2.start_time == fh.start_time
+            assert f2.shape[0] == 5*fh.shape[0]
+            assert abs(f2.stop_time - fh.stop_time
+                       - 4*(fh.stop_time-fh.start_time)) < 1.*u.ns
             d2 = f2.read()
 
-            assert np.all(d1 == d2)
+        assert np.all(d2.reshape(5, -1, 8) == data)
 
     def test_io_invalid(self, tmpdir):
         tmp_file = str(tmpdir.join('ts.dat'))

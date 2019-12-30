@@ -1,4 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
+import io
+
 import pytest
 import numpy as np
 from astropy import units as u
@@ -9,25 +11,62 @@ from ...data import SAMPLE_VDIF as SAMPLE_FILE
 
 
 class TestCorruptSampleCopy:
-    def setup(self):
-        with open(SAMPLE_FILE, 'rb') as fh:
-            self.sample_bytes = fh.read()
-        with vdif.open(SAMPLE_FILE, 'rs') as fs:
-            self.frame_nbytes = fs.header0.frame_nbytes
-            self.data = fs.read()
-            self.start_time = fs.start_time
-            self.stop_time = fs.stop_time
+    @classmethod
+    def setup_class(cls):
+        # Make a triply-long sample file - this since otherwise
+        # things already fail at the determination of thread_ids.
+        with vdif.open(SAMPLE_FILE, 'rs') as fs, \
+                io.BytesIO() as s, \
+                vdif.open(s, 'ws', header0=fs.header0, nthread=8) as fw:
 
-        self.thread_ids = [1, 3, 5, 7, 0, 2, 4, 6]
-        data = []
-        with vdif.open(SAMPLE_FILE, 'rb') as fr:
-            # Also create data in order of reading it from disk.
-            for i in range(0, fs.size, fs.samples_per_frame):
-                data.append(fr.read_frame().data)
+            data = fs.read()
+            for i in range(3):
+                fw.write(data)
 
-        self.disk_ordered = np.concatenate(data)
-        self.reverse_threads = [self.thread_ids.index(thread_id)
-                                for thread_id in range(8)]
+            cls.data = np.concatenate([data, data, data])
+
+            s.seek(0)
+            cls.sample_bytes = s.read()
+            cls.frame_nbytes = fw.header0.frame_nbytes
+            cls.start_time = fw.start_time
+            cls.stop_time = fw.tell('time')
+
+    def test_sample_bytes(self, tmpdir):
+        test_file = str(tmpdir.join('test.vdif'))
+        with open(test_file, 'wb') as fh:
+            fh.write(self.sample_bytes)
+        with vdif.open(test_file, 'rs') as fs:
+            data = fs.read()
+        assert np.all(data == self.data)
+
+    # Have 6 framesets, so 48 frames.
+    @pytest.mark.parametrize('missing', (
+        36, slice(46, 48), [30, 45], slice(8, 16), 0, slice(4, 12)))
+    def test_missing_frames(self, missing, tmpdir):
+        """Purely missing frames should just be marked invalid."""
+        # Even at the very start; gh-359
+        sample = np.frombuffer(self.sample_bytes, 'u1').reshape(-1, 5032)
+        use = np.ones(len(sample), bool)
+        use[missing] = False
+        reduced = sample[use]
+        corrupt_file = str(tmpdir.join('missing_frames.vdif'))
+        with open(corrupt_file, 'wb') as s:
+            s.write(reduced.tostring())
+
+        with vdif.open(corrupt_file, 'rs') as fh:
+            with pytest.warns(UserWarning,
+                              match='problem loading frame'):
+                data = fh.read()
+
+        # Get data in frame order to zero expected bad frames.
+        expected = (self.data.copy().reshape(-1, 20000, 8)
+                    .transpose(0, 2, 1).reshape(-1, 20000))
+        expected[missing] = 0.
+        # Back into regular order
+        expected = (expected.reshape(-1, 8, 20000)
+                    .transpose(0, 2, 1).reshape(-1, 8))
+
+        assert np.all(expected == data)
 
     def expected_bad_frames(self, missing):
         (start_f, start_r), (stop_f, stop_i) = [
@@ -51,14 +90,13 @@ class TestCorruptSampleCopy:
         assert bad_start == expected_bad_start
         assert bad_stop == expected_bad_stop
 
-    # Have to keep first frameset intact, as well as the
-    # first frame of the seconds one.
+    # Keep frames in first three frame sets intact for get_thread_ids()
     @pytest.mark.parametrize('missing', [
-        (slice(50320, 50321)),  # First byte of header of frame 10.
-        (slice(50500, 50600)),  # Part of payload of frame 10.
-        (slice(60000, 70000)),  # Parts of 11-13.
-        (slice(75490, 75500)),  # Part of header of frame 15.
-        (slice(80511, 80512))])  # Last byte of last frame.
+        (slice(5032*26, 5032*26+1)),  # First byte of header of frame 26.
+        (slice(5032*26+50, 5032*26+60)),  # Part of payload of frame 26.
+        (slice(5032*27+50, 5032*29+700)),  # Parts of 27-29
+        (slice(5032*31+10, 5032*31+20)),  # Part of header of frame 31.
+        (slice(5032*48-1, 5032*48))])  # Last byte of last frame.
     def test_missing_bytes(self, missing, tmpdir):
         corrupted = (self.sample_bytes[:missing.start]
                      + self.sample_bytes[missing.stop:])
@@ -75,26 +113,28 @@ class TestCorruptSampleCopy:
                               match='problem loading frame'):
                 data = fr.read()
 
-        expected = self.disk_ordered.copy().reshape(-1, 20000)
+        # Get data in frame order to zero expected bad frames.
+        expected = (self.data.copy().reshape(-1, 20000, 8)
+                    .transpose(0, 2, 1).reshape(-1, 20000))
         expected[bad_start:bad_stop] = 0.
-
-        # Mimic thread ordering
+        # Back into regular order
         expected = (expected.reshape(-1, 8, 20000)
-                    .transpose(0, 2, 1).reshape(-1, 8)
-                    [:, self.reverse_threads])
+                    .transpose(0, 2, 1).reshape(-1, 8))
+
         assert np.all(data == expected)
 
 
 class TestCorruptFile:
-    def setup(self):
-        self.header0 = vdif.VDIFHeader.fromvalues(
+    @classmethod
+    def setup_class(cls):
+        cls.header0 = vdif.VDIFHeader.fromvalues(
             edv=1, time=Time('2010-11-12T13:14:15'), nchan=2, bps=2,
             complex_data=False, thread_id=0, samples_per_frame=16,
             station='me', sample_rate=2*u.kHz)
-        self.nthread = 2
-        self.data = np.array([[[-1, 1],
-                               [-3, 3]]]*16)
-        self.frameset_nbytes = self.header0.frame_nbytes * self.nthread
+        cls.nthread = 2
+        cls.data = np.array([[[-1, 1],
+                              [-3, 3]]]*16)
+        cls.frameset_nbytes = cls.header0.frame_nbytes * cls.nthread
 
     def fake_file(self, tmpdir, nframes=16):
         filename = str(tmpdir.join('fake.vdif'))
@@ -176,12 +216,13 @@ class TestCorruptFile:
         assert len(data) == 15
         assert np.all(data.astype(int) == self.data)
 
+    # Note: keep frame sets 0--2 intact for get_thread_ids().
     @pytest.mark.parametrize('missing_bytes,missing_data', [
-        (slice(80, 160), slice(16, 32)),  # Remove frame set 1.
-        (slice(119, 121), slice(16, 32)),  # Corrupt frame set 1.
-        (slice(120, 121), slice(16, 32)),  # Corrupt frame 1, thread 1 header.
-        (slice(119, 120), slice(16, 32)),  # Corrupt frame 1, thread 0.
-        (slice(112, 205), slice(16, 48)),  # Corrupt frames 1, 2.
+        (slice(240, 320), slice(48, 64)),  # Remove frameset 3.
+        (slice(279, 281), slice(48, 64)),  # Corrupt frameset 3.
+        (slice(280, 281), slice(48, 64)),  # Corrupt frameset 3, thread 1.
+        (slice(279, 280), slice(48, 64)),  # Corrupt frameset 3, thread 0.
+        (slice(272, 365), slice(48, 80)),  # Corrupt framesets 3, 4
     ])
     def test_missing_middle(self, missing_bytes, missing_data, tmpdir):
         # In all these cases, some data will be missing.

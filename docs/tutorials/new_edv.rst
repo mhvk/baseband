@@ -427,13 +427,15 @@ class, and define a replacement::
     ...     def verify(self):
     ...         pass
 
-We can then use the stream reader without further modification::
+If we had the whole corrupt file, this might be enough to use the stream
+reader without further modification.  It turns out, though, that the frame
+numbers are not monotonic and that the station ID changes between frames as
+well, so one would be better off making a new copy.  Here, we can at least
+now read frames::
 
-    >>> fh2 = vdif.open(SAMPLE_DRAO_CORRUPT, 'rs',
-    ...                 sample_rate=5**12*u.Hz, verify=False)
-    >>> fh2.header0['eud2'] == header0['eud2']
-    True
-    >>> np.all(fh2.read(1) == payload0[0])
+    >>> fh2 = vdif.open(SAMPLE_DRAO_CORRUPT, 'rb')
+    >>> frame0 = fh2.read_frame()
+    >>> np.all(frame0.data == payload0.data)
     True
     >>> fh2.close()
 
