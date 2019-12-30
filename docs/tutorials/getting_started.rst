@@ -147,8 +147,9 @@ For an overview of the file, we can either print ``fh_vdif`` itself, or use the
     <BLANKLINE>
     File information:
     edv = 3
-    thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
     number_of_frames = 16
+    thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+    number_of_framesets = 2
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)
