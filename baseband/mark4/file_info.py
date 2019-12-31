@@ -1,6 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 
-from ..vlbi_base.file_info import VLBIFileReaderInfo
+from ..vlbi_base.file_info import VLBIFileReaderInfo, info_property
 
 
 __all__ = ['Mark4FileReaderInfo']
@@ -98,38 +98,27 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
     _header0_attrs = ('bps', 'samples_per_frame')
     _parent_attrs = ('ntrack', 'decade', 'ref_time')
 
-    def _get_header0(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(0)
-                header = fh.find_header()
-                self.offset0 = fh.tell()
-                return header
+    @info_property
+    def header0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(0)
+            header = fh.find_header()
+            self.offset0 = fh.tell()
+            return header
 
-        except Exception as exc:
-            self.errors['header0'] = exc
-            return None
+    @info_property
+    def frame0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(self.offset0)
+            return fh.read_frame()
 
-    def _get_frame0(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(self.offset0)
-                return fh.read_frame()
-        except Exception as exc:
-            self.errors['frame0'] = exc
-            return None
-
-    def _get_number_of_frames(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(-self.header0.frame_nbytes, 2)
-                fh.find_header(self.header0, forward=False)
-                number_of_frames = ((fh.tell() - self.offset0)
-                                    / self.header0.frame_nbytes) + 1
-
-        except Exception as exc:
-            self.errors['number_of_frames'] = exc
-            return None
+    @info_property
+    def number_of_frames(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(-self.header0.frame_nbytes, 2)
+            fh.find_header(self.header0, forward=False)
+            number_of_frames = ((fh.tell() - self.offset0)
+                                / self.header0.frame_nbytes) + 1
 
         if number_of_frames % 1 == 0:
             return int(number_of_frames)

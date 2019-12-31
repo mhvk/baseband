@@ -1,30 +1,27 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..vlbi_base.file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
+                                   info_property)
 
 
 class GSBTimeStampInfo(VLBIFileReaderInfo):
     attr_names = ('format', 'mode') + VLBIFileReaderInfo.attr_names[1:]
     _header0_attrs = ('mode',)
 
-    def _get_header0(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(0)
-                return fh.read_timestamp()
-        except Exception as exc:
-            self.errors['header0'] = exc
-            return None
+    @info_property
+    def header0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(0)
+            return fh.read_timestamp()
 
-    def _get_format(self):
-        return 'gsb'
+    @info_property
+    def format(self):
+        return 'gsb' if self.header0 is not None else None
 
-    def _readable(self):
-        # Cannot know whether it is readable without the raw data files.
-        return None
+    # Cannot know whether it is readable without the raw data files.
+    readable = None
 
-    def _get_number_of_frames(self):
-        # Tricky to determine without _last_header.
-        return None
+    number_of_frames = None
+    # Tricky to determine without _last_header.
 
     def _collect_info(self):
         super()._collect_info()
@@ -34,19 +31,15 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
 
 class GSBStreamReaderInfo(VLBIStreamReaderInfo):
 
-    def _get_frame0(self):
-        try:
-            return self._parent._read_frame(0)
-        except Exception as exc:
-            self.errors['frame0'] = exc
-            return None
+    @info_property
+    def frame0(self):
+        return self._parent._read_frame(0)
 
-    _decodable = VLBIFileReaderInfo._decodable
+    # Bit of a hack, but the base reader one suffices here with
+    # the frame0 override above and its default "decodable"
+    readable = VLBIFileReaderInfo.readable
+    decodable = VLBIFileReaderInfo.decodable
 
-    def _readable(self):
-        # Bit of a hack, but the base reader one suffices here with
-        # the _get_frame0 override above.
-        return VLBIFileReaderInfo._readable(self)
-
-    def _file_info(self):
+    @info_property
+    def file_info(self):
         return self._parent.fh_ts.info

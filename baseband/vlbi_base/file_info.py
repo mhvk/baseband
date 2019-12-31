@@ -15,6 +15,40 @@ __all__ = ['VLBIInfoMeta', 'VLBIInfoBase',
            'VLBIFileReaderInfo', 'VLBIStreamReaderInfo']
 
 
+class info_property:
+    """Like a property, but evaluate only once, and store errors.
+
+    It is not a data property and replaces itself with the evaluation
+    of the function.
+    """
+    def __new__(cls, fget=None, default=None):
+        if fget is None:
+            def wrapper(func):
+                return cls(func, default=default)
+
+            return wrapper
+
+        return super().__new__(cls)
+
+    def __init__(self, fget, default=None):
+        self.fget = fget
+        self.name = fget.__name__
+        self.default = default
+
+    def __get__(self, instance, cls=None):
+        if instance is None:
+            return self
+
+        try:
+            value = self.fget(instance)
+        except Exception as exc:
+            instance.errors[self.name] = exc
+            value = self.default
+
+        setattr(instance, self.name, value)
+        return value
+
+
 class VLBIInfoMeta(type):
     # Ensure all attributes are initialized to None, so that they are
     # always available (do this rather than overwrite __getattr__ so that
@@ -23,7 +57,8 @@ class VLBIInfoMeta(type):
         super().__init__(name, bases, dct)
         attr_names = dct.get('attr_names', ())
         for attr in attr_names:
-            setattr(cls, attr, None)
+            if not hasattr(cls, attr):
+                setattr(cls, attr, None)
 
 
 class VLBIInfoBase(metaclass=VLBIInfoMeta):
@@ -42,6 +77,7 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
 
     _parent_attrs = ()
     _parent = None
+    _self_attrs = ()
 
     def _getattr(self, object_, attr, error=True):
         """Guarded getattr, returning None on error (and storing the error)."""
@@ -244,57 +280,48 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     info_names = ('missing', 'checks', 'errors', 'warnings')
     """Dictionaries with further information that the container provides."""
 
-    def _get_header0(self):
+    @info_property
+    def header0(self):
         # Here, we do not even know whether the file is open or whether we
         # have the right format. We thus use a try/except and filter out all
         # warnings.
-        try:
-            with self._parent.temporary_offset() as fh:
-                with warnings.catch_warnings():
-                    warnings.simplefilter('ignore')
-                    fh.seek(0)
-                    return fh.read_header()
-        except Exception as exc:
-            self.errors['header0'] = exc
-            return None
+        with self._parent.temporary_offset() as fh:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                fh.seek(0)
+                return fh.read_header()
 
-    def _get_frame0(self):
+    @info_property
+    def frame0(self):
         # Try reading a frame.  This has no business failing if a
         # frame rate could be determined, but try anyway; maybe file is closed.
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(0)
-                return fh.read_frame()
-        except Exception as exc:
-            self.errors['frame0'] = exc
-            return None
+        with self._parent.temporary_offset() as fh:
+            fh.seek(0)
+            return fh.read_frame()
 
-    def _decodable(self):
-        frame0 = self._get_frame0()
+    @info_property(default=False)
+    def decodable(self):
         # Getting the first sample can fail if we don't have the right decoder.
-        try:
-            first_sample = frame0[0]
-        except Exception as exc:
-            self.errors['decodable'] = exc
-            return False
+        first_sample = self.frame0[0]
 
         if not isinstance(first_sample, np.ndarray):
-            self.errors['decodable'] = 'first sample is not an ndarray'
-            return False
+            raise TypeError('first sample is not an ndarray')
 
         return True
 
-    def _get_format(self):
-        return self._parent.__class__.__name__.split('File')[0].lower()
-
-    def _get_frame_rate(self):
-        try:
-            return self._parent.get_frame_rate()
-        except Exception as exc:
-            self.errors['frame_rate'] = exc
+    @info_property
+    def format(self):
+        if self.header0 is None:
             return None
 
-    def _get_number_of_frames(self):
+        return self._parent.__class__.__name__.split('File')[0].lower()
+
+    @info_property
+    def frame_rate(self):
+        return self._parent.get_frame_rate()
+
+    @info_property
+    def number_of_frames(self):
         with self._parent.temporary_offset() as fh:
             number_of_frames = fh.seek(0, 2) / self.header0.frame_nbytes
 
@@ -306,36 +333,32 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                 .format(number_of_frames))
             return None
 
-    def _get_start_time(self):
-        try:
-            return self.header0.time
-        except Exception as exc:
-            self.errors['start_time'] = exc
-            return None
+    @info_property
+    def start_time(self):
+        return self.header0.time
 
-    def _readable(self):
-        frame0 = self._get_frame0()
-        if frame0 is not None:
-            self.checks['decodable'] = self._decodable()
+    @info_property
+    def readable(self):
+        if self.frame0 is not None:
+            self.checks['decodable'] = self.decodable
             return all(bool(v) for v in self.checks.values())
         else:
             return False
 
     def _collect_info(self):
         super()._collect_info()
-        self.header0 = self._get_header0()
         if self.header0 is not None:
             for attr in self._header0_attrs:
                 setattr(self, attr, getattr(self.header0, attr))
-            self.format = self._get_format()
-            self.frame_rate = self._get_frame_rate()
+            self.format
+            self.frame_rate
             if ('sample_rate' not in self._header0_attrs
                     and self.frame_rate is not None
                     and self.samples_per_frame is not None):
                 self.sample_rate = self.frame_rate * self.samples_per_frame
-            self.number_of_frames = self._get_number_of_frames()
-            self.start_time = self._get_start_time()
-            self.readable = self._readable()
+            self.number_of_frames
+            self.start_time
+            self.readable
 
     def __repr__(self):
         result = 'File information:\n'
@@ -390,11 +413,12 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     # Note that we cannot have missing information in streams;
     # they cannot be opened without it.
 
-    def _file_info(self):
-        # Mostly here so GSB can override, since it should access fh_ts.
+    @info_property
+    def file_info(self):
         return self._parent.fh_raw.info
 
-    def _continuous(self):
+    @info_property
+    def continuous(self):
         """Check the stream is continuous.
 
         Tries reading the very end.  If there is a problem, will bisect
@@ -442,9 +466,10 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         finally:
             fh.seek(current_offset)
 
-    def _readable(self):
+    @info_property
+    def readable(self):
         if self.file_info.readable:
-            self.checks['continuous'] = self._continuous()
+            self.checks['continuous'] = self.continuous
             return all(bool(v) for v in self.checks.values())
         else:
             return False
@@ -452,11 +477,11 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     def _collect_info(self):
         super()._collect_info()
         # We want to include the raw info and its possible problems.
-        self.file_info = self._file_info()
+        self.file_info
         self.format = self.file_info.format
         for piece in self.info_names:
             getattr(self, piece).update(getattr(self.file_info, piece, {}))
-        self.readable = self._readable()
+        self.readable
 
     def _up_to_date(self):
         # Stream readers cannot change after initialization, so check is easy.

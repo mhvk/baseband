@@ -1,5 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..vlbi_base.file_info import VLBIFileReaderInfo
+from ..vlbi_base.file_info import VLBIFileReaderInfo, info_property
 
 
 class VDIFFileReaderInfo(VLBIFileReaderInfo):
@@ -19,27 +19,17 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
             self.errors['thread_ids'] = exc
             return None
 
-    def _get_header0(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(0)
-                header0 = fh.read_header()
-                # Almost all bytes are interpretable as headers,
-                # so we need a basic sanity check.
-                fh.seek(header0.frame_nbytes)
-                header1 = fh.read_header()
-                if header1.same_stream(header0):
-                    return header0
-        except Exception as exc:
-            self.errors['header0'] = exc
-            return None
+    @info_property
+    def header0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(0)
+            # Almost all bytes are interpretable as headers,
+            # so we need a basic sanity check.
+            return fh.find_header(maximum=0)
 
-    def _get_start_time(self):
-        try:
-            return self.header0.get_time(frame_rate=self.frame_rate)
-        except Exception as exc:
-            self.errors['start_time'] = exc
-            return None
+    @info_property
+    def start_time(self):
+        return self.header0.get_time(frame_rate=self.frame_rate)
 
     def _collect_info(self):
         super()._collect_info()
