@@ -71,6 +71,8 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         <BLANKLINE>
         missing:  decade, ref_time: needed to infer full times.
         <BLANKLINE>
+        checks:  decodable: True
+        <BLANKLINE>
         errors:  start_time: unsupported operand type(s) for //: ...
         >>> fh.close()
 
@@ -88,6 +90,8 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         start_time = 2014-06-16T07:38:12.475000000
         readable = True
         offset0 = 2696
+        <BLANKLINE>
+        checks:  decodable: True
         >>> fh.close()
     """
     attr_names = VLBIFileReaderInfo.attr_names + ('ntrack', 'offset0')

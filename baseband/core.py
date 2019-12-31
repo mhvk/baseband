@@ -198,7 +198,7 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
                                 isinstance(format, tuple) else str(format)))
         format = info.format
 
-        if info.missing and 's' in mode:
+        if getattr(info, 'missing', False) and 's' in mode:
             raise TypeError("file format {} is missing required arguments {}."
                             .format(format, info.missing))
 

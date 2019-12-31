@@ -1394,8 +1394,8 @@ def test_bad_file_info(tmpdir):
     with vdif.open(filename, 'rb') as fh:
         info = fh.info
         assert info.readable is False
-        assert 'readable' in fh.info.errors.keys()
-        assert isinstance(fh.info.errors['readable'], KeyError)
+        assert 'decodable' in fh.info.errors.keys()
+        assert isinstance(fh.info.errors['decodable'], KeyError)
 
     with vdif.open(filename, 'rs') as fh:
         assert fh.info.readable is False

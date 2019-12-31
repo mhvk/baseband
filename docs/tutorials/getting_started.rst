@@ -145,6 +145,9 @@ For an overview of the file, we can either print ``fh_vdif`` itself, or use the
     complex_data = False
     readable = True
     <BLANKLINE>
+    checks:  decodable: True
+             continuous: no obvious gaps
+    <BLANKLINE>
     File information:
     edv = 3
     number_of_frames = 16

@@ -33,6 +33,11 @@ Other Changes and Additions
   allows reading of files that have missing threads in their first frame
   set. [#361]
 
+- The stream reader info now also checks whether streams are continuous
+  by reading the first and last sample, allowing a simple way to check
+  whether the file will likely pose problems before possibly spending
+  a lot of time reading it. [#364]
+
 - Much faster localization of Mark 5B frames. [#351]
 
 - VLBI file readers have gained a new method ``locate_frames`` that finds

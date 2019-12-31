@@ -10,17 +10,17 @@ from ...vlbi_base.base import HeaderNotFoundError
 
 
 class TestCorruptSampleCopy:
-    def setup(self):
+    def setup_class(cls):
         with open(SAMPLE_FILE, 'rb') as fh:
-            self.sample_bytes = fh.read()
+            cls.sample_bytes = fh.read()
         with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
                          kday=56000, nchan=8, bps=2) as fs:
-            self.frame_nbytes = fs.header0.frame_nbytes
-            self.frame_rate = fs._frame_rate
-            self.start_time = fs.start_time
-            self.stop_time = fs.stop_time
-            self.data = fs.read()
-            self.frame3 = fs._frame
+            cls.frame_nbytes = fs.header0.frame_nbytes
+            cls.frame_rate = fs._frame_rate
+            cls.start_time = fs.start_time
+            cls.stop_time = fs.stop_time
+            cls.data = fs.read()
+            cls.frame3 = fs._frame
 
     def expected_bad_frames(self, missing):
         (start_f, start_r), (stop_f, stop_r) = [
@@ -106,6 +106,25 @@ class TestCorruptSampleCopy:
                 frame = self.frame3.__class__(header, self.frame3.payload,
                                               valid=False)
                 frame.tofile(fw)
+
+        # Check that bad frames are found with verify only.
+        with mark5b.open(filename, 'rs', nchan=8, bps=2,
+                         kday=56000, verify=True) as fv:
+            assert not fv.info.readable
+            assert not fv.info.checks['continuous']
+            assert 'continuous' in fv.info.errors
+            expected_msg = 'While reading at {}'.format(
+                bad_start * fv.samples_per_frame)
+            assert expected_msg in fv.info.errors['continuous']
+
+        # While only warnings are given when it is fixable.
+        with mark5b.open(filename, 'rs', nchan=8, bps=2,
+                         kday=56000, verify='fix') as ff:
+            assert ff.info.readable
+            assert 'fixable' in ff.info.checks['continuous']
+            assert 'continuous' in ff.info.warnings
+            assert expected_msg in ff.info.warnings['continuous']
+            assert 'problem loading frame' in ff.info.warnings['continuous']
 
         with mark5b.open(filename, 'rs', sample_rate=32*u.MHz,
                          kday=56000, nchan=8, bps=2) as fr:
