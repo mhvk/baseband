@@ -65,7 +65,6 @@ files can all be found in the `baseband.data` module)::
     samples_per_frame = 20000
     sample_shape = (8, 1)
 
-
 The same function will also tell you when more information is needed. For
 instance, for Mark 5B files one needs the number of channels used, as well as
 (roughly) when the data were taken::
@@ -768,11 +767,9 @@ Now check its `~baseband.vdif.base.VDIFStreamReader.info`::
     sample_shape = (2, 1)
     >>> fh.close()
 
-In detail, note that the error is given already for the first position,
-even though it was the second frame set that was corrupted.  But internally
-baseband reads a frame ahead, since a corrupted frame typically means
-something is bad before as well.  And here the end of the file is reached
-before the second frame set is read.
+In detail, the error is given for a position earlier than the one we
+corrupted, because internally baseband reads a frame ahead since a
+corrupted frame typically means something is bad before as well.
 
 This particular problem is not bad, since the VDIF reader can deal with
 missing frames.  Indeed, when one opens the file with the default
