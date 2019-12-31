@@ -59,6 +59,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         >>> fh.info
         File information:
         format = mark4
+        number_of_frames = 2
         frame_rate = 400.0 Hz
         sample_rate = 32.0 MHz
         samples_per_frame = 80000
@@ -77,6 +78,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         >>> fh.info
         File information:
         format = mark4
+        number_of_frames = 2
         frame_rate = 400.0 Hz
         sample_rate = 32.0 MHz
         samples_per_frame = 80000
@@ -111,6 +113,26 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
                 return fh.read_frame()
         except Exception as exc:
             self.errors['frame0'] = exc
+            return None
+
+    def _get_number_of_frames(self):
+        try:
+            with self._parent.temporary_offset() as fh:
+                fh.seek(-self.header0.frame_nbytes, 2)
+                fh.find_header(self.header0, forward=False)
+                number_of_frames = ((fh.tell() - self.offset0)
+                                    / self.header0.frame_nbytes) + 1
+
+        except Exception as exc:
+            self.errors['number_of_frames'] = exc
+            return None
+
+        if number_of_frames % 1 == 0:
+            return int(number_of_frames)
+        else:
+            self.warnings['number_of_frames'] = (
+                'file contains non-integer number ({}) of frames'
+                .format(number_of_frames))
             return None
 
     def _collect_info(self):

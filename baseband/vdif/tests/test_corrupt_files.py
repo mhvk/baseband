@@ -53,6 +53,13 @@ class TestCorruptSampleCopy:
         with open(corrupt_file, 'wb') as s:
             s.write(reduced.tostring())
 
+        with vdif.open(corrupt_file, 'rb') as fr:
+            assert 'number_of_frames' not in fr.info.warnings
+            if np.count_nonzero(use) % 8 == 0:
+                assert 'number_of_framesset' not in fr.info.warnings
+            else:
+                assert 'number_of_framesets' in fr.info.warnings
+
         with vdif.open(corrupt_file, 'rs') as fh:
             with pytest.warns(UserWarning,
                               match='problem loading frame'):
@@ -105,6 +112,9 @@ class TestCorruptSampleCopy:
         filename = str(tmpdir.join('corrupted.vdif'))
         with open(filename, 'wb') as fw:
             fw.write(corrupted)
+
+        with vdif.open(filename, 'rb') as fr:
+            assert 'number_of_frames' in fr.info.warnings
 
         with vdif.open(filename, 'rs') as fr:
             assert fr.start_time == self.start_time

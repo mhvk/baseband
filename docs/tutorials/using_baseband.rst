@@ -54,7 +54,9 @@ files can all be found in the `baseband.data` module)::
     <BLANKLINE>
     File information:
     edv = 3
+    number_of_frames = 16
     thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+    number_of_framesets = 2
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)
@@ -66,6 +68,7 @@ instance, for Mark 5B files one needs the number of channels used, as well as
     >>> baseband.file_info(baseband.data.SAMPLE_MARK5B)
     File information:
     format = mark5b
+    number_of_frames = 4
     frame_rate = 6400.0 Hz
     bps = 2
     complex_data = False
@@ -90,6 +93,7 @@ instance, for Mark 5B files one needs the number of channels used, as well as
     readable = True
     <BLANKLINE>
     File information:
+    number_of_frames = 4
     frame_rate = 6400.0 Hz
     samples_per_frame = 5000
     sample_shape = (8,)
@@ -223,7 +227,9 @@ Basic information about the file is obtained by either by ``fh.info`` or simply
     <BLANKLINE>
     File information:
     edv = 3
+    number_of_frames = 16
     thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+    number_of_framesets = 2
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)

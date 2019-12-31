@@ -50,6 +50,8 @@ Other Changes and Additions
 - The ``HeaderParser`` class was refactored and simplified, making setting
   keys faster. [#356]
 
+- ``info`` now also provides the number of frames in a file. [#364]
+
 
 3.0 (2019-08-28)
 ================

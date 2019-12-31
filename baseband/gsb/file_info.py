@@ -22,6 +22,10 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
         # Cannot know whether it is readable without the raw data files.
         return None
 
+    def _get_number_of_frames(self):
+        # Tricky to determine without _last_header.
+        return None
+
     def _collect_info(self):
         super()._collect_info()
         if self:
