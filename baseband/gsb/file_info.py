@@ -4,7 +4,7 @@ from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
 
 
 class GSBTimeStampInfo(VLBIFileReaderInfo):
-    attr_names = ('format', 'mode') + VLBIFileReaderInfo.attr_names[1:]
+    attr_names = ('format', 'mode', 'frame_rate', 'start_time', 'readable')
     _header0_attrs = ('mode',)
 
     @info_property
@@ -13,11 +13,10 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
             fh.seek(0)
             return fh.read_timestamp()
 
-    @info_property
+    @info_property(needs='header0')
     def format(self):
-        return 'gsb' if self.header0 is not None else None
+        return 'gsb'
 
-    # Cannot know whether it is readable without the raw data files.
     readable = None
 
     number_of_frames = None

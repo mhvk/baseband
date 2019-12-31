@@ -8,16 +8,13 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
                   + VLBIFileReaderInfo.attr_names[2:])
     _header0_attrs = ('edv', 'bps', 'samples_per_frame')
 
-    def _get_thread_ids(self):
+    @info_property
+    def thread_ids(self):
         # To get the thread_ids and thus the real sample shape,
         # need to check frame sets.
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(0)
-                return fh.get_thread_ids()
-        except Exception as exc:
-            self.errors['thread_ids'] = exc
-            return None
+        with self._parent.temporary_offset() as fh:
+            fh.seek(0)
+            return fh.get_thread_ids()
 
     @info_property
     def header0(self):
@@ -27,23 +24,31 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
             # so we need a basic sanity check.
             return fh.find_header(maximum=0)
 
-    @info_property
+    @info_property(needs=('header0', 'frame_rate'))
     def start_time(self):
         return self.header0.get_time(frame_rate=self.frame_rate)
+
+    @info_property(needs=('header0', 'thread_ids'))
+    def sample_shape(self):
+        return (len(self.thread_ids), self.header0.nchan)
+
+    @info_property(needs=('number_of_frames', 'thread_ids'))
+    def number_of_framesets(self):
+        number_of_framesets = self.number_of_frames / len(self.thread_ids)
+        if number_of_framesets % 1 == 0:
+            return int(number_of_framesets)
+
+        else:
+            self.warnings['number_of_framesets'] = (
+                'file contains non-integer number ({}) of '
+                'framesets'.format(number_of_framesets))
+            return None
+
+    @info_property(needs='header0')
+    def complex_data(self):
+        return self.header0['complex_data']
 
     def _collect_info(self):
         super()._collect_info()
         if self:
-            self.complex_data = self.header0['complex_data']
-            self.thread_ids = self._get_thread_ids()
-            if self.thread_ids is not None:
-                n_threads = len(self.thread_ids)
-                self.sample_shape = (n_threads, self.header0.nchan)
-                if self.number_of_frames is not None:
-                    number_of_framesets = self.number_of_frames / n_threads
-                    if number_of_framesets % 1 == 0:
-                        self.number_of_framesets = int(number_of_framesets)
-                    else:
-                        self.warnings['number_of_framesets'] = (
-                            'file contains non-integer number ({}) of '
-                            'framesets'.format(number_of_framesets))
+            self.number_of_framesets

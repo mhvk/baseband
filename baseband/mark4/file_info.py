@@ -106,13 +106,13 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
             self.offset0 = fh.tell()
             return header
 
-    @info_property
+    @info_property(needs='header0')
     def frame0(self):
         with self._parent.temporary_offset() as fh:
             fh.seek(self.offset0)
             return fh.read_frame()
 
-    @info_property
+    @info_property(needs='header0')
     def number_of_frames(self):
         with self._parent.temporary_offset() as fh:
             fh.seek(-self.header0.frame_nbytes, 2)
@@ -128,12 +128,17 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
                 .format(number_of_frames))
             return None
 
+    complex_data = False
+
+    @info_property(needs='header0')
+    def sample_shape(self):
+        return (self.header0.nchan,)
+
     def _collect_info(self):
         super()._collect_info()
         if self:
-            self.complex_data = False
             # TODO: Shouldn't Mark4Header provide this?
-            self.sample_shape = (self.header0.nchan,)
+            self.sample_shape
             if self.decade is None and self.ref_time is None:
                 self.missing['decade'] = self.missing['ref_time'] = (
                     "needed to infer full times.")

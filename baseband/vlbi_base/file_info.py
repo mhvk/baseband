@@ -21,28 +21,34 @@ class info_property:
     It is not a data property and replaces itself with the evaluation
     of the function.
     """
-    def __new__(cls, fget=None, default=None):
+    def __new__(cls, fget=None, needs=(), default=None):
         if fget is None:
             def wrapper(func):
-                return cls(func, default=default)
+                return cls(func, needs=needs, default=default)
 
             return wrapper
 
         return super().__new__(cls)
 
-    def __init__(self, fget, default=None):
+    def __init__(self, fget, needs=(), default=None):
         self.fget = fget
         self.name = fget.__name__
+        self.needs = needs if isinstance(needs, (tuple, list)) else (needs,)
         self.default = default
 
     def __get__(self, instance, cls=None):
         if instance is None:
             return self
 
-        try:
-            value = self.fget(instance)
-        except Exception as exc:
-            instance.errors[self.name] = exc
+        if all(getattr(instance, need, None) is not None
+               for need in self.needs):
+            try:
+                value = self.fget(instance)
+            except Exception as exc:
+                instance.errors[self.name] = exc
+                value = self.default
+
+        else:
             value = self.default
 
         setattr(instance, self.name, value)
@@ -77,7 +83,6 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
 
     _parent_attrs = ()
     _parent = None
-    _self_attrs = ()
 
     def _getattr(self, object_, attr, error=True):
         """Guarded getattr, returning None on error (and storing the error)."""
@@ -291,7 +296,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                 fh.seek(0)
                 return fh.read_header()
 
-    @info_property
+    @info_property(needs='header0')
     def frame0(self):
         # Try reading a frame.  This has no business failing if a
         # frame rate could be determined, but try anyway; maybe file is closed.
@@ -299,7 +304,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
             fh.seek(0)
             return fh.read_frame()
 
-    @info_property(default=False)
+    @info_property(needs='frame0', default=False)
     def decodable(self):
         # Getting the first sample can fail if we don't have the right decoder.
         first_sample = self.frame0[0]
@@ -309,18 +314,15 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
         return True
 
-    @info_property
+    @info_property(needs='header0')
     def format(self):
-        if self.header0 is None:
-            return None
-
         return self._parent.__class__.__name__.split('File')[0].lower()
 
-    @info_property
+    @info_property(needs='header0')
     def frame_rate(self):
         return self._parent.get_frame_rate()
 
-    @info_property
+    @info_property(needs='header0')
     def number_of_frames(self):
         with self._parent.temporary_offset() as fh:
             number_of_frames = fh.seek(0, 2) / self.header0.frame_nbytes
@@ -333,17 +335,14 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                 .format(number_of_frames))
             return None
 
-    @info_property
+    @info_property(needs='header0')
     def start_time(self):
         return self.header0.time
 
-    @info_property
+    @info_property(needs='frame0', default=False)
     def readable(self):
-        if self.frame0 is not None:
-            self.checks['decodable'] = self.decodable
-            return all(bool(v) for v in self.checks.values())
-        else:
-            return False
+        self.checks['decodable'] = self.decodable
+        return all(bool(v) for v in self.checks.values())
 
     def _collect_info(self):
         super()._collect_info()
