@@ -140,12 +140,13 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
 
         return info
 
-    def __set__(self, info):
-        # We do need to define __set__ since this ensures we are treated as
-        # a "data descriptor", i.e., that our __get__ will get called even
-        # if "info" is present in instance.__dict__; see
+    def __delete__(self, instance):
+        # We need to define either __set__ or __delete__ since this ensures we
+        # are treated as a "data descriptor", i.e., that our __get__ will get
+        # called even if "info" is present in instance.__dict__; see
         # https://docs.python.org/3/howto/descriptor.html
-        raise AttributeError("can't set info attribute.")
+        # __delete__ is more useful for us.
+        instance.__dict__.pop('info', None)
 
     def __bool__(self):
         return self.format is not None

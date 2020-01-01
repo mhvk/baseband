@@ -271,6 +271,16 @@ class TestMark5B:
             for key, value in expected.items():
                 assert getattr(info, key) == value
 
+            # Also check we cannot set, but can delete info
+            with pytest.raises(AttributeError):
+                fh.info = 'Parrot'
+
+            assert 'info' in fh.__dict__
+            del fh.info
+            assert 'info' not in fh.__dict__
+
+        assert 'closed' in repr(fh.info)
+
         # Finally, also do a brief check of the stream reader info.
         # Note that the readers properties themselves are tested further below.
         with mark5b.open(SAMPLE_FILE, 'rs', bps=2, nchan=8, kday=56000) as fh:
