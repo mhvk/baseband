@@ -55,16 +55,32 @@ class info_property:
         return value
 
 
+class IndirectAttribute:
+    def __init__(self, attr, source='_parent'):
+        self.attr = attr
+        self.source = source
+
+    def __get__(self, instance, cls=None):
+        if instance is None:
+            return self
+
+        value = instance._getattr(getattr(instance, self.source), self.attr)
+        setattr(instance, self.attr, value)
+        return value
+
+
 class VLBIInfoMeta(type):
     # Ensure all attributes are initialized to None, so that they are
     # always available (do this rather than overwrite __getattr__ so that
     # we can generate docstrings in sphinx for them).
     def __init__(cls, name, bases, dct):
         super().__init__(name, bases, dct)
-        attr_names = dct.get('attr_names', ())
-        for attr in attr_names:
-            if not hasattr(cls, attr):
-                setattr(cls, attr, None)
+        header0_attrs = dct.get('_header0_attrs', ())
+        for attr in header0_attrs:
+            setattr(cls, attr, IndirectAttribute(attr, source='header0'))
+        parent_attrs = dct.get('_parent_attrs', ())
+        for attr in parent_attrs:
+            setattr(cls, attr, IndirectAttribute(attr, source='_parent'))
 
 
 class VLBIInfoBase(metaclass=VLBIInfoMeta):
@@ -75,7 +91,7 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
     stored in ``self.errors``.  See ``self._getattr`` for an example.
     """
 
-    attr_names = ('format',)
+    attr_names = ()
     """Attributes that the container provides."""
 
     info_names = ()
@@ -96,10 +112,8 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
     def _collect_info(self):
         for name in self.info_names:
             setattr(self, name, OrderedDict())
-        # We link to attributes from the parent rather than just overriding
-        # __getattr__ to allow us to look for changes.
-        for attr in self._parent_attrs:
-            setattr(self, attr, self._getattr(self._parent, attr))
+        for attr in self.attr_names:
+            getattr(self, attr)
 
     def _up_to_date(self):
         """Determine whether the information we have stored is up to date."""
@@ -344,20 +358,9 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         self.checks['decodable'] = self.decodable
         return all(bool(v) for v in self.checks.values())
 
-    def _collect_info(self):
-        super()._collect_info()
-        if self.header0 is not None:
-            for attr in self._header0_attrs:
-                setattr(self, attr, getattr(self.header0, attr))
-            self.format
-            self.frame_rate
-            if ('sample_rate' not in self._header0_attrs
-                    and self.frame_rate is not None
-                    and self.samples_per_frame is not None):
-                self.sample_rate = self.frame_rate * self.samples_per_frame
-            self.number_of_frames
-            self.start_time
-            self.readable
+    @info_property(needs=('frame_rate', 'samples_per_frame'))
+    def sample_rate(self):
+        return self.frame_rate * self.samples_per_frame
 
     def __repr__(self):
         result = 'File information:\n'
@@ -415,6 +418,10 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     @info_property
     def file_info(self):
         return self._parent.fh_raw.info
+
+    @info_property(needs='file_info')
+    def format(self):
+        return self.file_info.format
 
     @info_property
     def continuous(self):
@@ -476,11 +483,12 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     def _collect_info(self):
         super()._collect_info()
         # We want to include the raw info and its possible problems.
-        self.file_info
-        self.format = self.file_info.format
         for piece in self.info_names:
-            getattr(self, piece).update(getattr(self.file_info, piece, {}))
-        self.readable
+            file_piece = getattr(self.file_info, piece, None)
+            if file_piece:
+                stream_piece = file_piece.copy()
+                stream_piece.update(getattr(self, piece))
+                setattr(self, piece, stream_piece)
 
     def _up_to_date(self):
         # Stream readers cannot change after initialization, so check is easy.

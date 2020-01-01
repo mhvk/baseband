@@ -6,6 +6,7 @@ from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
 class GSBTimeStampInfo(VLBIFileReaderInfo):
     attr_names = ('format', 'mode', 'frame_rate', 'start_time', 'readable')
     _header0_attrs = ('mode',)
+    # Should add number_of_frames, but tricky without _last_header.
 
     @info_property
     def header0(self):
@@ -18,9 +19,6 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
         return 'gsb'
 
     readable = None
-
-    number_of_frames = None
-    # Tricky to determine without _last_header.
 
     def _collect_info(self):
         super()._collect_info()

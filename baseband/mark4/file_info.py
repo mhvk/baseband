@@ -67,6 +67,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         bps = 2
         complex_data = False
         readable = True
+        ntrack = 64
         offset0 = 2696
         <BLANKLINE>
         missing:  decade, ref_time: needed to infer full times.
@@ -89,6 +90,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         complex_data = False
         start_time = 2014-06-16T07:38:12.475000000
         readable = True
+        ntrack = 64
         offset0 = 2696
         <BLANKLINE>
         checks:  decodable: True
@@ -137,8 +139,6 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
     def _collect_info(self):
         super()._collect_info()
         if self:
-            # TODO: Shouldn't Mark4Header provide this?
-            self.sample_shape
             if self.decade is None and self.ref_time is None:
                 self.missing['decade'] = self.missing['ref_time'] = (
                     "needed to infer full times.")

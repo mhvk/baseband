@@ -47,8 +47,3 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
     @info_property(needs='header0')
     def complex_data(self):
         return self.header0['complex_data']
-
-    def _collect_info(self):
-        super()._collect_info()
-        if self:
-            self.number_of_framesets
