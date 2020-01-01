@@ -21,18 +21,19 @@ class info_property:
     It is not a data property and replaces itself with the evaluation
     of the function.
     """
-    def __new__(cls, fget=None, needs=(), default=None):
+    def __new__(cls, fget=None, name=None, needs=(), default=None):
         if fget is None:
             def wrapper(func):
-                return cls(func, needs=needs, default=default)
+                return cls(func, name=name, needs=needs, default=default)
 
             return wrapper
 
         return super().__new__(cls)
 
-    def __init__(self, fget, needs=(), default=None):
+    def __init__(self, fget, name=None, needs=(), default=None):
         self.fget = fget
-        self.name = fget.__name__
+        self.name = fget.__name__ if name is None else name
+        self.method = name is None
         self.needs = needs if isinstance(needs, (tuple, list)) else (needs,)
         self.default = default
 
@@ -42,8 +43,9 @@ class info_property:
 
         if all(getattr(instance, need, None) is not None
                for need in self.needs):
+            args = (instance,) if self.method else ()
             try:
-                value = self.fget(instance)
+                value = self.fget(*args)
             except Exception as exc:
                 instance.errors[self.name] = exc
                 value = self.default
@@ -81,6 +83,10 @@ class VLBIInfoMeta(type):
         parent_attrs = dct.get('_parent_attrs', ())
         for attr in parent_attrs:
             setattr(cls, attr, IndirectAttribute(attr, source='_parent'))
+        info_attrs = dct.get('info_names', ())
+        for attr in info_attrs:
+            if not hasattr(cls, attr):
+                setattr(cls, attr, info_property(OrderedDict, name=attr))
 
 
 class VLBIInfoBase(metaclass=VLBIInfoMeta):
@@ -110,8 +116,6 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
             return None
 
     def _collect_info(self):
-        for name in self.info_names:
-            setattr(self, name, OrderedDict())
         for attr in self.attr_names:
             getattr(self, attr)
 
