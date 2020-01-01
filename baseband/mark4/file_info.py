@@ -109,12 +109,17 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         return time_info
 
     @info_item
-    def header0(self):
+    def offset0(self):
         with self._parent.temporary_offset() as fh:
             fh.seek(0)
-            header = fh.find_header()
-            self.offset0 = fh.tell()
-            return header
+            fh.find_header()
+            return fh.tell()
+
+    @info_item(needs='offset0')
+    def header0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(self.offset0)
+            return fh.read_header()
 
     @info_item(needs='header0')
     def frame0(self):

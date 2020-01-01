@@ -122,6 +122,12 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
     _parent_attrs = ()
     _parent = None
 
+    def __init__(self, parent=None):
+        if parent is not None:
+            self._parent = parent
+            for attr in self.attr_names:
+                getattr(self, attr)
+
     def _up_to_date(self):
         """Determine whether the information we have stored is up to date."""
         return all(getattr(self, attr) == getattr(self._parent, attr, None)
@@ -140,10 +146,7 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
             # - We start from scratch rather than determine what is no longer
             #   up to date, since we cannot know what an update may influence
             #   (e.g., for Mark 4, a change in ref_time affect start_time).
-            info = instance.__dict__['info'] = self.__class__()
-            info._parent = instance
-            for attr in info.attr_names:
-                getattr(info, attr)
+            info = instance.__dict__['info'] = self.__class__(parent=instance)
 
         return info
 
