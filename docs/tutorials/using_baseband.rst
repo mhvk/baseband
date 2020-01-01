@@ -51,6 +51,7 @@ files can all be found in the `baseband.data` module)::
     format = vdif
     bps = 2
     complex_data = False
+    verify = fix
     readable = True
     <BLANKLINE>
     checks:  decodable: True
@@ -91,6 +92,7 @@ instance, for Mark 5B files one needs the number of channels used, as well as
     format = mark5b
     bps = 2
     complex_data = False
+    verify = fix
     readable = True
     <BLANKLINE>
     checks:  decodable: True
@@ -227,6 +229,7 @@ Basic information about the file is obtained by either by ``fh.info`` or simply
     format = vdif
     bps = 2
     complex_data = False
+    verify = fix
     readable = True
     <BLANKLINE>
     checks:  decodable: True
@@ -747,6 +750,7 @@ Now check its `~baseband.vdif.base.VDIFStreamReader.info`::
     format = vdif
     bps = 8
     complex_data = False
+    verify = True
     readable = False
     <BLANKLINE>
     checks:  decodable: True
@@ -782,6 +786,7 @@ missing frames.  Indeed, when one opens the file with the default
     format = vdif
     bps = 8
     complex_data = False
+    verify = fix
     readable = True
     <BLANKLINE>
     checks:  decodable: True

@@ -412,7 +412,7 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         Keyed by the attributes/checks.
     """
     attr_names = ('start_time', 'stop_time', 'sample_rate', 'shape',
-                  'format', 'bps', 'complex_data', 'readable')
+                  'format', 'bps', 'complex_data', 'verify', 'readable')
     """Attributes that the container provides."""
 
     _parent_attrs = tuple(attr for attr in attr_names
@@ -496,8 +496,8 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
             return False
 
     def _up_to_date(self):
-        # Stream readers cannot change after initialization, so check is easy.
-        return True
+        # Stream readers can only change in how they verify.
+        return self.verify == self._parent.verify
 
     def __call__(self):
         """Create a dict with information about the stream and the raw file."""
