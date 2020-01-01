@@ -73,8 +73,6 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         missing:  decade, ref_time: needed to infer full times.
         <BLANKLINE>
         checks:  decodable: True
-        <BLANKLINE>
-        errors:  start_time: unsupported operand type(s) for //: ...
         >>> fh.close()
 
         >>> fh = mark4.open(SAMPLE_MARK4, 'rb', decade=2010)
@@ -99,6 +97,16 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
     attr_names = VLBIFileReaderInfo.attr_names + ('ntrack', 'offset0')
     _header0_attrs = ('bps', 'samples_per_frame')
     _parent_attrs = ('ntrack', 'decade', 'ref_time')
+
+    @info_property
+    def time_info(self):
+        time_info = (self.decade, self.ref_time)
+        if time_info == (None, None):
+            self.missing['decade'] = self.missing['ref_time'] = (
+                "needed to infer full times.")
+            return None
+
+        return time_info
 
     @info_property
     def header0(self):
@@ -136,9 +144,6 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
     def sample_shape(self):
         return (self.header0.nchan,)
 
-    def _collect_info(self):
-        super()._collect_info()
-        if self:
-            if self.decade is None and self.ref_time is None:
-                self.missing['decade'] = self.missing['ref_time'] = (
-                    "needed to infer full times.")
+    @info_property(needs=('header0', 'time_info'))
+    def start_time(self):
+        return super().start_time

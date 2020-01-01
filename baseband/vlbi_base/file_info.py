@@ -78,14 +78,17 @@ class VLBIInfoMeta(type):
     def __init__(cls, name, bases, dct):
         super().__init__(name, bases, dct)
         header0_attrs = dct.get('_header0_attrs', ())
-        for attr in header0_attrs:
-            setattr(cls, attr, IndirectAttribute(attr, source='header0'))
         parent_attrs = dct.get('_parent_attrs', ())
-        for attr in parent_attrs:
-            setattr(cls, attr, IndirectAttribute(attr, source='_parent'))
         info_attrs = dct.get('info_names', ())
-        for attr in info_attrs:
-            if not hasattr(cls, attr):
+        not_set_attrs = tuple(attr for attr in (cls.attr_names
+                                                + parent_attrs + info_attrs)
+                              if not hasattr(cls, attr))
+        for attr in not_set_attrs + header0_attrs:
+            if attr in header0_attrs:
+                setattr(cls, attr, IndirectAttribute(attr, source='header0'))
+            elif attr in parent_attrs:
+                setattr(cls, attr, IndirectAttribute(attr, source='_parent'))
+            elif attr in info_attrs:
                 setattr(cls, attr, info_property(OrderedDict, name=attr))
 
 
@@ -271,11 +274,8 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         complex_data = False
         readable = False
         <BLANKLINE>
-        missing:  nchan: needed to determine sample shape and rate.
+        missing:  nchan: needed to determine sample shape, frame rate, ...
                   kday, ref_time: needed to infer full times.
-        <BLANKLINE>
-        errors:  start_time: unsupported operand type(s) for +: ...
-                 frame0: In order to read frames, the file handle ...
 
         >>> fh.close()
 

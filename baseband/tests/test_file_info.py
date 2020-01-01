@@ -13,8 +13,8 @@ from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
 
 @pytest.mark.parametrize(
     ('sample', 'format_', 'missing', 'readable', 'error_keys'),
-    ((SAMPLE_M4, 'mark4', True, True, ['start_time']),
-     (SAMPLE_M5B, 'mark5b', True, False, ['start_time', 'frame0']),
+    ((SAMPLE_M4, 'mark4', True, True, []),
+     (SAMPLE_M5B, 'mark5b', True, False, []),
      (SAMPLE_VDIF, 'vdif', False, True, []),
      (SAMPLE_MWA, 'vdif', False, True, ['frame_rate']),
      (SAMPLE_DADA, 'dada', False, True, []),
