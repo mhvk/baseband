@@ -58,15 +58,27 @@ class info_property:
 
 
 class IndirectAttribute:
-    def __init__(self, attr, source='_parent'):
+    def __init__(self, attr, source='_parent', missing=None):
         self.attr = attr
         self.source = source
+        self.missing = missing
 
     def __get__(self, instance, cls=None):
         if instance is None:
             return self
 
-        value = instance._getattr(getattr(instance, self.source), self.attr)
+        # Guarded getattr, returning None on error (and storing the
+        # error or a missing message).
+        source = getattr(instance, self.source)
+        try:
+            value = getattr(source, self.attr)
+        except Exception as exc:
+            instance.errors[self.attr] = exc
+            value = None
+        else:
+            if value is None and self.missing:
+                instance.missing[self.attr] = self.missing
+
         setattr(instance, self.attr, value)
         return value
 
@@ -109,23 +121,13 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
     _parent_attrs = ()
     _parent = None
 
-    def _getattr(self, object_, attr, error=True):
-        """Guarded getattr, returning None on error (and storing the error)."""
-        try:
-            return getattr(object_, attr)
-        except Exception as exc:
-            if error:
-                self.errors[attr] = exc
-            return None
-
     def _collect_info(self):
         for attr in self.attr_names:
             getattr(self, attr)
 
     def _up_to_date(self):
         """Determine whether the information we have stored is up to date."""
-        return all(getattr(self, attr) == self._getattr(self._parent, attr,
-                                                        error=False)
+        return all(getattr(self, attr) == getattr(self._parent, attr, None)
                    for attr in self._parent_attrs)
 
     def __get__(self, instance, owner_cls):

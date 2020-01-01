@@ -1,5 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..vlbi_base.file_info import VLBIFileReaderInfo, info_property
+from ..vlbi_base.file_info import (VLBIFileReaderInfo,
+                                   info_property, IndirectAttribute)
 
 
 class Mark5BFileReaderInfo(VLBIFileReaderInfo):
@@ -16,21 +17,9 @@ class Mark5BFileReaderInfo(VLBIFileReaderInfo):
 
         return time_info
 
-    @info_property
-    def bps(self):
-        bps = self._parent.bps
-        if bps is None:
-            self.missing['bps'] = 'needed to decode data'
-
-        return bps
-
-    @info_property
-    def nchan(self):
-        nchan = self._parent.nchan
-        if nchan is None:
-            self.missing['nchan'] = (
-                "needed to determine sample shape, frame rate, decode data.")
-        return nchan
+    bps = IndirectAttribute('bps', missing='needed to decode data')
+    nchan = IndirectAttribute('nchan', missing=(
+        "needed to determine sample shape, frame rate, decode data."))
 
     @info_property(needs=('header0', 'frame_rate', 'time_info'))
     def start_time(self):
