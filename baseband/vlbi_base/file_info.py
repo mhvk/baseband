@@ -15,27 +15,40 @@ __all__ = ['VLBIInfoMeta', 'VLBIInfoBase',
            'VLBIFileReaderInfo', 'VLBIStreamReaderInfo']
 
 
-class info_property:
+class info_item:
     """Like a property, but evaluate only once, and store errors.
 
     It is not a data property and replaces itself with the evaluation
     of the function.
     """
-    def __new__(cls, fget=None, name=None, needs=(), default=None):
+    def __new__(cls, fget=None, name=None, needs=(), default=None,
+                missing=None):
         if fget is None:
             def wrapper(func):
-                return cls(func, name=name, needs=needs, default=default)
+                return cls(func, name=name, needs=needs, default=default,
+                           missing=missing)
 
             return wrapper
 
         return super().__new__(cls)
 
-    def __init__(self, fget, name=None, needs=(), default=None):
-        self.fget = fget
-        self.name = fget.__name__ if name is None else name
-        self.method = name is None
+    def __init__(self, fget, name=None, needs=(), default=None,
+                 missing=None):
+        if isinstance(fget, str):
+            if needs:
+                assert isinstance(needs, str)
+            else:
+                needs = '_parent'
+            self.name = fget
+            self.method = True
+            self.fget = indirect_attr_getter(self.name, needs)
+        else:
+            self.fget = fget
+            self.name = fget.__name__ if name is None else name
+            self.method = name is None
         self.needs = needs if isinstance(needs, (tuple, list)) else (needs,)
         self.default = default
+        self.missing = missing
 
     def __get__(self, instance, cls=None):
         if instance is None:
@@ -49,6 +62,11 @@ class info_property:
             except Exception as exc:
                 instance.errors[self.name] = exc
                 value = self.default
+            else:
+                if value is None:
+                    if self.missing:
+                        instance.missing[self.name] = self.missing
+                    value = self.default
 
         else:
             value = self.default
@@ -57,30 +75,11 @@ class info_property:
         return value
 
 
-class IndirectAttribute:
-    def __init__(self, attr, source='_parent', missing=None):
-        self.attr = attr
-        self.source = source
-        self.missing = missing
+def indirect_attr_getter(attr, source='_parent'):
+    def get_indirect_attr(instance):
+        return getattr(getattr(instance, source), attr)
 
-    def __get__(self, instance, cls=None):
-        if instance is None:
-            return self
-
-        # Guarded getattr, returning None on error (and storing the
-        # error or a missing message).
-        source = getattr(instance, self.source)
-        try:
-            value = getattr(source, self.attr)
-        except Exception as exc:
-            instance.errors[self.attr] = exc
-            value = None
-        else:
-            if value is None and self.missing:
-                instance.missing[self.attr] = self.missing
-
-        setattr(instance, self.attr, value)
-        return value
+    return get_indirect_attr
 
 
 class VLBIInfoMeta(type):
@@ -97,11 +96,11 @@ class VLBIInfoMeta(type):
                               if not hasattr(cls, attr))
         for attr in not_set_attrs + header0_attrs:
             if attr in header0_attrs:
-                setattr(cls, attr, IndirectAttribute(attr, source='header0'))
+                setattr(cls, attr, info_item(attr, needs='header0'))
             elif attr in parent_attrs:
-                setattr(cls, attr, IndirectAttribute(attr, source='_parent'))
+                setattr(cls, attr, info_item(attr, needs='_parent'))
             elif attr in info_attrs:
-                setattr(cls, attr, info_property(OrderedDict, name=attr))
+                setattr(cls, attr, info_item(OrderedDict, name=attr))
 
 
 class VLBIInfoBase(metaclass=VLBIInfoMeta):
@@ -306,7 +305,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     info_names = ('missing', 'checks', 'errors', 'warnings')
     """Dictionaries with further information that the container provides."""
 
-    @info_property
+    @info_item
     def header0(self):
         # Here, we do not even know whether the file is open or whether we
         # have the right format. We thus use a try/except and filter out all
@@ -317,7 +316,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                 fh.seek(0)
                 return fh.read_header()
 
-    @info_property(needs='header0')
+    @info_item(needs='header0')
     def frame0(self):
         # Try reading a frame.  This has no business failing if a
         # frame rate could be determined, but try anyway; maybe file is closed.
@@ -325,7 +324,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
             fh.seek(0)
             return fh.read_frame()
 
-    @info_property(needs='frame0', default=False)
+    @info_item(needs='frame0', default=False)
     def decodable(self):
         # Getting the first sample can fail if we don't have the right decoder.
         first_sample = self.frame0[0]
@@ -335,15 +334,15 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
         return True
 
-    @info_property(needs='header0')
+    @info_item(needs='header0')
     def format(self):
         return self._parent.__class__.__name__.split('File')[0].lower()
 
-    @info_property(needs='header0')
+    @info_item(needs='header0')
     def frame_rate(self):
         return self._parent.get_frame_rate()
 
-    @info_property(needs='header0')
+    @info_item(needs='header0')
     def number_of_frames(self):
         with self._parent.temporary_offset() as fh:
             number_of_frames = fh.seek(0, 2) / self.header0.frame_nbytes
@@ -356,16 +355,16 @@ class VLBIFileReaderInfo(VLBIInfoBase):
                 .format(number_of_frames))
             return None
 
-    @info_property(needs='header0')
+    @info_item(needs='header0')
     def start_time(self):
         return self.header0.time
 
-    @info_property(needs='frame0', default=False)
+    @info_item(needs='frame0', default=False)
     def readable(self):
         self.checks['decodable'] = self.decodable
         return all(bool(v) for v in self.checks.values())
 
-    @info_property(needs=('frame_rate', 'samples_per_frame'))
+    @info_item(needs=('frame_rate', 'samples_per_frame'))
     def sample_rate(self):
         return self.frame_rate * self.samples_per_frame
 
@@ -422,15 +421,15 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     # Note that we cannot have missing information in streams;
     # they cannot be opened without it.
 
-    @info_property
+    @info_item
     def file_info(self):
         return self._parent.fh_raw.info
 
-    @info_property(needs='file_info')
+    @info_item(needs='file_info')
     def format(self):
         return self.file_info.format
 
-    @info_property
+    @info_item
     def continuous(self):
         """Check the stream is continuous.
 
@@ -479,7 +478,7 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         finally:
             fh.seek(current_offset)
 
-    @info_property
+    @info_item
     def readable(self):
         if self.file_info.readable:
             self.checks['continuous'] = self.continuous

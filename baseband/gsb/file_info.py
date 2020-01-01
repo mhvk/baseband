@@ -1,6 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
-                                   info_property)
+                                   info_item)
 
 
 class GSBTimeStampInfo(VLBIFileReaderInfo):
@@ -8,13 +8,13 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
     _header0_attrs = ('mode',)
     # Should add number_of_frames, but tricky without _last_header.
 
-    @info_property
+    @info_item
     def header0(self):
         with self._parent.temporary_offset() as fh:
             fh.seek(0)
             return fh.read_timestamp()
 
-    @info_property(needs='header0')
+    @info_item(needs='header0')
     def format(self):
         return 'gsb'
 
@@ -28,7 +28,7 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
 
 class GSBStreamReaderInfo(VLBIStreamReaderInfo):
 
-    @info_property
+    @info_item
     def frame0(self):
         return self._parent._read_frame(0)
 
@@ -37,6 +37,6 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
     readable = VLBIFileReaderInfo.readable
     decodable = VLBIFileReaderInfo.decodable
 
-    @info_property
+    @info_item
     def file_info(self):
         return self._parent.fh_ts.info

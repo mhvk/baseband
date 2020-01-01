@@ -1,6 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 
-from ..vlbi_base.file_info import VLBIFileReaderInfo, info_property
+from ..vlbi_base.file_info import VLBIFileReaderInfo, info_item
 
 
 __all__ = ['Mark4FileReaderInfo']
@@ -98,7 +98,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
     _header0_attrs = ('bps', 'samples_per_frame')
     _parent_attrs = ('ntrack', 'decade', 'ref_time')
 
-    @info_property
+    @info_item
     def time_info(self):
         time_info = (self.decade, self.ref_time)
         if time_info == (None, None):
@@ -108,7 +108,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
 
         return time_info
 
-    @info_property
+    @info_item
     def header0(self):
         with self._parent.temporary_offset() as fh:
             fh.seek(0)
@@ -116,13 +116,13 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
             self.offset0 = fh.tell()
             return header
 
-    @info_property(needs='header0')
+    @info_item(needs='header0')
     def frame0(self):
         with self._parent.temporary_offset() as fh:
             fh.seek(self.offset0)
             return fh.read_frame()
 
-    @info_property(needs='header0')
+    @info_item(needs='header0')
     def number_of_frames(self):
         with self._parent.temporary_offset() as fh:
             fh.seek(-self.header0.frame_nbytes, 2)
@@ -140,10 +140,10 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
 
     complex_data = False
 
-    @info_property(needs='header0')
+    @info_item(needs='header0')
     def sample_shape(self):
         return (self.header0.nchan,)
 
-    @info_property(needs=('header0', 'time_info'))
+    @info_item(needs=('header0', 'time_info'))
     def start_time(self):
         return super().start_time
