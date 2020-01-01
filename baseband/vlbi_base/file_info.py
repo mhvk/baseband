@@ -3,6 +3,7 @@
 
 Loosely based on `~astropy.utils.data_info.DataInfo`.
 """
+import copy
 import warnings
 from collections import OrderedDict
 
@@ -22,26 +23,22 @@ class info_item:
     of the function.
     """
     def __new__(cls, fget=None, name=None, needs=(), default=None,
-                missing=None):
+                missing=None, copy=False):
         if fget is None:
             def wrapper(func):
                 return cls(func, name=name, needs=needs, default=default,
-                           missing=missing)
+                           missing=missing, copy=copy)
 
             return wrapper
 
         return super().__new__(cls)
 
     def __init__(self, fget, name=None, needs=(), default=None,
-                 missing=None):
+                 missing=None, copy=False):
         if isinstance(fget, str):
-            if needs:
-                assert isinstance(needs, str)
-            else:
-                needs = '_parent'
             self.name = fget
             self.method = True
-            self.fget = indirect_attr_getter(self.name, needs)
+            self.fget = indirect_attr_getter(self.name, needs or '_parent')
         else:
             self.fget = fget
             self.name = fget.__name__ if name is None else name
@@ -49,13 +46,15 @@ class info_item:
         self.needs = needs if isinstance(needs, (tuple, list)) else (needs,)
         self.default = default
         self.missing = missing
+        self.copy = copy
 
     def __get__(self, instance, cls=None):
         if instance is None:
             return self
 
-        if all(getattr(instance, need, None) is not None
-               for need in self.needs):
+        if (instance._parent is not None
+                and all(getattr(instance, need, None) is not None
+                        for need in self.needs)):
             args = (instance,) if self.method else ()
             try:
                 value = self.fget(*args)
@@ -70,6 +69,9 @@ class info_item:
 
         else:
             value = self.default
+
+        if self.copy:
+            value = copy.copy(value)
 
         setattr(instance, self.name, value)
         return value
@@ -120,10 +122,6 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
     _parent_attrs = ()
     _parent = None
 
-    def _collect_info(self):
-        for attr in self.attr_names:
-            getattr(self, attr)
-
     def _up_to_date(self):
         """Determine whether the information we have stored is up to date."""
         return all(getattr(self, attr) == getattr(self._parent, attr, None)
@@ -144,7 +142,8 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
             #   (e.g., for Mark 4, a change in ref_time affect start_time).
             info = instance.__dict__['info'] = self.__class__()
             info._parent = instance
-            info._collect_info()
+            for attr in info.attr_names:
+                getattr(info, attr)
 
         return info
 
@@ -421,6 +420,13 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     # Note that we cannot have missing information in streams;
     # they cannot be opened without it.
 
+    checks = info_item('checks', needs='file_info', copy=True,
+                       default=OrderedDict())
+    errors = info_item('errors', needs='file_info', copy=True,
+                       default=OrderedDict())
+    warnings = info_item('warnings', needs='file_info', copy=True,
+                         default=OrderedDict())
+
     @info_item
     def file_info(self):
         return self._parent.fh_raw.info
@@ -485,16 +491,6 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
             return all(bool(v) for v in self.checks.values())
         else:
             return False
-
-    def _collect_info(self):
-        super()._collect_info()
-        # We want to include the raw info and its possible problems.
-        for piece in self.info_names:
-            file_piece = getattr(self.file_info, piece, None)
-            if file_piece:
-                stream_piece = file_piece.copy()
-                stream_piece.update(getattr(self, piece))
-                setattr(self, piece, stream_piece)
 
     def _up_to_date(self):
         # Stream readers cannot change after initialization, so check is easy.

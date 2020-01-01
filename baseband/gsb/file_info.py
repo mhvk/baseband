@@ -20,10 +20,11 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
 
     readable = None
 
-    def _collect_info(self):
-        super()._collect_info()
-        if self:
-            self.missing['raw'] = 'need raw binary files for the stream reader'
+    @info_item
+    def missing(self):
+        missing = super().missing
+        missing['raw'] = 'need raw binary files for the stream reader'
+        return missing
 
 
 class GSBStreamReaderInfo(VLBIStreamReaderInfo):
