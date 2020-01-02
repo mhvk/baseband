@@ -1,6 +1,11 @@
 # Licensed under the GPLv3 - see LICENSE
+"""The Mark4FileReaderInfo property.
 
-from ..vlbi_base.file_info import VLBIFileReaderInfo
+Includes information about what is needed to calcuate times,
+number of tracks and offset of first header.
+"""
+
+from ..vlbi_base.file_info import VLBIFileReaderInfo, info_item
 
 
 __all__ = ['Mark4FileReaderInfo']
@@ -67,13 +72,12 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         bps = 2
         complex_data = False
         readable = True
+        ntrack = 64
         offset0 = 2696
         <BLANKLINE>
         missing:  decade, ref_time: needed to infer full times.
         <BLANKLINE>
         checks:  decodable: True
-        <BLANKLINE>
-        errors:  start_time: unsupported operand type(s) for //: ...
         >>> fh.close()
 
         >>> fh = mark4.open(SAMPLE_MARK4, 'rb', decade=2010)
@@ -89,47 +93,59 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         complex_data = False
         start_time = 2014-06-16T07:38:12.475000000
         readable = True
+        ntrack = 64
         offset0 = 2696
         <BLANKLINE>
         checks:  decodable: True
         >>> fh.close()
     """
-    attr_names = VLBIFileReaderInfo.attr_names + ('ntrack', 'offset0')
+    attr_names = (VLBIFileReaderInfo.attr_names[:-4]
+                  + ('ntrack', 'offset0')
+                  + VLBIFileReaderInfo.attr_names[-4:])
+    """Attributes that the container provides."""
+
     _header0_attrs = ('bps', 'samples_per_frame')
     _parent_attrs = ('ntrack', 'decade', 'ref_time')
 
-    def _get_header0(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(0)
-                header = fh.find_header()
-                self.offset0 = fh.tell()
-                return header
-
-        except Exception as exc:
-            self.errors['header0'] = exc
+    @info_item
+    def time_info(self):
+        """Additional time info needed to get the start time."""
+        time_info = (self.decade, self.ref_time)
+        if time_info == (None, None):
+            self.missing['decade'] = self.missing['ref_time'] = (
+                "needed to infer full times.")
             return None
 
-    def _get_frame0(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(self.offset0)
-                return fh.read_frame()
-        except Exception as exc:
-            self.errors['frame0'] = exc
-            return None
+        return time_info
 
-    def _get_number_of_frames(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(-self.header0.frame_nbytes, 2)
-                fh.find_header(self.header0, forward=False)
-                number_of_frames = ((fh.tell() - self.offset0)
-                                    / self.header0.frame_nbytes) + 1
+    @info_item
+    def offset0(self):
+        """Offset in bytes to the location of the first header."""
+        with self._parent.temporary_offset() as fh:
+            fh.seek(0)
+            fh.find_header()
+            return fh.tell()
 
-        except Exception as exc:
-            self.errors['number_of_frames'] = exc
-            return None
+    @info_item(needs='offset0')
+    def header0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(self.offset0)
+            return fh.read_header()
+
+    @info_item(needs='header0')
+    def frame0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(self.offset0)
+            return fh.read_frame()
+
+    @info_item(needs='header0')
+    def number_of_frames(self):
+        """Total number of frames."""
+        with self._parent.temporary_offset() as fh:
+            fh.seek(-self.header0.frame_nbytes, 2)
+            fh.find_header(self.header0, forward=False)
+            number_of_frames = ((fh.tell() - self.offset0)
+                                / self.header0.frame_nbytes) + 1
 
         if number_of_frames % 1 == 0:
             return int(number_of_frames)
@@ -139,12 +155,15 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
                 .format(number_of_frames))
             return None
 
-    def _collect_info(self):
-        super()._collect_info()
-        if self:
-            self.complex_data = False
-            # TODO: Shouldn't Mark4Header provide this?
-            self.sample_shape = (self.header0.nchan,)
-            if self.decade is None and self.ref_time is None:
-                self.missing['decade'] = self.missing['ref_time'] = (
-                    "needed to infer full times.")
+    complex_data = False
+
+    @info_item(needs='header0')
+    def sample_shape(self):
+        """Dimensions of each complete sample."""
+        return (self.header0.nchan,)
+
+    # Override just to replace what it "needs".
+    @info_item(needs=('header0', 'time_info'))
+    def start_time(self):
+        """Time of the first sample."""
+        return super().start_time

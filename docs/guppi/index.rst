@@ -137,4 +137,5 @@ Reference/API
 .. automodapi:: baseband.guppi.header
 .. automodapi:: baseband.guppi.payload
 .. automodapi:: baseband.guppi.frame
+.. automodapi:: baseband.guppi.file_info
 .. automodapi:: baseband.guppi.base

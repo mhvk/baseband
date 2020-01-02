@@ -13,8 +13,8 @@ from ..data import (SAMPLE_MARK4 as SAMPLE_M4, SAMPLE_MARK5B as SAMPLE_M5B,
 
 @pytest.mark.parametrize(
     ('sample', 'format_', 'missing', 'readable', 'error_keys'),
-    ((SAMPLE_M4, 'mark4', True, True, ['start_time']),
-     (SAMPLE_M5B, 'mark5b', True, False, ['start_time', 'frame0']),
+    ((SAMPLE_M4, 'mark4', True, True, []),
+     (SAMPLE_M5B, 'mark5b', True, False, []),
      (SAMPLE_VDIF, 'vdif', False, True, []),
      (SAMPLE_MWA, 'vdif', False, True, ['frame_rate']),
      (SAMPLE_DADA, 'dada', False, True, []),
@@ -27,7 +27,7 @@ def test_basic_file_info(sample, format_, missing, readable, error_keys):
     assert info.format == format_
     assert info_dict['format'] == format_
     assert (hasattr(info, 'missing') and info.missing != {}) is missing
-    assert ('missing' in info_dict) is missing
+    assert ('missing' in info_dict and info_dict['missing'] != {}) is missing
     assert info.readable is readable
     assert list(info.errors.keys()) == error_keys
 
@@ -58,8 +58,9 @@ def test_file_info(sample, format_, used, consistent, inconsistent):
     assert info.format == format_
     info_dict = info()
     for attr in info.attr_names:
-        assert getattr(info, attr) is not None
-        assert attr in info_dict
+        info_value = getattr(info, attr)
+        assert info_value is not None
+        assert attr in info_dict or info_value == {}
     assert set(info.used_kwargs.keys()) == set(used)
     assert set(info.consistent_kwargs.keys()) == set(consistent)
     assert set(info.inconsistent_kwargs.keys()) == set(inconsistent)

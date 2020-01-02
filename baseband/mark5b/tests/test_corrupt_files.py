@@ -117,14 +117,13 @@ class TestCorruptSampleCopy:
                 bad_start * fv.samples_per_frame)
             assert expected_msg in fv.info.errors['continuous']
 
-        # While only warnings are given when it is fixable.
-        with mark5b.open(filename, 'rs', nchan=8, bps=2,
-                         kday=56000, verify='fix') as ff:
-            assert ff.info.readable
-            assert 'fixable' in ff.info.checks['continuous']
-            assert 'continuous' in ff.info.warnings
-            assert expected_msg in ff.info.warnings['continuous']
-            assert 'problem loading frame' in ff.info.warnings['continuous']
+            # While only warnings are given when it is fixable.
+            fv.verify = 'fix'
+            assert fv.info.readable
+            assert 'fixable' in fv.info.checks['continuous']
+            assert 'continuous' in fv.info.warnings
+            assert expected_msg in fv.info.warnings['continuous']
+            assert 'problem loading frame' in fv.info.warnings['continuous']
 
         with mark5b.open(filename, 'rs', sample_rate=32*u.MHz,
                          kday=56000, nchan=8, bps=2) as fr:

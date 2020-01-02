@@ -113,4 +113,5 @@ Reference/API
    :include-all-objects:
 .. automodapi:: baseband.mark5b.payload
 .. automodapi:: baseband.mark5b.frame
+.. automodapi:: baseband.mark5b.file_info
 .. automodapi:: baseband.mark5b.base

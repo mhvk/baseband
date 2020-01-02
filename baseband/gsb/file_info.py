@@ -1,52 +1,45 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..vlbi_base.file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
+                                   info_item)
 
 
 class GSBTimeStampInfo(VLBIFileReaderInfo):
-    attr_names = ('format', 'mode') + VLBIFileReaderInfo.attr_names[1:]
+    attr_names = ('format', 'mode', 'frame_rate', 'start_time', 'readable',
+                  'missing', 'errors')
     _header0_attrs = ('mode',)
+    # Should add number_of_frames, but tricky without _last_header.
 
-    def _get_header0(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(0)
-                return fh.read_timestamp()
-        except Exception as exc:
-            self.errors['header0'] = exc
-            return None
+    @info_item
+    def header0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(0)
+            return fh.read_timestamp()
 
-    def _get_format(self):
+    @info_item(needs='header0')
+    def format(self):
         return 'gsb'
 
-    def _readable(self):
-        # Cannot know whether it is readable without the raw data files.
-        return None
+    # Cannot know whether it is readable without the raw data files.
+    readable = None
 
-    def _get_number_of_frames(self):
-        # Tricky to determine without _last_header.
-        return None
-
-    def _collect_info(self):
-        super()._collect_info()
-        if self:
-            self.missing['raw'] = 'need raw binary files for the stream reader'
+    @info_item
+    def missing(self):
+        missing = super().missing
+        missing['raw'] = 'need raw binary files for the stream reader'
+        return missing
 
 
 class GSBStreamReaderInfo(VLBIStreamReaderInfo):
 
-    def _get_frame0(self):
-        try:
-            return self._parent._read_frame(0)
-        except Exception as exc:
-            self.errors['frame0'] = exc
-            return None
+    @info_item
+    def frame0(self):
+        return self._parent._read_frame(0)
 
-    _decodable = VLBIFileReaderInfo._decodable
+    # Bit of a hack, but the base reader one suffices here with
+    # the frame0 override above and its default "decodable"
+    readable = VLBIFileReaderInfo.readable
+    decodable = VLBIFileReaderInfo.decodable
 
-    def _readable(self):
-        # Bit of a hack, but the base reader one suffices here with
-        # the _get_frame0 override above.
-        return VLBIFileReaderInfo._readable(self)
-
-    def _file_info(self):
+    @info_item
+    def file_info(self):
         return self._parent.fh_ts.info

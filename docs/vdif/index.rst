@@ -184,4 +184,5 @@ Reference/API
    :include-all-objects:
 .. automodapi:: baseband.vdif.payload
 .. automodapi:: baseband.vdif.frame
+.. automodapi:: baseband.vdif.file_info
 .. automodapi:: baseband.vdif.base
