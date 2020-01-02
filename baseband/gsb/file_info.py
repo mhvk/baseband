@@ -4,7 +4,8 @@ from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
 
 
 class GSBTimeStampInfo(VLBIFileReaderInfo):
-    attr_names = ('format', 'mode', 'frame_rate', 'start_time', 'readable')
+    attr_names = ('format', 'mode', 'frame_rate', 'start_time', 'readable',
+                  'missing', 'errors')
     _header0_attrs = ('mode',)
     # Should add number_of_frames, but tricky without _last_header.
 

@@ -99,7 +99,9 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         checks:  decodable: True
         >>> fh.close()
     """
-    attr_names = VLBIFileReaderInfo.attr_names + ('ntrack', 'offset0')
+    attr_names = (VLBIFileReaderInfo.attr_names[:-4]
+                  + ('ntrack', 'offset0')
+                  + VLBIFileReaderInfo.attr_names[-4:])
     """Attributes that the container provides."""
 
     _header0_attrs = ('bps', 'samples_per_frame')

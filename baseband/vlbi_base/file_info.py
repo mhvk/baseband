@@ -126,9 +126,6 @@ class VLBIInfoMeta(type):
             setattr(cls, attr, info_item(attr, needs='header0'))
         for attr in set(dct.get('_parent_attrs', ())) - defs:
             setattr(cls, attr, info_item(attr, needs='_parent'))
-        for attr in set(dct.get('info_names', ())) - defs:
-            setattr(cls, attr, info_item(attr, default=OrderedDict(),
-                                         copy=True))
 
 
 class VLBIInfoBase(metaclass=VLBIInfoMeta):
@@ -154,9 +151,6 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
 
     attr_names = ()
     """Attributes that the container provides."""
-
-    info_names = ()
-    """Dictionaries with further information that the container provides."""
 
     _parent_attrs = ()
     _parent = None
@@ -207,16 +201,11 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
         information, as well as possible warnings and errors.
         """
         info = {}
-        if self:
-            for attr in self.attr_names:
-                value = getattr(self, attr)
-                if value is not None:
-                    info[attr] = value
-
-        for info_name in self.info_names:
-            extra = getattr(self, info_name)
-            if extra:
-                info[info_name] = extra
+        for attr in self.attr_names:
+            value = getattr(self, attr)
+            if not (value is None or (isinstance(value, dict)
+                                      and value == {})):
+                info[attr] = value
 
         return info
 
@@ -234,28 +223,26 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
         result = ''
         for attr in self.attr_names:
             value = getattr(self, attr)
-            if value is not None:
+            if isinstance(value, dict):
+                prefix = '\n{}: '.format(attr)
+                if attr == 'missing':
+                    for msg in sorted(set(self.missing.values())):
+                        keys = sorted(set(key for key in self.missing
+                                          if self.missing[key] == msg))
+                        result += "{} {}: {}\n".format(prefix,
+                                                       ', '.join(keys), msg)
+                        prefix = ' ' * (len(attr) + 2)
+                else:
+                    for key, val in value.items():
+                        result += "{} {}: {}\n".format(prefix, key, str(val))
+                        prefix = ' ' * (len(attr) + 2)
+
+            elif value is not None:
                 if isinstance(value, Time):
                     value = Time(value, format='isot', precision=9)
                 elif attr == 'sample_rate':
                     value = value.to(u.MHz)
                 result += '{} = {}\n'.format(attr, value)
-
-        for info_name in self.info_names:
-            items = getattr(self, info_name, {})
-            prefix = '\n{}: '.format(info_name)
-            if info_name == 'missing':
-                for msg in sorted(set(self.missing.values())):
-                    keys = sorted(set(key for key in self.missing
-                                      if self.missing[key] == msg))
-                    result += "{} {}: {}\n".format(prefix,
-                                                   ', '.join(keys), msg)
-                    prefix = ' ' * (len(info_name) + 2)
-
-            else:
-                for key, value in items.items():
-                    result += "{} {}: {}\n".format(prefix, key, str(value))
-                    prefix = ' ' * (len(info_name) + 2)
 
         return result
 
@@ -344,14 +331,17 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     """
     attr_names = ('format', 'number_of_frames', 'frame_rate', 'sample_rate',
                   'samples_per_frame', 'sample_shape', 'bps', 'complex_data',
-                  'start_time', 'readable')
+                  'start_time', 'readable',
+                  'missing', 'checks', 'errors', 'warnings')
     """Attributes that the container provides."""
 
     _header0_attrs = ('bps', 'complex_data', 'samples_per_frame',
                       'sample_shape')
 
-    info_names = ('missing', 'checks', 'errors', 'warnings')
-    """Dictionaries with further information that the container provides."""
+    missing = info_item('missing', default=OrderedDict(), copy=True)
+    checks = info_item('checks', default=OrderedDict(), copy=True)
+    errors = info_item('errors', default=OrderedDict(), copy=True)
+    warnings = info_item('warnings', default=OrderedDict(), copy=True)
 
     @info_item
     def header0(self):
@@ -470,14 +460,13 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         Keyed by the attributes/checks.
     """
     attr_names = ('start_time', 'stop_time', 'sample_rate', 'shape',
-                  'format', 'bps', 'complex_data', 'verify', 'readable')
+                  'format', 'bps', 'complex_data', 'verify', 'readable',
+                  'checks', 'errors', 'warnings')
     """Attributes that the container provides."""
 
     _parent_attrs = tuple(attr for attr in attr_names
                           if attr not in ('format', 'readable'))
 
-    info_names = ('checks', 'errors', 'warnings')
-    """Dictionaries with further information that the container provides."""
     # Note that we cannot have missing information in streams;
     # they cannot be opened without it.
 
@@ -574,15 +563,11 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
             # Add information from the raw file, but skip atttributes and
             # extra info dicts that have been included already.
             raw_attrs = file_info.attr_names
-            raw_info = file_info.info_names
             try:
                 file_info.attr_names = [attr for attr in raw_attrs
                                         if attr not in self.attr_names]
-                file_info.info_names = [name for name in raw_info
-                                        if name not in self.info_names]
                 result += '\n' + repr(file_info)
             finally:
                 file_info.attr_names = raw_attrs
-                file_info.info_names = raw_info
 
         return result
