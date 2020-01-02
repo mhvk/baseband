@@ -117,25 +117,18 @@ class info_item:
 
 
 class VLBIInfoMeta(type):
-    # Ensure all attributes are initialized to None, so that they are
-    # always available (do this rather than overwrite __getattr__ so that
-    # we can generate docstrings in sphinx for them).
+    # Set any default attributes according to where they are mentioned
+    # (if not explicitly defined already).
     def __init__(cls, name, bases, dct):
         super().__init__(name, bases, dct)
-        header0_attrs = dct.get('_header0_attrs', ())
-        parent_attrs = dct.get('_parent_attrs', ())
-        info_attrs = dct.get('info_names', ())
-        not_set_attrs = tuple(attr for attr in (cls.attr_names
-                                                + parent_attrs + info_attrs)
-                              if not hasattr(cls, attr))
-        for attr in not_set_attrs + header0_attrs:
-            if attr in header0_attrs:
-                setattr(cls, attr, info_item(attr, needs='header0'))
-            elif attr in parent_attrs:
-                setattr(cls, attr, info_item(attr, needs='_parent'))
-            elif attr in info_attrs:
-                setattr(cls, attr, info_item(attr, default=OrderedDict(),
-                                             copy=True))
+        defs = set(dct.keys())
+        for attr in set(dct.get('_header0_attrs', ())) - defs:
+            setattr(cls, attr, info_item(attr, needs='header0'))
+        for attr in set(dct.get('_parent_attrs', ())) - defs:
+            setattr(cls, attr, info_item(attr, needs='_parent'))
+        for attr in set(dct.get('info_names', ())) - defs:
+            setattr(cls, attr, info_item(attr, default=OrderedDict(),
+                                         copy=True))
 
 
 class VLBIInfoBase(metaclass=VLBIInfoMeta):
@@ -352,8 +345,11 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     attr_names = ('format', 'number_of_frames', 'frame_rate', 'sample_rate',
                   'samples_per_frame', 'sample_shape', 'bps', 'complex_data',
                   'start_time', 'readable')
+    """Attributes that the container provides."""
+
     _header0_attrs = ('bps', 'complex_data', 'samples_per_frame',
                       'sample_shape')
+
     info_names = ('missing', 'checks', 'errors', 'warnings')
     """Dictionaries with further information that the container provides."""
 

@@ -1,5 +1,12 @@
 # Licensed under the GPLv3 - see LICENSE
+"""The Mark5BFileReaderInfo property.
+
+Includes information about what is needed to calcuate times.
+"""
 from ..vlbi_base.file_info import VLBIFileReaderInfo, info_item
+
+
+__all__ = ['Mark5BFileReaderInfo']
 
 
 class Mark5BFileReaderInfo(VLBIFileReaderInfo):

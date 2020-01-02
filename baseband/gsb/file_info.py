@@ -18,6 +18,7 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
     def format(self):
         return 'gsb'
 
+    # Cannot know whether it is readable without the raw data files.
     readable = None
 
     @info_item

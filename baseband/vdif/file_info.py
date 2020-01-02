@@ -1,11 +1,20 @@
 # Licensed under the GPLv3 - see LICENSE
+"""The VDIFFileReaderInfo property.
+
+Includes information about threads and frame sets.
+"""
 from ..vlbi_base.file_info import VLBIFileReaderInfo, info_item
+
+
+__all__ = ['VDIFFileReaderInfo']
 
 
 class VDIFFileReaderInfo(VLBIFileReaderInfo):
     attr_names = (('format', 'edv', 'number_of_frames', 'thread_ids',
                    'number_of_framesets')
                   + VLBIFileReaderInfo.attr_names[2:])
+    """Attributes that the container provides."""
+
     _header0_attrs = ('edv', 'bps', 'samples_per_frame')
 
     @info_item
@@ -24,7 +33,9 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
             # so we need a basic sanity check.
             return fh.find_header(maximum=0)
 
-    @info_item(needs=('header0', 'frame_rate'))
+    # Some headers also need frame rate, but fine to let that
+    # lead to an error.
+    @info_item(needs='header0')
     def start_time(self):
         return self.header0.get_time(frame_rate=self.frame_rate)
 

@@ -1,4 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE
+"""The Mark4FileReaderInfo property.
+
+Includes information about what is needed to calcuate times,
+number of tracks and offset of first header.
+"""
 
 from ..vlbi_base.file_info import VLBIFileReaderInfo, info_item
 
@@ -95,6 +100,8 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         >>> fh.close()
     """
     attr_names = VLBIFileReaderInfo.attr_names + ('ntrack', 'offset0')
+    """Attributes that the container provides."""
+
     _header0_attrs = ('bps', 'samples_per_frame')
     _parent_attrs = ('ntrack', 'decade', 'ref_time')
 
