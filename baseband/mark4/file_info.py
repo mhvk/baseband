@@ -100,6 +100,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
 
     @info_item
     def time_info(self):
+        """Additional time info needed to get the start time."""
         time_info = (self.decade, self.ref_time)
         if time_info == (None, None):
             self.missing['decade'] = self.missing['ref_time'] = (
@@ -110,6 +111,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
 
     @info_item
     def offset0(self):
+        """Offset in bytes to the location of the first header."""
         with self._parent.temporary_offset() as fh:
             fh.seek(0)
             fh.find_header()
@@ -129,6 +131,7 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
 
     @info_item(needs='header0')
     def number_of_frames(self):
+        """Total number of frames."""
         with self._parent.temporary_offset() as fh:
             fh.seek(-self.header0.frame_nbytes, 2)
             fh.find_header(self.header0, forward=False)
@@ -147,8 +150,11 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
 
     @info_item(needs='header0')
     def sample_shape(self):
+        """Dimensions of each complete sample."""
         return (self.header0.nchan,)
 
+    # Override just to replace what it "needs".
     @info_item(needs=('header0', 'time_info'))
     def start_time(self):
+        """Time of the first sample."""
         return super().start_time

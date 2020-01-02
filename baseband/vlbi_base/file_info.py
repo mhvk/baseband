@@ -4,6 +4,7 @@
 Loosely based on `~astropy.utils.data_info.DataInfo`.
 """
 import copy
+import operator
 import warnings
 from collections import OrderedDict
 
@@ -12,59 +13,97 @@ from astropy import units as u
 from astropy.time import Time
 
 
-__all__ = ['VLBIInfoMeta', 'VLBIInfoBase',
+__all__ = ['info_item', 'VLBIInfoMeta', 'VLBIInfoBase',
            'VLBIFileReaderInfo', 'VLBIStreamReaderInfo']
 
 
 class info_item:
-    """Like a property, but evaluate only once, and store errors.
+    """Like a lazy property, evaluated only once.
 
-    It is not a data property and replaces itself with the evaluation
-    of the function.
+    Can be used as a decorator.
+
+    It replaces itself with the evaluation of the function, i.e.,
+    it is not a data descriptor.
+
+    Any errors encountered during the evaluation are stored in the
+    instances ``errors`` dict.
+
+    Parameters
+    ----------
+    attr : str or callable, optional
+        If a string, assumes we will get that attribute from ``needs``,
+        otherwise the attr will be called to calculate the value.  In
+        this case, the name of the attribute will be taken from the
+        callable's name.  If this argument is not given, it is assumed
+        the class is used as a decorator, and a wrapper is returned.
+    needs : str or tuple of str
+        The attributes that need to be present to get or calculate
+        ``attr``.  If ``attr`` is a string, this should be where the
+        attribute should be gotten from (e.g., 'header0' or '_parent');
+        if not given, the attribute will simply be set to ``default``.
+    default : value, optional
+        The value to return if the needs are not met.  Default: `None`.
+    doc : str, optional
+        Docstring of the descriptor.  If not given will be taken from
+        ``attr`` if a function, otherwise constructed.  (Hard to access
+        from within python, but useful for sphinx documentation.)
+    missing : str, optional
+        If the value could be calculated or retrieved, but is `None`,
+        then add this string to the ``missing`` attribute of the instance.
+        Used, e.g., for Mark 5B to give a helpful message if ``bps``
+        is not found on the file reader instance.
+    copy : bool
+        Whether the copy the value if it is retrieved.  This can be
+        useful, e.g., if the value is expected to be a `dict` and an
+        independent copy should be made.
     """
-    def __new__(cls, fget=None, name=None, needs=(), default=None,
+    def __new__(cls, attr=None, needs=(), default=None, doc=None,
                 missing=None, copy=False):
-        if fget is None:
+        if attr is None:
             def wrapper(func):
-                return cls(func, name=name, needs=needs, default=default,
+                return cls(func, needs=needs, default=default, doc=doc,
                            missing=missing, copy=copy)
 
             return wrapper
 
         return super().__new__(cls)
 
-    def __init__(self, fget, name=None, needs=(), default=None,
+    def __init__(self, attr, needs=(), default=None, doc=None,
                  missing=None, copy=False):
-        if isinstance(fget, str):
-            self.name = fget
-            self.method = True
-            self.fget = indirect_attr_getter(self.name, needs or '_parent')
+        needs = tuple(needs) if isinstance(needs, (tuple, list)) else (needs,)
+        if callable(attr):
+            self.fget = attr
+            self.attr = attr.__name__
+            if doc is None:
+                doc = attr.__doc__
         else:
-            self.fget = fget
-            self.name = fget.__name__ if name is None else name
-            self.method = name is None
-        self.needs = needs if isinstance(needs, (tuple, list)) else (needs,)
+            self.attr = attr
+            full_attr = '.'.join(needs+(attr,))
+            self.fget = operator.attrgetter(full_attr) if needs else None
+            if doc is None:
+                doc = "Link to " + full_attr.replace('_parent', 'parent')
+
+        self.needs = needs if '_parent' in needs else ('_parent',) + needs
         self.default = default
         self.missing = missing
         self.copy = copy
+        self.__doc__ = doc
 
     def __get__(self, instance, cls=None):
         if instance is None:
             return self
 
-        if (instance._parent is not None
-                and all(getattr(instance, need, None) is not None
-                        for need in self.needs)):
-            args = (instance,) if self.method else ()
+        if self.fget and all(getattr(instance, need, None) is not None
+                             for need in self.needs):
             try:
-                value = self.fget(*args)
+                value = self.fget(instance)
             except Exception as exc:
-                instance.errors[self.name] = exc
+                instance.errors[self.attr] = exc
                 value = self.default
             else:
                 if value is None:
                     if self.missing:
-                        instance.missing[self.name] = self.missing
+                        instance.missing[self.attr] = self.missing
                     value = self.default
 
         else:
@@ -73,15 +112,8 @@ class info_item:
         if self.copy:
             value = copy.copy(value)
 
-        setattr(instance, self.name, value)
+        setattr(instance, self.attr, value)
         return value
-
-
-def indirect_attr_getter(attr, source='_parent'):
-    def get_indirect_attr(instance):
-        return getattr(getattr(instance, source), attr)
-
-    return get_indirect_attr
 
 
 class VLBIInfoMeta(type):
@@ -102,15 +134,29 @@ class VLBIInfoMeta(type):
             elif attr in parent_attrs:
                 setattr(cls, attr, info_item(attr, needs='_parent'))
             elif attr in info_attrs:
-                setattr(cls, attr, info_item(OrderedDict, name=attr))
+                setattr(cls, attr, info_item(attr, default=OrderedDict(),
+                                             copy=True))
 
 
 class VLBIInfoBase(metaclass=VLBIInfoMeta):
     """Container providing a standardized interface to file information.
 
     In order to ensure that information is always returned, all access
-    to the parent should be within ``try/except`` with a possible error
-    stored in ``self.errors``.  See ``self._getattr`` for an example.
+    to the parent should be via `~baseband.vlbi_base.file_info.info_item`,
+    which ensures that any errors are stored in ``self.errors``.
+    In addition, it may be useful to capture warnings and store them in
+    ``self.warnings``.
+
+    The instance evaluates as `True` if the underlying file is of the right
+    format, and can thus, at least in principle, be read (though more
+    information may be needed, given in ``missing``, or the file may be
+    corrupt futher on).
+
+    Parameters
+    ----------
+    parent : instance, optional
+        Instance of the file or stream reader the ``info`` instance is
+        attached too.  `None` if it is the class version.
     """
 
     attr_names = ()
@@ -162,7 +208,11 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
         return self.format is not None
 
     def __call__(self):
-        """Create a dict with file information, including missing pieces."""
+        """Create a dict with file information.
+
+        This includes information about checks done, possible missing
+        information, as well as possible warnings and errors.
+        """
         info = {}
         if self:
             for attr in self.attr_names:
@@ -309,6 +359,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
     @info_item
     def header0(self):
+        """Header of the first frame in the file."""
         # Here, we do not even know whether the file is open or whether we
         # have the right format. We thus use a try/except and filter out all
         # warnings.
@@ -320,6 +371,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
     @info_item(needs='header0')
     def frame0(self):
+        """First frame from the file."""
         # Try reading a frame.  This has no business failing if a
         # frame rate could be determined, but try anyway; maybe file is closed.
         with self._parent.temporary_offset() as fh:
@@ -328,6 +380,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
     @info_item(needs='frame0', default=False)
     def decodable(self):
+        """Whether decoding the first frame worked."""
         # Getting the first sample can fail if we don't have the right decoder.
         first_sample = self.frame0[0]
 
@@ -338,14 +391,17 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
     @info_item(needs='header0')
     def format(self):
+        """The file format."""
         return self._parent.__class__.__name__.split('File')[0].lower()
 
     @info_item(needs='header0')
     def frame_rate(self):
+        """Number of frames per unit time."""
         return self._parent.get_frame_rate()
 
     @info_item(needs='header0')
     def number_of_frames(self):
+        """Total number of frames."""
         with self._parent.temporary_offset() as fh:
             number_of_frames = fh.seek(0, 2) / self.header0.frame_nbytes
 
@@ -359,15 +415,18 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 
     @info_item(needs='header0')
     def start_time(self):
+        """Time of the first sample."""
         return self.header0.time
 
     @info_item(needs='frame0', default=False)
     def readable(self):
+        """Whether the file is readable and decodable."""
         self.checks['decodable'] = self.decodable
         return all(bool(v) for v in self.checks.values())
 
     @info_item(needs=('frame_rate', 'samples_per_frame'))
     def sample_rate(self):
+        """Rate of complete samples per unit time."""
         return self.frame_rate * self.samples_per_frame
 
     def __repr__(self):
@@ -379,10 +438,11 @@ class VLBIFileReaderInfo(VLBIInfoBase):
 class VLBIStreamReaderInfo(VLBIInfoBase):
     """Standardized information on stream readers.
 
-    The ``info`` descriptor provides a few standard attributes, all of which
-    can also be accessed directly on the stream filehandle. More detailed
-    information on the underlying file is stored in its info, accessible via
-    ``info.file_info``.
+    The ``info`` descriptor provides a few standard attributes, most of which
+    can also be accessed directly on the stream filehandle, and tests basic
+    readability of the stream. More detailed information on the underlying
+    file is stored in its info, accessible via ``info.file_info`` (and shown
+    by ``__repr__``).
 
     Attributes
     ----------
@@ -399,6 +459,8 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
         Number of bits used to encode each elementary sample.
     complex_data : bool
         Whether the data are complex.
+    verify : bool or str
+        The type of verification done by the stream reader.
     readable : bool
         Whether the first and last samples could be read and decoded.
     checks : dict
@@ -432,10 +494,12 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
 
     @info_item
     def file_info(self):
+        """Information from the underlying file reader."""
         return self._parent.fh_raw.info
 
     @info_item(needs='file_info')
     def format(self):
+        """Format of the underlying file."""
         return self.file_info.format
 
     @info_item
@@ -489,6 +553,7 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
 
     @info_item
     def readable(self):
+        """Whether the stream can be read (possibly fixing errors)."""
         if self.file_info.readable:
             self.checks['continuous'] = self.continuous
             return all(bool(v) for v in self.checks.values())
