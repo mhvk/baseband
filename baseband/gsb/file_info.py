@@ -4,10 +4,9 @@ from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
 
 
 class GSBTimeStampInfo(VLBIFileReaderInfo):
-    attr_names = ('format', 'mode', 'frame_rate', 'start_time', 'readable',
-                  'missing', 'errors')
+    attr_names = ('format', 'mode', 'number_of_frames', 'frame_rate',
+                  'start_time', 'readable', 'missing', 'errors', 'warnings')
     _header0_attrs = ('mode',)
-    # Should add number_of_frames, but tricky without _last_header.
 
     @info_item
     def header0(self):
@@ -18,6 +17,24 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
     @info_item(needs='header0')
     def format(self):
         return 'gsb'
+
+    @info_item(needs='header0')
+    def number_of_frames(self):
+        with self._parent.temporary_offset() as fh:
+            file_nbytes = fh.seek(0, 2)
+            if file_nbytes == self.header0.nbytes:
+                return 1
+
+            guess = max(int(round(file_nbytes / self.header0.nbytes)) - 2, 0)
+            while True:
+                guess += 1
+                fh.seek(self.header0.seek_offset(guess))
+                try:
+                    self.header0.fromfile(fh).time
+                except EOFError:
+                    break
+
+        return guess
 
     # Cannot know whether it is readable without the raw data files.
     readable = None

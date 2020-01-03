@@ -272,11 +272,10 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         Whether to do basic checks of frame integrity when reading.  The first
         frame of the stream is always checked.  Default: `True`.
     """
-    # TODO: right now cannot inherit from GSBFileReader, unlike for other
-    # baseband classes, since we need to access multiple files.  Can this
-    # be solved with FileWriter/FileReader classes that handle timestamps and
-    # multiple blocks, combining these into a frame?
-
+    # TODO: right we are not really compatible with VLBIStreamReaderBase,
+    # since we need to access multiple files.  Can this be solved with
+    # FileWriter/FileReader classes that handle timestamps and multiple blocks,
+    # combining these into a frame?
     def __init__(self, fh_ts, fh_raw, sample_rate=None, samples_per_frame=None,
                  payload_nbytes=None, nchan=None, bps=None, complex_data=None,
                  squeeze=True, subset=(), verify=True):
@@ -294,8 +293,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     def _last_header(self):
         """Last header of the timestamp file."""
         with self.fh_ts.temporary_offset() as fh_ts:
-            fh_ts.seek(0, 2)
-            fh_ts_len = fh_ts.tell()
+            fh_ts_len = fh_ts.seek(0, 2)
             if fh_ts_len == self.header0.nbytes:
                 # Only one line in file
                 return self.header0

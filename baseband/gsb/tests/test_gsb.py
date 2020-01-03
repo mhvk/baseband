@@ -196,6 +196,25 @@ class TestGSB:
         assert abs(header.time
                    - Time('2013-07-28T02:53:55.3241088')) < 1.*u.ns
 
+    @pytest.mark.parametrize('sample,mode', [
+        (SAMPLE_RAWDUMP_HEADER, 'rawdump'),
+        (SAMPLE_PHASED_HEADER, 'phased')])
+    def test_raw_info(self, sample, mode):
+        with gsb.open(sample, 'rt') as fh:
+            expected = len(fh.fh_raw.readlines())
+            fh.seek(0)
+            header0 = gsb.GSBHeader.fromfile(fh, verify=True)
+            info = fh.info
+            assert info.format == 'gsb'
+            assert info.mode == mode
+            assert info.number_of_frames == expected
+            assert abs(info.frame_rate - u.Hz / 0.251658240) < 1. * u.nHz
+            assert info.start_time == header0.time
+            assert info.readable is None
+            assert info.missing.keys() == {'raw'}
+            assert info.errors == {}
+            assert info.warnings == {}
+
     def test_decoding(self):
         """Check that 4-bit encoding works."""
         areal = np.arange(-8., 8.)
