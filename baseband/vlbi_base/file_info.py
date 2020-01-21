@@ -234,7 +234,8 @@ class VLBIInfoBase(metaclass=VLBIInfoMeta):
                         prefix = ' ' * (len(attr) + 2)
                 else:
                     for key, val in value.items():
-                        result += "{} {}: {}\n".format(prefix, key, str(val))
+                        str_val = str(val) or repr(val)
+                        result += "{} {}: {}\n".format(prefix, key, str_val)
                         prefix = ' ' * (len(attr) + 2)
 
             elif value is not None:
@@ -476,6 +477,16 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
                        default=OrderedDict())
     warnings = info_item('warnings', needs='file_info', copy=True,
                          default=OrderedDict())
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        if parent is not None:
+            # Remove errors from file_info if we actually got the item.
+            # (e.g., start_time if frame_rate couldn't be calculated.)
+            for key in self.errors:
+                if (key in self.file_info.errors
+                        and getattr(self, key, None) is not None):
+                    del self.errors[key]
 
     @info_item
     def file_info(self):
