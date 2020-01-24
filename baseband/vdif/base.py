@@ -536,6 +536,15 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         if self.verify != 'fix':
             raise exc
 
+        # If the frameset does contain the right number of frames, but all
+        # are invalid, assume not just the data but also the frame number
+        # and seconds might be wrong, i.e., just proceed with it.
+        # TODO: make this an option for a specific type of fixing!
+        if (frameset is not None
+                and len(frameset.frames) == len(self._thread_ids)
+                and not any(frame.valid for frame in frameset.frames)):
+            return frameset
+
         msg = 'problem loading frame set {}.'.format(index)
 
         # Where should we be?

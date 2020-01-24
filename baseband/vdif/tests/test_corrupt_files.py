@@ -265,3 +265,51 @@ class TestCorruptFile:
         expected = np.concatenate([self.data] * 16)
         expected[missing_data] = 0.
         assert np.all(data.astype(int) == expected)
+
+
+class TestInvalidFrameHeaders:
+    # CHIME VDIF files from ARO can have invalid frames included in
+    # which the header information -- in particular the frame_nr and
+    # seconds -- are corrupt as well.  Check that we can skip those.
+    @classmethod
+    def setup_class(cls):
+        cls.header0 = vdif.VDIFHeader.fromvalues(
+            edv=1, time=Time('2010-11-12T13:14:15'), nchan=2, bps=2,
+            complex_data=False, thread_id=0, samples_per_frame=16,
+            station='me', sample_rate=2*u.kHz)
+        cls.nthread = 2
+        cls.data = np.array([[[-1, 1],
+                              [-3, 3]]]*16)
+        cls.frameset_nbytes = cls.header0.frame_nbytes * cls.nthread
+
+    def fake_file(self, tmpdir):
+        filename = str(tmpdir.join('fake.vdif'))
+        with vdif.open(filename, 'wb') as fw:
+            for i in range(16):
+                header = self.header0.copy()
+                if i != 10:
+                    header['frame_nr'] = i
+                else:
+                    header['frame_nr'] = 0
+                    header['seconds'] = 0
+                    header['invalid_data'] = True
+                fw.write_frameset(self.data, header=header)
+
+        return filename
+
+    @pytest.mark.parametrize('verify', ('fix', False))
+    def test_invalid_frame_fix(self, verify, tmpdir):
+        fake_file = self.fake_file(tmpdir)
+        with vdif.open(fake_file, 'rs', verify=verify) as fr:
+            data = fr.read()
+
+        expected = np.stack([self.data] * 16)
+        expected[10] = 0
+        expected.shape = (-1,) + self.data.shape[1:]
+        assert np.all(data.astype(int) == expected)
+
+    def test_invalid_frame_nofix(self, tmpdir):
+        fake_file = self.fake_file(tmpdir)
+        with pytest.raises(ValueError, match='wrong frame number'):
+            with vdif.open(fake_file, 'rs', verify=True) as fr:
+                fr.read()
