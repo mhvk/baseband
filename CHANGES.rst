@@ -1,3 +1,10 @@
+4.0 (unreleased)
+================
+
+- This future version will likely only support python 3.7, numpy 1.17 and
+  astropy 4.0.
+
+
 3.1 (2020-01-23)
 ================
 
