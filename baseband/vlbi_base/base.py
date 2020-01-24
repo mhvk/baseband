@@ -998,7 +998,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         count = data.shape[0]
         offset0 = self.offset
         sample = 0
-        while count > 0:
+        while sample < count:
             frame_index, sample_offset = divmod(self.offset,
                                                 self.samples_per_frame)
             if frame_index != self._frame_index:
@@ -1008,7 +1008,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             else:
                 self._valid &= valid
 
-            nsample = min(count, len(self._frame) - sample_offset)
+            nsample = min(count - sample, len(self._frame) - sample_offset)
             sample_end = sample_offset + nsample
             self._frame[sample_offset:sample_end] = data[sample:
                                                          sample + nsample]
@@ -1022,7 +1022,6 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             sample += nsample
             # Explicitly set offset (just in case write_frame adjusts it too).
             self.offset = offset0 + sample
-            count -= nsample
 
     def _write_frame(self, frame, valid=True):
         # Default implementation is to assume this is a frame that can write
