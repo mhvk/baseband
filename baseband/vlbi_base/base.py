@@ -780,7 +780,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         offset0 = self.offset
         sample = 0
-        while count > 0:
+        while sample < count:
             # For current position, get frame plus offset in that frame.
             frame_index, sample_offset = divmod(self.offset,
                                                 self.samples_per_frame)
@@ -791,7 +791,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
             frame = self._frame
 
-            nsample = min(count, len(frame) - sample_offset)
+            nsample = min(count - sample, len(frame) - sample_offset)
             data = frame[sample_offset:sample_offset + nsample]
             data = self._squeeze_and_subset(data)
             # Copy to relevant part of output.
@@ -799,7 +799,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             sample += nsample
             # Explicitly set offset (just in case read_frame adjusts it too).
             self.offset = offset0 + sample
-            count -= nsample
 
         return out
 
