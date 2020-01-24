@@ -19,6 +19,9 @@ Bug Fixes
 - ``find_header`` will now always check that the frame corresponding to
   a header is complete (i.e., fits within the file). [#354]
 
+- The ``count`` argument to ``.read()`` no longer is changed in-place, making
+  it safe to pass in array scalars or dimensionless quantities. [#373]
+
 Other Changes and Additions
 ---------------------------
 

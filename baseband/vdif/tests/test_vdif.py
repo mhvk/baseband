@@ -1286,6 +1286,16 @@ def test_arochime_vdif():
             pass
 
 
+def test_count_not_changed():
+    """Test that count input to .read() does not get changed."""
+    # Regression test for problem reported in
+    # https://github.com/mhvk/baseband/issues/370#issuecomment-577916056
+    count = np.array(2)
+    with vdif.open(SAMPLE_AROCHIME, 'rs', sample_rate=800*u.MHz/2048) as fh:
+        fh.read(count)
+        assert count == 2
+
+
 def test_legacy_vdif(tmpdir):
     """Create legacy header, ensuring it is not treated as EDV=0 (see #12)."""
     # legacy_mode, 1 sec, epoch 4, vdif v1, nchan=2, 507*8 bytes, bps=2, 'AA'
