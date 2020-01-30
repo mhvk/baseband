@@ -16,7 +16,7 @@ from astropy.time import Time
 __all__ = ['GUPPIHeader']
 
 
-ASTROPY_LT_3_2 = (astropy.version.major, astropy.version.minor) < (3, 2)
+ASTROPY_LT_3_2 = astropy.__version__[:3] < '3.2'
 
 
 class GUPPIHeader(fits.Header):
