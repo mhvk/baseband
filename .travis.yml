@@ -85,8 +85,8 @@ matrix:
 
         # Also regularly try the big-endian s390 architecture, in the
         # process checking that installing dependencies with apt works.
-        # stage: Cron tests
         - name: big-endian s390 architecture with apt
+          stage: Cron tests
           arch: s390
           language: c
           env: INSTALL_WITH_APT=True
