@@ -104,6 +104,10 @@ install:
         sudo apt-get install -y --no-install-recommends ${APT_DEPENDENCIES};
       fi
 
+    - if [[ $TOXENV == *-cov ]]; then
+        export TOXPOSARGS=$TOXPOSARGS" --cov-report=xml:"$TRAVIS_BUILD_DIR"/coverage.xml";
+      fi
+
 script:
     - if [[ $INSTALL_WITH_APT != True ]]; then
         tox $TOXARGS -- $TOXPOSARGS;
