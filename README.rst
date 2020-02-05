@@ -22,14 +22,24 @@ If you used this package in your research, please cite it via DOI
 Project Status
 --------------
 
+.. image:: https://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
+    :target: https://www.astropy.org/
+    :alt: Powered by Astropy Badge
+
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214268.svg
+   :target: https://doi.org/10.5281/zenodo.1214268
+   :alt: Zenodo link
+
 .. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master
    :target: https://travis-ci.org/mhvk/baseband
+   :alt: Test Status
 
-.. image:: https://coveralls.io/repos/github/mhvk/baseband/badge.svg
-   :target: https://coveralls.io/github/mhvk/baseband
+.. image:: https://codecov.io/gh/mhvk/baseband/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/mhvk/baseband
+   :alt: Coverage Level
 
 .. image:: https://readthedocs.org/projects/baseband/badge/?version=latest
-   :target: http://baseband.readthedocs.io/en/latest/?badge=latest
+   :target: https://baseband.readthedocs.io/en/latest/?badge=latest
    :alt: Documentation Status
 
 Contributing
