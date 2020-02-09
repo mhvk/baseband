@@ -34,6 +34,15 @@ if sys.byteorder == 'big':  # pragma: no cover
         return (((x & 0x55AA55AA55AA55AA))
                 | ((x & 0xAA00AA00AA00AA00) >> 9)
                 | ((x & 0x0055005500550055) << 9))
+
+    def reorder64_Ft(x):
+        """Reorder 64-track bits to bring signs & magnitudes together.
+
+        Special version for the Ft station, which has unusual settings.
+        """
+        return (((x & 0xFFFFAFFAFFFFAFFA))
+                | ((x & 0x0000000500000005) >> 6)
+                | ((x & 0x0000500000005000) << 6))
 else:
     def reorder32(x):
         """Reorder 32-track bits to bring signs & magnitudes together."""
@@ -48,6 +57,15 @@ else:
         return (((x & 0xAA55AA55AA55AA55))
                 | ((x & 0x5500550055005500) >> 7)
                 | ((x & 0x00AA00AA00AA00AA) << 7))
+
+    def reorder64_Ft(x):
+        """Reorder 64-track bits to bring signs & magnitudes together.
+
+        Special version for the Ft station, which has unusual settings.
+        """
+        return (((x & 0xFFFFFAAFFFFFFAAF))
+                | ((x & 0x0000050000000500) >> 4)
+                | ((x & 0x0000005000000050) << 4))
     # Check on 2015-JUL-12: C code: 738811025863578102 -> 738829572664316278
     # 118, 209, 53, 244, 148, 217, 64, 10
     # reorder64(np.array([738811025863578102], dtype=np.uint64))
