@@ -96,6 +96,7 @@ class GSBFileReader(VLBIFileBase):
     complex_data : bool, optional
         Whether data are complex.  Default: `False`.
     """
+
     def __init__(self, fh_raw, payload_nbytes, nchan=1, bps=4,
                  complex_data=False):
         self.payload_nbytes = payload_nbytes
@@ -167,18 +168,18 @@ class GSBStreamBase(VLBIStreamBase):
             if sample_rate is None:
                 payload_nbytes = 2**22 if rawdump else 2**23 // len(fh_raw[0])
             else:
-                payload_nbytes = int((sample_rate /
-                                      self.fh_ts.info.frame_rate)
+                payload_nbytes = int((sample_rate
+                                      / self.fh_ts.info.frame_rate)
                                      .to(u.one).round())
 
         if payload_nbytes is None:
-            payload_nbytes = (samples_per_frame * nchan *
-                              (2 if complex_data else 1) * bps // 8 //
-                              (1 if rawdump else len(fh_raw[0])))
+            payload_nbytes = (samples_per_frame * nchan
+                              * (2 if complex_data else 1) * bps
+                              // (8 * (1 if rawdump else len(fh_raw[0]))))
         elif samples_per_frame is None:
-            samples_per_frame = (payload_nbytes * 8 // bps *
-                                 (1 if rawdump else len(fh_raw[0])) //
-                                 (nchan * (2 if complex_data else 1)))
+            samples_per_frame = (payload_nbytes * 8 // bps
+                                 * (1 if rawdump else len(fh_raw[0]))
+                                 // (nchan * (2 if complex_data else 1)))
 
         # By default, GSB rawdump and phased frames span exactly 0.251658240 s.
         if sample_rate is None:
@@ -271,11 +272,10 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         Whether to do basic checks of frame integrity when reading.  The first
         frame of the stream is always checked.  Default: `True`.
     """
-    # TODO: right now cannot inherit from GSBFileReader, unlike for other
-    # baseband classes, since we need to access multiple files.  Can this
-    # be solved with FileWriter/FileReader classes that handle timestamps and
-    # multiple blocks, combining these into a frame?
-
+    # TODO: right we are not really compatible with VLBIStreamReaderBase,
+    # since we need to access multiple files.  Can this be solved with
+    # FileWriter/FileReader classes that handle timestamps and multiple blocks,
+    # combining these into a frame?
     def __init__(self, fh_ts, fh_raw, sample_rate=None, samples_per_frame=None,
                  payload_nbytes=None, nchan=None, bps=None, complex_data=None,
                  squeeze=True, subset=(), verify=True):
@@ -293,8 +293,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     def _last_header(self):
         """Last header of the timestamp file."""
         with self.fh_ts.temporary_offset() as fh_ts:
-            fh_ts.seek(0, 2)
-            fh_ts_len = fh_ts.tell()
+            fh_ts_len = fh_ts.seek(0, 2)
             if fh_ts_len == self.header0.nbytes:
                 # Only one line in file
                 return self.header0
@@ -310,8 +309,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         # If the last header is missing characters, use the header before it
         # (which may be the first header).
         try:
-            assert (len(" ".join(last_line_tuple)) >=
-                    len(" ".join(self.header0.words)))
+            assert (len(" ".join(last_line_tuple))
+                    >= len(" ".join(self.header0.words)))
             last_header = self.header0.__class__(last_line_tuple)
         except Exception:
             warnings.warn("The last header entry, '{0}', has an incorect "
@@ -327,6 +326,9 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         return self.info.readable
 
     def _read_frame(self, index):
+        # We simply overwrite the base implementation, since for GSB
+        # standard assumptions, like fh_raw being a single file, do
+        # not hold.
         self.fh_ts.seek(self.header0.seek_offset(index))
         if self.header0.mode == 'rawdump':
             self.fh_raw.seek(index * self._payload_nbytes)
@@ -334,15 +336,12 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
             for fh_pair in self.fh_raw:
                 for fh in fh_pair:
                     fh.seek(index * self._payload_nbytes)
-        frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
-                                  payload_nbytes=self._payload_nbytes,
-                                  nchan=self._unsliced_shape.nchan,
-                                  bps=self.bps, complex_data=self.complex_data,
-                                  verify=self.verify)
-        assert int(((frame.header.time - self.start_time) *
-                    self.sample_rate / self.samples_per_frame)
-                   .to(u.one).round()) == index
-        return frame
+
+        return GSBFrame.fromfile(self.fh_ts, self.fh_raw,
+                                 payload_nbytes=self._payload_nbytes,
+                                 nchan=self._unsliced_shape.nchan,
+                                 bps=self.bps, complex_data=self.complex_data,
+                                 verify=self.verify)
 
 
 class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
@@ -431,8 +430,8 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
                 seq_nr=(index + self.header0['seq_nr']),
                 mem_block=((self.header0['mem_block'] + index) % 8))
         else:
-            header = self.header0.fromvalues(time=self.start_time +
-                                             time_offset)
+            header = self.header0.fromvalues(time=self.start_time
+                                             + time_offset)
 
         return GSBFrame(header, self._payload, valid=True, verify=False)
 

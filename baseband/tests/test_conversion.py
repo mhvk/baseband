@@ -45,8 +45,8 @@ class TestVDIFMark5B:
             assert header.frame_nbytes == 10032
             assert header.nbytes == 32
             assert header.payload_nbytes == m5h.payload_nbytes
-            assert (header.samples_per_frame ==
-                    10000 * 8 // m5pl.bps // m5pl.sample_shape.nchan)
+            assert (header.samples_per_frame
+                    == 10000 * 8 // m5pl.bps // m5pl.sample_shape.nchan)
 
         # Check that we can handle > 512 Mbps sampling rate.
         header3 = vdif.VDIFHeader.from_mark5b_header(
@@ -72,8 +72,8 @@ class TestVDIFMark5B:
         with pytest.raises(ValueError):
             header_copy.time
         frame_rate = 32. * u.MHz / header.samples_per_frame
-        assert abs(header_copy.get_time(frame_rate=frame_rate) -
-                   m5h2.time) < 1.*u.ns
+        assert abs(header_copy.get_time(frame_rate=frame_rate)
+                   - m5h2.time) < 1.*u.ns
 
     def test_payload(self):
         """Check Mark 5B payloads can used in a Mark5B VDIF payload."""
@@ -242,6 +242,7 @@ class TestVDIF3ToMark5B:
 
 class TestVDIF0BPS1ToMark5B:
     """Real conversion: VDIF EDV 3, BPS 1 to Mark 5B."""
+
     def test_stream(self, tmpdir):
         with vdif.open(SAMPLE_BPS1_VDIF, 'rs', sample_rate=8*u.MHz) as fr:
             start_time = fr.start_time

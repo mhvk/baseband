@@ -6,9 +6,7 @@ from collections import namedtuple
 import pytest
 import numpy as np
 import astropy.units as u
-from astropy.tests.helper import catch_warnings
 
-from ..utils import bcd_encode, bcd_decode, CRC, gcd, lcm
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
 from ..frame import VLBIFrameBase
@@ -38,33 +36,6 @@ class Payload(VLBIPayloadBase):
                  8: encode_8bit}
     _decoders = {1: decode_1bit,
                  8: decode_8bit}
-
-
-class TestBCD:
-    def test_bcd_decode(self):
-        assert bcd_decode(0x1) == 1
-        assert bcd_decode(0x9123) == 9123
-        with pytest.raises(ValueError):
-            bcd_decode(0xf)
-        decoded = bcd_decode(np.array([0x1, 0x9123]))
-        assert isinstance(decoded, np.ndarray)
-        assert np.all(decoded == np.array([1, 9123]))
-        with pytest.raises(ValueError):
-            bcd_decode(np.array([0xf, 9123]))
-        with pytest.raises(TypeError):
-            bcd_decode([1, 2])
-
-    def test_bcd_encode(self):
-        assert bcd_encode(1) == 0x1
-        assert bcd_encode(9123) == 0x9123
-        with pytest.raises(TypeError):
-            bcd_encode('bla')
-
-    def test_roundtrip(self):
-        assert bcd_decode(bcd_encode(15)) == 15
-        assert bcd_decode(bcd_encode(8765)) == 8765
-        a = np.array([1, 9123])
-        assert np.all(bcd_decode(bcd_encode(a)) == a)
 
 
 class TestVLBIBase:
@@ -106,7 +77,7 @@ class TestVLBIBase:
         assert len(new.keys()) == 5
         with pytest.raises(TypeError):
             self.header_parser + {'x4_0_32': (4, 0, 32)}
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             self.header_parser.copy().update(('x4_0_32', (4, 0, 32)))
 
     def test_header_basics(self):
@@ -146,8 +117,8 @@ class TestVLBIBase:
         assert self.header['x0_16_4'] == 4
         assert self.header['x0_31_1'] is False
         assert self.header['x1_0_32'] == self.header.words[1]
-        assert (self.header['x2_0_64'] ==
-                self.header.words[2] + self.header.words[3] * (1 << 32))
+        assert (self.header['x2_0_64']
+                == self.header.words[2] + self.header.words[3] * (1 << 32))
         assert 'x0_31_1' in self.header
         assert 'bla' not in self.header
         with pytest.raises(KeyError):
@@ -161,25 +132,35 @@ class TestVLBIBase:
 
     def test_make_setter(self):
         header = self.header.copy()
-        header['x0_16_4'] = 0xf
+        header['x0_16_4'] = 0xe
+        assert header.words[0] == 0x123e5678
+        header['x0_16_4'] = 0
+        assert header.words[0] == 0x12305678
+        header['x0_16_4'] = True  # Special value: fill all bits
         assert header.words[0] == 0x123f5678
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError,
+                           match='cannot be represented with 4 bits'):
             header['x0_16_4'] = 0x10
+        with pytest.raises(ValueError, match='no default value'):
+            header['x0_16_4'] = None
+
         header['x0_31_1'] = True
         assert header.words[0] == 0x923f5678
         header['x1_0_32'] = 0x1234
         assert header.words[:2] == [0x923f5678, 0x1234]
         header['x2_0_64'] = 1
         assert header.words[2:] == [1, 0]
-        header['x2_0_64'] = None
+        header['x2_0_64'] = True  # fill all bits
+        assert header.words[2:] == [0xffffffff, 0xffffffff]
+        header['x2_0_64'] = None  # set to default
         assert header.words[2:] == [0, 1]
         # Also check update method.
         header.update(x1_0_32=0x5678, x2_0_64=1)
         assert header.words == [0x923f5678, 0x5678, 1, 0]
-        with catch_warnings(UserWarning) as w:
+        with pytest.warns(UserWarning, match='unused.*bla'):
             header.update(bla=10)
-        assert 'unused' in str(w[0].message)
-        assert 'bla' in str(w[0].message)
+        with pytest.raises(ValueError, match='cannot be represented'):
+            header.update(x0_16_4=-1)
 
     def test_header_parser_class(self):
         header_parser = self.header_parser
@@ -201,6 +182,74 @@ class TestVLBIBase:
         with pytest.raises(Exception):
             self.HeaderParser((('0_2_64', (0, 2, 64, 4)),))
 
+    def test_header_without_invariants(self):
+        # More elaborate tests implicitly done in locate_frames.
+        assert self.Header.invariants() == set()
+        assert self.header.invariants() == set()
+        with pytest.raises(ValueError):
+            self.header.invariant_pattern()
+        with pytest.raises(ValueError):
+            self.Header.invariant_pattern()
+
+        # But we can construct one by passing on the invariants ourselves,
+        # if those have defaults.
+        pattern, mask = self.Header.invariant_pattern({'x0_31_1'})
+        assert pattern == [0, 0, 0, 0]
+        assert mask == [0x80000000, 0, 0, 0]
+        # If there is no default, we cannot use a key on the class.
+        with pytest.raises(ValueError):
+            self.Header.invariant_pattern({'x1_0_32'})
+        # But we can on the instance.
+        pattern, mask = self.header.invariant_pattern({'x1_0_32'})
+        assert pattern == self.header.words
+        assert mask == [0, 0xffffffff, 0, 0]
+
+    def test_header_with_implicit_invariants(self):
+        class SyncHeader(self.Header):
+            _header_parser = self.Header._header_parser + HeaderParser(
+                (('sync_pattern', (1, 0, 32, 0x12345678)),))
+
+        assert SyncHeader.invariants() == {'sync_pattern'}
+        pattern, mask = SyncHeader.invariant_pattern()
+        assert pattern == [0, 0x12345678, 0, 0]
+        assert mask == [0, 0xffffffff, 0, 0]
+        sync_header = SyncHeader.fromvalues(x2_0_64=10)
+        assert sync_header.invariants() == {'sync_pattern'}
+        pattern, mask = sync_header.invariant_pattern()
+        assert pattern == [0, 0x12345678, 10, 0]
+        assert mask == [0x00000000, 0xffffffff, 0, 0]
+        pattern, mask = sync_header.invariant_pattern({'x0_16_4',
+                                                       'sync_pattern'})
+        assert pattern == [0, 0x12345678, 10, 0]
+        assert mask == [0xf0000, 0xffffffff, 0, 0]
+        # If given keys have no default, the class version should fail.
+        with pytest.raises(ValueError):
+            SyncHeader.invariant_pattern({'x0_16_4', 'sync_pattern'})
+
+    def test_header_with_explicit_invariants(self):
+        class SyncHeader(self.Header):
+            _header_parser = self.Header._header_parser + HeaderParser(
+                (('sync_pattern', (1, 0, 32, 0x12345678)),))
+            _invariants = {'sync_pattern'}
+            _stream_invariants = _invariants | {'x0_31_1'}
+
+        assert SyncHeader.invariants() == {'sync_pattern'}
+        pattern, mask = SyncHeader.invariant_pattern()
+        assert pattern == [0, 0x12345678, 0, 0]
+        assert mask == [0, 0xffffffff, 0, 0]
+        sync_header = SyncHeader.fromvalues(x2_0_64=10)
+        assert sync_header.invariants() == {'sync_pattern', 'x0_31_1'}
+        pattern, mask = sync_header.invariant_pattern()
+        assert pattern == [0, 0x12345678, 10, 0]
+        assert mask == [0x80000000, 0xffffffff, 0, 0]
+        pattern, mask = sync_header.invariant_pattern({'x0_16_4',
+                                                       'sync_pattern'})
+        assert pattern == [0, 0x12345678, 10, 0]
+        assert mask == [0xf0000, 0xffffffff, 0, 0]
+        # If given keys have no default, the class version should fail.
+        with pytest.raises(ValueError):
+            SyncHeader.invariant_pattern({'x0_16_4', 'sync_pattern'})
+
     def test_payload_basics(self):
         assert self.payload.complex_data is False
         assert self.payload.sample_shape == (2,)
@@ -209,29 +258,30 @@ class TestVLBIBase:
         assert self.payload.shape == (4, 2)
         assert self.payload.size == 8
         assert self.payload.ndim == 2
-        assert np.all(self.payload.data.ravel() ==
-                      self.payload.words.view(np.int8))
-        assert np.all(np.array(self.payload).ravel() ==
-                      self.payload.words.view(np.int8))
-        assert np.all(np.array(self.payload, dtype=np.int8).ravel() ==
-                      self.payload.words.view(np.int8))
+        assert np.all(self.payload.data.ravel()
+                      == self.payload.words.view(np.int8))
+        assert np.all(np.array(self.payload).ravel()
+                      == self.payload.words.view(np.int8))
+        assert np.all(np.array(self.payload, dtype=np.int8).ravel()
+                      == self.payload.words.view(np.int8))
         payload = self.Payload(self.payload.words, bps=4)
         with pytest.raises(KeyError):
             payload.data
         with pytest.raises(ValueError):
             self.Payload(self.payload.words.astype('>u4'), bps=4)
         payload = self.Payload(self.payload.words, bps=8, complex_data=True)
-        assert np.all(payload.data ==
-                      self.payload.data[:, 0] + 1j * self.payload.data[:, 1])
+        assert np.all(payload.data
+                      == (self.payload.data[:, 0]
+                          + 1j * self.payload.data[:, 1]))
 
         assert self.payload1bit.complex_data is True
         assert self.payload1bit.sample_shape == (5,)
         assert self.payload1bit.bps == 1
         assert self.payload1bit.shape == (16, 5)
         assert self.payload1bit.nbytes == 20
-        assert np.all(self.payload1bit.data.ravel() ==
-                      np.unpackbits(self.payload1bit.words.view(np.uint8))
-                      .astype(np.float32).view(np.complex64))
+        assert np.all(self.payload1bit.data.ravel()
+                      == (np.unpackbits(self.payload1bit.words.view(np.uint8))
+                          .astype(np.float32).view(np.complex64)))
 
     @pytest.mark.parametrize('item', (2, slice(1, 3), (), slice(2, None),
                                       (2, 1), (slice(None), 0),
@@ -248,8 +298,8 @@ class TestVLBIBase:
         check[item] = 1 - sel_data
         assert np.all(payload[item] == 1 - sel_data)
         assert np.all(payload.data == check)
-        assert np.all(payload[:] ==
-                      payload.words.view(np.int8).reshape(-1, 2))
+        assert np.all(payload[:]
+                      == payload.words.view(np.int8).reshape(-1, 2))
         assert payload != self.payload
         payload[item] = sel_data
         assert np.all(payload[item] == sel_data)
@@ -367,8 +417,8 @@ class TestVLBIBase:
         assert self.frame.ndim == self.payload.ndim
         assert np.all(self.frame.data == self.payload.data)
         assert np.all(np.array(self.frame) == np.array(self.payload))
-        assert np.all(np.array(self.frame, dtype=np.float64) ==
-                      np.array(self.payload))
+        assert np.all(np.array(self.frame, dtype=np.float64)
+                      == np.array(self.payload))
         assert self.frame.valid is True
         frame = self.Frame(self.header, self.payload, valid=False)
         assert np.all(frame.data == 0.)
@@ -492,10 +542,10 @@ class TestSqueezeAndSubset:
         sr = self.make_reader_with_shape(squeeze=True)
         assert sr.sample_shape == self.squeezed_shape
         assert sr.sample_shape._fields == self.squeezed_fields
-        assert (sr._squeeze_and_subset(self.unsliced_data).shape ==
-                self.squeezed_data.shape)
-        assert (sr._squeeze_and_subset(self.unsliced_data[:1]).shape ==
-                (1,) + self.squeezed_shape)
+        assert (sr._squeeze_and_subset(self.unsliced_data).shape
+                == self.squeezed_data.shape)
+        assert (sr._squeeze_and_subset(self.unsliced_data[:1]).shape
+                == (1,) + self.squeezed_shape)
 
         # With VLBIStreamWriterBase, we can access _unsqueeze.
         sw = self.make_writer_with_shape(squeeze=False)
@@ -505,10 +555,10 @@ class TestSqueezeAndSubset:
         sw = self.make_writer_with_shape(squeeze=True)
         assert sw.sample_shape == self.squeezed_shape
         assert sw.sample_shape._fields == self.squeezed_fields
-        assert (sw._unsqueeze(self.squeezed_data).shape ==
-                self.unsliced_data.shape)
-        assert (sw._unsqueeze(self.squeezed_data[:1]).shape ==
-                (1,) + self.unsliced_shape)
+        assert (sw._unsqueeze(self.squeezed_data).shape
+                == self.unsliced_data.shape)
+        assert (sw._unsqueeze(self.squeezed_data[:1]).shape
+                == (1,) + self.unsliced_shape)
 
         # Check that single-axis sample shape squeezes to ().
         sample_shape_maker_s = namedtuple('SampleShape', 'n0')
@@ -578,45 +628,3 @@ class TestSqueezeAndSubset:
         # Slice is out of bounds of 3rd dimension.
         with pytest.raises(AssertionError) as excinfo:
             self.make_reader_with_shape(subset=(3, 0, slice(4, 8)))
-
-
-def test_crc():
-    # Test example from age 4 of
-    # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
-    stream = '0000 002D 0330 0000' + 'FFFF FFFF' + '4053 2143 3805 5'
-    crc_expected = '284'
-    crc12 = CRC(0x180f)
-    stream = stream.replace(' ', '').lower()
-    istream = int(stream, base=16)
-    assert '{:037x}'.format(istream) == stream
-    bitstream = np.array([((istream & (1 << bit)) != 0)
-                          for bit in range(37*4-1, -1, -1)], np.bool)
-    crcstream = crc12(bitstream)
-    crc = np.bitwise_or.reduce(crcstream.astype(np.uint32) <<
-                               np.arange(11, -1, -1))
-    assert '{:03x}'.format(crc) == crc_expected
-    fullstream = np.hstack((bitstream, crcstream))
-    assert crc12.check(fullstream)
-
-
-# PY2
-@pytest.mark.parametrize(
-    ('a', 'b', 'gcd_out'),
-    ((7, 14, 7),
-     (2712341, 234243, 1),
-     (0, 5, 5),
-     (4, -12, 4),
-     (-4, -12, 4)))
-def test_gcd(a, b, gcd_out):
-    assert gcd(a, b) == gcd_out
-
-
-@pytest.mark.parametrize(
-    ('a', 'b', 'lcm_out'),
-    ((7, 14, 14),
-     (7853, 6199, 48680747),
-     (0, 5, 0),
-     (4, -12, 12),
-     (-4, -12, 12)))
-def test_lcm(a, b, lcm_out):
-    assert lcm(a, b) == lcm_out

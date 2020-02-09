@@ -1,20 +1,30 @@
 # Licensed under the GPLv3 - see LICENSE
 import io
 import warnings
-import numpy as np
 import operator
 from collections import namedtuple
 from contextlib import contextmanager
 
+import numpy as np
+from numpy.lib.stride_tricks import as_strided
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from ..helpers import sequentialfile as sf
+from .offsets import RawOffsets
+from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from .utils import byte_array
 
 
-__all__ = ['VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
-           'VLBIStreamReaderBase', 'VLBIStreamWriterBase', 'make_opener']
+__all__ = ['HeaderNotFoundError',
+           'VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
+           'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
+           'make_opener']
+
+
+class HeaderNotFoundError(LookupError):
+    """Error in finding a header in a stream."""
+    pass
 
 
 class VLBIFileBase:
@@ -92,6 +102,188 @@ class VLBIFileReaderBase(VLBIFileBase):
 
     info = VLBIFileReaderInfo()
 
+    def locate_frames(self, pattern, *, mask=None, frame_nbytes=None,
+                      offset=0, forward=True, maximum=None, check=1):
+        """Use a pattern to locate frame starts near the current position.
+
+        Note that the current position is always included.
+
+        Parameters
+        ----------
+        pattern : header, ~numpy.ndaray, bytes, int, or iterable of int
+            Synchronization pattern to look for.  If a header or header class,
+            :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariant_pattern`
+            is used to create a masked pattern, using invariant keys from
+            :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariants`.
+            If an `~numpy.ndarray` or `bytes` instance, a byte array view is
+            taken. If an (iterable of) int, the integers need to be unsigned
+            32 bit and will be interpreted as little-endian.
+        mask : ~numpy.ndarray, bytes, int, or iterable of int.
+            Bit mask for the pattern, with 1 indicating a given bit will
+            be used the comparison.
+        frame_nbytes : int, optional
+            Frame size in bytes.  Defaults to the frame size in any header
+            passed in.
+        offset : int, optional
+            Offset from the frame start that the pattern occurs.  Any
+            offsets inferred from masked entries are added to this (hence,
+            no offset needed when a header is passed in as ``pattern``).
+        forward : bool, optional
+            Seek forward if `True` (default), backward if `False`.
+        maximum : int, optional
+            Maximum number of bytes to search away from the present location.
+            Default: search twice the frame size if given, otherwise 1 million
+            (extra bytes to avoid partial patterns will be added).
+            Use 0 to check only at the current position.
+        check : int or tuple of int, optional
+            Frame offsets where another sync pattern should be present
+            (if inside the file). Ignored if ``frame_nbytes`` is not given.
+            Default: 1, i.e., a sync pattern should be present one
+            frame after the one found (independent of ``forward``),
+            thus helping to guarantee the frame is not corrupted.
+
+        Returns
+        -------
+        locations : list of int
+            Locations of sync patterns within the range scanned,
+            in order of proximity to the starting position.
+        """
+        if hasattr(pattern, 'invariant_pattern'):
+            if frame_nbytes is None:
+                frame_nbytes = pattern.frame_nbytes
+            pattern, mask = pattern.invariant_pattern()
+
+        pattern = byte_array(pattern)
+
+        if mask is not None:
+            mask = byte_array(mask)
+            useful = np.nonzero(mask)[0]
+            useful_slice = slice(useful[0], useful[-1]+1)
+            mask = mask[useful_slice]
+            pattern = pattern[useful_slice]
+            offset += useful_slice.start
+
+        if maximum is None:
+            maximum = (2 * frame_nbytes if frame_nbytes else 1000000) - 1
+
+        if check is None or frame_nbytes is None:
+            check = np.array([], dtype=int)
+            check_min = check_max = 0
+        else:
+            check = np.atleast_1d(check) * frame_nbytes
+            # For Numpy >=1.15, can just be check.min(initial=0) in the
+            # calculation of start, stop below.
+            check_min = min(check.min(), 0)
+            check_max = max(check.max(), 0)
+
+        if frame_nbytes is None:
+            # If not set, we just let it stand in for the extra bytes
+            # that should be read to ensure we can even see a pattern.
+            frame_nbytes = offset + pattern.size
+
+        with self.temporary_offset() as fh:
+            # Calculate the fiducial start of the region we are looking in.
+            if forward:
+                seek_start = fh.tell()
+            else:
+                seek_start = fh.tell() - maximum
+            # Determine what part of the file to read, including the extra
+            # bits for doing the checking.  Note that we ensure not to start
+            # before the start of the file, but we do not check for ending
+            # after the end of the file, as we want to avoid a possibly
+            # expensive seek (e.g., if the file is a SequentialFile of a lot
+            # of individual files).  We rely instead on reading fewer bytes
+            # than requested if we are close to the end.
+            start = max(seek_start + offset + check_min, 0)
+            stop = max(seek_start + maximum + 1 + check_max + frame_nbytes,
+                       start)
+
+            fh.seek(start)
+            data = fh.read(stop-start)
+
+        # Since we may have hit the end of the file, check what the actual
+        # stop position was (needed at end).
+        stop = start + len(data)
+        # We normally have read more than really needed (to check for EOF);
+        # select what we actually want and convert to an array of bytes.
+        size = min(maximum + 1 + check_max - check_min,
+                   stop - start - pattern.size)
+        if size <= 0:
+            return []
+        data = np.frombuffer(data, dtype='u1', count=size+pattern.size)
+
+        # We match in two steps, first matching just the first pattern byte,
+        # and then matching the rest in one step using a strided array.
+        # The hope is that this gives a good compromise in speed: not
+        # iterate in python for each pattern byte, yet not doing pattern
+        # size times more comparisons than needed in C.
+        if mask is None:
+            match = data[:-pattern.size] == pattern[0]
+        else:
+            match = ((data[:-pattern.size] ^ pattern[0]) & mask[0]) == 0
+        matches = np.nonzero(match)[0]
+        # Re-stride data so that it looks like each element is followed by
+        # all others, and check those all in one go.
+        strided = as_strided(data[1:], strides=(1, 1),
+                             shape=(size, pattern.size-1))
+        if mask is None:
+            match = strided[matches] == pattern[1:]
+        else:
+            match = ((strided[matches] ^ pattern[1:]) & mask[1:]) == 0
+        matches = matches[match.all(-1)]
+
+        if not forward:
+            # Order by proximity to the file position.
+            matches = matches[::-1]
+
+        # Convert matches to a list of actual file positions.
+        matches += start - offset
+        matches = matches.tolist()
+        # Keep only matches for which
+        # (1) the location is in the requested range of current +/- maximum,
+        # (2) the associated frames completely fit in the file, and
+        # (3) the pattern is also present at the requested check points.
+        # The range in positions actually wanted. Here, we guarantee not
+        # only (1) but also (2) by using the recalculated `stop` from above,
+        # which is limited by the file size.
+        loc_start = max(seek_start, 0)
+        loc_stop = min(seek_start+maximum+1, stop-frame_nbytes+1)
+        # And the range in which it was possible to check positions.
+        check_start = start
+        check_stop = stop-offset-pattern.size
+        locations = [loc for loc in matches
+                     if (loc_start <= loc < loc_stop
+                         and all(c in matches for c in loc+check
+                                 if check_start <= c < check_stop))]
+
+        return locations
+
+    def find_header(self, *args, **kwargs):
+        """Find the nearest header from the current position.
+
+        If successful, the file pointer is left at the start of the header.
+
+        Parameters are as for ``locate_frames``.
+
+        Returns
+        -------
+        header
+            Retrieved header.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no header could be located.
+        AssertionError
+            If the header did not pass verification.
+        """
+        locations = self.locate_frames(*args, **kwargs)
+        if not locations:
+            raise HeaderNotFoundError('could not locate a a nearby frame.')
+        self.seek(locations[0])
+        with self.temporary_offset():
+            return self.read_header()
+
     def get_frame_rate(self):
         """Determine the number of frames per second.
 
@@ -139,6 +331,7 @@ class VLBIStreamBase:
         self._complex_data = complex_data
         self.samples_per_frame = samples_per_frame
         self.sample_rate = sample_rate
+        self._frame_rate = (sample_rate / samples_per_frame).to(u.Hz)
         self.offset = 0
         self._fill_value = fill_value
 
@@ -201,6 +394,12 @@ class VLBIStreamBase:
         # Subclasses can override this if information is needed beyond that
         # provided in the header.
         return header.time
+
+    def _set_time(self, header, time):
+        """Set time in a header."""
+        # Subclasses can override this if information is needed beyond that
+        # provided in the header.
+        header.time = time
 
     @lazyproperty
     def start_time(self):
@@ -268,7 +467,7 @@ class VLBIStreamBase:
 
     @verify.setter
     def verify(self, verify):
-        self._verify = bool(verify)
+        self._verify = bool(verify) if verify != 'fix' else verify
 
     def tell(self, unit=None):
         """Current offset in the file.
@@ -331,8 +530,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         if sample_rate is None:
             try:
-                sample_rate = (samples_per_frame *
-                               fh_raw.get_frame_rate()).to(u.MHz)
+                sample_rate = (samples_per_frame
+                               * fh_raw.get_frame_rate()).to(u.MHz)
 
             except Exception as exc:
                 exc.args += ("the sample rate could not be auto-detected. "
@@ -346,6 +545,9 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
             bps, complex_data, squeeze, subset, fill_value, verify)
 
+        if hasattr(header0, 'frame_nbytes'):
+            self._raw_offsets = RawOffsets(frame_nbytes=header0.frame_nbytes)
+
     info = VLBIStreamReaderInfo()
 
     def _squeeze_and_subset(self, data):
@@ -354,8 +556,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         The first dimension (sample number) is never removed.
         """
         if self.squeeze:
-            data = data.reshape(data.shape[:1] +
-                                tuple(sh for sh in data.shape[1:] if sh > 1))
+            data = data.reshape(data.shape[:1]
+                                + tuple(sh for sh in data.shape[1:] if sh > 1))
         if self.subset:
             data = data[(slice(None),) + self.subset]
 
@@ -390,16 +592,16 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         # We got the shape.  We only bother trying to associate names with the
         # dimensions when we know for sure what happened in the subsetting.
         subset_shape = dummy_subset.shape[1:]
-        if (not hasattr(sample_shape, '_fields') or subset_shape == () or
-                len(self.subset) > len(sample_shape)):
+        if (not hasattr(sample_shape, '_fields') or subset_shape == ()
+                or len(self.subset) > len(sample_shape)):
             return subset_shape
 
         # We can only associate names when indexing each dimension separately
         # gives a consistent result with the complete subset.
         subset_axis = 0
         fields = []
-        subset = self.subset + (slice(None),) * (len(sample_shape) -
-                                                 len(self.subset))
+        subset = self.subset + (slice(None),) * (len(sample_shape)
+                                                 - len(self.subset))
         try:
             for field, sample_dim, item in zip(sample_shape._fields,
                                                sample_shape, subset):
@@ -424,11 +626,13 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """Last header of the file."""
         with self.fh_raw.temporary_offset() as fh_raw:
             fh_raw.seek(-self.header0.frame_nbytes, 2)
-            last_header = fh_raw.find_header(forward=False)
-        if last_header is None:
-            raise ValueError("corrupt VLBI frame? No frame in last {0} bytes."
-                             .format(10 * self.header0.frame_nbytes))
-        return last_header
+            try:
+                return fh_raw.find_header(self.header0, forward=False,
+                                          check=(-1, 1))
+            except HeaderNotFoundError as exc:
+                exc.args += ("corrupt VLBI frame? No frame in last {0} bytes."
+                             .format(2 * self.header0.frame_nbytes),)
+                raise
 
     # Override the following so we can refer to stop_time in the docstring.
     @property
@@ -456,14 +660,14 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         See also `start_time` for the start time of the file, and `time` for
         the time of the sample pointer's current offset.
         """
-        return (self._get_time(self._last_header) +
-                (self.samples_per_frame / self.sample_rate).to(u.s))
+        return (self._get_time(self._last_header)
+                + (self.samples_per_frame / self.sample_rate).to(u.s))
 
     @lazyproperty
     def _nsample(self):
         """Number of complete samples in the stream data."""
-        return int(((self.stop_time - self.start_time) *
-                    self.sample_rate).to(u.one).round())
+        return int(((self.stop_time - self.start_time)
+                    * self.sample_rate).to(u.one).round())
 
     @property
     def shape(self):
@@ -571,21 +775,23 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             out = np.empty((count,) + self.sample_shape, dtype=self.dtype)
         else:
             assert out.shape[1:] == self.sample_shape, (
-                "'out' should have trailing shape {}".format(self.sample_shape))
+                "'out' must have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
 
         offset0 = self.offset
         sample = 0
-        while count > 0:
+        while sample < count:
             # For current position, get frame plus offset in that frame.
             frame_index, sample_offset = divmod(self.offset,
                                                 self.samples_per_frame)
             if frame_index != self._frame_index:
                 self._frame = self._read_frame(frame_index)
+                self._frame.fill_value = self.fill_value
                 self._frame_index = frame_index
 
             frame = self._frame
-            nsample = min(count, len(frame) - sample_offset)
+
+            nsample = min(count - sample, len(frame) - sample_offset)
             data = frame[sample_offset:sample_offset + nsample]
             data = self._squeeze_and_subset(data)
             # Copy to relevant part of output.
@@ -593,9 +799,162 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             sample += nsample
             # Explicitly set offset (just in case read_frame adjusts it too).
             self.offset = offset0 + sample
-            count -= nsample
 
         return out
+
+    _next_index = None
+
+    def _read_frame(self, index):
+        """Base implementation of reading a frame.
+
+        This contains two pieces which subclasses can override as needed
+        (or override the whole thing).
+        """
+        self._seek_frame(index)
+        if not self.verify:
+            return self._fh_raw_read_frame()
+
+        # If we are reading with care, we read also a frame ahead
+        # to make sure that is not corrupted.  If such a frame has
+        # been kept, we use it now.  Otherwise, we read a new frame.
+        # We always remove the cached copy, since we cannot be sure
+        # it is even the right number.
+        if index == self._next_index:
+            frame = self._next_frame
+            frame_index = index
+            self.fh_raw.seek(frame.nbytes, 1)
+            self._next_index = self._next_frame = None
+
+        else:
+            self._next_index = self._next_frame = None
+            try:
+                frame = self._fh_raw_read_frame()
+                frame_index = self._tell_frame(frame)
+            except Exception as exc:
+                return self._bad_frame(index, None, exc)
+
+        # Check whether we actually got the right frame.
+        if frame_index != index:
+            return self._bad_frame(index, frame,
+                                   ValueError('wrong frame number.'))
+
+        # In either case, we check the next frame (if there is one).
+        try:
+            with self.fh_raw.temporary_offset():
+                self._next_frame = self._fh_raw_read_frame()
+                self._next_index = self._tell_frame(self._next_frame)
+        except Exception as exc:
+            return self._bad_frame(index, frame, exc)
+
+        return frame
+
+    def _bad_frame(self, index, frame, exc):
+        """Deal with a bad frame.
+
+        Parameters
+        ----------
+        index : int
+            Frame index that is to be read.
+        frame : `~baseband.vlbi_base.frame.VLBIFrameBase` or None
+            Frame that was read without failure.  If not `None`, either
+            the frame index is wrong or the next frame could not be read.
+        exc : Exception
+            Exception that led to the call.
+        """
+        if (frame is not None and self._tell_frame(frame) == index
+                and index == self._tell_frame(self._last_header)):
+            # If we got an exception because we're trying to read beyond the
+            # last frame, the frame is almost certainly OK, so keep it.
+            return frame
+
+        if self.verify != 'fix':
+            raise exc
+
+        msg = 'problem loading frame {}.'.format(index)
+
+        # Where should we be?
+        raw_offset = self._seek_frame(index)
+        # See if we're in the right place.  First ensure we have a header.
+        # Here, it is more important that it is a good one than that we go
+        # too far, so we insist on two consistent frames after it.  We
+        # increase the maximum a bit to be able to jump over bad bits.
+        self.fh_raw.seek(raw_offset)
+        try:
+            header = self.fh_raw.find_header(
+                self.header0, forward=True, check=(1, 2),
+                maximum=3*self.header0.frame_nbytes)
+        except HeaderNotFoundError:
+            exc.args += (msg + ' Cannot find header nearby.',)
+            raise exc
+
+        # Don't yet know how to deal with excess data.
+        header_index = self._tell_frame(header)
+        if header_index < index:
+            exc.args += (msg + ' There appears to be excess data.')
+            raise exc
+
+        # Go backward until we find previous frame, storing offsets
+        # as we go.  We again increase the maximum since we may need
+        # to jump over a bad bit.
+        while header_index >= index:
+            raw_pos = self.fh_raw.tell()
+            header1 = header
+            header1_index = header_index
+            self.fh_raw.seek(-1, 1)
+            try:
+                header = self.fh_raw.find_header(
+                    self.header0, forward=False,
+                    maximum=4*self.header0.frame_nbytes)
+            except HeaderNotFoundError:
+                exc.args += (msg + ' Could not find previous index.',)
+                raise exc
+
+            header_index = self._tell_frame(header)
+            # While we are at it, update the list of known indices.
+            self._raw_offsets[header1_index] = raw_pos
+
+        # Move back to position of last good header (header1).
+        self.fh_raw.seek(raw_pos)
+
+        if header1_index > index:
+            # Frame is missing!
+            msg += ' The frame seems to be missing.'
+            # Construct a missing frame.
+            header = header1.copy()
+            self._set_time(header, self.time)
+            frame = self._frame.__class__(header, self._frame.payload,
+                                          valid=False)
+
+        else:
+            assert header1_index == index, \
+                'at this point, we should have a good header.'
+            if raw_pos != raw_offset:
+                msg += ' Stream off by {0} bytes.'.format(raw_offset
+                                                          - raw_pos)
+                # Above, we should have added information about
+                # this index in our offset table.
+                assert index in self._raw_offsets.frame_nr
+
+            # At this point, reading the frame should always work,
+            # and we know there is a header right after it.
+            frame = self._fh_raw_read_frame()
+            assert self._tell_frame(frame) == index
+
+        warnings.warn(msg)
+        return frame
+
+    def _seek_frame(self, index):
+        """Move the underlying file pointer to the frame of the given index."""
+        return self.fh_raw.seek(self._raw_offsets[index])
+
+    def _fh_raw_read_frame(self):
+        """Read a frame at the current position of the underlying file."""
+        return self.fh_raw.read_frame(verify=self.verify)
+
+    def _tell_frame(self, frame):
+        """Get the index of the frame relative to the first frame."""
+        dt = self._get_time(frame) - self.start_time
+        return int(round((dt * self._frame_rate).to_value(u.one)))
 
 
 class VLBIStreamWriterBase(VLBIStreamBase):
@@ -639,7 +998,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         count = data.shape[0]
         offset0 = self.offset
         sample = 0
-        while count > 0:
+        while sample < count:
             frame_index, sample_offset = divmod(self.offset,
                                                 self.samples_per_frame)
             if frame_index != self._frame_index:
@@ -649,7 +1008,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             else:
                 self._valid &= valid
 
-            nsample = min(count, len(self._frame) - sample_offset)
+            nsample = min(count - sample, len(self._frame) - sample_offset)
             sample_end = sample_offset + nsample
             self._frame[sample_offset:sample_end] = data[sample:
                                                          sample + nsample]
@@ -663,7 +1022,6 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             sample += nsample
             # Explicitly set offset (just in case write_frame adjusts it too).
             self.offset = offset0 + sample
-            count -= nsample
 
     def _write_frame(self, frame, valid=True):
         # Default implementation is to assume this is a frame that can write
@@ -676,8 +1034,8 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         if extra != 0:
             warnings.warn("closing with partial buffer remaining.  "
                           "Writing padded frame, marked as invalid.")
-            self.write(np.zeros((self.samples_per_frame - extra,) +
-                                self.sample_shape), valid=False)
+            self.write(np.zeros((self.samples_per_frame - extra,)
+                                + self.sample_shape), valid=False)
             assert self.offset % self.samples_per_frame == 0
         return super().close()
 
@@ -726,8 +1084,8 @@ def make_opener(fmt, classes, doc='', append_doc=True):
     def open(name, mode='rs', **kwargs):
         # If sequentialfile object, check that it's opened properly.
         if isinstance(name, sf.SequentialFileBase):
-            assert (('r' in mode and name.mode == 'rb') or
-                    ('w' in mode and name.mode == 'w+b')), (
+            assert (('r' in mode and name.mode == 'rb')
+                    or ('w' in mode and name.mode == 'w+b')), (
                         "open only accepts sequential files opened in 'rb' "
                         "mode for reading or 'w+b' mode for writing.")
 

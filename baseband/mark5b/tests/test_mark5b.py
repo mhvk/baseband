@@ -3,10 +3,10 @@ import pytest
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from astropy.tests.helper import catch_warnings
 
 from ... import mark5b
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
+from ...vlbi_base.base import HeaderNotFoundError
 from ...data import SAMPLE_MARK5B as SAMPLE_FILE
 
 
@@ -65,8 +65,8 @@ class TestMark5B:
         assert header.payload_nbytes == 10000
         assert header.frame_nbytes == 10016
         assert header['frame_nr'] == 0
-        assert abs(header.time -
-                   Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
+        assert abs(header.time
+                   - Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             header.tofile(s)
             s.seek(0)
@@ -91,7 +91,7 @@ class TestMark5B:
         # Check payload and frame size setters.
         header6 = mark5b.Mark5BHeader(header.words, kday=56000)
         header6.time == header.time
-        header6.payload = 10000
+        header6.payload_nbytes = 10000
         header6.frame_nbytes = 10016
         with pytest.raises(ValueError):
             header6.payload_nbytes = 9999
@@ -141,9 +141,9 @@ class TestMark5B:
         # the documentation is rather unclear.
         assert np.all(mark5b.payload.lut1bit[0] == 1.)
         assert np.all(mark5b.payload.lut1bit[0xff] == -1.)
-        assert np.all(mark5b.payload.lut1bit.astype(int) ==
-                      (1 - 2 * ((np.arange(256)[:, np.newaxis] >>
-                                 np.arange(8)) & 1)))
+        assert np.all(mark5b.payload.lut1bit.astype(int)
+                      == (1 - 2 * ((np.arange(256)[:, np.newaxis]
+                                    >> np.arange(8)) & 1)))
         assert np.all(mark5b.payload.lut2bit[0] == -o2h)
         assert np.all(mark5b.payload.lut2bit[0x55] == 1.)
         assert np.all(mark5b.payload.lut2bit[0xaa] == -1.)
@@ -162,10 +162,10 @@ class TestMark5B:
         assert payload.sample_shape == (8,)
         assert payload.sample_shape.nchan == 8
         assert payload.dtype == np.float32
-        assert np.all(payload[:3].astype(int) ==
-                      np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
-                                [-3, +3, -1, +3, -1, -1, -1, +1],
-                                [+3, -1, +3, +3, +1, -1, +3, -1]]))
+        assert np.all(payload[:3].astype(int)
+                      == np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
+                                   [-3, +3, -1, +3, -1, -1, -1, +1],
+                                   [+3, -1, +3, +3, +1, -1, +3, -1]]))
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             payload.tofile(s)
             s.seek(0)
@@ -231,9 +231,11 @@ class TestMark5B:
             header = fh.read_header()
             start_time = header.time
             frame_rate = fh.get_frame_rate()
+            number_of_frames = fh.seek(0, 2) // header.frame_nbytes
             info = fh.info
 
         expected = {'format': 'mark5b',
+                    'number_of_frames': number_of_frames,
                     'frame_rate': frame_rate,
                     'sample_rate': 32 * u.MHz,
                     'samples_per_frame': 5000,
@@ -241,7 +243,8 @@ class TestMark5B:
                     'bps': 2,
                     'complex_data': False,
                     'start_time': start_time,
-                    'readable': True}
+                    'readable': True,
+                    'checks': {'decodable': True}}
         for key, value in expected.items():
             assert getattr(info, key) == value
         assert info() == expected
@@ -268,6 +271,16 @@ class TestMark5B:
             for key, value in expected.items():
                 assert getattr(info, key) == value
 
+            # Also check we cannot set, but can delete info
+            with pytest.raises(AttributeError):
+                fh.info = 'Parrot'
+
+            assert 'info' in fh.__dict__
+            del fh.info
+            assert 'info' not in fh.__dict__
+
+        assert 'closed' in repr(fh.info)
+
         # Finally, also do a brief check of the stream reader info.
         # Note that the readers properties themselves are tested further below.
         with mark5b.open(SAMPLE_FILE, 'rs', bps=2, nchan=8, kday=56000) as fh:
@@ -282,8 +295,11 @@ class TestMark5B:
                            'shape': (20000, 8),
                            'bps': 2,
                            'complex_data': False,
+                           'verify': 'fix',
                            'readable': True,
-                           'file_info': expected}
+                           'file_info': expected,
+                           'checks': {'decodable': True,
+                                      'continuous': 'no obvious gaps'}}
 
         for key, value in stream_expected.items():
             if key == 'file_info':
@@ -306,10 +322,10 @@ class TestMark5B:
         assert frame.size == payload.size
         assert frame.ndim == payload.ndim
         assert frame == mark5b.Mark5BFrame(header, payload)
-        assert np.all(frame.data[:3].astype(int) ==
-                      np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
-                                [-3, +3, -1, +3, -1, -1, -1, +1],
-                                [+3, -1, +3, +3, +1, -1, +3, -1]]))
+        assert np.all(frame.data[:3].astype(int)
+                      == np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
+                                   [-3, +3, -1, +3, -1, -1, -1, +1],
+                                   [+3, -1, +3, +3, +1, -1, +3, -1]]))
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
@@ -367,8 +383,8 @@ class TestMark5B:
                 except EOFError:
                     break
                 header_time = frame.header.time
-                expected = (start_time +
-                            frame.header['frame_nr'] * frame_duration)
+                expected = (start_time
+                            + frame.header['frame_nr'] * frame_duration)
                 assert abs(header_time - expected) < 1. * u.ns
 
         # Some files have headers in which the fraction is not set.
@@ -388,33 +404,76 @@ class TestMark5B:
         header.set_time(time=(start_time + 1. / frame_rate),
                         frame_rate=frame_rate)
         header.get_time(frame_rate)
-        assert abs(header.get_time(frame_rate) -
-                   start_time - 1. / frame_rate) < 1. * u.ns
+        assert abs(header.get_time(frame_rate)
+                   - start_time - 1. / frame_rate) < 1. * u.ns
         header.set_time(time=(start_time + 3921. / frame_rate),
                         frame_rate=frame_rate)
-        assert abs(header.get_time(frame_rate) -
-                   start_time - 3921. / frame_rate) < 1. * u.ns
+        assert abs(header.get_time(frame_rate)
+                   - start_time - 3921. / frame_rate) < 1. * u.ns
         # Test using bcd_fraction gives us within 0.1 ms accuracy.
         assert abs(header.time - start_time - 3921. / frame_rate) < 0.1 * u.ms
         header.set_time(time=(start_time + 25599. / frame_rate),
                         frame_rate=frame_rate)
-        assert abs(header.get_time(frame_rate) -
-                   start_time - 25599. / frame_rate) < 1. * u.ns
+        assert abs(header.get_time(frame_rate)
+                   - start_time - 25599. / frame_rate) < 1. * u.ns
         # Check rounding when using passing fractional frametimes.
         header.set_time(time=(start_time + 25598.53 / frame_rate),
                         frame_rate=frame_rate)
-        assert abs(header.get_time(frame_rate) -
-                   start_time - 25599. / frame_rate) < 1. * u.ns
+        assert abs(header.get_time(frame_rate)
+                   - start_time - 25599. / frame_rate) < 1. * u.ns
         # Check rounding to the nearest second when less than 2 ns away.
         header.set_time(time=(start_time + 0.9 * u.ns), frame_rate=frame_rate)
         assert header.seconds == header0.seconds
         header.set_time(time=(start_time - 0.9 * u.ns), frame_rate=frame_rate)
         assert header.seconds == header0.seconds
 
+    def test_locate_frames(self, tmpdir):
+        with mark5b.open(SAMPLE_FILE, 'rb', kday=56000) as fh:
+            header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
+            fh.seek(0)
+            assert fh.locate_frames() == [0, 10016]
+            assert fh.locate_frames(forward=True) == [0, 10016]
+            assert fh.locate_frames(forward=False) == [0]
+            assert fh.tell() == 0
+            fh.seek(10000)
+            assert (fh.locate_frames(forward=True)
+                    == [header0.frame_nbytes, 2 * header0.frame_nbytes])
+            assert fh.tell() == 10000
+            assert fh.locate_frames(forward=False) == [0]
+            fh.seek(-10000, 2)
+            assert (fh.locate_frames(forward=False)
+                    == [x * header0.frame_nbytes for x in (3, 2)])
+            fh.seek(-30, 2)
+            assert fh.locate_frames(forward=True) == []
+
+        m5_test = str(tmpdir.join('test.m5b'))
+        # Check a corrupted file.
+        with open(m5_test, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(10040))
+            f.seek(20000)
+            s.write(f.read())
+        shifted_pos = header0.frame_nbytes * 2 - 9960
+        with mark5b.open(m5_test, 'rb', kday=header0.kday) as fh:
+            fh.seek(0)
+            assert fh.locate_frames() == [0, shifted_pos]
+            assert (fh.locate_frames(check=None)
+                    == [0, header0.frame_nbytes, shifted_pos])
+            fh.seek(10000)
+            assert (fh.locate_frames(forward=True)
+                    == [shifted_pos, shifted_pos+header0.frame_nbytes])
+            assert (fh.locate_frames(forward=True, check=None)
+                    == [header0.frame_nbytes, shifted_pos,
+                        shifted_pos+header0.frame_nbytes])
+        # For completeness, also check a really short file...
+        with open(m5_test, 'wb') as s, open(SAMPLE_FILE, 'rb') as f:
+            s.write(f.read(10018))
+        with mark5b.open(m5_test, 'rb') as fh:
+            fh.seek(10)
+            assert fh.locate_frames(forward=True) == []
+            assert fh.tell() == 10
+            assert fh.locate_frames(forward=False) == [0]
+
     def test_find_header(self, tmpdir):
-        # Below, the tests set the file pointer to very close to a header,
-        # since otherwise they run *very* slow.  This is somehow related to
-        # pytest, since speed is not a big issue running stuff on its own.
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000) as fh:
             header0 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             fh.seek(0)
@@ -423,6 +482,9 @@ class TestMark5B:
             fh.seek(10000)
             header_10000f = fh.find_header(forward=True)
             assert fh.tell() == header0.frame_nbytes
+            fh.seek(10000)
+            header_10000b = fh.find_header(forward=False)
+            assert fh.tell() == 0
             fh.seek(16)
             header_16b = fh.find_header(forward=False)
             assert fh.tell() == 0
@@ -430,8 +492,9 @@ class TestMark5B:
             header_m10000b = fh.find_header(forward=False)
             assert fh.tell() == 3 * header0.frame_nbytes
             fh.seek(-30, 2)
-            header_end = fh.find_header(forward=True)
-            assert header_end is None
+            with pytest.raises(HeaderNotFoundError):
+                fh.find_header(forward=True)
+        assert header_10000b == header_0
         assert header_16b == header_0
         assert header_10000f['frame_nr'] == 1
         assert header_m10000b['frame_nr'] == 3
@@ -470,8 +533,8 @@ class TestMark5B:
             assert fh.shape == (20000,) + fh.sample_shape
             assert fh.size == np.prod(fh.shape)
             assert fh.ndim == len(fh.shape)
-            assert abs(fh.start_time -
-                       Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
+            assert abs(fh.start_time
+                       - Time('2014-06-13T05:30:01.000000000')) < 1. * u.ns
             assert abs(fh.stop_time - fh.start_time - 625 * u.us) < 1. * u.ns
             record = fh.read(12)
             assert fh.tell() == 12
@@ -480,8 +543,8 @@ class TestMark5B:
             assert fh.tell() == 10002
             assert fh.fh_raw.tell() == 3. * header.frame_nbytes
             assert fh.time == fh.tell(unit='time')
-            assert (np.abs(fh.time - (fh.start_time + 10002 / (32 * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fh.time - (fh.start_time + 10002 / (32 * u.MHz)))
+                    < 1. * u.ns)
             fh.seek(fh.start_time + 1000 / (32 * u.MHz))
             assert fh.tell() == 1000
             fh.seek(-10, 2)
@@ -508,14 +571,14 @@ class TestMark5B:
         frate = (1. / ((last_header.time - header.time) / 3.)).to(u.Hz).value
         assert round(frate) == 6400
         assert record.shape == (12, 8)
-        assert np.all(record.astype(int)[:3] ==
-                      np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
-                                [-3, +3, -1, +3, -1, -1, -1, +1],
-                                [+3, -1, +3, +3, +1, -1, +3, -1]]))
+        assert np.all(record.astype(int)[:3]
+                      == np.array([[-3, -1, +1, -1, +3, -3, -3, +3],
+                                   [-3, +3, -1, +3, -1, -1, -1, +1],
+                                   [+3, -1, +3, +3, +1, -1, +3, -1]]))
         assert record2.shape == (2, 8)
-        assert np.all(record2.astype(int) ==
-                      np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
-                                [-1, +1, -3, +3, -3, +1, +3, +1]]))
+        assert np.all(record2.astype(int)
+                      == np.array([[-1, -1, -1, +3, +3, -3, +3, -1],
+                                   [-1, +1, -3, +3, -3, +1, +3, +1]]))
         assert record3.shape == (10, 8)
 
         # Check passing a time object.
@@ -589,8 +652,8 @@ class TestMark5B:
                          nchan=8, bps=2) as fh:
             record5 = fh.read()     # Read across days.
             assert np.all(record5 == record)
-            assert (abs(fh.time - Time('2014:165:00:00:01', precision=9)) <
-                    1. * u.ns)
+            assert (abs(fh.time - Time('2014:165:00:00:01', precision=9))
+                    < 1. * u.ns)
 
         # As above, but checking if data can be read across kday increments
         # (2017-09-03 is MJD 57999 and 2017-09-04 is MJD 58000).
@@ -687,6 +750,11 @@ class TestMark5B:
             assert abs(fh.start_time - test_time) < 1.*u.ns
             assert fh.header0['frame_nr'] == 198
 
+    def test_filestreamer_readable(self):
+        with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
+                         ref_time=Time('2015-01-01'), nchan=8, bps=2) as fh:
+            assert fh.info.readable
+
     def test_sequentialfile(self, tmpdir):
         """Tests writing and reading of sequential files.
 
@@ -721,15 +789,14 @@ class TestMark5B:
     @pytest.mark.parametrize('fill_value', (0., -999.))
     def test_incomplete_stream(self, tmpdir, fill_value):
         m5_incomplete = str(tmpdir.join('incomplete.m5'))
-        with catch_warnings(UserWarning) as w:
-            with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
-                             kday=56000, nchan=8, bps=2) as fr:
-                record = fr.read(10)
+        with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
+                         kday=56000, nchan=8, bps=2) as fr:
+            record = fr.read(10)
+            with pytest.warns(UserWarning, match='partial buffer'):
                 with mark5b.open(m5_incomplete, 'ws', header0=fr.header0,
                                  sample_rate=32*u.MHz, nchan=8) as fw:
                     fw.write(record)
-        assert len(w) == 1
-        assert 'partial buffer' in str(w[0].message)
+
         with mark5b.open(m5_incomplete, 'rs', sample_rate=32*u.MHz, kday=56000,
                          nchan=8, bps=2, fill_value=fill_value) as fwr:
             assert fwr.fill_value == fill_value

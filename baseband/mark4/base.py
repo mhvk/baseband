@@ -1,11 +1,11 @@
 # Licensed under the GPLv3 - see LICENSE
 import numpy as np
-from astropy.utils import lazyproperty
+from astropy.utils import lazyproperty, deprecated
 import astropy.units as u
 
 from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase)
+                              VLBIStreamWriterBase, HeaderNotFoundError)
 from .header import Mark4Header
 from .payload import Mark4Payload
 from .frame import Mark4Frame
@@ -41,6 +41,7 @@ class Mark4FileReader(VLBIFileReaderBase):
         Reference time within 4 years of the observation time.  Used only
         if ``decade`` is not given.
     """
+
     def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None):
         self.ntrack = ntrack
         self.decade = decade
@@ -93,131 +94,73 @@ class Mark4FileReader(VLBIFileReaderBase):
         """
         with self.temporary_offset():
             self.seek(0)
-            self.locate_frame()
-            header0 = self.read_header()
-            self.seek(header0.payload_nbytes, 1)
+            header0 = self.find_header()
+            self.seek(header0.frame_nbytes, 1)
             header1 = self.read_header()
 
         # Mark 4 specification states frames-lengths range from 1.25 ms
         # to 160 ms.
-        tdelta = header1.fraction[0] - header0.fraction[0]
+        tdelta = (header1.fraction[0] - header0.fraction[0]) % 1.
         return u.Quantity(1 / tdelta, u.Hz).round()
 
-    def locate_frame(self, forward=True, maximum=None):
-        """Locate the frame nearest the current position.
-
-        The search is for the following pattern:
-
-        * 32*tracks bits set at offset bytes
-        * 1*tracks bits unset before offset
-        * 32*tracks bits set at offset+2500*tracks bytes
-
-        This reflects 'sync_pattern' of 0xffffffff for a given header and one
-        a frame ahead, which is in word 2, plus the lsb of word 1, which is
-        'system_id'.
-
-        If the file does not have ntrack is set, it will be auto-determined.
+    def locate_frames(self, pattern=None, *, mask=None, frame_nbytes=None,
+                      offset=0, forward=True, maximum=None, check=1):
+        """Use a pattern to locate frame starts near the current position.
 
         Parameters
         ----------
+        pattern : header, ~numpy.ndaray, bytes, or (iterable of) int, optional
+            Synchronization pattern to look for.  The default uses the
+            Mark 4 sync pattern, plus that the bit before is 0. See
+            `~baseband.mark4.header.Mark4Header.invariant_pattern`.
+        mask : ~numpy.ndarray, bytes, int, or iterable of int.
+            Bit mask for the pattern, with 1 indicating a given bit will
+            be used the comparison.  Only used if ``pattern`` is given
+            and is not a header.
+        frame_nbytes : int, optional
+            Frame size in bytes.  Defaults to the frame size for
+            ``ntrack``.  If given, overrides ``self.ntrack``.
+        offset : int, optional
+            Offset from the frame start that the pattern occurs.  Only
+            used if ``pattern`` is given and not a header.
         forward : bool, optional
-            Whether to search forwards or backwards.  Default: `True`.
+            Seek forward if `True` (default), backward if `False`.
         maximum : int, optional
-            Maximum number of bytes forward to search through.
-            Default: twice the frame size (``20000 * ntrack // 8``).
+            Maximum number of bytes to search away from the present location.
+            Use 0 to check only at the current position.
+        check : int or tuple of int, optional
+            Frame offsets where another sync pattern should be present (if
+            inside the file). Default: 1, i.e., a sync pattern should be
+            present one frame after the one found (independent of
+            ``forward``), thus helping to guarantee the frame is OK.
 
         Returns
         -------
-        offset : int or `None`
-            Byte offset of the next frame. `None` if the search was not
-            successful.
+        locations : list of int
+            Locations of sync patterns within the range scanned,
+            in order of proximity to the starting position.
         """
-        fh = self.fh_raw
-        file_pos = fh.tell()
         # Use initializer value (determines ntrack if not already given).
-        ntrack = self.ntrack
-        if ntrack is None:
-            fh.seek(0)
-            ntrack = self.determine_ntrack(maximum=maximum)
+        if frame_nbytes is None:
+            ntrack = self.ntrack
             if ntrack is None:
-                raise ValueError("cannot determine ntrack automatically. "
-                                 "Try passing in an explicit value.")
-            if forward and fh.tell() >= file_pos:
-                return fh.tell()
+                with self.temporary_offset():
+                    self.seek(0)
+                    ntrack = self.determine_ntrack(maximum=maximum)
 
-            fh.seek(file_pos)
+            frame_nbytes = ntrack * 2500
 
-        nset = np.ones(32 * ntrack // 8, dtype=np.int16)
-        nunset = np.ones(ntrack // 8, dtype=np.int16)
-        frame_nbytes = ntrack * 2500
-        fh.seek(0, 2)
-        filesize = fh.tell()
-        if filesize < frame_nbytes:
-            fh.seek(file_pos)
-            return None
-
-        if maximum is None:
-            maximum = 2 * frame_nbytes
-        # Loop over chunks to try to find the frame marker.
-        step = frame_nbytes // 2
-        # Read a bit more at every step to ensure we don't miss a "split"
-        # header.
-        block = step + 160 * ntrack // 8
-        if forward:
-            iterate = range(max(min(file_pos, filesize - block), 0),
-                            max(min(file_pos + maximum, filesize - block + 1),
-                                1),
-                            step)
         else:
-            iterate = range(min(max(file_pos - step, 0), filesize - block),
-                            min(max(file_pos - step - maximum - 1, -1),
-                                filesize - block),
-                            -step)
-        for frame in iterate:
-            fh.seek(frame)
+            ntrack, resid = divmod(frame_nbytes, 2500)
+            if resid:
+                raise ValueError('frame_nbytes must be a multiple of '
+                                 '2500 bytes for Mark 4 data.')
 
-            data = np.frombuffer(fh.read(block), dtype=np.uint8)
-            assert len(data) == block
-            # Find header pattern.
-            databits1 = nbits[data]
-            nosync = np.convolve(databits1[len(nunset):] < 6, nset, 'valid')
-            nolow = np.convolve(databits1[:-len(nset)] > 1, nunset, 'valid')
-            wrong = nosync + nolow
-            possibilities = np.where(wrong == 0)[0]
-            # Check candidates by seeing whether there is a sync word
-            # a frame size ahead. (Note: loop can be empty.)
-            for possibility in possibilities[::1 if forward else -1]:
-                # Real start of possible header.
-                frame_start = frame + possibility - 63 * ntrack // 8
-                if (forward and frame_start < file_pos or
-                        not forward and frame_start > file_pos):
-                    continue
-                # Check there is a header following this.
-                check = frame_start + frame_nbytes
-                if check >= filesize - 32 * 2 * ntrack // 8 - len(nunset):
-                    # But do before this one if we're beyond end of file.
-                    check = frame_start - frame_nbytes
-                    if check < 0:  # Assume OK if only one frame fits in file.
-                        if frame_start + frame_nbytes > filesize:
-                            continue
-                        else:
-                            break
-
-                fh.seek(check + 32 * 2 * ntrack // 8)
-                check_data = np.frombuffer(fh.read(len(nunset)),
-                                           dtype=np.uint8)
-                databits2 = nbits[check_data]
-                if np.all(databits2 >= 6):
-                    break  # Got it!
-
-            else:  # None of them worked, so do next block.
-                continue
-
-            fh.seek(frame_start)
-            return frame_start
-
-        fh.seek(file_pos)
-        return None
+        if pattern is None:
+            pattern, mask = Mark4Header.invariant_pattern(ntrack=self.ntrack)
+        return super().locate_frames(
+            pattern, mask=mask, frame_nbytes=frame_nbytes, offset=offset,
+            forward=forward, maximum=maximum, check=check)
 
     def determine_ntrack(self, maximum=None):
         """Determines the number of tracks, by seeking the next frame.
@@ -237,46 +180,51 @@ class Mark4FileReader(VLBIFileReaderBase):
         Returns
         -------
         ntrack : int or None
-            Number of Mark 4 bitstreams.  `None` if no frame was found.
+            Number of Mark 4 bitstreams.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no frame was found for any value of ntrack.
         """
         # Currently only 16, 32 and 64-track frames supported.
         old_ntrack = self.ntrack
-        for ntrack in 16, 32, 64:
+        trials = 16, 32, 64
+        for ntrack in trials:
+            self.ntrack = ntrack
             try:
-                self.ntrack = ntrack
-                if self.locate_frame(maximum=maximum) is not None:
-                    return ntrack
+                self.find_header(maximum=maximum)
+                return ntrack
             except Exception:
-                self.ntrack = old_ntrack
-                raise
+                pass
 
         self.ntrack = old_ntrack
-        return None
+        raise HeaderNotFoundError("cannot determine ntrack automatically. "
+                                  "(tried {}). Try passing in an "
+                                  "explicit value.".format(trials))
 
-    def find_header(self, forward=True, maximum=None):
-        """Find the nearest header from the current position.
+    @deprecated(since='3.1', alternative='locate_frames or find_header')
+    def locate_frame(self, *args, **kwargs):
+        """Use a pattern to locate the frame nearest the current position.
 
-        If successful, the file pointer is left at the start of the header.
-
-        Parameters
-        ----------
-        forward : bool, optional
-            Seek forward if `True` (default), backward if `False`.
-        maximum : int, optional
-            Maximum number of bytes forward to search through.
-            Default: twice the frame size (``20000 * ntrack // 8``).
+        Like ``locate_frames``, but selects the closest frame and leaves
+        the file pointer at its position.
 
         Returns
         -------
-        header : :class:`~baseband.mark4.Mark4Header` or None
-            Retrieved Mark 4 header, or `None` if nothing found.
+        location : int
+            The location of the file pointer.
+
+        Raises
+        ------
+        ~baseband.vlbi_base.base.HeaderNotFoundError
+            If no frame was found.
         """
-        offset = self.locate_frame(forward=forward)
-        if offset is None:
-            return None
-        header = self.read_header()
-        self.fh_raw.seek(offset)
-        return header
+        locations = self.locate_frames(*args, **kwargs)
+        if not locations:
+            raise HeaderNotFoundError('could not locate a a nearby frame.')
+
+        return self.seek(locations[0])
 
 
 class Mark4FileWriter(VLBIFileBase):
@@ -316,8 +264,6 @@ class Mark4StreamBase(VLBIStreamBase):
             unsliced_shape=(header0.nchan,),
             bps=header0.bps, complex_data=False, squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
-        self._frame_rate = int((self.sample_rate /
-                                self.samples_per_frame).to(u.Hz).round().value)
 
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
@@ -352,16 +298,17 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         squeezing).  If an empty tuple (default), all channels are read.
     fill_value : float or complex, optional
         Value to use for invalid or missing data. Default: 0.
-    verify : bool, optional
-        Whether to do basic checks of frame integrity when reading.  The first
-        frame of the stream is always checked.  Default: `True`.
+    verify : bool or str, optional
+        Whether to do basic checks of frame integrity when reading.
+        Default: 'fix', which implies basic verification and replacement
+        of gaps with zeros.
     """
 
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, ntrack=None, decade=None,
                  ref_time=None, squeeze=True, subset=(), fill_value=0.,
-                 verify=True):
+                 verify='fix'):
 
         if decade is None and ref_time is None:
             raise TypeError("Mark 4 stream reader requires either decade or "
@@ -371,15 +318,20 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         fh_raw = Mark4FileReader(fh_raw, ntrack=ntrack, decade=decade,
                                  ref_time=ref_time)
         # Find first header, determining ntrack if needed.
-        header0 = fh_raw.find_header()
-        assert header0 is not None, (
-            "could not find a first frame using ntrack={}. Perhaps "
-            "try ntrack=None for auto-determination.".format(ntrack))
-        self._offset0 = fh_raw.tell()
+        try:
+            header0 = fh_raw.find_header()
+        except Exception as exc:
+            if ntrack is not None:
+                exc.args += ("could not find a first frame using ntrack={}. "
+                             "Perhaps try ntrack=None for auto-determination."
+                             .format(ntrack),)
+            raise exc
+
         super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
+        self._raw_offsets[0] = fh_raw.tell()
         # Use reference time in preference to decade so that a stream wrapping
         # a decade will work.
         self.fh_raw.decade = None
@@ -393,14 +345,6 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         # 4 years away from the start.
         last_header.infer_decade(self.start_time)
         return last_header
-
-    def _read_frame(self, index):
-        self.fh_raw.seek(self._offset0 + index * self.header0.frame_nbytes)
-        frame = self.fh_raw.read_frame(verify=self.verify)
-        # Set decoded value for invalid data.
-        frame.fill_value = self.fill_value
-        # TODO: add check that we got the right frame.
-        return frame
 
 
 class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
@@ -449,16 +393,16 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
                          sample_rate=sample_rate, squeeze=squeeze)
         # Set up initial payload with right shape.
         samples_per_payload = (
-            header0.samples_per_frame * header0.payload_nbytes //
-            header0.frame_nbytes)
+            header0.samples_per_frame * header0.payload_nbytes
+            // header0.frame_nbytes)
         self._payload = Mark4Payload.fromdata(
             np.zeros((samples_per_payload, header0.nchan), np.float32),
             header0)
 
     def _make_frame(self, frame_index):
         header = self.header0.copy()
-        header.update(time=self.start_time + frame_index /
-                      self._frame_rate * u.s)
+        header.update(time=self.start_time + frame_index
+                      / self._frame_rate)
         # Reuse payload.
         return Mark4Frame(header, self._payload)
 
@@ -488,9 +432,10 @@ subset : indexing object, optional
     squeezing).  If an empty tuple (default), all channels are read.
 fill_value : float or complex, optional
     Value to use for invalid or missing data. Default: 0.
-verify : bool, optional
-    Whether to do basic checks of frame integrity when reading.  The first
-    frame of the stream is always checked.  Default: `True`.
+verify : bool or 'fix', optional
+    Whether to do basic checks of frame integrity when reading.
+    Default: 'fix', which implies basic verification and replacement
+    of gaps with zeros.
 
 --- For writing a stream : (see `~baseband.mark4.base.Mark4StreamWriter`)
 

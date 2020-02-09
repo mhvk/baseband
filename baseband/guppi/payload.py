@@ -179,8 +179,8 @@ class GUPPIPayload(VLBIPayloadBase):
 
         if self.channels_first:
             # Reshape words so channels fall along first axis, then decode.
-            decoded_words = decoder(
-                self.words.reshape(self.sample_shape.nchan, -1)[:, words_slice])
+            decoded_words = decoder(self.words.reshape(self.sample_shape.nchan,
+                                                       -1)[:, words_slice])
             # Reshape to (nsample, nchan, npol), then use data_slice.
             return (decoded_words.view(self.dtype).T
                     .reshape(-1, *self.sample_shape)[data_slice])
@@ -201,9 +201,9 @@ class GUPPIPayload(VLBIPayloadBase):
         # Check if the new data spans an entire word and is correctly shaped.
         # If so, skip decoding.  If not, decode appropriate words and insert
         # new data.
-        if not (data_slice == slice(None) and
-                data.shape[-2:] == self.sample_shape and
-                data.dtype.kind == self.dtype.kind):
+        if not (data_slice == slice(None)
+                and data.shape[-2:] == self.sample_shape
+                and data.dtype.kind == self.dtype.kind):
             decoder = self._decoders[self._coder]
             if self.channels_first:
                 decoded_words = decoder(np.ascontiguousarray(

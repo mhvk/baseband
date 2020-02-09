@@ -10,9 +10,9 @@
 #
 """VLBI Data Interchange Format (VDIF) reader/writer
 
-For the VDIF specification, see http://www.vlbi.org/vdif
+For the VDIF specification, see https://vlbi.org/vlbi-standards/vdif/
 """
-from .base import open
-from .header import VDIFHeader
-from .payload import VDIFPayload
-from .frame import VDIFFrame, VDIFFrameSet
+from .base import open  # noqa
+from .header import VDIFHeader  # noqa
+from .payload import VDIFPayload  # noqa
+from .frame import VDIFFrame, VDIFFrameSet  # noqa

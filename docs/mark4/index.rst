@@ -14,7 +14,7 @@ in the Mark IIIA/IV/VLBA `design specifications`_.
 Baseband currently only supports files that have been parity-stripped and
 corrected for barrel roll and data modulation.
 
-.. _design specifications: http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+.. _design specifications: https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
 .. _mark4_file_structure:
 
@@ -68,22 +68,53 @@ the small sample file ``baseband/data/sample.m4``, and the `numpy`,
 Opening a Mark 4 file with `~baseband.mark4.open` in binary mode provides
 a normal file reader but extended with methods to read a
 `~baseband.mark4.Mark4Frame`.  Mark 4 files generally **do not start (or end)
-at a frame boundary**, so in binary mode one has to seek the first
-frame using `~baseband.mark4.base.Mark4FileReader.locate_frame` (which will
+at a frame boundary**, so in binary mode one has to find the first
+header using `~baseband.mark4.base.Mark4FileReader.find_header` (which will
 also determine the number of Mark 4 tracks, if not given explicitly). Since
 Mark 4 files do not store the full time information, one must pass either the
 the decade the data was taken, or an equivalent reference `~astropy.time.Time`
 object::
 
     >>> fb = mark4.open(SAMPLE_MARK4, 'rb', decade=2010)
-    >>> fb.locate_frame()  # Locate first frame.
+    >>> fb.find_header()  # Locate first header and determine ntrack.
+    <Mark4Header bcd_headstack1: [0x3344]*64,
+                 bcd_headstack2: [0x1122]*64,
+                 headstack_id: [0, ..., 1],
+                 bcd_track_id: [0x2, ..., 0x33],
+                 fan_out: [0, ..., 3],
+                 magnitude_bit: [False, ..., True],
+                 lsb_output: [True]*64,
+                 converter_id: [0, ..., 7],
+                 time_sync_error: [False]*64,
+                 internal_clock_error: [False]*64,
+                 processor_time_out_error: [False]*64,
+                 communication_error: [False]*64,
+                 _1_11_1: [False]*64,
+                 _1_10_1: [False]*64,
+                 track_roll_enabled: [False]*64,
+                 sequence_suspended: [False]*64,
+                 system_id: [108]*64,
+                 _1_0_1_sync: [False]*64,
+                 sync_pattern: [0xffffffff]*64,
+                 bcd_unit_year: [0x4]*64,
+                 bcd_day: [0x167]*64,
+                 bcd_hour: [0x7]*64,
+                 bcd_minute: [0x38]*64,
+                 bcd_second: [0x12]*64,
+                 bcd_fraction: [0x475]*64,
+                 crc: [0xea6, ..., 0x212]>
+    >>> fb.ntrack
+    64
+    >>> fb.tell()
     2696
     >>> frame = fb.read_frame()
     >>> frame.shape
     (80000, 8)
+    >>> frame.header.time
+    <Time object: scale='utc' format='yday' value=2014:167:07:38:12.47500>
     >>> fb.close()
 
-Opening in stream mode automatically seeks for the first frame, and wraps the
+Opening in stream mode automatically finds the first frame, and wraps the
 low-level routines such that reading and writing is in units of samples.  It
 also provides access to header information.  Here we pass a reference
 `~astropy.time.Time` object within 4 years of the observation start time to

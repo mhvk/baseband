@@ -1,13 +1,11 @@
-# We set the language to c because python isn't supported on the MacOS X nodes
-# on Travis. However, the language ends up being irrelevant anyway, since we
-# install Python ourselves using conda.
-language: c
+language: python
+
+# We need a full clone to make sure setuptools_scm works properly
+git:
+    depth: false
 
 os:
     - linux
-
-# Setting sudo to false opts in to Travis-CI container-based builds.
-sudo: false
 
 # The apt packages below are needed for sphinx builds. A full list of packages
 # that can be included can be found here:
@@ -18,49 +16,42 @@ addons:
     apt:
         packages:
             - graphviz
-            - texlive-latex-extra
-            - dvipng
+
+
+stages:
+   # Do the style check and a single test job, don't proceed if it fails
+   - name: Initial tests
+   # Test docs, astropy dev, and without optional dependencies
+   - name: Comprehensive tests
+   # These will only run when cron is opted in
+   - name: Cron tests
+     if: type = cron
+
+stage: Comprehensive tests
 
 env:
     global:
 
         # The following versions are the 'default' for tests, unless
-        # overidden underneath. They are defined here in order to save having
+        # overridden underneath. They are defined here in order to save having
         # to repeat them for all configurations.
-        - PYTHON_VERSION=3.7
-        - NUMPY_VERSION=stable
-        - ASTROPY_VERSION=stable
-        - MAIN_CMD='python setup.py'
-        - SETUP_CMD='test'
-        - EVENT_TYPE='pull_request push'
 
+        # The following three variables are for tox. TOXENV is a standard
+        # variable that tox uses to determine the environment to run,
+        # TOXARGS are arguments passed to tox, and TOXPOSARGS are arguments
+        # that tox passes through to the {posargs} indicator in tox.ini.
+        # The latter can be used for example to pass arguments to pytest.
+        - TOXENV='test'
+        - TOXARGS='-v'
+        - TOXPOSARGS=''
 
-        # For this package-template, we include examples of Cython modules,
-        # so Cython is required for testing. If your package does not include
-        # Cython code, you can set CONDA_DEPENDENCIES=''
-        - CONDA_DEPENDENCIES=''
-        - CONDA_DEPENDENCIES_DOC='sphinx-astropy'
-
-        # List other runtime dependencies for the package that are available as
-        # pip packages here.
-        - PIP_DEPENDENCIES=''
-
-        # Conda packages for affiliated packages are hosted in channel
-        # "astropy" while builds for astropy LTS with recent numpy versions
-        # are in astropy-ci-extras. If your package uses either of these,
-        # add the channels to CONDA_CHANNELS along with any other channels
-        # you want to use.
-        - CONDA_CHANNELS='astropy-ci-extras astropy'
+        # Also allow tests without pip or tox, getting our packages using apt
+        - INSTALL_WITH_APT=False
+        - APT_DEPENDENCIES='python3-astropy python3-pytest-astropy python3-setuptools'
 
         # If there are matplotlib or other GUI tests, uncomment the following
         # line to use the X virtual framebuffer.
         # - SETUP_XVFB=True
-
-        # If you want to ignore certain flake8 errors, you can list them
-        # in FLAKE8_OPT, for example:
-        # - FLAKE8_OPT='--ignore=E501'
-        - FLAKE8_OPT=''
-
 
 matrix:
 
@@ -68,56 +59,64 @@ matrix:
     fast_finish: true
 
     include:
-        # Do a coverage test.
-        - env: SETUP_CMD='test --coverage'
 
-        # Check for sphinx doc build warnings - we do this first because it
-        # may run for a long time.
-        - env: SETUP_CMD='build_sphinx -w'
-               CONDA_DEPENDENCIES=$CONDA_DEPENDENCIES_DOC
+        - name: Tests that all the basics are covered.
+          stage: Initial tests
+          python: 3.7
+          env: TOXENV=py37-test
+
+        - name: Code style checks
+          stage: Initial tests
+          python: 3.8
+          env: TOXENV=codestyle
+
+        - name: Documentation build
+          python: 3.8
+          env: TOXENV=build_docs
+
+        - name: Coverage using oldest supported versions
+          python: 3.7
+          env: TOXENV="py37-test-oldestdeps-cov"
 
         # Now try Astropy dev with the latest Python
-        - env: ASTROPY_VERSION=development
-               EVENT_TYPE='pull_request push cron'
+        - name: Python 3.8 with developer version of astropy
+          python: 3.8
+          env: TOXENV=py38-test-devdeps
 
-        # Try combination of oldest python, numpy, and astropy versions.
-        - env: PYTHON_VERSION=3.5 NUMPY_VERSION=1.10 ASTROPY_VERSION=3.0
-
-        # Make sure that egg_info works without dependencies
-        - env: SETUP_CMD='egg_info'
-
-        # Do a PEP8/pyflakes test with flake8 (see setup.cfg for options)
-        - env: MAIN_CMD="flake8 --count baseband" SETUP_CMD=''
+        # Also regularly try the big-endian s390 architecture, in the
+        # process checking that installing dependencies with apt works.
+        - name: big-endian s390 architecture with apt
+          stage: Cron tests
+          arch: s390
+          language: c
+          env: INSTALL_WITH_APT=True
 
 install:
 
     # We now use the ci-helpers package to set up our testing environment.
-    # This is done by using Miniconda and then using conda and pip to install
-    # dependencies. Which dependencies are installed using conda and pip is
-    # determined by the CONDA_DEPENDENCIES and PIP_DEPENDENCIES variables,
-    # which should be space-delimited lists of package names. See the README
-    # in https://github.com/astropy/ci-helpers for information about the full
-    # list of environment variables that can be used to customize your
-    # environment. In some cases, ci-helpers may not offer enough flexibility
-    # in how to install a package, in which case you can have additional
-    # commands in the install: section below.
 
-    - git clone --depth 1 git://github.com/astropy/ci-helpers.git
-    - source ci-helpers/travis/setup_conda.sh
+    - if [[ $INSTALL_WITH_APT != True ]]; then
+        pip install tox;
+      else
+        curl https://ftp-master.debian.org/keys/archive-key-10.asc | sudo apt-key add -;
+        echo "deb http://ftp.us.debian.org/debian testing main" | sudo tee -a /etc/apt/sources.list;
+        sudo apt-get -qq update;
+        sudo apt-get install -y --no-install-recommends ${APT_DEPENDENCIES};
+      fi
 
-    # As described above, using ci-helpers, you should be able to set up an
-    # environment with dependencies installed using conda and pip, but in some
-    # cases this may not provide enough flexibility in how to install a
-    # specific dependency (and it will not be able to install non-Python
-    # dependencies). Therefore, you can also include commands below (as
-    # well as at the start of the install section or in the before_install
-    # section if they are needed before setting up conda) to install any
-    # other dependencies.
+    - if [[ $TOXENV == *-cov ]]; then
+        export TOXPOSARGS=$TOXPOSARGS" --cov-report=xml:"$TRAVIS_BUILD_DIR"/coverage.xml";
+      fi
 
 script:
-   - $MAIN_CMD $SETUP_CMD
+    - if [[ $INSTALL_WITH_APT != True ]]; then
+        tox $TOXARGS -- $TOXPOSARGS;
+      else
+        pytest-3;
+      fi
 
 after_success:
-    # If coveralls.io is set up for this package, uncomment the line below.
-    # The coveragerc file may be customized as needed for your package.
-    - if [[ $SETUP_CMD == *coverage* ]]; then coveralls --rcfile='baseband/tests/coveragerc'; fi
+    - if [[ $TOXENV == *-cov ]]; then
+        pip install codecov;
+        codecov --gcov-glob "*cextern*";
+      fi

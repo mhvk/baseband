@@ -22,9 +22,10 @@ decoded samples::
 For other file formats, a bit more information is needed.  Below, we cover the
 basics of :ref:`inspecting files <using_baseband_inspecting>`, :ref:`reading
 <using_baseband_reading>` from and :ref:`writing <using_baseband_writing>`
-to files, and :ref:`converting <using_baseband_converting>` from one format
-to another.  We assume that Baseband as well as `NumPy
-<http://www.numpy.org/>`_ and the `Astropy`_ units module have been imported::
+to files, :ref:`converting <using_baseband_converting>` from one format
+to another, and :ref:`diagnosing problems <using_baseband_problems>`.
+We assume that Baseband as well as `NumPy <https://www.numpy.org/>`_ and the
+`Astropy`_ units module have been imported::
 
     >>> import baseband
     >>> import numpy as np
@@ -50,10 +51,17 @@ files can all be found in the `baseband.data` module)::
     format = vdif
     bps = 2
     complex_data = False
+    verify = fix
     readable = True
+    <BLANKLINE>
+    checks:  decodable: True
+             continuous: no obvious gaps
     <BLANKLINE>
     File information:
     edv = 3
+    number_of_frames = 16
+    thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+    number_of_framesets = 2
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)
@@ -65,16 +73,14 @@ instance, for Mark 5B files one needs the number of channels used, as well as
     >>> baseband.file_info(baseband.data.SAMPLE_MARK5B)
     File information:
     format = mark5b
+    number_of_frames = 4
     frame_rate = 6400.0 Hz
     bps = 2
     complex_data = False
     readable = False
     <BLANKLINE>
-    missing:  nchan: needed to determine sample shape and rate.
+    missing:  nchan: needed to determine sample shape, frame rate, decode data.
               kday, ref_time: needed to infer full times.
-    <BLANKLINE>
-    errors:  start_time: unsupported operand type(s) for +: 'NoneType' and 'int'
-             frame0: In order to read frames, the file handle should be initialized with nchan set.
 
     >>> from astropy.time import Time
     >>> baseband.file_info(baseband.data.SAMPLE_MARK5B, nchan=8, ref_time=Time('2014-01-01'))
@@ -86,9 +92,14 @@ instance, for Mark 5B files one needs the number of channels used, as well as
     format = mark5b
     bps = 2
     complex_data = False
+    verify = fix
     readable = True
     <BLANKLINE>
+    checks:  decodable: True
+             continuous: no obvious gaps
+    <BLANKLINE>
     File information:
+    number_of_frames = 4
     frame_rate = 6400.0 Hz
     samples_per_frame = 5000
     sample_shape = (8,)
@@ -194,7 +205,7 @@ of shape dimensions, is retrievable using::
 
 By default, dimensions of length unity are |squeezed|, or removed from the
 sample shape.  To retain them, we can pass ``squeeze=False`` to
-`~baseband.vdif.open`:
+`~baseband.vdif.open`::
 
     >>> fhns = vdif.open(SAMPLE_VDIF, 'rs', squeeze=False)
     >>> fhns.sample_shape    # Sample shape now keeps channel dimension.
@@ -218,10 +229,17 @@ Basic information about the file is obtained by either by ``fh.info`` or simply
     format = vdif
     bps = 2
     complex_data = False
+    verify = fix
     readable = True
+    <BLANKLINE>
+    checks:  decodable: True
+             continuous: no obvious gaps
     <BLANKLINE>
     File information:
     edv = 3
+    number_of_frames = 16
+    thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+    number_of_framesets = 2
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)
@@ -368,7 +386,7 @@ The full list of keywords is available by printing out ``header0``::
                  personality: 131>
 
 A number of derived properties, such as the time (as a `~astropy.time.Time`
-object), are also available through the header object.
+object), are also available through the header object::
 
     >>> header0.time
     <Time object: scale='utc' format='isot' value=2014-06-16T05:56:07.000000000>
@@ -521,7 +539,7 @@ offers wider compatibility, or better fits the structure of the data.  As an
 example, we convert the sample Mark 4 data to VDIF.
 
 Since we don't have a VDIF header handy, we pass the relevant Mark 4 header
-values into `vdif.open <baseband.vdif.open>` to create one.
+values into `vdif.open <baseband.vdif.open>` to create one::
 
     >>> import baseband.mark4 as mark4
     >>> from baseband.data import SAMPLE_MARK4
@@ -692,3 +710,95 @@ Because DADA and GUPPI data are usually stored in file sequences with names
 derived from header values - eg. 'puppi_58132_J1810+1744_2176.0010.raw',
 their format openers have template support built-in.  For usage details, please
 see the API entries for `baseband.dada.open` and `baseband.guppi.open`.
+
+.. _using_baseband_problems:
+
+Diagnosing problems with baseband files
+=======================================
+
+Little is more annoying than starting a very long analysis script only to find
+the reader crashed with an error near the end.  Unfortunately, while there is
+only one way for success, there are many for failure.  Some, though, can be
+found by :ref:`inspecting files <using_baseband_inspecting>`.  To see
+what would show up for a file that misses a frame, we first construct one::
+
+    >>> from astropy.time import Time
+    >>> from baseband import vdif
+    >>> fc = vdif.open('corrupt.vdif', 'ws', edv=1, nthread=2,
+    ...                bps=8, samples_per_frame=16,
+    ...                time=Time('J2010'), sample_rate=16*u.kHz)
+    >>> fc.write(np.zeros((8000, 2)))
+    >>> fc.fh_raw.seek(-100, 1)
+    47900
+    >>> fc.write(np.zeros((8000, 2)))
+    >>> fc.close()
+
+Here, rewinding the internal raw file pointer a bit to simulate "missing
+bytes" is an implementation detail that one should not rely on!
+
+Now check its `~baseband.vdif.base.VDIFStreamReader.info`::
+
+    >>> fh = baseband.vdif.open('corrupt.vdif', 'rs', verify=True)
+    >>> fh.info.readable
+    False
+    >>> fh.info
+    Stream information:
+    start_time = 2009-12-31T23:58:53.816000000
+    stop_time = 2009-12-31T23:58:54.816000000
+    sample_rate = 0.016 MHz
+    shape = (16000, 2)
+    format = vdif
+    bps = 8
+    complex_data = False
+    verify = True
+    readable = False
+    <BLANKLINE>
+    checks:  decodable: True
+             continuous: False
+    <BLANKLINE>
+    errors:  continuous: While reading at 7968: AssertionError()
+    <BLANKLINE>
+    warnings:  number_of_frames: file contains non-integer number (1997.9166666666667) of frames
+    <BLANKLINE>
+    File information:
+    edv = 1
+    thread_ids = [0, 1]
+    frame_rate = 1000.0 Hz
+    samples_per_frame = 16
+    sample_shape = (2, 1)
+    >>> fh.close()
+
+In detail, the error is given for a position earlier than the one we
+corrupted, because internally baseband reads a frame ahead since a
+corrupted frame typically means something is bad before as well.
+
+This particular problem is not bad, since the VDIF reader can deal with
+missing frames.  Indeed, when one opens the file with the default
+``verify='fix'``, one gets::
+
+    >>> fh = baseband.vdif.open('corrupt.vdif', 'rs')
+    >>> fh.info
+    Stream information:
+    start_time = 2009-12-31T23:58:53.816000000
+    stop_time = 2009-12-31T23:58:54.816000000
+    sample_rate = 0.016 MHz
+    shape = (16000, 2)
+    format = vdif
+    bps = 8
+    complex_data = False
+    verify = fix
+    readable = True
+    <BLANKLINE>
+    checks:  decodable: True
+             continuous: fixable gaps
+    <BLANKLINE>
+    warnings:  number_of_frames: file contains non-integer number (1997.9166666666667) of frames
+               continuous: While reading at 7968: problem loading frame set 498. Thread(s) [1] missing; set to invalid.
+    <BLANKLINE>
+    File information:
+    edv = 1
+    thread_ids = [0, 1]
+    frame_rate = 1000.0 Hz
+    samples_per_frame = 16
+    sample_shape = (2, 1)
+    >>> fh.close()

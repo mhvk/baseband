@@ -4,7 +4,6 @@ import copy
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from astropy.tests.helper import catch_warnings
 from ... import dada
 from ...helpers import sequentialfile as sf
 from ..base import DADAFileNameSequencer
@@ -57,9 +56,16 @@ class TestDADA:
                 s.write((line + '\n').encode('ascii'))
             s.write('# end of header\n'.encode('ascii'))
             s.seek(0)
-            with catch_warnings(UserWarning) as w:
+            with pytest.warns(UserWarning, match='Odd'):
                 dada.DADAHeader.fromfile(s)
-            assert 'Odd' in str(w[0].message)
+
+        with open(SAMPLE_FILE, 'rb') as fh, \
+                open(str(tmpdir.join('test2.dada')), 'w+b') as s:
+            # And an incomplete header for completeness.
+            s.write(fh.read(1000))
+            s.seek(0)
+            with pytest.raises(EOFError):
+                dada.DADAHeader.fromfile(s)
 
         # Note that this is not guaranteed to preserve order!
         header3 = dada.DADAHeader.fromkeys(**header)
@@ -67,8 +73,8 @@ class TestDADA:
         assert header3.mutable is True
         # Check attribute setting.
         header3.start_time = header.start_time - 0.5 * u.day
-        assert np.abs(header3.start_time -
-                      (header.start_time - 0.5 * u.day)) < 1 * u.ns
+        assert np.abs(header3.start_time
+                      - (header.start_time - 0.5 * u.day)) < 1 * u.ns
         assert np.abs(header3.time - (header.time - 0.5 * u.day)) < 1 * u.ns
         # Check against rounding.
         just_below_int = Time(55000, -1e-15, format='mjd')
@@ -167,6 +173,7 @@ class TestDADA:
                                                  sample_shape=(2, 1), bps=8,
                                                  complex_data=True)
             assert payload2 == payload
+            assert s.tell() == 64000
             with pytest.raises(EOFError):
                 # Too few bytes.
                 s.seek(100)
@@ -176,6 +183,7 @@ class TestDADA:
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(4096)
             payload4 = dada.DADAPayload.fromfile(fh, self.header, memmap=True)
+            assert fh.tell() == 4096+payload4.nbytes
         assert isinstance(payload4.words, np.memmap)
         assert not isinstance(payload.words, np.memmap)
         assert payload == payload4
@@ -208,6 +216,7 @@ class TestDADA:
             frame.tofile(s)
             s.seek(0)
             frame2 = dada.DADAFrame.fromfile(s, memmap=False)
+            assert s.tell() == frame.nbytes
         assert frame2 == frame
         frame3 = dada.DADAFrame.fromdata(payload.data, header)
         assert frame3 == frame
@@ -304,13 +313,13 @@ class TestDADA:
             record2 = fh.read(out=record2)
             assert fh.tell() == 10002
             assert fh.time == fh.tell(unit='time')
-            assert (np.abs(fh.time - (start_time + 10002 / (16 * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fh.time - (start_time + 10002 / (16 * u.MHz)))
+                    < 1. * u.ns)
             fh.seek(fh.start_time + 1000 / (16*u.MHz))
             assert fh.tell() == 1000
             assert fh._last_header == fh.header0
-            assert np.abs(fh.stop_time -
-                          (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fh.stop_time
+                          - (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
             # Test seeker works with both int and str values for whence.
             assert fh.seek(13, 0) == fh.seek(13, 'start')
             assert fh.seek(-13, 2) == fh.seek(-13, 'end')
@@ -340,14 +349,14 @@ class TestDADA:
             assert fw.sample_rate == 16 * u.MHz
             fw.write(self.payload.data)
             assert fw.start_time == start_time
-            assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz)))
+                    < 1. * u.ns)
 
         with dada.open(filename, 'rs') as fh:
             data = fh.read()
             assert fh.start_time == start_time
-            assert (np.abs(fh.time - (start_time + 16000 / (16. * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fh.time - (start_time + 16000 / (16. * u.MHz)))
+                    < 1. * u.ns)
             assert fh.stop_time == fh.time
             assert fh.sample_rate == 16 * u.MHz
         assert np.all(data == self.payload.data.squeeze())
@@ -359,14 +368,14 @@ class TestDADA:
                        payload_nbytes=32000, npol=1, nchan=1) as fw:
             fw.write(self.payload.data[:, 0, 0])
             assert np.abs(fw.start_time - start_time) < 1.*u.ns
-            assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz)))
+                    < 1. * u.ns)
 
         with dada.open(filename, 'rs') as fh:
             data_onepol = fh.read()
             assert np.abs(fh.start_time - start_time) < 1.*u.ns
-            assert np.abs(fh.stop_time - (start_time + 16000 /
-                                          (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fh.stop_time
+                          - (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data_onepol == self.payload.data[:, 0, 0])
 
         # Try reading a single polarization.
@@ -383,8 +392,8 @@ class TestDADA:
                        payload_nbytes=32000, npol=2, nchan=2) as fw:
             fw.write(data2d)
             assert np.abs(fw.start_time - start_time) < 1.*u.ns
-            assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz)))
+                    < 1. * u.ns)
 
         # First check if write was successful.
         with dada.open(filename, 'rs') as fh:
@@ -455,12 +464,11 @@ class TestDADA:
         set is valid but invalid samples use the fill value.
         """
         filename = str(tmpdir.join('a.dada'))
-        with catch_warnings(UserWarning) as w:
+        with pytest.warns(UserWarning, match='partial buffer'):
             with dada.open(filename, 'ws', header0=self.header,
                            squeeze=False) as fw:
                 fw.write(self.payload[:10])
-        assert len(w) == 1
-        assert 'partial buffer' in str(w[0].message)
+
         with dada.open(filename, 'rs', squeeze=False) as fwr:
             data = fwr.read()
             assert np.all(data[:10] == self.payload[:10])
@@ -484,16 +492,16 @@ class TestDADA:
         assert np.abs(stop_time - (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
 
         with dada.open(filenames[1], 'rs') as fr:
-            assert (np.abs(fr.time - (start_time + 8000 / (16. * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fr.time - (start_time + 8000 / (16. * u.MHz)))
+                    < 1. * u.ns)
             data1 = fr.read()
         assert np.all(data1 == data[8000:])
 
         with dada.open(filenames, 'rs') as fr:
             assert fr.start_time == start_time
             assert fr.time == start_time
-            assert np.abs(fr.stop_time -
-                          (start_time + 16000 / (16. * u.MHz))) < 1. * u.ns
+            assert np.abs(fr.stop_time
+                          - (start_time + 16000 / (16. * u.MHz))) < 1. * u.ns
             data2 = fr.read()
             assert fr.time == fr.stop_time
         assert np.all(data2 == data)
@@ -549,11 +557,11 @@ class TestDADA:
             assert fh.header0.frame_nbytes == filesize - 3
             assert fh.header0.nbytes == self.header.nbytes
             assert fh.samples_per_frame == (
-                (filesize - self.header.nbytes) * 8 // fh.header0.bps // 2 //
-                np.prod(fh.header0.sample_shape))
+                (filesize - self.header.nbytes) * 8 // fh.header0.bps // 2
+                // np.prod(fh.header0.sample_shape))
             assert fh.header0 is fh._last_header
-            assert np.abs(fh.stop_time - fh.start_time -
-                          7478 / fh.sample_rate) < 1 * u.ns
+            assert np.abs(fh.stop_time - fh.start_time
+                          - 7478 / fh.sample_rate) < 1 * u.ns
             assert fh.shape == (7478, 2)
             # Taking advantage of data being repeated 3 times.
             assert np.all(fh.read() == data[:7478])
@@ -561,8 +569,8 @@ class TestDADA:
         # Check reading sequence of files.
         with dada.open(filenames) as fh:
             assert fh.samples_per_frame == header.samples_per_frame
-            assert np.abs(fh.stop_time - fh.start_time -
-                          39478 / fh.sample_rate) < 1 * u.ns
+            assert np.abs(fh.stop_time
+                          - fh.start_time - 39478 / fh.sample_rate) < 1 * u.ns
             assert fh.shape == (39478, 2)
             assert np.all(fh.read() == data[:39478])
             fh.seek(-29, 2)
@@ -593,8 +601,8 @@ class TestDADA:
 
         # Reading the new sequence, the last frame should be ignored.
         with dada.open(filenames) as fh:
-            assert np.abs(fh.stop_time - fh.start_time -
-                          32000 / fh.sample_rate) < 1 * u.ns
+            assert np.abs(fh.stop_time
+                          - fh.start_time - 32000 / fh.sample_rate) < 1 * u.ns
             assert fh.shape == (32000, 2)
 
     def test_template_stream(self, tmpdir):
@@ -609,24 +617,24 @@ class TestDADA:
             fw.write(data[1000:])
             stop_time = fw.time
         assert np.abs(time1000 - (header.time + 1000 / (16.*u.MHz))) < 1.*u.ns
-        assert np.abs(stop_time - (header.time + 16000 /
-                                   (16. * u.MHz))) < 1. * u.ns
+        assert np.abs(stop_time
+                      - (header.time + 16000 / (16. * u.MHz))) < 1. * u.ns
 
         with dada.open(template.format(frame_nr=1), 'rs') as fr:
             data1 = fr.read()
             assert fr.time == fr.stop_time
-            assert np.abs(fr.start_time -
-                          (start_time + 4000 / (16.*u.MHz))) < 1.*u.ns
-            assert np.abs(fr.stop_time -
-                          (start_time + 8000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.start_time
+                          - (start_time + 4000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.stop_time
+                          - (start_time + 8000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data1 == data[4000:8000])
 
         with dada.open(template, 'rs') as fr:
             assert fr.time == start_time
             data2 = fr.read()
             assert fr.stop_time == fr.time
-            assert np.abs(fr.stop_time -
-                          (header.time + 16000 / (16. * u.MHz))) < 1. * u.ns
+            assert np.abs(fr.stop_time
+                          - (header.time + 16000 / (16. * u.MHz))) < 1. * u.ns
         assert np.all(data2 == data)
 
         # More complicated template, 8 files.
@@ -636,20 +644,20 @@ class TestDADA:
         with dada.open(template, 'ws', header0=header) as fw:
             fw.write(data[:7000])
             assert fw.start_time == header.time
-            assert (np.abs(fw.time - (start_time + 7000 / (16. * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + 7000 / (16. * u.MHz)))
+                    < 1. * u.ns)
             fw.write(data[7000:])
-            assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz)))
+                    < 1. * u.ns)
 
         name3 = template.format(utc_start=header['UTC_START'],
-                                obs_offset=header['OBS_OFFSET'] +
-                                3 * header.payload_nbytes)
+                                obs_offset=header['OBS_OFFSET']
+                                + 3 * header.payload_nbytes)
         with dada.open(name3, 'rs') as fr:
-            assert np.abs(fr.start_time -
-                          (start_time + 6000 / (16.*u.MHz))) < 1.*u.ns
-            assert np.abs(fr.stop_time -
-                          (start_time + 8000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.start_time
+                          - (start_time + 6000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.stop_time
+                          - (start_time + 8000 / (16.*u.MHz))) < 1.*u.ns
             data1 = fr.read()
             assert fr.stop_time == fr.time
         assert np.all(data1 == data[6000:8000])
@@ -660,16 +668,16 @@ class TestDADA:
             dada.open(template, 'rs')
 
         kwargs = dict(UTC_START=header['UTC_START'],
-                      OBS_OFFSET=header['OBS_OFFSET'] +
-                      3 * header.payload_nbytes,
+                      OBS_OFFSET=header['OBS_OFFSET']
+                      + 3 * header.payload_nbytes,
                       FILE_SIZE=header['FILE_SIZE'])
         with dada.open(template, 'rs', **kwargs) as fr:
-            assert (np.abs(fr.time - (start_time + 6000 / (16. * u.MHz))) <
-                    1. * u.ns)
+            assert (np.abs(fr.time - (start_time + 6000 / (16. * u.MHz)))
+                    < 1. * u.ns)
             data2 = fr.read()
             assert fr.time == fr.stop_time
-            assert np.abs(fr.stop_time -
-                          (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
+            assert np.abs(fr.stop_time
+                          - (start_time + 16000 / (16.*u.MHz))) < 1.*u.ns
         assert np.all(data2 == data[6000:])
 
         # Just to check internal checks are OK.

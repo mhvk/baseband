@@ -9,14 +9,13 @@ GUPPI
 The GUPPI format is the output of the `Green Bank Ultimate Pulsar Processing
 Instrument <https://safe.nrao.edu/wiki/bin/view/CICADA/NGNPP>`_ and any clones
 operating at other telescopes, such as `PUPPI at the Arecibo Observatory
-<http://www.naic.edu/puppi-observing/>`_.  Baseband specifically supports GUPPI
-data **taken in baseband mode**, and is based off of `DSPSR's implementation
-<https://github.com/demorest/dspsr>`_.  While general format specifications can
-be found at the `SERA Project
-<http://seraproject.org/mw/index.php?title=GBT_FIle_Formats>`_ and on `Paul
-Demorest's site <https://www.cv.nrao.edu/~pdemores/GUPPI_Raw_Data_Format>`_,
-some of the header information could be invalid or not applicable,
-particularly with older files.
+<https://www.naic.edu/puppi-observing/>`_.  Baseband specifically supports
+GUPPI data **taken in baseband mode**, and is based off of `DSPSR's
+implementation <https://github.com/demorest/dspsr>`_.  While general format
+specifications can be found on `Paul Demorest's site
+<https://www.cv.nrao.edu/~pdemores/GUPPI_Raw_Data_Format>`_, some of the
+header information could be invalid or not applicable, particularly with older
+files.
 
 Baseband currently only supports 8-bit |elementary samples|.
 
@@ -138,4 +137,5 @@ Reference/API
 .. automodapi:: baseband.guppi.header
 .. automodapi:: baseband.guppi.payload
 .. automodapi:: baseband.guppi.frame
+.. automodapi:: baseband.guppi.file_info
 .. automodapi:: baseband.guppi.base

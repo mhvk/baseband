@@ -6,7 +6,7 @@ Implements a Mark5BFrame class that can be used to hold a header and a
 payload, providing access to the values encoded in both.
 
 For the specification, see
-http://www.haystack.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
+https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 """
 import numpy as np
 
@@ -64,15 +64,15 @@ class Mark5BFrame(VLBIFrameBase):
     def __init__(self, header, payload, valid=None, verify=True):
         if valid is None:
             # Is this payload OK?  Usually yes, so short-circuit on first few.
-            valid = (payload.words[0] != self._fill_pattern or
-                     payload.words[1] != self._fill_pattern or
-                     payload.words[2] != self._fill_pattern or
-                     (payload.words[3:] != self._fill_pattern).any())
+            valid = (payload.words[0] != self._fill_pattern
+                     or payload.words[1] != self._fill_pattern
+                     or payload.words[2] != self._fill_pattern
+                     or (payload.words[3:] != self._fill_pattern).any())
 
         super().__init__(header, payload, valid, verify)
 
     @classmethod
-    def fromfile(cls, fh, kday=None, ref_time=None, nchan=1, bps=3, valid=None,
+    def fromfile(cls, fh, kday=None, ref_time=None, nchan=1, bps=2, valid=None,
                  verify=True):
         """Read a frame from a filehandle.
 

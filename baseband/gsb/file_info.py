@@ -1,50 +1,62 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..vlbi_base.file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
+                                   info_item)
 
 
 class GSBTimeStampInfo(VLBIFileReaderInfo):
-    attr_names = ('format', 'mode') + VLBIFileReaderInfo.attr_names[1:]
+    attr_names = ('format', 'mode', 'number_of_frames', 'frame_rate',
+                  'start_time', 'readable', 'missing', 'errors', 'warnings')
     _header0_attrs = ('mode',)
 
-    def _get_header0(self):
-        try:
-            with self._parent.temporary_offset() as fh:
-                fh.seek(0)
-                return fh.read_timestamp()
-        except Exception as exc:
-            self.errors['header0'] = exc
-            return None
+    @info_item
+    def header0(self):
+        with self._parent.temporary_offset() as fh:
+            fh.seek(0)
+            return fh.read_timestamp()
 
-    def _get_format(self):
+    @info_item(needs='header0')
+    def format(self):
         return 'gsb'
 
-    def _readable(self):
-        # Cannot know whether it is readable without the raw data files.
-        return None
+    @info_item(needs='header0')
+    def number_of_frames(self):
+        with self._parent.temporary_offset() as fh:
+            file_nbytes = fh.seek(0, 2)
+            if file_nbytes == self.header0.nbytes:
+                return 1
 
-    def _collect_info(self):
-        super()._collect_info()
-        if self:
-            self.missing['raw'] = 'need raw binary files for the stream reader'
+            guess = max(int(round(file_nbytes / self.header0.nbytes)) - 2, 0)
+            while True:
+                guess += 1
+                fh.seek(self.header0.seek_offset(guess))
+                try:
+                    self.header0.fromfile(fh).time
+                except EOFError:
+                    break
+
+        return guess
+
+    # Cannot know whether it is readable without the raw data files.
+    readable = None
+
+    @info_item
+    def missing(self):
+        missing = super().missing
+        missing['raw'] = 'need raw binary files for the stream reader'
+        return missing
 
 
 class GSBStreamReaderInfo(VLBIStreamReaderInfo):
 
-    def _get_frame0(self):
-        try:
-            return self._parent._read_frame(0)
-        except Exception as exc:
-            self.errors['frame0'] = exc
-            return None
+    @info_item
+    def frame0(self):
+        return self._parent._read_frame(0)
 
-    def _readable(self):
-        # Bit of a hack, but the base reader one suffices here.
-        return VLBIFileReaderInfo._readable(self)
+    # Bit of a hack, but the base reader one suffices here with
+    # the frame0 override above and its default "decodable"
+    readable = VLBIFileReaderInfo.readable
+    decodable = VLBIFileReaderInfo.decodable
 
-    def _raw_file_info(self):
-        info = self._parent.fh_ts.info
-        # The timestamp reader info has a built-in missing for the
-        # raw file, but this is incorrect if we're in a stream, which
-        # cannot have been opened without one. (Yes, this is a hack.)
-        info.missing = {}
-        return info
+    @info_item
+    def file_info(self):
+        return self._parent.fh_ts.info

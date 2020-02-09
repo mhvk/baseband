@@ -1,4 +1,74 @@
-3.0 (unreleased)
+4.0 (unreleased)
+================
+
+- This future version will likely only support python 3.7, numpy 1.17 and
+  astropy 4.0.
+
+
+3.1 (2020-01-23)
+================
+
+Bug Fixes
+---------
+
+- Frame rates are now calculated correctly also for Mark 4 data in which the
+  first frame is the last within a second. [#341]
+
+- Fixed a bug where a VDIF header was not found correctly if the file pointer
+  was very close to the start of a header already. [#346]
+
+- In VDIF header verification, include that the implied payload must have
+  non-negative size. [#348]
+
+- Mark 4 now checks by default (``verify=True``) that frames are ordered
+  correctly. [#349]
+
+- ``find_header`` will now always check that the frame corresponding to
+  a header is complete (i.e., fits within the file). [#354]
+
+- The ``count`` argument to ``.read()`` no longer is changed in-place, making
+  it safe to pass in array scalars or dimensionless quantities. [#373]
+
+Other Changes and Additions
+---------------------------
+
+- The Mark 4, Mark 5B, and VDIF stream readers are now able to replace
+  missing pieces of files with zeros using ``verify='fix'``. This is
+  also the new default; use ``verify=True`` for the old behaviour of
+  raising an error on any inconsistency. [#357]
+
+- The ``VDIFFileReader`` gained a new ``get_thread_ids()`` method, which
+  will scan through frames to determine the threads present in the file.
+  This is now used inside ``VDIFStreamReader`` and, combined with the above,
+  allows reading of files that have missing threads in their first frame
+  set. [#361]
+
+- The stream reader info now also checks whether streams are continuous
+  by reading the first and last sample, allowing a simple way to check
+  whether the file will likely pose problems before possibly spending
+  a lot of time reading it. [#364]
+
+- Much faster localization of Mark 5B frames. [#351]
+
+- VLBI file readers have gained a new method ``locate_frames`` that finds
+  frame starts near the current location. [#354]
+
+- For VLBI file readers, ``find_header`` now raises an exception if no
+  frame is found (rather than return `None`).
+
+- The Mark 4 file reader's ``locate_frame`` has been deprecated. Its
+  functionality is replaced by ``locate_frames`` and ``find_header``. [#354]
+
+- Custom stream readers can now override only part of reading a given frame
+  and testing that it is the right one. [#355]
+
+- The ``HeaderParser`` class was refactored and simplified, making setting
+  keys faster. [#356]
+
+- ``info`` now also provides the number of frames in a file. [#364]
+
+
+3.0 (2019-08-28)
 ================
 
 - This version only supports python3.
@@ -17,22 +87,6 @@ Bug Fixes
   ``verify=False``. This is needed for astropy 3.2, which initializes an empty
   header in its revamped ``.fromstring`` method. [#314]
 
-- Getting ``.info`` on closed files no longer leads to an error (though
-  no information can be retrieved). [#326]
-
-Other Changes and Additions
----------------------------
-
-- Increased speed of VDIF stream reading by removing redundant verification.
-  Reduces the overhead for verification for VDIF CHIME data from 50% (factor
-  1.5) to 13%. [#321]
-
-2.0.1 (unreleased)
-==================
-
-Bug Fixes
----------
-
 - VDIF multichannel headers and payloads are now forced to have power-of-two
   bits per sample. [#315]
 
@@ -44,6 +98,16 @@ Bug Fixes
 
 - All headers now check that ``samples_per_frame`` are set to possible numbers.
   [#325]
+
+- Getting ``.info`` on closed files no longer leads to an error (though
+  no information can be retrieved). [#326]
+
+Other Changes and Additions
+---------------------------
+
+- Increased speed of VDIF stream reading by removing redundant verification.
+  Reduces the overhead for verification for VDIF CHIME data from 50% (factor
+  1.5) to 13%. [#321]
 
 2.0 (2018-12-12)
 ================

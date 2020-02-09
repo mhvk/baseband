@@ -6,7 +6,7 @@ Implements a Mark4Payload class used to store payload words, and decode to
 or encode from a data array.
 
 For the specification, see
-http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 """
 import operator
 
@@ -81,10 +81,10 @@ class Mark4Frame(VLBIFrameBase):
 
         None of the error flags are set.
         """
-        return not np.any(self.header['time_sync_error'] |
-                          self.header['internal_clock_error'] |
-                          self.header['processor_time_out_error'] |
-                          self.header['communication_error'])
+        return not np.any(self.header['time_sync_error']
+                          | self.header['internal_clock_error']
+                          | self.header['processor_time_out_error']
+                          | self.header['communication_error'])
 
     @valid.setter
     def valid(self, valid):

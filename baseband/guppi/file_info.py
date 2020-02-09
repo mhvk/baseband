@@ -1,5 +1,12 @@
 # Licensed under the GPLv3 - see LICENSE
+"""The GuppiFileReaderInfo property.
+
+Overrides what can be gotten from the first header.
+"""
 from ..vlbi_base.file_info import VLBIFileReaderInfo
+
+
+__all__ = ['GUPPIFileReaderInfo']
 
 
 class GUPPIFileReaderInfo(VLBIFileReaderInfo):

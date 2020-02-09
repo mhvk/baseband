@@ -6,7 +6,7 @@ Implements a Mark4Payload class used to store payload words, and decode to
 or encode from a data array.
 
 For the specification, see
-http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 """
 import sys
 from collections import namedtuple
@@ -25,9 +25,9 @@ __all__ = ['reorder32', 'reorder64', 'init_luts', 'decode_8chan_2bit_fanout4',
 if sys.byteorder == 'big':  # pragma: no cover
     def reorder32(x):
         """Reorder 32-track bits to bring signs & magnitudes together."""
-        return (((x & 0x55AA55AA)) |
-                ((x & 0xAA00AA00) >> 9) |
-                ((x & 0x00550055) << 9))
+        return (((x & 0x55AA55AA))
+                | ((x & 0xAA00AA00) >> 9)
+                | ((x & 0x00550055) << 9))
 
     def reorder64(x):
         """Reorder 64-track bits to bring signs & magnitudes together."""
@@ -42,9 +42,9 @@ if sys.byteorder == 'big':  # pragma: no cover
 else:
     def reorder32(x):
         """Reorder 32-track bits to bring signs & magnitudes together."""
-        return (((x & 0xAA55AA55)) |
-                ((x & 0x55005500) >> 7) |
-                ((x & 0x00AA00AA) << 7))
+        return (((x & 0xAA55AA55))
+                | ((x & 0x55005500) >> 7)
+                | ((x & 0x00AA00AA) << 7))
 
     # Can speed this up from 140 to 132 us by predefining bit patterns as
     # array scalars.  Inplace calculations do not seem to help much.
@@ -58,6 +58,7 @@ else:
         return (((x & 0xFFFFFAAFFFFFFAAF)) |
                 ((x & 0x0000050000000500) >> 4) |
                 ((x & 0x0000005000000050) << 4))
+      
     # Check on 2015-JUL-12: C code: 738811025863578102 -> 738829572664316278
     # 118, 209, 53, 244, 148, 217, 64, 10
     # reorder64(np.array([738811025863578102], dtype=np.uint64))
@@ -88,18 +89,18 @@ def init_luts():
     # fanout 1 @ 8/16t, fanout 4 @ 32/64t
     s = i*2  # 0, 2, 4, 6
     m = s+1  # 1, 3, 5, 7
-    lut2bit1 = decoder_levels[2][(b >> s & 1) * 2 +
-                                 (b >> m & 1)]
+    lut2bit1 = decoder_levels[2][2*(b >> s & 1)
+                                 + (b >> m & 1)]
     # fanout 2 @ 8/16t, fanout 1 @ 32/64t
     s = i + (i//2)*2  # 0, 1, 4, 5
     m = s + 2         # 2, 3, 6, 7
-    lut2bit2 = decoder_levels[2][(b >> s & 1) * 2 +
-                                 (b >> m & 1)]
+    lut2bit2 = decoder_levels[2][2*(b >> s & 1)
+                                 + (b >> m & 1)]
     # fanout 4 @ 8/16t, fanout 2 @ 32/64t
     s = i    # 0, 1, 2, 3
     m = s+4  # 4, 5, 6, 7
-    lut2bit3 = decoder_levels[2][(b >> s & 1) * 2 +
-                                 (b >> m & 1)]
+    lut2bit3 = decoder_levels[2][2*(b >> s & 1)
+                                 + (b >> m & 1)]
     return lut1bit, lut2bit1, lut2bit2, lut2bit3
 
 

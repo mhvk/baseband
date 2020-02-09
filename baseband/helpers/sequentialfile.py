@@ -9,8 +9,8 @@ import numpy as np
 from astropy.utils import lazyproperty
 
 
-__all__ = ['FileNameSequencer',
-           'SequentialFileBase', 'SequentialFileReader', 'SequentialFileWriter',
+__all__ = ['FileNameSequencer', 'SequentialFileBase',
+           'SequentialFileReader', 'SequentialFileWriter',
            'open']
 
 
@@ -49,6 +49,7 @@ class FileNameSequencer:
     >>> vfs[10]
     'obs.edv3.00010.vdif'
     """
+
     def __init__(self, template, header={}):
         self.items = {}
 
@@ -88,6 +89,7 @@ class SequentialFileBase:
 
     For details, see `SequentialFileReader` and `SequentialFileWriter`.
     """
+
     def __init__(self, files, mode='rb', opener=None):
         self.files = files
         self.mode = mode
@@ -125,8 +127,8 @@ class SequentialFileBase:
                 file_size = self.file_size
                 if file_size is not None:  # can happen for single-file write.
                     self._file_sizes.append(file_size)
-                    self._file_offsets.append(self._file_offsets[-1] +
-                                              file_size)
+                    self._file_offsets.append(self._file_offsets[-1]
+                                              + file_size)
 
     def tell(self):
         """Return the current stream position."""
@@ -210,6 +212,13 @@ class SequentialFileReader(SequentialFileBase):
         Function to open a single file (default: `io.open`).
     """
 
+    def __getattr__(self, attr):
+        if attr.startswith('read'):
+            # Ensure we skip to the next file if needed.
+            self.seek(0, 1)
+
+        return super().__getattr__(attr)
+
     @property
     def file_size(self):
         """Size of the underlying file currently open for reading."""
@@ -246,8 +255,8 @@ class SequentialFileReader(SequentialFileBase):
             raise OSError('invalid offset')
 
         # If the offset is not in the current file, find right one.
-        while not (0 <= offset - self._file_offsets[self.file_nr] <
-                   self._file_sizes[self.file_nr]):
+        while not (0 <= offset - self._file_offsets[self.file_nr]
+                   < self._file_sizes[self.file_nr]):
             # Note that not all files may have been opened at this point.
             # In that case, bisecting would find we're out of the current files
             # and one would open a new one.  The while loop ensures we keep
@@ -275,6 +284,8 @@ class SequentialFileReader(SequentialFileBase):
 
         data = b''
         while count > 0:
+            # Go to current offset, possibly opening new file.
+            self.seek(0, 1)
             extra = self.fh.read(count)
             if not extra:
                 break
@@ -283,8 +294,6 @@ class SequentialFileReader(SequentialFileBase):
                 data = extra
             else:
                 data += extra
-            # Go to current offset, possibly opening new file.
-            self.seek(0, 1)
 
         return data
     read.__doc__ = io.BufferedIOBase.read.__doc__
@@ -312,6 +321,7 @@ class SequentialFileWriter(SequentialFileBase):
     opener : callable, optional
         Function to open a single file (default: `io.open`).
     """
+
     def __init__(self, files, mode='w+b', file_size=None, opener=None):
         self.file_size = file_size
         super().__init__(files, mode, opener)

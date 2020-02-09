@@ -9,7 +9,7 @@ MARK 5B
 The Mark 5B format is the output format of the Mark 5B disk-based VLBI data
 system.  It is described in its `design specifications`_.
 
-.. _design specifications: http://www.haystack.mit.edu/tech/vlbi/mark5/mark5_memos/019.pdf
+.. _design specifications: https://www.haystack.mit.edu/tech/vlbi/mark5/mark5_memos/019.pdf
 
 .. _mark5b_file_structure:
 
@@ -113,4 +113,5 @@ Reference/API
    :include-all-objects:
 .. automodapi:: baseband.mark5b.payload
 .. automodapi:: baseband.mark5b.frame
+.. automodapi:: baseband.mark5b.file_info
 .. automodapi:: baseband.mark5b.base

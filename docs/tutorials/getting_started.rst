@@ -30,7 +30,7 @@ For this tutorial, we'll use two sample files::
 
     >>> from baseband.data import SAMPLE_VDIF, SAMPLE_MARK5B
 
-The first file is a VDIF one created from `EVN <http://www.evlbi.org/>`_/`VLBA
+The first file is a VDIF one created from `EVN <https://www.evlbi.org/>`_/`VLBA
 <https://public.nrao.edu/telescopes/vlba/>`_ observations of `Black Widow
 pulsar PSR B1957+20 <https://en.wikipedia.org/wiki/Black_Widow_Pulsar>`_,
 while the second is a Mark 5B from EVN/`WSRT
@@ -143,10 +143,17 @@ For an overview of the file, we can either print ``fh_vdif`` itself, or use the
     format = vdif
     bps = 2
     complex_data = False
+    verify = fix
     readable = True
+    <BLANKLINE>
+    checks:  decodable: True
+             continuous: no obvious gaps
     <BLANKLINE>
     File information:
     edv = 3
+    number_of_frames = 16
+    thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+    number_of_framesets = 2
     frame_rate = 1600.0 Hz
     samples_per_frame = 20000
     sample_shape = (8, 1)

@@ -5,18 +5,19 @@ Implements a Mark4Header class used to store header words, and decode/encode
 the information therein.
 
 For the specification of tape Mark 4 format, see
-http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
 A little bit on the disk representation is at
-http://adsabs.harvard.edu/abs/2003ASPC..306..123W
+https://ui.adsabs.harvard.edu/abs/2003ASPC..306..123W
 """
-import operator
+import struct
 
 import numpy as np
 from astropy.time import Time
+from astropy.utils import sharedmethod
 
 from ..vlbi_base.header import HeaderParser, VLBIHeaderBase
-from ..vlbi_base.utils import bcd_decode, bcd_encode, CRC
+from ..vlbi_base.utils import bcd_decode, bcd_encode, CRCStack
 
 __all__ = ['CRC12', 'crc12', 'stream2words', 'words2stream',
            'Mark4TrackHeader', 'Mark4Header']
@@ -35,12 +36,12 @@ CRC12 = 0x180f
 """CRC polynomial used for Mark 4 Headers.
 
 x^12 + x^11 + x^3 + x^2 + x + 1, i.e., 0x180f.
-See page 4 of http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+See page 4 of https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
 This is also a 'standard' CRC-12 mentioned in
 https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 """
-crc12 = CRC(CRC12)
+crc12 = CRCStack(CRC12)
 
 
 def stream2words(stream, track=None):
@@ -90,7 +91,7 @@ def words2stream(words):
 class Mark4TrackHeader(VLBIHeaderBase):
     """Decoder/encoder of a Mark 4 Track Header.
 
-    See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+    See https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
     Parameters
     ----------
@@ -130,6 +131,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
          ('track_roll_enabled', (1, 9, 1, False)),
          ('sequence_suspended', (1, 8, 1, False)),
          ('system_id', (1, 0, 8)),
+         ('_1_0_1_sync', (1, 0, 1, 0)),  # Lowest bit of system ID is 0.
          ('sync_pattern', (2, 0, 32, 0xffffffff)),
          ('bcd_unit_year', (3, 28, 4)),
          ('bcd_day', (3, 16, 12)),
@@ -139,23 +141,32 @@ class Mark4TrackHeader(VLBIHeaderBase):
          ('bcd_fraction', (4, 12, 12)),
          ('crc', (4, 0, 12))))
     _sync_pattern = _header_parser.defaults['sync_pattern']
+    _invariants = {'sync_pattern', '_1_0_1_sync'}
+    """Keys of invariant parts in all Mark 4 headers.
+
+    This includes the lowest bit of 'system_id', which is apparently
+    always 0 (at least, mark5access assumes so too).
+    """
+    _stream_invariants = (_invariants
+                          | {'bcd_headstack1', 'bcd_headstack2',
+                             'track_roll_enabled', 'sequence_suspended',
+                             'system_id'})
+    """Keys of invariant parts in a given Mark 4 stream."""
+
+    _struct = struct.Struct('<5I')
 
     _properties = ('decade', 'track_id', 'fraction', 'time')
     """Properties accessible/usable in initialisation."""
 
     decade = None
+    """Decade of year, to complement 'bcd_unit_year' from header."""
 
     def __init__(self, words, decade=None, ref_time=None, verify=True):
-        if words is None:
-            self.words = [0, 0, 0, 0, 0]
-        else:
-            self.words = words
         if decade is not None:
             self.decade = decade
-        elif ref_time is not None:
+        super().__init__(words, verify=verify)
+        if decade is None and ref_time is not None:
             self.infer_decade(ref_time)
-        if verify:
-            self.verify()
 
     def verify(self):
         """Verify header integrity."""
@@ -179,6 +190,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
 
     @property
     def track_id(self):
+        """Track identifier (decoded from 'bcd_track_id')."""
         return bcd_decode(self['bcd_track_id'])
 
     @track_id.setter
@@ -190,7 +202,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
         """Fractional seconds (decoded from 'bcd_fraction')."""
         ms = bcd_decode(self['bcd_fraction'])
         # The last digit encodes a fraction -- see table 2 in
-        # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        # https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         # 0: 0.00      5: 5.00
         # 1: 1.25      6: 6.25
         # 2: 2.50      7: 7.50
@@ -215,7 +227,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
         'bcd_hour', 'bcd_minute', 'bcd_second' header items, as well as
         the ``fraction`` property (inferred from 'bcd_fraction') and
         ``decade`` from the initialisation.  See
-        See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        See https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         """
         return Time('{decade:03d}{uy:1x}:{d:03x}:{h:02x}:{m:02x}:{s:08.5f}'
                     .format(decade=self.decade//10, uy=self['bcd_unit_year'],
@@ -225,6 +237,13 @@ class Mark4TrackHeader(VLBIHeaderBase):
                     format='yday', scale='utc', precision=5)
 
     def set_time(self, time):
+        """Convert Time object to BCD timestamp elements.
+
+        Parameters
+        ----------
+        time : `~astropy.time.Time`
+            The time to use for this header.
+        """
         old_precision = time.precision
         try:
             time.precision = 5
@@ -246,7 +265,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
 class Mark4Header(Mark4TrackHeader):
     """Decoder/encoder of a Mark 4 Header, containing all streams.
 
-    See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+    See https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
 
     Parameters
     ----------
@@ -271,13 +290,13 @@ class Mark4Header(Mark4TrackHeader):
     """
 
     _track_header = Mark4TrackHeader
-    _properties = (Mark4TrackHeader._properties +
-                   ('fanout', 'samples_per_frame', 'bps', 'nchan', 'nsb',
-                    'converters'))
+    _properties = (Mark4TrackHeader._properties
+                   + ('fanout', 'samples_per_frame', 'bps', 'nchan', 'nsb',
+                      'converters'))
     _dtypes = MARK4_DTYPES
 
     # keyed with bps, fanout; Tables 10-14 in reference documentation:
-    # http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+    # https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
     # rows are channels with Sign, Mag for each for bps=2, columns fanout.
     # So for bps=2, fanout=4 (abbreviating channel a Sign, Mag as aS, aM):
     # Channel a has samples (aS, aM) in tracks (2, 10), (4,12), etc.
@@ -312,6 +331,7 @@ class Mark4Header(Mark4TrackHeader):
                  verify=True):
         if words is None:
             words = np.zeros((5, ntrack), dtype=np.uint32)
+            verify = False
         super().__init__(words, decade=decade, ref_time=ref_time,
                          verify=verify)
 
@@ -319,8 +339,38 @@ class Mark4Header(Mark4TrackHeader):
         super().verify()
         assert set(self['fan_out']) == set(np.arange(self.fanout))
         assert (len(set((c, l) for (c, l) in zip(self['converter_id'],
-                                                 self['lsb_output']))) ==
-                self.nchan)
+                                                 self['lsb_output'])))
+                == self.nchan)
+
+    @sharedmethod
+    def invariant_pattern(self, invariants=None, ntrack=None):
+        """Invariant pattern to help search for headers.
+
+        On the class, like mark5access, we use use one bit more than the sync
+        pattern in word 2, viz., lsb of word 1, which we assume is always 0
+        (it is the lowest bit of eight of 'system_id').
+
+        Parameters
+        ----------
+        invariants : set of str, optional
+            Set of keys to header parts that are shared between all headers
+            of a given type or within a given stream/file.  Default: from
+            `~baseband.vlbi_base.header.VLBIHeaderBase.invariants()`.
+        ntrack : int, optional
+            Number of tracks.  Required for getting class invariants,
+            ignored for instances.
+        """
+
+        if not isinstance(self, type):
+            ntrack = self.ntrack
+
+        elif ntrack is None:
+            raise ValueError("need to pass in ``ntrack`` to "
+                             "get Mark 4 generic invariants.")
+
+        pattern, mask = super().invariant_pattern(invariants=invariants,
+                                                  ntrack=ntrack)
+        return words2stream(pattern), words2stream(mask)
 
     def infer_decade(self, ref_time):
         super().infer_decade(ref_time)
@@ -362,7 +412,7 @@ class Mark4Header(Mark4TrackHeader):
         """Assignments of tracks to channels and fanout items.
 
         The assignments are inferred from tables 10-14 in
-        http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         except that 2 has been subtracted so that tracks start at 0,
         and that for 64 tracks the arrays are suitably enlarged by adding
         another set of channels.
@@ -547,7 +597,8 @@ class Mark4Header(Mark4TrackHeader):
                                8 * self.frame_nbytes)
         if extra or fanout not in (1, 2, 4):
             raise ValueError(
-                "header cannot store {} samples per frame. Should be one of {}."
+                "header cannot store {} samples per frame. "
+                "Should be one of {}."
                 .format(samples_per_frame,
                         ', '.join([str(f * 8 * self.frame_nbytes)
                                    for f in (1, 2, 4)])))
@@ -681,7 +732,7 @@ class Mark4Header(Mark4TrackHeader):
 
         Uses bcd-encoded 'unit_year', 'day', 'hour', 'minute', 'second' and
         'frac_sec', plus ``decade`` from the initialisation to calculate the
-        time.  See http://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
+        time.  See https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         """
         if len(set(self['bcd_fraction'])) == 1:
             return self[0].time
@@ -726,8 +777,8 @@ class Mark4Header(Mark4TrackHeader):
             return self.__class__(new_words, self.decade, verify=False)
 
     def __eq__(self, other):
-        return (type(self) is type(other) and
-                np.all(self.words == other.words))
+        return (type(self) is type(other)
+                and np.all(self.words == other.words))
 
     def __repr__(self):
         name = self.__class__.__name__

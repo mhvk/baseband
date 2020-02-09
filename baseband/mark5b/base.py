@@ -38,6 +38,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
     bps : int, optional
         Bits per elementary sample.  Default: 2.
     """
+
     def __init__(self, fh_raw, kday=None, ref_time=None, nchan=None, bps=2):
         self.kday = kday
         self.ref_time = ref_time
@@ -114,80 +115,18 @@ class Mark5BFileReader(VLBIFileReaderBase):
                     pass
             raise exc
 
-    def find_header(self, forward=True, maximum=None):
-        """Find the nearest header from the current position.
+    def locate_frames(self, pattern=None, **kwargs):
+        """Use a pattern to locate frame starts near the current position.
 
-        If successful, the file pointer is left at the start of the header.
+        Note that the current position is always included.
 
-        Parameters
-        ----------
-        forward : bool, optional
-            Seek forward if `True` (default), backward if `False`.
-        maximum : int, optional
-            Maximum number of bytes to search through.  Default: twice the
-            frame size of 10016 bytes.
-
-        Returns
-        -------
-        header : :class:`~baseband.mark5b.Mark5BHeader` or None
-            Retrieved Mark 5B header, or `None` if nothing found.
+        Parameters are as for
+        `baseband.vlbi_base.base.VLBIFileReaderBase.locate_frames`
+        except that by default the Mark 5B sync pattern is used.
         """
-        frame_nbytes = 10016  # This is fixed for Mark 5B.
-        if maximum is None:
-            maximum = 2 * frame_nbytes
-        # Loop over chunks to try to find the frame marker.
-        file_pos = self.tell()
-        # First check whether we are right at a frame marker (usually true).
-        try:
-            header = self.read_header()
-            self.seek(-header.nbytes, 1)
-            return header
-        except Exception:
-            pass
-
-        self.seek(0, 2)
-        nbytes = self.tell()
-        if forward:
-            iterate = range(file_pos, min(file_pos + maximum - 16,
-                                          nbytes - frame_nbytes))
-        else:
-            iterate = range(min(file_pos, nbytes - frame_nbytes),
-                            max(file_pos - maximum, -1), -1)
-
-        for frame in iterate:
-            try:
-                self.seek(frame)
-                header1 = self.read_header()
-            except Exception:
-                continue
-
-            # Get header from a frame up and check it is consistent (we always
-            # check up since this checks that the payload has the right length)
-            next_frame = frame + frame_nbytes
-            if next_frame > nbytes - 16:
-                # If we're too far ahead for there to be another header,
-                # at least the one below should be OK.
-                next_frame = frame - frame_nbytes
-                # Except if there is only one frame in the first place.
-                if next_frame < 0:
-                    self.seek(frame)
-                    return header1
-
-            self.seek(next_frame)
-            try:
-                header2 = self.read_header()
-            except Exception:
-                continue
-
-            if(header2.jday == header1.jday and
-               abs(header2.seconds - header1.seconds) <= 1 and
-               abs(header2['frame_nr'] - header1['frame_nr']) <= 1):
-                self.seek(frame)
-                return header1
-
-        # Didn't find any frame.
-        self.seek(file_pos)
-        return None
+        if pattern is None:
+            pattern = Mark5BHeader
+        return super().locate_frames(pattern, **kwargs)
 
 
 class Mark5BFileWriter(VLBIFileBase):
@@ -195,6 +134,7 @@ class Mark5BFileWriter(VLBIFileBase):
 
     Adds `write_frame` method to the VLBI binary file wrapper.
     """
+
     def write_frame(self, data, header=None, bps=2, valid=True, **kwargs):
         """Write a single frame (header plus payload).
 
@@ -235,8 +175,6 @@ class Mark5BStreamBase(VLBIStreamBase):
             unsliced_shape=(nchan,), bps=bps, complex_data=False,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
-        self._frame_rate = int((self.sample_rate /
-                                self.samples_per_frame).to(u.Hz).round().value)
 
 
 class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
@@ -272,16 +210,17 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         squeezing). If an empty tuple (default), all channels are read.
     fill_value : float or complex
         Value to use for invalid or missing data. Default: 0.
-    verify : bool, optional
-        Whether to do basic checks of frame integrity when reading.  The first
-        frame of the stream is always checked.  Default: `True`.
+    verify : bool or 'fix', optional
+        Whether to do basic checks of frame integrity when reading.
+        Default: 'fix', which implies basic verification and replacement
+        of gaps with zeros.
     """
 
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, kday=None, ref_time=None,
                  nchan=None, bps=2, squeeze=True, subset=(), fill_value=0.,
-                 verify=True):
+                 verify='fix'):
 
         if nchan is None:
             raise TypeError("Mark 5B stream reader requires nchan to be "
@@ -312,18 +251,17 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         last_header.infer_kday(self.start_time)
         return last_header
 
-    def _read_frame(self, index):
-        self.fh_raw.seek(index * self.header0.frame_nbytes)
-        frame = self.fh_raw.read_frame(verify=self.verify)
-        # Set decoded value for invalid data.
-        frame.fill_value = self.fill_value
+    def _set_time(self, header, time):
+        header.set_time(time, frame_rate=self._frame_rate)
+
+    def _tell_frame(self, frame):
+        # Override to provide index faster, without calculating times.
         # TODO: OK to ignore leap seconds? Not sure what writer does.
-        assert (self._frame_rate *
-                (frame.seconds - self.header0.seconds +
-                 86400 * (frame.kday + frame.jday -
-                          self.header0.kday - self.header0.jday)) +
-                frame['frame_nr'] - self.header0['frame_nr']) == index
-        return frame
+        return int(round(self._frame_rate.to_value(u.Hz)
+                         * (frame.seconds - self.header0.seconds
+                            + 86400 * (frame.kday - self.header0.kday
+                                       + frame.jday - self.header0.jday))
+                         + frame['frame_nr'] - self.header0['frame_nr']))
 
 
 class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
@@ -363,7 +301,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
 
     def __init__(self, fh_raw, header0=None, sample_rate=None, nchan=1, bps=2,
                  squeeze=True, **kwargs):
-        samples_per_frame = Mark5BHeader._payload_nbytes * 8 // bps // nchan
+        samples_per_frame = Mark5BHeader.payload_nbytes * 8 // bps // nchan
         if header0 is None:
             if 'time' in kwargs:
                 kwargs['frame_rate'] = sample_rate / samples_per_frame
@@ -382,9 +320,8 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
         # Set up header for new frame.
         header = self.header0.copy()
         # Update time and frame_nr in one go.
-        frame_rate = self._frame_rate * u.Hz
-        header.set_time(time=self.start_time + index / frame_rate,
-                        frame_rate=frame_rate)
+        header.set_time(time=self.start_time + index / self._frame_rate,
+                        frame_rate=self._frame_rate)
         # Recalculate CRC.
         header.update()
         # Reuse payload.
@@ -418,9 +355,10 @@ subset : indexing object, optional
     squeezing). If an empty tuple (default), all channels are read.
 fill_value : float or complex
     Value to use for invalid or missing data. Default: 0.
-verify : bool, optional
-    Whether to do basic checks of frame integrity when reading.  The first
-    frame of the stream is always checked.  Default: `True`.
+verify : bool or 'fix', optional
+    Whether to do basic checks of frame integrity when reading.
+    Default: 'fix', which implies basic verification and replacement
+    of gaps with zeros.
 
 --- For writing a stream : (see `~baseband.mark5b.base.Mark5BStreamWriter`)
 

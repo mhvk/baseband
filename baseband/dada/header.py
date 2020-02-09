@@ -4,9 +4,13 @@ Definitions for DADA pulsar baseband headers.
 
 Implements a DADAHeader class used to store header definitions in a FITS
 header, and read & write these from files.
+
+The DADA headers are described in the DADA software specification, at
+http://psrdada.sourceforge.net/manuals/Specification.pdf
+
+See also :ref:`dada_header`.
 """
 import io
-import operator
 import warnings
 from collections import OrderedDict
 
@@ -117,8 +121,8 @@ class DADAHeader(OrderedDict):
         args = []
         for line_no, line in enumerate(lines):
             split = line.strip().split('#')
-            comment = split[1].strip() if (len(split) > 1 and
-                                           split[1]) else None
+            comment = split[1].strip() if (len(split) > 1
+                                           and split[1]) else None
             split = split[0].strip().split() if split else []
             key = split[0] if split and split[0] else '_{0:d}'.format(line_no)
             value = split[1] if (len(split) > 1 and split[1]) else None
@@ -174,7 +178,10 @@ class DADAHeader(OrderedDict):
         lines = []
         while fh.tell() - start_pos < hdr_size:
             line = fh.readline().decode('ascii')
-            if line == '' or line[0] == '#' and 'end of header' in line:
+            if line == '':  # empty lines are '\n'
+                raise EOFError
+
+            if line[0] == '#' and 'end of header' in line:
                 break
 
             if line.startswith('HDR_SIZE'):
@@ -351,16 +358,17 @@ class DADAHeader(OrderedDict):
     @property
     def samples_per_frame(self):
         """Number of complete samples in the frame."""
-        return (self.payload_nbytes * 8 //
-                self.bps // (2 if self.complex_data else 1) // self['NPOL'] //
-                self['NCHAN'])
+        return (self.payload_nbytes * 8
+                // (self.bps * (2 if self.complex_data else 1))
+                // self['NPOL']
+                // self['NCHAN'])
 
     @samples_per_frame.setter
     def samples_per_frame(self, samples_per_frame):
         old_payload_nbytes = self.payload_nbytes
         self.payload_nbytes = int(
-            (samples_per_frame * self['NCHAN'] * self['NPOL'] *
-             self.bps * (2 if self.complex_data else 1) + 7) // 8)
+            (samples_per_frame * self['NCHAN'] * self['NPOL']
+             * self.bps * (2 if self.complex_data else 1) + 7) // 8)
         if self.samples_per_frame != samples_per_frame:
             exc = ValueError("header cannot store {} samples per frame. "
                              "Nearest is {}.".format(samples_per_frame,
@@ -371,17 +379,17 @@ class DADAHeader(OrderedDict):
     @property
     def offset(self):
         """Offset from start of observation in units of time."""
-        return ((self['OBS_OFFSET'] *
-                 8 // (self['NBIT'] * self['NDIM'] *
-                       self['NPOL'] * self['NCHAN'])) *
-                self['TSAMP'] * u.us)
+        return ((self['OBS_OFFSET'] * 8
+                 // (self['NBIT'] * self['NDIM']
+                     * self['NPOL'] * self['NCHAN']))
+                * self['TSAMP'] * u.us)
 
     @offset.setter
     def offset(self, offset):
         self['OBS_OFFSET'] = (int((offset / (self['TSAMP'] * u.us))
-                                  .to(u.one).round()) *
-                              ((self['NBIT'] * self['NDIM'] *
-                                self['NPOL'] * self['NCHAN'] + 7) // 8))
+                                  .to(u.one).round())
+                              * ((self['NBIT'] * self['NDIM']
+                                  * self['NPOL'] * self['NCHAN'] + 7) // 8))
 
     @property
     def start_time(self):
@@ -403,8 +411,8 @@ class DADAHeader(OrderedDict):
         if mjd_frac < 0:
             mjd_int -= 1
             mjd_frac += 1.
-        self['MJD_START'] = ('{0:05d}'.format(mjd_int) +
-                             ('{0:17.15f}'.format(mjd_frac))[1:])
+        self['MJD_START'] = ('{0:05d}'.format(mjd_int)
+                             + ('{0:17.15f}'.format(mjd_frac))[1:])
 
     @property
     def time(self):
@@ -439,11 +447,11 @@ class DADAHeader(OrderedDict):
         # more digits than can really be stored.
         return (all(self.get(k, None) == other.get(k, None)
                     for k in (set(self.keys()) | set(other.keys()))
-                    if not k.startswith('_') and k != 'MJD_START') and
-                float(self.get('MJD_START', 0.)) ==
-                float(other.get('MJD_START', 0.)))
+                    if not k.startswith('_') and k != 'MJD_START')
+                and (float(self.get('MJD_START', 0.))
+                     == float(other.get('MJD_START', 0.))))
 
     def __repr__(self):
-        return('{0}("""'.format(self.__class__.__name__) +
-               '\n'.join(self._tolines()) +
-               '""")')
+        return('{0}("""'.format(self.__class__.__name__)
+               + '\n'.join(self._tolines())
+               + '""")')

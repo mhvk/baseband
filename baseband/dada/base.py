@@ -1,8 +1,9 @@
 # Licensed under the GPLv3 - see LICENSE
 import io
 import re
+import operator
+from functools import reduce
 
-import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
@@ -63,6 +64,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
     >>> dfs[10]
     '2013-07-02-01:37:40.0000006400640000.000000.dada'
     """
+
     def __init__(self, template, header={}):
         self.items = {}
 
@@ -87,8 +89,8 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
         file_nr = self.items.pop('file_nr')
         self.items['FRAME_NR'] = self.items['FILE_NR'] = file_nr
         if self._has_obs_offset:
-            self.items['OBS_OFFSET'] = (self._obs_offset0 +
-                                        file_nr * self._file_size)
+            self.items['OBS_OFFSET'] = (self._obs_offset0
+                                        + file_nr * self._file_size)
 
 
 class DADAFileReader(VLBIFileReaderBase):
@@ -158,6 +160,7 @@ class DADAFileWriter(VLBIFileBase):
     wrapper.  The latter allows one to encode data in pieces, writing to disk
     as needed.
     """
+
     def write_frame(self, data, header=None, **kwargs):
         """Write a single frame (header plus payload).
 
@@ -249,13 +252,13 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                          verify=verify)
         # Store number of frames, for finding last header.
         with self.fh_raw.temporary_offset() as fh_raw:
-            fh_raw.seek(0, 2)
-            self._nframes, self._partial_frame_nbytes = divmod(
-                fh_raw.tell(), self.header0.frame_nbytes)
+            self._raw_file_size = fh_raw.seek(0, 2)
+            self._nframes, partial_frame_nbytes = divmod(
+                self._raw_file_size, self.header0.frame_nbytes)
             # If there is a partial last frame.
-            if self._partial_frame_nbytes > 0:
+            if partial_frame_nbytes > 0:
                 # If partial last frame contains payload bytes.
-                if self._partial_frame_nbytes > self.header0.nbytes:
+                if partial_frame_nbytes > self.header0.nbytes:
                     self._nframes += 1
                     # If there's only one frame and it's incomplete.
                     if self._nframes == 1:
@@ -265,8 +268,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                 # frame, in which case raise an EOFError.
                 elif self._nframes == 0:
                     raise EOFError('file (of {0} bytes) appears to end without'
-                                   'any payload.'.format(
-                                       self._partial_frame_nbytes))
+                                   'any payload.'.format(partial_frame_nbytes))
 
     @lazyproperty
     def _last_header(self):
@@ -275,23 +277,26 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         If last frame is prematurely truncated, header's payload_nbytes is
         reduced accordingly to let the stream reader read to the end of file.
         """
-        # Seek forward rather than backward, as last frame often has missing
-        # bytes.
+        # We assume DADA files are complete except for possibly the last one.
+        # Hence, we seek directly to where the last header should be, but
+        # adjust it if the last file is short.
         with self.fh_raw.temporary_offset() as fh_raw:
-            fh_raw.seek((self._nframes - 1) * self.header0.frame_nbytes)
+            self._seek_frame(self._nframes - 1)
             header = fh_raw.read_header()
-            if self._partial_frame_nbytes > self.header0.nbytes:
+            payload_nbytes = self._raw_file_size - fh_raw.tell()
+            assert payload_nbytes > 0, 'setup failed: no payload in last frame'
+            if header.payload_nbytes > payload_nbytes:
+                # Truncated last frame.  Adjust header to give the actual
+                # number of useful samples, insisting that the payload has
+                # integer number of both words and complete samples.
                 header.mutable = True
-                # Payload should have integer number of both words and complete
-                # samples.
                 payload_block = lcm(
                     DADAPayload._dtype_word.itemsize,
-                    self.header0.bps * (
-                        2 if self.header0.complex_data else 1) *
-                    np.prod(self.sample_shape) // 8)
-                header.payload_nbytes = payload_block * (
-                    (self._partial_frame_nbytes - header.nbytes) //
-                    payload_block)
+                    reduce(operator.mul, self.sample_shape,
+                           self.header0.bps * (2 if self.header0.complex_data
+                                               else 1) // 8))
+                header.payload_nbytes = ((payload_nbytes // payload_block)
+                                         * payload_block)
                 header.mutable = False
 
         return header
@@ -303,25 +308,30 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         See also `start_time` for the start time of the file, and `time` for
         the time of the sample pointer's current offset.
         """
-        return (self._get_time(self._last_header) +
-                (self._last_header.samples_per_frame /
-                 self.sample_rate).to(u.s))
+        return (self._get_time(self._last_header)
+                + (self._last_header.samples_per_frame
+                   / self.sample_rate).to(u.s))
 
-    def _read_frame(self, index):
-        if index < self._nframes - 1:
-            self.fh_raw.seek(index * self.header0.frame_nbytes)
-            frame = self.fh_raw.read_frame(memmap=True, verify=self.verify)
-        else:
-            self.fh_raw.seek(index * self.header0.frame_nbytes +
-                             self.header0.nbytes)
-            last_header = self._last_header
-            last_payload = DADAPayload.fromfile(self.fh_raw, memmap=True,
-                                                header=last_header)
-            frame = DADAFrame(last_header, last_payload)
+    def _fh_raw_read_frame(self):
+        # Override to special-case last frame, which may be short.
+        if (self.fh_raw.tell() // self.header0.frame_nbytes
+                < self._nframes - 1):
+            return self.fh_raw.read_frame()
 
-        assert (frame.header['OBS_OFFSET'] - self.header0['OBS_OFFSET'] ==
-                index * self.header0.payload_nbytes)
-        return frame
+        # Use last header, which will have properly adjusted payload size.
+        self.fh_raw.seek(self.header0.nbytes, 1)
+        last_payload = DADAPayload.fromfile(self.fh_raw, memmap=True,
+                                            header=self._last_header)
+        # Ensure we skip all the way to the end of the file, to indicate
+        # there is no use in trying to check for the next header.
+        self.fh_raw.seek(0, 2)
+        return DADAFrame(self._last_header, last_payload)
+
+    def _tell_frame(self, frame):
+        # Override for faster calculation of frame index.
+        return int(round((frame['OBS_OFFSET']
+                          - self.header0['OBS_OFFSET'])
+                         / self.header0.payload_nbytes))
 
 
 class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
@@ -339,6 +349,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
         If `True` (default), `write` accepts squeezed arrays as input,
         and adds any dimensions of length unity.
     """
+
     def __init__(self, fh_raw, header0, squeeze=True):
         assert header0.get('OBS_OVERLAP', 0) == 0
         fh_raw = DADAFileWriter(fh_raw)
@@ -346,8 +357,8 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
 
     def _make_frame(self, index):
         header = self.header0.copy()
-        header.update(obs_offset=self.header0['OBS_OFFSET'] +
-                      index * self.header0.payload_nbytes)
+        header.update(obs_offset=self.header0['OBS_OFFSET']
+                      + index * self.header0.payload_nbytes)
         return self.fh_raw.memmap_frame(header)
 
     def _write_frame(self, frame, valid=True):

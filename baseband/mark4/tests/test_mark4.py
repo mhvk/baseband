@@ -1,11 +1,12 @@
 # Licensed under the GPLv3 - see LICENSE
 import pytest
 import numpy as np
+from numpy.testing import assert_array_equal
 import astropy.units as u
 from astropy.time import Time
-from astropy.tests.helper import catch_warnings
 
 from ... import mark4
+from ...vlbi_base.base import HeaderNotFoundError
 from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
 from ..header import Mark4TrackHeader
 from ..payload import reorder32, reorder64
@@ -78,8 +79,8 @@ class TestMark4:
         assert header.payload_nbytes == header.frame_nbytes - header.nbytes
         assert header.mutable is False
         assert header.nsb == 1
-        assert np.all(header.converters['converter'] ==
-                      [0, 2, 1, 3, 4, 6, 5, 7])
+        assert np.all(header.converters['converter']
+                      == [0, 2, 1, 3, 4, 6, 5, 7])
         assert np.all(header.converters['lsb'])
         assert repr(header).startswith('<Mark4Header bcd_headstack1: [0')
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
@@ -156,8 +157,8 @@ class TestMark4:
         # OK, this is silly, but why not...
         header7.time = header.time + np.arange(64) * 125 * u.ms
         assert len(header7.time) == 64
-        assert np.all(abs(header7.time - header.time -
-                          np.arange(64) * 125 * u.ms) < 1.*u.ns)
+        assert np.all(abs(header7.time - header.time
+                          - np.arange(64) * 125 * u.ms) < 1.*u.ns)
         with pytest.raises(ValueError):  # different decades
             header7.time = header.time - (np.linspace(0, 20, 64) // 4) * 4*u.yr
         # Check slicing.
@@ -191,6 +192,34 @@ class TestMark4:
         assert header13.ntrack == 53
         assert abs(header13.time - header.time) < 1. * u.ns
 
+    def test_invariant_pattern(self):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            fh.seek(0xa88)
+            header0 = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+            fh.seek(0xa88)
+            h0w = np.fromfile(fh, '<u8', header0.nbytes // 8)
+            fh.seek(0xa88+header0.frame_nbytes)
+            h1w = np.fromfile(fh, '<u8', header0.nbytes // 8)
+
+        p, m = header0.invariant_pattern()
+
+        assert np.all(p == h0w)
+        assert not np.all(p == h1w)
+        assert np.all((h1w & m) == (p & m))
+
+        p, m = mark4.Mark4Header.invariant_pattern(ntrack=64)
+        # Check it is the same as what mark5access looked for.
+        assert p[63] == 0
+        assert np.all(p[64:96] == 0xffffffffffffffff)
+        assert np.all(p[:63] == 0)
+        assert np.all(p[96:] == 0)
+        assert np.all(m[63:96] == 0xffffffffffffffff)
+        assert np.all(m[:63] == 0)
+        assert np.all(m[96:] == 0)
+
+        assert np.all((h0w ^ p) & m == 0)
+        assert np.all((h1w ^ p) & m == 0)
+
     @pytest.mark.parametrize(('unit_year', 'ref_time', 'decade'),
                              [(5, Time('2014:1:12:00:00'), 2010),
                               (5, Time('2009:362:19:27:33'), 2000),
@@ -211,9 +240,9 @@ class TestMark4:
         o2h = OPTIMAL_2BIT_HIGH
         assert np.all(mark4.payload.lut1bit[0] == 1.)
         assert np.all(mark4.payload.lut1bit[0xff] == -1.)
-        assert np.all(mark4.payload.lut1bit.astype(int) ==
-                      1 - 2 * ((np.arange(256)[:, np.newaxis] >>
-                                np.arange(8)) & 1))
+        assert np.all(mark4.payload.lut1bit.astype(int)
+                      == 1 - 2 * ((np.arange(256)[:, np.newaxis]
+                                   >> np.arange(8)) & 1))
         assert np.all(mark4.payload.lut2bit1[0] == -o2h)
         assert np.all(mark4.payload.lut2bit1[0x55] == 1.)
         assert np.all(mark4.payload.lut2bit1[0xaa] == -1.)
@@ -232,8 +261,8 @@ class TestMark4:
         check = np.array([738811025863578102], dtype='<u8').view('u8')
         expected = np.array([118, 209, 53, 244, 148, 217, 64, 10])
         assert np.all(reorder64(check).view(np.uint8) == expected)
-        assert np.all(reorder32(check.view('u4')).view(np.uint8) ==
-                      expected)
+        assert np.all(reorder32(check.view('u4')).view(np.uint8)
+                      == expected)
 
     def test_payload(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -249,10 +278,10 @@ class TestMark4:
         assert payload.sample_shape == (8,)
         assert payload.sample_shape.nchan == 8
         assert payload.dtype == np.float32
-        assert np.all(payload[0].astype(int) ==
-                      np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(payload[1].astype(int) ==
-                      np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        assert np.all(payload[0].astype(int)
+                      == np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
+        assert np.all(payload[1].astype(int)
+                      == np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
 
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             payload.tofile(s)
@@ -314,16 +343,17 @@ class TestMark4:
 
     def test_binary_file_reader(self):
         with mark4.open(SAMPLE_FILE, 'rb', decade=2010, ntrack=64) as fh:
-            fh.locate_frame()
-            assert fh.tell() == 0xa88
+            locations = fh.locate_frames()
+            assert locations == [0xa88, 0xa88+64*2500]
+            fh.seek(0xa88)
             header = mark4.Mark4Header.fromfile(fh, decade=2010, ntrack=64)
             fh.seek(0xa88)
             header2 = fh.read_header()
             current_pos = fh.tell()
             assert header2 == header
             frame_rate = fh.get_frame_rate()
-            assert abs(frame_rate -
-                       32 * u.MHz / header.samples_per_frame) < 1 * u.nHz
+            assert abs(frame_rate
+                       - 32 * u.MHz / header.samples_per_frame) < 1 * u.nHz
             assert fh.tell() == current_pos
             repr_fh = repr(fh)
 
@@ -349,10 +379,10 @@ class TestMark4:
         assert frame == mark4.Mark4Frame(header, payload)
         data = frame.data
         assert np.all(data[:640] == 0.)
-        assert np.all(data[640].astype(int) ==
-                      np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(data[641].astype(int) ==
-                      np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        assert np.all(data[640].astype(int)
+                      == np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
+        assert np.all(data[641].astype(int)
+                      == np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
         # Check writing and round-trip.
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             frame.tofile(s)
@@ -509,8 +539,8 @@ class TestMark4:
             header_160000f = fh.find_header(forward=True)
             assert fh.tell() == 0xa88 + header0.frame_nbytes
             fh.seek(0xa87)
-            header_0xa87b = fh.find_header(forward=False)
-            assert header_0xa87b is None
+            with pytest.raises(HeaderNotFoundError):
+                fh.find_header(forward=False)
             assert fh.tell() == 0xa87
             fh.seek(0xa88)
             header_0xa88f = fh.find_header()
@@ -523,16 +553,17 @@ class TestMark4:
             assert fh.tell() == 0xa88
             fh.seek(-10000, 2)
             header_m10000b = fh.find_header(forward=False)
-            assert fh.tell() == 0xa88 + 2*header0.frame_nbytes
+            assert fh.tell() == 0xa88 + header0.frame_nbytes
             fh.seek(-300, 2)
-            header_end = fh.find_header(forward=True)
-            assert header_end is None
+            with pytest.raises(HeaderNotFoundError):
+                fh.find_header(forward=True)
+
         assert header_100b == header_0
         assert header_0xa88f == header_0
         assert header_0xa88b == header_0
         assert header_0xa89 == header_160000f
         assert abs(header_160000f.time - header_0.time - 2.5*u.ms) < 1.*u.ns
-        assert abs(header_m10000b.time - header_0.time - 5*u.ms) < 1.*u.ns
+        assert abs(header_m10000b.time - header_0.time - 2.5*u.ms) < 1.*u.ns
         # test small file
         with open(SAMPLE_FILE, 'rb') as fh:
             # One that simply is too small altogether
@@ -541,9 +572,11 @@ class TestMark4:
                                                        ntrack=64) as fh_short:
                 s.write(fh.read(80000))
                 fh_short.seek(100)
-                assert fh_short.find_header() is None
+                with pytest.raises(HeaderNotFoundError):
+                    fh_short.find_header()
                 assert fh_short.tell() == 100
-                assert fh_short.find_header(forward=False) is None
+                with pytest.raises(HeaderNotFoundError):
+                    fh_short.find_header(forward=False)
                 assert fh_short.tell() == 100
 
             # And one that could fit one frame, but doesn't.
@@ -552,9 +585,11 @@ class TestMark4:
                 fh.seek(0)
                 s.write(fh.read(162690))
                 fh_short.seek(200)
-                assert fh_short.find_header() is None
+                with pytest.raises(HeaderNotFoundError):
+                    fh_short.find_header()
                 assert fh_short.tell() == 200
-                assert fh_short.find_header(forward=False) is None
+                with pytest.raises(HeaderNotFoundError):
+                    fh_short.find_header(forward=False)
                 assert fh_short.tell() == 200
 
             # now add enough that the file does include a complete header.
@@ -574,31 +609,31 @@ class TestMark4:
 
     def test_determine_ntrack(self):
         with mark4.open(SAMPLE_FILE, 'rb', ntrack=64) as fh:
-            offset0 = fh.locate_frame()
-            assert offset0 == 2696
+            offsets = fh.locate_frames()
+            assert offsets[0] == 2696
         with mark4.open(SAMPLE_FILE, 'rb') as fh:
             assert fh.ntrack is None
             ntrack = fh.determine_ntrack()
             assert ntrack == fh.ntrack == 64
-            assert fh.fh_raw.tell() == offset0
+            assert fh.fh_raw.tell() == offsets[0]
 
         with mark4.open(SAMPLE_32TRACK, 'rb', ntrack=32) as fh:
             # Seek past first frame header; find second frame.
             fh.seek(10000)
-            offset0 = fh.locate_frame()
-            assert offset0 == 89656
+            offsets = fh.locate_frames()
+            assert offsets[0] == 89656
         with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
             fh.seek(10000)
             ntrack = fh.determine_ntrack()
-            assert fh.fh_raw.tell() == offset0
+            assert fh.fh_raw.tell() == offsets[0]
             assert ntrack == fh.ntrack == 32
 
         with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb', ntrack=32) as fh:
-            offset0 = fh.locate_frame()
-            assert offset0 == 17436
+            offsets = fh.locate_frames()
+            assert offsets[0] == 17436
         with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
             ntrack = fh.determine_ntrack()
-            assert fh.fh_raw.tell() == offset0
+            assert fh.fh_raw.tell() == offsets[0]
             assert ntrack == fh.ntrack == 32
             assert fh.ntrack == 32
 
@@ -639,10 +674,10 @@ class TestMark4:
 
         assert record.shape == (642, 8)
         assert np.all(record[:640] == 0.)
-        assert np.all(record.astype(int)[640] ==
-                      np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
-        assert np.all(record.astype(int)[641] ==
-                      np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
+        assert np.all(record.astype(int)[640]
+                      == np.array([-1, +1, +1, -3, -3, -3, +1, -1]))
+        assert np.all(record.astype(int)[641]
+                      == np.array([+1, +1, -3, +1, +1, -3, -1, -1]))
         assert record2.shape == (2, 8)
         assert np.all(record2[0] == 0.)
         assert not np.any(record2[1] == 0.)
@@ -755,8 +790,8 @@ class TestMark4:
             assert fh.header0.decade == 2010
             record6 = fh.read()
             assert np.all(record6 == record)
-            assert (abs(fh.time - Time('2020:1:00:00:00.0025', precision=9)) <
-                    1. * u.ns)
+            assert (abs(fh.time - Time('2020:1:00:00:00.0025', precision=9))
+                    < 1. * u.ns)
             assert fh._frame.header.decade == 2020
 
     # Test that writing an incomplete stream is possible, and that frame set is
@@ -764,15 +799,14 @@ class TestMark4:
     @pytest.mark.parametrize('fill_value', (0., -999.))
     def test_incomplete_stream(self, tmpdir, fill_value):
         m4_incomplete = str(tmpdir.join('incomplete.m4'))
-        with catch_warnings(UserWarning) as w:
-            with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fr:
-                record = fr.read(10)
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010) as fr:
+            record = fr.read(10)
+            with pytest.warns(UserWarning, match='partial buffer'):
                 with mark4.open(m4_incomplete, 'ws', header0=fr.header0,
                                 sample_rate=32*u.MHz,
                                 ntrack=64, decade=2010) as fw:
                     fw.write(record)
-        assert len(w) == 1
-        assert 'partial buffer' in str(w[0].message)
+
         with mark4.open(m4_incomplete, 'rs', sample_rate=32*u.MHz,
                         ntrack=64, decade=2010, fill_value=fill_value) as fwr:
             assert np.all(fwr.read() == fill_value)
@@ -791,7 +825,7 @@ class TestMark4:
             s.seek(0)
             # With too many payload samples for one frame, f2.locate_frame
             # will fail.
-            with pytest.raises(AssertionError):
+            with pytest.raises(HeaderNotFoundError):
                 f2 = mark4.open(s, 'rs', sample_rate=32*u.MHz,
                                 ntrack=64, decade=2010)
 
@@ -809,8 +843,41 @@ class TestMark4:
             with mark4.open(s, 'rs', sample_rate=32*u.MHz,
                             ntrack=64, decade=2010) as f2:
                 assert f2.header0 == frame0.header
-                with pytest.raises(ValueError):
+                with pytest.raises(HeaderNotFoundError):
                     f2._last_header
+
+    def test_corrupt_stream_missing_frame(self, tmpdir):
+        corrupt_file = str(tmpdir.join('test.m4'))
+        with mark4.open(SAMPLE_FILE, 'rb', decade=2010, ntrack=64) as fh, \
+                open(corrupt_file, 'w+b') as s:
+            fh.seek(0xa88)
+            frame0 = fh.read_frame()
+            frame1 = fh.read_frame()
+            dt = frame1.time - frame0.time
+            frame0.tofile(s)
+            frame1.header.mutable = True
+            for index in (1, 2, 4):
+                frame1.header.time = frame0.header.time + index * dt
+                frame1.tofile(s)
+
+        with mark4.open(corrupt_file, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010) as f2:
+            assert f2.start_time == frame0.header.time
+            assert abs(f2.stop_time - frame1.header.time - dt) < 1*u.ns
+            with pytest.warns(UserWarning,
+                              match='problem loading frame.*3'):
+                data = f2.read()
+
+        expected = np.concatenate((frame0.data, frame1.data, frame1.data,
+                                   np.zeros_like(frame1.data), frame1.data))
+        assert_array_equal(data, expected)
+
+        with mark4.open(corrupt_file, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010, verify=True) as f3:
+            assert f3.start_time == frame0.header.time
+            assert abs(f3.stop_time - frame1.header.time - dt) < 1*u.ns
+            with pytest.raises(ValueError, match='wrong frame number'):
+                data = f3.read()
 
     def test_stream_invalid(self):
         with pytest.raises(ValueError):
@@ -822,9 +889,9 @@ class TestMark4:
 
 
 class Test32TrackFanout4():
-    def test_locate_frame(self):
+    def test_locate_frames(self):
         with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
-            assert fh.locate_frame() == 9656
+            assert fh.locate_frames() == [9656, 9656+32*2500]
             assert fh.ntrack == 32
 
     def test_header(self):
@@ -847,6 +914,7 @@ class Test32TrackFanout4():
     def test_file_streamer(self, tmpdir):
         with mark4.open(SAMPLE_32TRACK, 'rs', sample_rate=32*u.MHz,
                         ntrack=32, decade=2010) as fh:
+            assert fh.fh_raw.tell() == 9656
             header0 = fh.header0
             assert fh.samples_per_frame == 80000
             assert fh.sample_rate == 32 * u.MHz
@@ -854,7 +922,7 @@ class Test32TrackFanout4():
             assert start_time.yday == '2015:011:01:23:10.48500'
             record = fh.read(160000)
             fh_raw_tell1 = fh.fh_raw.tell()
-            assert fh_raw_tell1 == 169656
+            assert fh_raw_tell1 == 160000+9656
 
         assert np.all(record[:640] == 0.)
         # Data retrieved using: m5d ar/rg10a_ar_no0014 MKIV1_4-256-4-2 700
@@ -868,7 +936,7 @@ class Test32TrackFanout4():
         with mark4.open(fl, 'ws', header0=header0, sample_rate=32*u.MHz) as fw:
             fw.write(record)
             number_of_bytes = fw.fh_raw.tell()
-            assert number_of_bytes == fh_raw_tell1 - 9656
+            assert number_of_bytes == 160000
 
         # Note: this test would not work if we wrote only a single record.
         with mark4.open(fl, 'rs', sample_rate=32*u.MHz,
@@ -885,9 +953,9 @@ class Test32TrackFanout4():
 
 
 class Test32TrackFanout2():
-    def test_locate_frame(self):
+    def test_locate_frames(self):
         with mark4.open(SAMPLE_32TRACK_FANOUT2, 'rb') as fh:
-            assert fh.locate_frame() == 17436
+            assert fh.locate_frames() == [17436, 17436+32*2500]
             assert fh.ntrack == 32
 
     def test_header(self):
@@ -948,9 +1016,9 @@ class Test32TrackFanout2():
 
 
 class Test16TrackFanout4():
-    def test_locate_frame(self):
+    def test_locate_frames(self):
         with mark4.open(SAMPLE_16TRACK, 'rb') as fh:
-            assert fh.locate_frame() == 22124
+            assert fh.locate_frames() == [22124, 22124+16*2500]
             assert fh.ntrack == 16
 
     def test_header(self):
@@ -1011,3 +1079,31 @@ class Test16TrackFanout4():
             orig_bytes = fr.read(number_of_bytes)
             conv_bytes = fh.read()
             assert conv_bytes == orig_bytes
+
+
+def test_start_at_last_frame(tmpdir):
+    """Regression test for files where first frame is last in a second.
+
+    Previously, this caused the frame rate and thus the sample rate to
+    be calculated wrongly.  See gh-340.
+    """
+    fl = str(tmpdir.join('test.m4'))
+    sample_rate = 32*u.MHz
+    frame_rate = sample_rate / 80000
+    start_time = Time('2012-01-02') - 1/frame_rate
+    with mark4.open(fl, 'ws', sample_rate=sample_rate, time=start_time,
+                    ntrack=32, nchan=4, fanout=4, bps=2) as fw:
+        fw.write(np.ones((80000*2, 4)))
+
+    with mark4.open(fl, 'rs', decade=2010) as fr:
+        assert fr.sample_rate == sample_rate
+
+
+@pytest.mark.parametrize('sample', [
+    SAMPLE_FILE, SAMPLE_32TRACK, SAMPLE_32TRACK_FANOUT2,
+    SAMPLE_16TRACK])
+def test_file_streamer_continuous(sample):
+    sample_rate = (16 if sample == SAMPLE_32TRACK_FANOUT2 else 32) * u.MHz
+    with mark4.open(sample, 'rs', sample_rate=sample_rate, decade=2010) as fs:
+        assert fs.info.readable
+        assert 'no obvious gaps' in fs.info.checks['continuous']

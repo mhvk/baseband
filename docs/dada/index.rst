@@ -6,7 +6,10 @@ DADA
 
 Distributed Acquisition and Data Analysis (DADA) format data files contain a
 single :term:`data frame` consisting of an ASCII :term:`header` of typically
-4096 bytes followed by a :term:`payload`.
+4096 bytes followed by a :term:`payload`.  DADA is defined by its
+`software specification
+<http://psrdada.sourceforge.net/manuals/Specification.pdf>`_ and
+actual usage; files are described by an :ref:`ASCII header <dada_header>`.
 
 .. _dada_usage:
 
@@ -85,7 +88,7 @@ To set up a file for writing as a stream is possible as well::
     >>> fr.close()
 
 Here, we have used an even smaller size of the payload, to show how one can
-define multiple files.  DADA data are typically stored in sequences of files. 
+define multiple files.  DADA data are typically stored in sequences of files.
 If one passes a time-ordered list or tuple of filenames to
 `~baseband.dada.open`, it uses |sequentialfile.open| to access the sequence.
 If, as above, one passes a template string, `~baseband.dada.open` uses
@@ -93,6 +96,14 @@ If, as above, one passes a template string, `~baseband.dada.open` uses
 sequencer.  (See API links for further details.)
 
 .. |sequentialfile.open| replace:: `sequentialfile.open <baseband.helpers.sequentialfile.open>`
+
+Further details
+===============
+
+.. toctree::
+   :maxdepth: 1
+
+   header
 
 .. _dada_api:
 

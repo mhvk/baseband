@@ -31,8 +31,8 @@ class TimeGSB(TimeString):
     def set_jds(self, val1, val2):
         """Parse the time strings contained in val1 and set jd1, jd2"""
         iterator = np.nditer([val1, None, None, None, None, None, None],
-                             op_dtypes=([val1.dtype] + 5 * [np.intc] +
-                                        [np.double]))
+                             op_dtypes=([val1.dtype] + 5 * [np.intc]
+                                        + [np.double]))
         try:
             for val, iy, im, id, ihr, imin, dsec in iterator:
                 timestr = val.item()
@@ -63,8 +63,8 @@ class TimeGSB(TimeString):
         isecs = ihmsfs['s']
         ifracs = ihmsfs['f']
 
-        fmt = ('{0:04d} {1:02d} {2:02d} {3:02d} {4:02d} {5:02d} 0.{6:0' +
-               str(self.precision) + 'd}')
+        fmt = ('{0:04d} {1:02d} {2:02d} {3:02d} {4:02d} {5:02d} '
+               '0.{6:0' + str(self.precision) + 'd}')
         outs = []
         for iy, im, id, ihr, imin, isec, ifracsec in np.nditer(
                 [iys, ims, ids, ihrs, imins, isecs, ifracs]):
@@ -185,6 +185,8 @@ class GSBHeader(VLBIHeaderBase):
         """
         start_pos = fh.tell()
         s = fh.readline()
+        if s == '':
+            raise EOFError
         nbytes = fh.tell() - start_pos
         return cls(tuple(s.split()), mode=None, nbytes=nbytes, *args, **kwargs)
 
@@ -238,8 +240,8 @@ class GSBHeader(VLBIHeaderBase):
         return n * nbytes
 
     def __eq__(self, other):
-        return (type(self) is type(other) and
-                tuple(self.words) == tuple(other.words))
+        return (type(self) is type(other)
+                and tuple(self.words) == tuple(other.words))
 
 
 class GSBRawdumpHeader(GSBHeader):

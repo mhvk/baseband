@@ -5,7 +5,7 @@ Release Procedure
 *****************
 
 This procedure is based off of `Astropy's
-<http://docs.astropy.org/en/stable/development/releasing.html>`_, and
+<https://docs.astropy.org/en/stable/development/releasing.html>`_, and
 additionally uses information from the `PyPI packaging tutorial
 <https://packaging.python.org/tutorials/packaging-projects/>`_.
 
@@ -24,7 +24,7 @@ To make releases, you will need
   associated with your GitHub account.  While releases do not need to be
   signed, we recommend doing so to ensure they are trustworthy.  To make a GPG
   key and associate it with your GitHub account, see the `Astropy documentation
-  <http://docs.astropy.org/en/stable/development/releasing.html#creating-a-gpg-signing-key-and-a-signed-tag>`_.
+  <https://docs.astropy.org/en/stable/development/releasing.html#creating-a-gpg-signing-key-and-a-signed-tag>`_.
 
 Versioning
 ==========
@@ -57,12 +57,10 @@ releases are labelled "m", and patch ones labelled "p".
 We begin in the main development branch (the local equivalent to
 ``mhvk/baseband:master``).  First, check the following:
 
-- **Ensure tests pass**.  Run the test suite by running ``python setup.py
-  test`` in the Baseband root directory.  To avoid any headaches further into
-  the release process, run the test suite in both Python 2 and 3 environments.
-  for
+- **Ensure tests pass**.  Run the test suite by running ``python3 setup.py
+  test`` in the Baseband root directory.
 - **Update** ``CHANGES.rst``.  All merge commits to master since the last
-  release should be documented (except trivial ones such as typo corrections). 
+  release should be documented (except trivial ones such as typo corrections).
   Since ``CHANGES.rst`` is updated for each merge commit, in practice it is
   only necessary to change the date of the release you are working on from
   "unreleased" to the current date.
@@ -97,15 +95,13 @@ main development branch.  Then, for each::
     git cherry-pick -m 1 <SHA-1>
 
 For more information, see `Astropy's documentation
-<http://docs.astropy.org/en/stable/development/releasing.html#backporting-fixes-from-master>`_.
+<https://docs.astropy.org/en/stable/development/releasing.html#backporting-fixes-from-master>`_.
 
 Once you have cherry-picked, check the following:
 
 - **Ensure tests pass and documentation builds**.  Run the test suite by
-  running ``python setup.py test``, and build documentation by running
-  ``python setup.py build_docs``, in the Baseband root directory. To avoid any
-  headaches further into the release process, run the test suite in both Python
-  2 and 3 environments.
+  running ``python3 setup.py test``, and build documentation by running
+  ``python3 setup.py build_docs``, in the Baseband root directory.
 - **Update** ``CHANGES.rst``.  Typically, merge commits record their changes,
   including any backported bugfixes, in ``CHANGES.rst``.  Cherry-picking should
   add these records to this branch's ``CHANGES.rst``, but if not, manually
@@ -178,16 +174,15 @@ Finally, package the release's source code::
 5. Test the release
 -------------------
 
-We now test installing and running Baseband in clean Python 2 and Python 3
-virtual environments, to ensure there are no subtle bugs that come from your
-customized development environment. Before creating the virtualenvs, we
-recommend checking if the ``$PYTHONPATH`` environmental variable is set.  If it
-is, set it to a null value (in bash, ``PYTHONPATH=``) before proceeding.
+We now test installing and running Baseband in clean virtual environments, to
+ensure there are no subtle bugs that come from your customized development
+environment. Before creating the virtualenvs, we recommend checking if the
+``$PYTHONPATH`` environmental variable is set.  If it is, set it to a null
+value (in bash, ``PYTHONPATH=``) before proceeding.
 
 To create the environments::
 
-    virtualenv --no-site-packages --python=python basepy2
-    virtualenv --no-site-packages --python=python3 basepy3
+    python3 -m venv --no-site-packages test_release
 
 Now, for each environment, activate it, navigate to the Baseband root
 directory, and run the tests::
@@ -200,12 +195,12 @@ directory, and run the tests::
     python -c 'import baseband; baseband.test()'
     deactivate
 
-If the test suite raises any errors (at this point, likely dependency or
-Python 2 back-compatibility issues), delete the release tag::
+If the test suite raises any errors (at this point, likely dependency issues),
+delete the release tag::
 
     git tag -d v<version>
 
-For a major/minor release, delete the ``v<version branch>.x`` branch as well. 
+For a major/minor release, delete the ``v<version branch>.x`` branch as well.
 Then, make the necessary changes directly on the main development branch.  Once
 the issues are fixed, repeat steps 2 - 6.
 
@@ -246,7 +241,7 @@ Releases, where you should see our new release in blue.
 
 The Baseband GitHub repo `automatically updates
 <https://guides.github.com/activities/citable-code/>`_ Baseband's `Zenodo
-<https://zenodo.org/record/1322808>`_ repository for each published release. 
+<https://zenodo.org/record/1322808>`_ repository for each published release.
 Check if your release has made it to Zenodo by clicking the badge in
 ``Readme.rst``.
 
