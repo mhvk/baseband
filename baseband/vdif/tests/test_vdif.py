@@ -655,7 +655,7 @@ class TestVDIF:
             fh.seek(0, 2)
             assert fh.locate_frames(
                 pattern=np.ma.MaskedArray(
-                    np.array(header0.words[3:6], 'u4').view('u1'),
+                    np.array(header0.words[3:6], '<u4').view('u1'),
                     [False, False, True, True] + [False]*8),
                 offset=3*4,
                 forward=False) == [x*5032 for x in range(15, -1, -1)]

@@ -1,3 +1,13 @@
+3.1.1 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- Mark 5B is fixed so that writing files is now also possible on big-endian
+  architectures.
+
+
 3.1 (2020-01-23)
 ================
 
