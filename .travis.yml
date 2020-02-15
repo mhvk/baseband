@@ -62,8 +62,8 @@ matrix:
 
         - name: Tests that all the basics are covered.
           stage: Initial tests
-          python: 3.7
-          env: TOXENV=py37-test
+          python: 3.8
+          env: TOXENV=py38-test
 
         - name: Code style checks
           stage: Initial tests
@@ -80,6 +80,7 @@ matrix:
 
         # Now try Astropy dev with the latest Python
         - name: Python 3.8 with developer version of astropy
+          stage: Cron tests
           python: 3.8
           env: TOXENV=py38-test-devdeps
 
