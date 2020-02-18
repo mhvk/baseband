@@ -14,6 +14,12 @@ SAMPLE_MARK4 = _full_path('sample.m4')
 
 Created from a European VLBI Network/Arecibo PSR B1957+20 observation using
 dd if=gp052d_ar_no0021 of=sample.m4 bs=128000 count=3
+
+These data follow standard assignments:
+fan_out       0011223300112233001122330011223300112233001122330011223300112233
+magnitude_bit 0000000011111111000000001111111100000000111111110000000011111111
+lsb_output    1111111111111111111111111111111111111111111111111111111111111111
+converter_id  0202020202020202131313131313131346464646464646465757575757575757
 """
 
 SAMPLE_MARK4_32TRACK = _full_path('sample_32track.m4')
@@ -21,6 +27,12 @@ SAMPLE_MARK4_32TRACK = _full_path('sample_32track.m4')
 
 Created from a Arecibo observation simultaneous with RadioAstron using
 dd if=rg10a_ar_no0014 of=sample_32track.m4 bs=10000 count=17
+
+These data follow standard assignments:
+fan_out       00112233001122330011223300112233
+magnitude_bit 00000000111111110000000011111111
+lsb_output    01010101010101010101010101010101
+converted_id  00000000000000001111111111111111
 """
 
 SAMPLE_MARK4_32TRACK_FANOUT2 = _full_path('sample_32track_fanout2.m4')
@@ -28,6 +40,12 @@ SAMPLE_MARK4_32TRACK_FANOUT2 = _full_path('sample_32track_fanout2.m4')
 
 Created from an Arecibo observation of PSR B1133+16 using
 dd if=gk049c_ar_no0011.m5a of=sample_32track_fanout2.m4 bs=10000 count=18
+
+These data follow standard assignments:
+fan_out       00110011001100110011001100110011
+magnitude_bit 00001111000011110000111100001111
+lsb_output    00000000000000001111111111111111
+converted_id  02020202131313130202020213131313
 """
 
 SAMPLE_MARK4_16TRACK = _full_path('sample_16track.m4')
@@ -35,6 +53,24 @@ SAMPLE_MARK4_16TRACK = _full_path('sample_16track.m4')
 
 Created from the first two frames an Arecibo observation of the Crab Pulsar on
 2013/11/03.  (2013_306_raks02ae/ar/gs033a_ar_no0055.m5a)
+
+These data follow standard assignments:
+fan_out       0123012301230123
+magnitude_bit 0000111100001111
+lsb_output    1111111111111111
+converted_id  0000000011111111
+"""
+
+SAMPLE_MARK4_64TRACK_FANOUT2_FT = _full_path('sample_64track_fanout2_ft.m4')
+"""Mark 4 sample. ntrack=64, fanout=2, bps=2.
+
+Created from Fortleza (Ft) station by Shaogang Gao (gh-332).
+
+These data do not follow standard assignments, so need special treatment:
+fan_out       0011001100110011001100110011001100110011001100110011001100110011
+magnitude_bit 0000010110101111000011110000111100000101101011110000111100001111
+lsb_output    0000101000001010000000000000000000001010000010100000000000000000
+converted_id  030303030404040415151515262626267a7a7a7a7b7b7b7b8c8c8c8c9d9d9d9d
 """
 
 SAMPLE_MARK5B = _full_path('sample.m5b')

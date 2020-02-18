@@ -13,7 +13,8 @@ from ..payload import reorder32, reorder64
 from ...data import (SAMPLE_MARK4 as SAMPLE_FILE,
                      SAMPLE_MARK4_32TRACK as SAMPLE_32TRACK,
                      SAMPLE_MARK4_32TRACK_FANOUT2 as SAMPLE_32TRACK_FANOUT2,
-                     SAMPLE_MARK4_16TRACK as SAMPLE_16TRACK)
+                     SAMPLE_MARK4_16TRACK as SAMPLE_16TRACK,
+                     SAMPLE_MARK4_64TRACK_FANOUT2_FT as SAMPLE_64TRACK_FT)
 
 # Results from mark5access on 2015-JAN-22.
 # m5d evn/Ar/gp052d_ar_no0021 MKIV1_4-512-8-2 1000
@@ -1107,3 +1108,77 @@ def test_file_streamer_continuous(sample):
     with mark4.open(sample, 'rs', sample_rate=sample_rate, decade=2010) as fs:
         assert fs.info.readable
         assert 'no obvious gaps' in fs.info.checks['continuous']
+
+
+class Test64TrackFt():
+    def test_locate_frame(self):
+        with mark4.open(SAMPLE_64TRACK_FT, 'rb') as fh:
+            assert fh.locate_frames()[0] == 124288
+            assert fh.ntrack == 64
+
+    def test_header(self):
+        with open(SAMPLE_64TRACK_FT, 'rb') as fh:
+            fh.seek(124288)
+            header = mark4.Mark4Header.fromfile(fh, ntrack=64, decade=2010)
+
+        # Try initialising with properties instead of keywords.
+        # * time imply the decade, bcd_unit_year, bcd_day, bcd_hour,
+        #   bcd_minute, bcd_second, bcd_fraction;
+        # * ntrack, samples_per_frame, bps define headstack_id, bcd_track_id,
+        #   fan_out, and magnitude_bit;
+        # * explicitly set lsb_output and converter_id as they are so odd.
+        header1 = mark4.Mark4Header.fromvalues(
+            ntrack=64, samples_per_frame=40000,
+            time=header.time, system_id=114, lsb_output=header['lsb_output'],
+            converter_id=header['converter_id'],
+            magnitude_bit=header['magnitude_bit'])
+        assert header1 == header
+
+    def test_file_streamer(self, tmpdir):
+        with mark4.open(SAMPLE_64TRACK_FT, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010) as fh:
+            header0 = fh.header0
+            assert fh.samples_per_frame == 40000
+            assert fh.sample_rate == 32 * u.MHz
+            start_time = fh.start_time
+            assert start_time.yday == '2019:128:17:32:21.07250'
+            record = fh.read(40000)
+            fh_raw_tell1 = fh.fh_raw.tell()
+            assert fh_raw_tell1 == 160000 + 124288
+            fh.fh_raw.seek(0)
+            preheader_junk = fh.fh_raw.read(124288)
+
+        assert np.all(record[:320] == 0.)
+        # Note: cannot directly compare with mark5access/m5d,
+        # since that has the wrong bit reordering!  Can only compare the
+        # second half of each 32 tracks, i.e., 4:8 and 12:16. Still, doing
+        # m5d sample_64track_fanout2.m4 MKIV1_2-128-16-2 1000, and
+        # taking first 28 payload samples:
+        m5access_data = np.array(
+            [[3, -3, -1, -3, 1, 1, 3, -3, -1, -3, 1, -1, -1, 1, 1, -1],
+             [3, -3, 1, 3, 1, 1, -1, 1, 3, -3, 1, 3, -1, 1, 3, 3],
+             [-3, 3, 1, -1, -1, -1, -3, 3, -3, 3, -1, 1, -3, -1, -1, 3],
+             [-1, 1, -1, -3, -1, 3, 3, 3, 1, 1, 1, 1, -1, -1, -3, -1]])
+        assert np.all(record[320:324, 4:8].astype(int)
+                      == m5access_data[:, 4:8])
+        assert np.all(record[320:324, 12:].astype(int)
+                      == m5access_data[:, 12:])
+
+        fl = str(tmpdir.join('test.m4'))
+        with mark4.open(fl, 'ws', header0=header0, sample_rate=32*u.MHz) as fw:
+            fw.fh_raw.write(preheader_junk)
+            fw.write(record)
+            number_of_bytes = fw.fh_raw.tell()
+            assert number_of_bytes == fh_raw_tell1
+
+        # Note: this test would not work if we wrote only a single record.
+        with mark4.open(fl, 'rs', sample_rate=32*u.MHz,
+                        ntrack=64, decade=2010) as fh:
+            assert fh.start_time == start_time
+            record2 = fh.read()
+            assert np.all(record2 == record)
+
+        with open(fl, 'rb') as fh, open(SAMPLE_64TRACK_FT, 'rb') as fr:
+            orig_bytes = fr.read(number_of_bytes)
+            conv_bytes = fh.read()
+            assert conv_bytes == orig_bytes
