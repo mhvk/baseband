@@ -37,17 +37,14 @@ env:
         # to repeat them for all configurations.
 
         # The following three variables are for tox. TOXENV is a standard
-        # variable that tox uses to determine the environment to run,
+        # variable that tox uses to determine the environment to run
+        # (the default of empty means not to use tox),
         # TOXARGS are arguments passed to tox, and TOXPOSARGS are arguments
         # that tox passes through to the {posargs} indicator in tox.ini.
         # The latter can be used for example to pass arguments to pytest.
-        - TOXENV='test'
+        - TOXENV=''
         - TOXARGS='-v'
         - TOXPOSARGS=''
-
-        # Also allow tests without pip or tox, getting our packages using apt
-        - INSTALL_WITH_APT=False
-        - APT_DEPENDENCIES='python3-astropy python3-pytest-astropy python3-setuptools'
 
         # If there are matplotlib or other GUI tests, uncomment the following
         # line to use the X virtual framebuffer.
@@ -90,13 +87,13 @@ matrix:
           stage: Cron tests
           arch: s390
           language: c
-          env: INSTALL_WITH_APT=True
+          env: APT_DEPENDENCIES='python3-astropy python3-pytest-astropy python3-setuptools'
 
 install:
 
     # We now use the ci-helpers package to set up our testing environment.
 
-    - if [[ $INSTALL_WITH_APT != True ]]; then
+    - if [ ! -z $TOXENV ]; then
         pip install tox;
       else
         curl https://ftp-master.debian.org/keys/archive-key-10.asc | sudo apt-key add -;
@@ -110,7 +107,7 @@ install:
       fi
 
 script:
-    - if [[ $INSTALL_WITH_APT != True ]]; then
+    - if [ ! -z $TOXENV ]; then
         tox $TOXARGS -- $TOXPOSARGS;
       else
         pytest-3;
