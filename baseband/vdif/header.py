@@ -17,7 +17,8 @@ from ..vlbi_base.header import (four_word_struct, eight_word_struct,
 from ..mark5b.header import Mark5BHeader
 
 
-__all__ = ['VDIFHeader', 'VDIFBaseHeader', 'VDIFSampleRateHeader',
+__all__ = ['VDIFHeader', 'VDIFBaseHeader',
+           'VDIFNoSampleRateHeader', 'VDIFSampleRateHeader',
            'VDIFLegacyHeader', 'VDIFHeader0', 'VDIFHeader1',
            'VDIFHeader2', 'VDIFHeader3', 'VDIFMark5BHeader',
            'VDIF_HEADER_CLASSES']
@@ -50,7 +51,7 @@ class VDIFHeaderMeta(type):
 
         # Ignore VDIFHeader and VDIFBaseHeader, register others
         if name not in ('VDIFHeader', 'VDIFBaseHeader',
-                        'VDIFSampleRateHeader'):
+                        'VDIFNoSampleRateHeader', 'VDIFSampleRateHeader'):
 
             # Extract edv from class; convert to -1 if edv is False
             # for VDIFLegacy
@@ -214,37 +215,12 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         Note that to set ``time`` to non-integer seconds one also needs to
         pass in ``frame_rate`` or ``sample_rate``.
         """
-        # TODO: here, we act differently depending on what information the
-        # VDIF header subclass can handle. Ideally, these different actions
-        # would be stored on the subclasses themselves, but then their super
-        # calls would end up here anyway.  One could by-pass those by checking
-        # whether cls is VDIFHeader.  But another issue is that the headers
-        # with a sample rate are currently subclasses of those without, so
-        # the super chain doesn't work well.
-        #
         # Some defaults that are not done by setting properties.
         kwargs.setdefault('legacy_mode', edv is False)
         if edv is not False:
             kwargs['edv'] = edv
-        # For setting time, one normally needs a frame rate.  If headers
-        # provide this information, we can just proceed.
-        if 'time' not in kwargs or 'frame_rate' in VDIF_HEADER_CLASSES.get(
-                edv if edv is not False else -1, VDIFBaseHeader)._properties:
-            return super().fromvalues(edv, verify=verify, **kwargs)
-        # If the VDIF header subclass does not provide the frame rate, we
-        # first initialize without time, and then set the time explicitly
-        # using whatever frame_rate or sample_rate was passed.
-        time = kwargs.pop('time')
-        sample_rate = kwargs.pop('sample_rate', None)
-        frame_rate = kwargs.pop('frame_rate', None)
-        # Skip verification in super as we do it after time is set.
-        self = super().fromvalues(edv, verify=False, **kwargs)
-        if frame_rate is None and sample_rate is not None:
-            frame_rate = sample_rate / self.samples_per_frame
-        self.set_time(time, frame_rate=frame_rate)
-        if verify:
-            self.verify()
-        return self
+
+        return super().fromvalues(edv, verify=verify, **kwargs)
 
     @classmethod
     def fromkeys(cls, **kwargs):
@@ -471,7 +447,44 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     time = property(get_time, set_time)
 
 
-class VDIFLegacyHeader(VDIFHeader):
+class VDIFNoSampleRateHeader(VDIFHeader):
+    def update(self, *, time=None, frame_rate=None, sample_rate=None,
+               verify=True, **kwargs):
+        """Update the header by setting keywords or properties.
+
+        Here, any keywords matching header keys are applied first, and any
+        remaining ones are used to set header properties, in the order set
+        by the class (in ``_properties``).
+
+        Parameters
+        ----------
+        time : `~astropy.time.Time`, optional
+            A possible new time.  This is updated last.
+        frame_rate : `~astropy.units.Quantity`, optional
+            The frame rate to use in calculating the frame number from the
+            time.  Needed for times at non-integer seconds.  Ignored if no
+            ``time`` is given.
+        sample_rate : `~astropy.units.Quantity`, optional
+            Alternative to ``frame_rate``.  Ignored if no ``time`` is given,
+            or if ``frame_rate`` is given.
+        verify : bool, optional
+            If `True` (default), verify integrity after updating.
+        **kwargs
+            Arguments used to set keywords and properties.
+        """
+        super().update(verify=False, **kwargs)
+
+        if time is not None:
+            if frame_rate is None and sample_rate is not None:
+                frame_rate = sample_rate / self.samples_per_frame
+
+            self.set_time(time, frame_rate=frame_rate)
+
+        if verify:
+            self.verify()
+
+
+class VDIFLegacyHeader(VDIFNoSampleRateHeader):
     """Legacy VDIF header that uses only 4 32-bit words.
 
     See Section 6 of
@@ -530,7 +543,7 @@ class VDIFBaseHeader(VDIFHeader):
             assert self['sync_pattern'] == self._sync_pattern
 
 
-class VDIFHeader0(VDIFBaseHeader):
+class VDIFHeader0(VDIFBaseHeader, VDIFNoSampleRateHeader):
     """VDIF Header for EDV=0.
 
     EDV=0 implies the extended user data fields are not used.
@@ -698,7 +711,7 @@ class VDIFHeader3(VDIFSampleRateHeader):
         return cls.nbytes + cls.payload_nbytes
 
 
-class VDIFHeader2(VDIFBaseHeader):
+class VDIFHeader2(VDIFBaseHeader, VDIFNoSampleRateHeader):
     """VDIF Header for EDV=2.
 
     See https://vlbi.org/wp-content/uploads/2019/03/alma-vdif-edv.pdf
@@ -733,7 +746,7 @@ class VDIFHeader2(VDIFBaseHeader):
         assert self.bps == 2 and not self['complex_data']
 
 
-class VDIFMark5BHeader(VDIFBaseHeader, Mark5BHeader):
+class VDIFMark5BHeader(VDIFBaseHeader, VDIFNoSampleRateHeader, Mark5BHeader):
     """Mark 5B over VDIF (EDV=0xab).
 
     See https://vlbi.org/wp-content/uploads/2019/03/vdif_extension_0xab.pdf
