@@ -114,7 +114,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     # that is not a safe bet.
 
     _properties = ('frame_nbytes', 'payload_nbytes', 'bps', 'nchan',
-                   'samples_per_frame', 'station', 'time')
+                   'samples_per_frame', 'station', 'ref_time', 'time')
     """Properties accessible/usable in initialisation for all VDIF headers."""
 
     _edv = None
@@ -219,6 +219,9 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         kwargs.setdefault('legacy_mode', edv is False)
         if edv is not False:
             kwargs['edv'] = edv
+
+        if 'time' in kwargs and 'ref_epoch' not in kwargs:
+            kwargs.setdefault('ref_time', kwargs['time'])
 
         return super().fromvalues(edv, verify=verify, **kwargs)
 
@@ -374,6 +377,20 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         assert int(station_id) == station_id
         self['station_id'] = station_id
 
+    @property
+    def ref_time(self):
+        """Reference time for the header, as encoded by 'ref_epoch'.
+
+        If set, will use the nearest reference epoch before the given time.
+        """
+        return ref_epochs[self['ref_epoch']]
+
+    @ref_time.setter
+    def ref_time(self, ref_time):
+        assert ref_time > ref_epochs[0]
+        ref_index = np.searchsorted((ref_epochs - ref_time).sec, 0) - 1
+        self['ref_epoch'] = ref_index
+
     def get_time(self, frame_rate=None):
         """Converts ref_epoch, seconds, and frame_nr to Time object.
 
@@ -402,7 +419,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
 
             offset = (frame_nr / frame_rate).to_value(u.s)
 
-        return (ref_epochs[self['ref_epoch']]
+        return (self.ref_time
                 + TimeDelta(self['seconds'], offset, format='sec'))
 
     def set_time(self, time, frame_rate=None):
@@ -418,10 +435,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
         frame_rate : `~astropy.units.Quantity`, optional
             For calculating 'frame_nr' from the fractional seconds.
         """
-        assert time > ref_epochs[0]
-        ref_index = np.searchsorted((ref_epochs - time).sec, 0) - 1
-        self['ref_epoch'] = ref_index
-        seconds = time - ref_epochs[ref_index]
+        seconds = time - self.ref_time
         int_sec = int(seconds.sec)
 
         # Round to nearest ns to handle timestamp difference errors.
