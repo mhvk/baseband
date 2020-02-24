@@ -181,8 +181,7 @@ class Mark5BStreamBase(VLBIStreamBase):
 
     def _set_time(self, header, time):
         """Update time and frame_nr, as well as the CRC."""
-        header.set_time(time, frame_rate=self._frame_rate)
-        header.update()
+        header.update(time=time, frame_rate=self._frame_rate)
 
 
 class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
