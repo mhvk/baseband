@@ -210,7 +210,8 @@ class VLBIFrameBase:
 
     # Try to get any attribute not on the frame from the header properties.
     def __getattr__(self, attr):
-        if attr in self.header._properties:
+        if (attr in self.header._properties
+                or attr in ('get_time', 'set_time', 'update')):
             return getattr(self.header, attr)
         else:
             # Raise appropriate error.

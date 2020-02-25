@@ -1022,7 +1022,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
     def _make_frame(self, index):
         # Default implementation assumes that an initial _frame was
         # set up and just re-uses it with a new time.
-        self._set_time(self._frame.header,
+        self._set_time(self._frame,
                        self.start_time + index / self._frame_rate)
         return self._frame
 
