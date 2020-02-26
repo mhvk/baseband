@@ -386,6 +386,13 @@ class VDIFStreamBase(VLBIStreamBase):
         """
         return header.get_time(frame_rate=self._frame_rate)
 
+    def _set_time(self, header, time):
+        """Set time in a header.
+
+        This passes on sample rate, which not all VDIF headers can calculate.
+        """
+        header.update(time=time, frame_rate=self._frame_rate)
+
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
                 "    sample_rate={s.sample_rate},"
@@ -818,19 +825,18 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
                 self.header0.sample_rate = self.sample_rate
             assert self.header0.sample_rate == self.sample_rate
 
-        self._frameset = VDIFFrameSet.fromdata(
+        self._frame = VDIFFrameSet.fromdata(
             np.zeros((self.samples_per_frame,) + self._unsliced_shape,
                      dtype=np.complex64 if self.complex_data else np.float32),
             self.header0)
 
-    def _make_frame(self, index):
+    def _set_index(self, frame, index):
+        # Override to avoid explicit time calculations.
         dt, frame_nr = divmod(index + self.header0['frame_nr'],
                               int(self._frame_rate.to_value(u.Hz)))
         seconds = self.header0['seconds'] + dt
-        # Reuse frameset.
-        self._frameset['seconds'] = seconds
-        self._frameset['frame_nr'] = frame_nr
-        return self._frameset
+        frame['seconds'] = seconds
+        frame['frame_nr'] = frame_nr
 
 
 open = make_opener('VDIF', globals(), doc="""

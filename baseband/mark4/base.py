@@ -400,10 +400,6 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
             header0)
         self._frame = Mark4Frame(header0.copy(), payload)
 
-    def _set_time(self, header, time):
-        # Set time using update to also update CRC.
-        header.update(time=time)
-
 
 open = make_opener('Mark4', globals(), doc="""
 --- For reading a stream : (see `~baseband.mark4.base.Mark4StreamReader`)

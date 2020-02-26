@@ -1019,11 +1019,13 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             # Explicitly set offset (just in case write_frame adjusts it too).
             self.offset = offset0 + sample
 
+    def _set_index(self, frame, index):
+        frame.update(time=self.start_time + index / self._frame_rate)
+
     def _make_frame(self, index):
         # Default implementation assumes that an initial _frame was
-        # set up and just re-uses it with a new time.
-        self._set_time(self._frame,
-                       self.start_time + index / self._frame_rate)
+        # set up and just re-uses it with a new index
+        self._set_index(self._frame, index)
         return self._frame
 
     def _write_frame(self, frame, valid=True):

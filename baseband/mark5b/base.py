@@ -321,6 +321,11 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
                                 bps=self.bps)
         self._frame = Mark5BFrame(header0.copy(), payload)
 
+    def _set_index(self, frame, index):
+        """Update time and frame_nr, as well as the CRC."""
+        frame.update(time=self.start_time + index / self._frame_rate,
+                     frame_rate=self._frame_rate)
+
 
 open = make_opener('Mark5B', globals(), doc="""
 --- For reading a stream : (see `~baseband.mark5b.base.Mark5BStreamReader`)
