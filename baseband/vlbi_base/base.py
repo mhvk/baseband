@@ -20,7 +20,8 @@ from .utils import byte_array
 
 
 __all__ = ['HeaderNotFoundError',
-           'FileBase', 'VLBIFileReaderBase', 'StreamBase',
+           'FileBase', 'VLBIFileReaderBase',
+           'StreamBase', 'StreamReaderBase',
            'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
            'FileInfo', 'FileOpener']
 
@@ -573,7 +574,7 @@ class StreamBase:
                                      if self.subset else '')))
 
 
-class VLBIStreamReaderBase(StreamBase):
+class StreamReaderBase(StreamBase):
 
     info = StreamReaderInfo()
 
@@ -680,16 +681,14 @@ class VLBIStreamReaderBase(StreamBase):
 
     @lazyproperty
     def _last_header(self):
-        """Last header of the file."""
-        with self.fh_raw.temporary_offset(
-                -self.header0.frame_nbytes, 2) as fh_raw:
-            try:
-                return fh_raw.find_header(self.header0, forward=False,
-                                          check=(-1, 1))
-            except HeaderNotFoundError as exc:
-                exc.args += ("corrupt VLBI frame? No frame in last {0} bytes."
-                             .format(2 * self.header0.frame_nbytes),)
-                raise
+        """Header of the last file for this stream."""
+        # Base implementation.  Seek forward rather than backward, as last
+        # frame can have missing bytes.
+        with self.fh_raw.temporary_offset() as fh_raw:
+            file_size = fh_raw.seek(0, 2)
+            nframes, fframe = divmod(file_size, self.header0.frame_nbytes)
+            fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
+            return fh_raw.read_header()
 
     # Override the following so we can refer to stop_time in the docstring.
     @property
@@ -864,8 +863,62 @@ class VLBIStreamReaderBase(StreamBase):
     def _read_frame(self, index):
         """Base implementation of reading a frame.
 
-        This contains two pieces which subclasses can override as needed
-        (or override the whole thing).
+        It cannot handle bad frames, and contains pieces which subclasses
+        can override as needed (or override the whole thing).
+        """
+        self._seek_frame(index)
+        frame = self._fh_raw_read_frame()
+        # Check whether we actually got the right frame.
+        if self.verify and self._get_index(frame) != index:
+            raise ValueError('wrong frame number.')
+
+        return frame
+
+    def _seek_frame(self, index):
+        """Move the underlying file pointer to the frame of the given index."""
+        return self.fh_raw.seek(self._raw_offsets[index])
+
+    def _fh_raw_read_frame(self):
+        """Read a frame at the current position of the underlying file."""
+        return self.fh_raw.read_frame(verify=self.verify)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Remove any cached frames and associated indices, since these
+        # are almost certainly not needed and can be regenerated.
+        for item in ('_frame', '_frame_index', '_next_frame', '_next_index',
+                     'sample_shape'):
+            state.pop(item, None)
+
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+
+class VLBIStreamReaderBase(StreamReaderBase):
+    # This class is different mostly in assuming more specifically
+    # that the underlying file has small subsequent frames, and
+    # that its fh_raw has a find_header method.
+
+    @lazyproperty
+    def _last_header(self):
+        """Last header of the file."""
+        with self.fh_raw.temporary_offset(
+                -self.header0.frame_nbytes, 2) as fh_raw:
+            try:
+                return fh_raw.find_header(self.header0, forward=False,
+                                          check=(-1, 1))
+            except HeaderNotFoundError as exc:
+                exc.args += ("corrupt VLBI frame? No frame in last {0} bytes."
+                             .format(2 * self.header0.frame_nbytes),)
+                raise
+
+    def _read_frame(self, index):
+        """Base implementation of reading a VLBI frame.
+
+        It can handle bad frames to some extent, and contains pieces
+        which subclasses can override as needed.
         """
         self._seek_frame(index)
         if not self.verify:
@@ -998,27 +1051,6 @@ class VLBIStreamReaderBase(StreamBase):
 
         warnings.warn(msg)
         return frame
-
-    def _seek_frame(self, index):
-        """Move the underlying file pointer to the frame of the given index."""
-        return self.fh_raw.seek(self._raw_offsets[index])
-
-    def _fh_raw_read_frame(self):
-        """Read a frame at the current position of the underlying file."""
-        return self.fh_raw.read_frame(verify=self.verify)
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        # Remove any cached frames and associated indices, since these
-        # are almost certainly not needed and can be regenerated.
-        for item in ('_frame', '_frame_index', '_next_frame', '_next_index',
-                     'sample_shape'):
-            state.pop(item, None)
-
-        return state
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
 
 
 class VLBIStreamWriterBase(StreamBase):

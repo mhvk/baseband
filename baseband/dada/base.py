@@ -10,7 +10,7 @@ from astropy.utils import lazyproperty
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
     FileBase,
-    StreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, StreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from ..vlbi_base.file_info import FileReaderInfo
 from ..vlbi_base.utils import lcm
@@ -224,7 +224,7 @@ class DADAStreamBase(StreamBase):
                       + index * self.header0.payload_nbytes)
 
 
-class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
+class DADAStreamReader(DADAStreamBase, StreamReaderBase):
     """DADA format reader.
 
     Allows access to DADA files as a continuous series of samples.
@@ -250,7 +250,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
 
     def __init__(self, fh_raw, squeeze=True, subset=(), verify=True):
         fh_raw = DADAFileReader(fh_raw)
-        header0 = DADAHeader.fromfile(fh_raw)
+        header0 = fh_raw.read_header()
         super().__init__(fh_raw, header0, squeeze=squeeze, subset=subset,
                          verify=verify)
         # Store number of frames, for finding last header.

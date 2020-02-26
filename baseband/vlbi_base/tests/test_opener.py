@@ -9,7 +9,7 @@ from ...helpers import sequentialfile as sf
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..base import (FileOpener,
                     FileBase, VLBIFileReaderBase,
-                    VLBIStreamReaderBase, VLBIStreamWriterBase)
+                    StreamReaderBase, VLBIStreamWriterBase)
 
 
 class BareHeader(VLBIHeaderBase):
@@ -38,7 +38,7 @@ class BareFileWriter(FileBase):
     pass
 
 
-class BareStreamReader(VLBIStreamReaderBase):
+class BareStreamReader(StreamReaderBase):
     pass
 
 

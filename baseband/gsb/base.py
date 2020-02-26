@@ -8,7 +8,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
     FileBase,
-    StreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, StreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from .header import GSBHeader
 from .payload import GSBPayload
@@ -257,7 +257,7 @@ class GSBStreamBase(StreamBase):
                     self.subset else '')))
 
 
-class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
+class GSBStreamReader(GSBStreamBase, StreamReaderBase):
     """GSB format reader.
 
     Allows access to GSB files as a continuous series of samples.  Requires
@@ -306,7 +306,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         Whether to do basic checks of frame integrity when reading.  The first
         frame of the stream is always checked.  Default: `True`.
     """
-    # TODO: right we are not really compatible with VLBIStreamReaderBase,
+    # TODO: right we are not really compatible with StreamReaderBase,
     # since we need to access multiple files.  Can this be solved with
     # FileWriter/FileReader classes that handle timestamps and multiple blocks,
     # combining these into a frame?
@@ -366,10 +366,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         """Whether the file can be read and decoded."""
         return self.info.readable
 
-    def _read_frame(self, index):
-        # We simply overwrite the base implementation, since for GSB
-        # standard assumptions, like fh_raw being a single file, do
-        # not hold.
+    def _seek_frame(self, index):
         self.fh_ts.seek(self.header0.seek_offset(index))
         if self.header0.mode == 'rawdump':
             self.fh_raw.seek(index * self._payload_nbytes)
@@ -378,15 +375,12 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 for fh in fh_pair:
                     fh.seek(index * self._payload_nbytes)
 
-        frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
-                                  payload_nbytes=self._payload_nbytes,
-                                  nchan=self._unsliced_shape.nchan,
-                                  bps=self.bps, complex_data=self.complex_data,
-                                  verify=self.verify)
-        if self.verify and self._get_index(frame) != index:
-            raise ValueError('wrong frame number.')
-
-        return frame
+    def _fh_raw_read_frame(self):
+        return GSBFrame.fromfile(self.fh_ts, self.fh_raw,
+                                 payload_nbytes=self._payload_nbytes,
+                                 nchan=self._unsliced_shape.nchan,
+                                 bps=self.bps, complex_data=self.complex_data,
+                                 verify=self.verify)
 
     def __getstate__(self):
         state = super().__getstate__()

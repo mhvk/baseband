@@ -7,7 +7,7 @@ from astropy.utils import lazyproperty
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
     FileBase,
-    StreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, StreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
@@ -225,7 +225,7 @@ class GUPPIStreamBase(StreamBase):
                       + index * self._packets_per_frame)
 
 
-class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
+class GUPPIStreamReader(GUPPIStreamBase, StreamReaderBase):
     """GUPPI format reader.
 
     Allows access to GUPPI files as a continuous series of samples.
@@ -251,20 +251,9 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
 
     def __init__(self, fh_raw, squeeze=True, subset=(), verify=True):
         fh_raw = GUPPIFileReader(fh_raw)
-        header0 = GUPPIHeader.fromfile(fh_raw)
+        header0 = fh_raw.read_header()
         super().__init__(fh_raw, header0, squeeze=squeeze,
                          subset=subset, verify=verify)
-
-    @lazyproperty
-    def _last_header(self):
-        """Header of the last file for this stream."""
-        # Seek forward rather than backward, as last frame often has missing
-        # bytes.
-        with self.fh_raw.temporary_offset() as fh_raw:
-            file_size = fh_raw.seek(0, 2)
-            nframes, fframe = divmod(file_size, self.header0.frame_nbytes)
-            fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
-            return fh_raw.read_header()
 
 
 class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
