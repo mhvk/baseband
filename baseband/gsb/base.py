@@ -435,7 +435,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
 
         return GSBFrame(header, self._payload, valid=True, verify=False)
 
-    def _write_frame(self, frame):
+    def _fh_raw_write_frame(self, frame):
         assert frame.valid
         frame.tofile(self.fh_ts, self.fh_raw)
 

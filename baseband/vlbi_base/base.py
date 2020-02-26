@@ -1020,7 +1020,7 @@ class VLBIStreamWriterBase(VLBIStreamBase):
                                                          sample + nsample]
             self._frame.valid &= valid
             if sample_end == self.samples_per_frame:
-                self._write_frame(self._frame)
+                self._fh_raw_write_frame(self._frame)
 
             sample += nsample
             # Explicitly set offset (just in case write_frame adjusts it too).
@@ -1033,9 +1033,9 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         self._frame.valid = True
         return self._frame
 
-    def _write_frame(self, frame):
-        # Default implementation is to assume this is a frame that can write
-        # the underlying binary file.
+    def _fh_raw_write_frame(self, frame):
+        # Default implementation is to assume that the frame knows how to
+        # write itself to the underlying file.
         frame.tofile(self.fh_raw)
 
     def close(self):
