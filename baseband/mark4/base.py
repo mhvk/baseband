@@ -4,7 +4,7 @@ from astropy.utils import lazyproperty
 import astropy.units as u
 
 from ..vlbi_base.base import (
-    VLBIFileBase, VLBIFileReaderBase,
+    FileBase, VLBIFileReaderBase,
     VLBIStreamBase, VLBIStreamReaderBase,
     VLBIStreamWriterBase, HeaderNotFoundError,
     FileOpener, FileInfo)
@@ -204,7 +204,7 @@ class Mark4FileReader(VLBIFileReaderBase):
                                   "explicit value.".format(trials))
 
 
-class Mark4FileWriter(VLBIFileBase):
+class Mark4FileWriter(FileBase):
     """Simple writer for Mark 4 files.
 
     Adds `write_frame` method to the VLBI binary file wrapper.

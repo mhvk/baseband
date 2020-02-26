@@ -20,7 +20,7 @@ from .utils import byte_array
 
 
 __all__ = ['HeaderNotFoundError',
-           'VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
+           'FileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
            'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
            'FileInfo', 'FileOpener']
 
@@ -30,7 +30,7 @@ class HeaderNotFoundError(LookupError):
     pass
 
 
-class VLBIFileBase:
+class FileBase:
     """VLBI file wrapper, used to add frame methods to a binary data file.
 
     The underlying file is stored in ``fh_raw`` and all attributes that do not
@@ -121,7 +121,7 @@ class VLBIFileBase:
         self.__dict__.update(state)
 
 
-class VLBIFileReaderBase(VLBIFileBase):
+class VLBIFileReaderBase(FileBase):
     """VLBI wrapped file reader base class.
 
     Typically, a subclass will define ``read_header``, ``read_frame``,

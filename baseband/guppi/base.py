@@ -6,7 +6,7 @@ from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
-    VLBIFileBase, VLBIFileReaderBase,
+    FileBase, VLBIFileReaderBase,
     VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from .header import GUPPIHeader
@@ -140,7 +140,7 @@ class GUPPIFileReader(VLBIFileReaderBase):
                 / (header.samples_per_frame - header.overlap)).to(u.Hz)
 
 
-class GUPPIFileWriter(VLBIFileBase):
+class GUPPIFileWriter(FileBase):
     """Simple writer/mapper for GUPPI files.
 
     Adds `write_frame` and `memmap_frame` methods to the VLBI binary file

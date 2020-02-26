@@ -9,7 +9,7 @@ from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
-    VLBIFileBase, VLBIFileReaderBase,
+    FileBase, VLBIFileReaderBase,
     VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from ..vlbi_base.file_info import FileReaderInfo
@@ -156,7 +156,7 @@ class DADAFileReader(VLBIFileReaderBase):
         return (header.sample_rate / header.samples_per_frame).to(u.Hz)
 
 
-class DADAFileWriter(VLBIFileBase):
+class DADAFileWriter(FileBase):
     """Simple writer/mapper for DADA files.
 
     Adds `write_frame` and `memmap_frame` methods to the VLBI binary file

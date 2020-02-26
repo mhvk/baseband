@@ -7,7 +7,7 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
-    VLBIFileBase,
+    FileBase,
     VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from .header import GSBHeader
@@ -21,7 +21,7 @@ __all__ = ['GSBTimeStampIO', 'GSBFileReader', 'GSBFileWriter',
            'open', 'info']
 
 
-class GSBTimeStampIO(VLBIFileBase):
+class GSBTimeStampIO(FileBase):
     """Simple reader/writer for GSB time stamp files.
 
     Wraps a binary filehandle, providing methods `read_timestamp`,
@@ -76,7 +76,7 @@ class GSBTimeStampIO(VLBIFileBase):
         return (1. / (timestamp1.time - timestamp0.time)).to(u.Hz)
 
 
-class GSBFileReader(VLBIFileBase):
+class GSBFileReader(FileBase):
     """Simple reader for GSB data files.
 
     Wraps a binary filehandle, providing a `read_payload` method to help
@@ -122,7 +122,7 @@ class GSBFileReader(VLBIFileBase):
                                    complex_data=self.complex_data)
 
 
-class GSBFileWriter(VLBIFileBase):
+class GSBFileWriter(FileBase):
     """Simple writer for GSB data files.
 
     Adds `write_payload` method to the basic VLBI binary file wrapper.

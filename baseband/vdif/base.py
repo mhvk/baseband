@@ -7,7 +7,7 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
-    VLBIFileBase, VLBIFileReaderBase,
+    FileBase, VLBIFileReaderBase,
     VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo, HeaderNotFoundError)
 from .header import VDIFHeader
@@ -314,7 +314,7 @@ class VDIFFileReader(VLBIFileReaderBase):
         raise HeaderNotFoundError("could not locate a nearby header.")
 
 
-class VDIFFileWriter(VLBIFileBase):
+class VDIFFileWriter(FileBase):
     """Simple writer for VDIF files.
 
     Adds `write_frame` and `write_frameset` methods to the basic VLBI

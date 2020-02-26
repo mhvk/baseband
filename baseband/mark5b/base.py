@@ -4,7 +4,7 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
-    VLBIFileBase, VLBIFileReaderBase,
+    FileBase, VLBIFileReaderBase,
     VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from .header import Mark5BHeader
@@ -129,7 +129,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
         return super().locate_frames(pattern, **kwargs)
 
 
-class Mark5BFileWriter(VLBIFileBase):
+class Mark5BFileWriter(FileBase):
     """Simple writer for Mark 5B files.
 
     Adds `write_frame` method to the VLBI binary file wrapper.

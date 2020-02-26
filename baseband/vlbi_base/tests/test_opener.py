@@ -8,7 +8,7 @@ from astropy import units as u
 from ...helpers import sequentialfile as sf
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..base import (FileOpener,
-                    VLBIFileBase, VLBIFileReaderBase,
+                    FileBase, VLBIFileReaderBase,
                     VLBIStreamReaderBase, VLBIStreamWriterBase)
 
 
@@ -34,7 +34,7 @@ class BareFileReader(VLBIFileReaderBase):
     pass
 
 
-class BareFileWriter(VLBIFileBase):
+class BareFileWriter(FileBase):
     pass
 
 

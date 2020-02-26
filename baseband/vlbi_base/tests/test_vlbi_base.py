@@ -11,7 +11,7 @@ import astropy.units as u
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
 from ..frame import VLBIFrameBase
-from ..base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
+from ..base import (FileBase, VLBIFileReaderBase, VLBIStreamBase,
                     VLBIStreamReaderBase, VLBIStreamWriterBase)
 
 
@@ -467,27 +467,27 @@ class TestVLBIBase:
         # This is probably too basic to show that the wrapper works.
         filename = str(tmpdir.join('test.dat'))
         with io.open(filename, 'wb') as fw:
-            fh = VLBIFileBase(fw)
+            fh = FileBase(fw)
             assert fh.fh_raw is fw
             assert not fh.readable()
             assert fh.writable()
             assert not fh.closed
             with pytest.raises(AttributeError):
                 fh.bla
-            assert repr(fh).startswith('VLBIFileBase(fh_raw')
+            assert repr(fh).startswith('FileBase(fh_raw')
             fh.write(b'abcd')
             fh.close()
             assert fh.closed
             assert fh.fh_raw.closed
         with io.open(filename, 'rb') as fr:
-            fh = VLBIFileReaderBase(fr)
+            fh = FileBase(fr)
             assert fh.fh_raw is fr
             assert fh.readable()
             assert not fh.writable()
             assert not fh.closed
             with pytest.raises(AttributeError):
                 fh.bla
-            assert repr(fh).startswith('VLBIFileReaderBase(fh_raw')
+            assert repr(fh).startswith('FileBase(fh_raw')
             assert fh.read() == b'abcd'
             fh.close()
             assert fh.closed
@@ -547,7 +547,7 @@ class TestVLBIBase:
             with pytest.raises(ValueError):
                 fh4.read()
 
-        with VLBIFileBase(io.open(filename, 'wb')) as fw:
+        with FileBase(io.open(filename, 'wb')) as fw:
             with pytest.raises(TypeError):
                 pickle.dumps(fw)
 
