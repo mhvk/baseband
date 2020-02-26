@@ -11,7 +11,7 @@ import astropy.units as u
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import PayloadBase
 from ..frame import FrameBase
-from ..base import (FileBase, VLBIFileReaderBase, VLBIStreamBase,
+from ..base import (FileBase, VLBIFileReaderBase, StreamBase,
                     VLBIStreamReaderBase, VLBIStreamWriterBase)
 
 
@@ -499,7 +499,7 @@ class TestVLBIBase:
             fw.write(b'abcdefghijklmnopqrstuvwxyz')
 
         with io.open(filename, 'rb') as fr:
-            fh = VLBIFileReaderBase(fr)
+            fh = FileBase(fr)
             fh.seek(2)
             assert fh.read(2) == b'cd'
             assert fh.tell() == 4
@@ -598,11 +598,11 @@ class TestSqueezeAndSubset:
     def test_sample_shape_and_squeeze(self):
         # Tests stream base's sample and squeezing routines.
         # Try tuple only.
-        sb = VLBIStreamBase(fh_raw=None, header0=self.header0,
-                            subset=None, squeeze=False)
+        sb = StreamBase(fh_raw=None, header0=self.header0,
+                        subset=None, squeeze=False)
         assert sb.sample_shape == self.unsliced_shape
-        sb = VLBIStreamBase(fh_raw=None, header0=self.header0,
-                            subset=None, squeeze=True)
+        sb = StreamBase(fh_raw=None, header0=self.header0,
+                        subset=None, squeeze=True)
         assert sb.sample_shape == self.squeezed_shape
 
         # Try reader with equivalent sample shape.

@@ -8,7 +8,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
     FileBase,
-    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from .header import GSBHeader
 from .payload import GSBPayload
@@ -144,7 +144,7 @@ class GSBFileWriter(FileBase):
         return data.tofile(self.fh_raw)
 
 
-class GSBStreamBase(VLBIStreamBase):
+class GSBStreamBase(StreamBase):
     """Base for GSB streams."""
 
     _sample_shape_maker = GSBPayload._sample_shape_maker

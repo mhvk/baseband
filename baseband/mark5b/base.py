@@ -5,7 +5,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
     FileBase, VLBIFileReaderBase,
-    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
@@ -164,7 +164,7 @@ class Mark5BFileWriter(FileBase):
         return data.tofile(self.fh_raw)
 
 
-class Mark5BStreamBase(VLBIStreamBase):
+class Mark5BStreamBase(StreamBase):
     """Base for Mark 5B streams."""
 
     _sample_shape_maker = Mark5BPayload._sample_shape_maker

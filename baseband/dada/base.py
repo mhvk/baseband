@@ -10,7 +10,7 @@ from astropy.utils import lazyproperty
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
     FileBase,
-    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from ..vlbi_base.file_info import FileReaderInfo
 from ..vlbi_base.utils import lcm
@@ -208,7 +208,7 @@ class DADAFileWriter(FileBase):
         return DADAFrame(header, payload)
 
 
-class DADAStreamBase(VLBIStreamBase):
+class DADAStreamBase(StreamBase):
     """Base for DADA streams."""
 
     _sample_shape_maker = DADAPayload._sample_shape_maker

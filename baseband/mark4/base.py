@@ -3,9 +3,10 @@ import numpy as np
 from astropy.utils import lazyproperty
 import astropy.units as u
 
+
 from ..vlbi_base.base import (
     FileBase, VLBIFileReaderBase,
-    VLBIStreamBase, VLBIStreamReaderBase,
+    StreamBase, VLBIStreamReaderBase,
     VLBIStreamWriterBase, HeaderNotFoundError,
     FileOpener, FileInfo)
 from .header import Mark4Header
@@ -230,7 +231,7 @@ class Mark4FileWriter(FileBase):
         return data.tofile(self.fh_raw)
 
 
-class Mark4StreamBase(VLBIStreamBase):
+class Mark4StreamBase(StreamBase):
     """Base for Mark 4 streams."""
 
     _sample_shape_maker = Mark4Payload._sample_shape_maker

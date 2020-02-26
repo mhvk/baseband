@@ -20,7 +20,7 @@ from .utils import byte_array
 
 
 __all__ = ['HeaderNotFoundError',
-           'FileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
+           'FileBase', 'VLBIFileReaderBase', 'StreamBase',
            'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
            'FileInfo', 'FileOpener']
 
@@ -358,8 +358,9 @@ class VLBIFileReaderBase(FileBase):
         return (max_frame + 1) * u.Hz
 
 
-class VLBIStreamBase:
-    """VLBI file wrapper, allowing access as a stream of data."""
+class StreamBase:
+    """Baseband file wrapper, allowing access as a stream of data."""
+    # Apart from verify, instances are meant to be immutable.
 
     _sample_shape_maker = None
     _frame_index = None
@@ -572,7 +573,7 @@ class VLBIStreamBase:
                                      if self.subset else '')))
 
 
-class VLBIStreamReaderBase(VLBIStreamBase):
+class VLBIStreamReaderBase(StreamBase):
 
     info = StreamReaderInfo()
 
@@ -1020,7 +1021,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         self.__dict__.update(state)
 
 
-class VLBIStreamWriterBase(VLBIStreamBase):
+class VLBIStreamWriterBase(StreamBase):
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)

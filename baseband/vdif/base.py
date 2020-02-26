@@ -8,7 +8,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
     FileBase, VLBIFileReaderBase,
-    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo, HeaderNotFoundError)
 from .header import VDIFHeader
 from .payload import VDIFPayload
@@ -363,7 +363,7 @@ class VDIFFileWriter(FileBase):
         return data.tofile(self.fh_raw)
 
 
-class VDIFStreamBase(VLBIStreamBase):
+class VDIFStreamBase(StreamBase):
     """Base for VDIF streams."""
 
     _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
