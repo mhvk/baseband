@@ -386,6 +386,27 @@ class VDIFStreamBase(VLBIStreamBase):
         """
         return header.get_time(frame_rate=self._frame_rate)
 
+    def _set_time(self, header, time):
+        """Set time in a header.
+
+        This passes on sample rate, which not all VDIF headers can calculate.
+        """
+        header.update(time=time, frame_rate=self._frame_rate)
+
+    def _get_index(self, header):
+        # Override to avoid explicit time calculations.
+        return int(round((header['seconds'] - self.header0['seconds'])
+                         * self._frame_rate.to_value(u.Hz)
+                         + header['frame_nr'] - self.header0['frame_nr']))
+
+    def _set_index(self, header, index):
+        # Override to avoid explicit time calculations.
+        dt, frame_nr = divmod(index + self.header0['frame_nr'],
+                              int(round(self._frame_rate.to_value(u.Hz))))
+        seconds = self.header0['seconds'] + dt
+        header['seconds'] = seconds
+        header['frame_nr'] = frame_nr
+
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
                 "    sample_rate={s.sample_rate},"
@@ -519,16 +540,11 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                                          edv=self.header0.edv,
                                          verify=self.verify)
 
-    def _tell_frame(self, frame):
-        return int(round((frame['seconds'] - self.header0['seconds'])
-                         * self._frame_rate.to_value(u.Hz)
-                         + frame['frame_nr'] - self.header0['frame_nr']))
-
     def _bad_frame(self, index, frameset, exc):
         # Duplication of base class, but able to deal with missing
         # frames inside a frame set.
-        if (frameset is not None and self._tell_frame(frameset) == index
-                and index == self._tell_frame(self._last_header)):
+        if (frameset is not None and self._get_index(frameset) == index
+                and index == self._get_index(self._last_header)):
             # If we got an exception because we're trying to read beyond the
             # last frame, the frame is almost certainly OK, so keep it.
             return frameset
@@ -565,7 +581,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             raise exc
 
         # Don't yet know how to deal with excess data.
-        header_index = self._tell_frame(header)
+        header_index = self._get_index(header)
         if header_index < index:
             exc.args += (msg + ' There appears to be excess data.',)
             raise exc
@@ -590,7 +606,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                 exc.args += (msg + ' Could not find previous index.',)
                 raise exc
 
-            header_index = self._tell_frame(header)
+            header_index = self._get_index(header)
             if header_index < header1_index:
                 # While we are at it: if we pass an index boundary,
                 # update the list of known indices.
@@ -613,10 +629,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             # (after the very long else clause).
             # TODO: just use the writer's _make_frame??
             frames = {}
-            dt, frame_nr = divmod(index + self.header0['frame_nr'],
-                                  int(self._frame_rate.to_value(u.Hz)))
-            header['frame_nr'] = frame_nr
-            header['seconds'] = self.header0['seconds'] + dt
+            self._set_index(header, index)
         else:
             assert header1_index == index, \
                 'at this point, we should have a good header.'
@@ -710,7 +723,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             # If the next header is of the next frame, set up the raw
             # offset (which likely will be needed, saving some time).
             if (next_header is not None
-                    and self._tell_frame(next_header) == index + 1):
+                    and self._get_index(next_header) == index + 1):
                 self._raw_offsets[index+1] = self.fh_raw.tell()
 
         # Create invalid frame template,
@@ -818,19 +831,10 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
                 self.header0.sample_rate = self.sample_rate
             assert self.header0.sample_rate == self.sample_rate
 
-        self._frameset = VDIFFrameSet.fromdata(
+        self._frame = VDIFFrameSet.fromdata(
             np.zeros((self.samples_per_frame,) + self._unsliced_shape,
                      dtype=np.complex64 if self.complex_data else np.float32),
             self.header0)
-
-    def _make_frame(self, index):
-        dt, frame_nr = divmod(index + self.header0['frame_nr'],
-                              int(self._frame_rate.to_value(u.Hz)))
-        seconds = self.header0['seconds'] + dt
-        # Reuse frameset.
-        self._frameset['seconds'] = seconds
-        self._frameset['frame_nr'] = frame_nr
-        return self._frameset
 
 
 open = make_opener('VDIF', globals(), doc="""

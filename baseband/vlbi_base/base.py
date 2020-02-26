@@ -401,6 +401,20 @@ class VLBIStreamBase:
         # provided in the header.
         header.time = time
 
+    def _get_index(self, header):
+        """Infer the index of the frame header relative to the first frame."""
+        # This base implementation uses the time, but can be overridden
+        # with faster methods in subclasses.
+        dt = self._get_time(header) - self.start_time
+        return int(round((dt * self._frame_rate).to_value(u.one)))
+
+    def _set_index(self, header, index):
+        """Set frame header index relative to the first frame."""
+        # Can be overridden if there is a simpler way than using the time,
+        # or if other properties need to be set.
+        self._set_time(header,
+                       time=self.start_time + index / self._frame_rate)
+
     @lazyproperty
     def start_time(self):
         """Start time of the file.
@@ -829,7 +843,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             self._next_index = self._next_frame = None
             try:
                 frame = self._fh_raw_read_frame()
-                frame_index = self._tell_frame(frame)
+                frame_index = self._get_index(frame)
             except Exception as exc:
                 return self._bad_frame(index, None, exc)
 
@@ -842,7 +856,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         try:
             with self.fh_raw.temporary_offset():
                 self._next_frame = self._fh_raw_read_frame()
-                self._next_index = self._tell_frame(self._next_frame)
+                self._next_index = self._get_index(self._next_frame)
         except Exception as exc:
             return self._bad_frame(index, frame, exc)
 
@@ -861,8 +875,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         exc : Exception
             Exception that led to the call.
         """
-        if (frame is not None and self._tell_frame(frame) == index
-                and index == self._tell_frame(self._last_header)):
+        if (frame is not None and self._get_index(frame) == index
+                and index == self._get_index(self._last_header)):
             # If we got an exception because we're trying to read beyond the
             # last frame, the frame is almost certainly OK, so keep it.
             return frame
@@ -888,7 +902,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             raise exc
 
         # Don't yet know how to deal with excess data.
-        header_index = self._tell_frame(header)
+        header_index = self._get_index(header)
         if header_index < index:
             exc.args += (msg + ' There appears to be excess data.')
             raise exc
@@ -909,7 +923,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 exc.args += (msg + ' Could not find previous index.',)
                 raise exc
 
-            header_index = self._tell_frame(header)
+            header_index = self._get_index(header)
             # While we are at it, update the list of known indices.
             self._raw_offsets[header1_index] = raw_pos
 
@@ -921,7 +935,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             msg += ' The frame seems to be missing.'
             # Construct a missing frame.
             header = header1.copy()
-            self._set_time(header, self.time)
+            self._set_index(header, index)
             frame = self._frame.__class__(header, self._frame.payload,
                                           valid=False)
 
@@ -938,7 +952,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             # At this point, reading the frame should always work,
             # and we know there is a header right after it.
             frame = self._fh_raw_read_frame()
-            assert self._tell_frame(frame) == index
+            assert self._get_index(frame) == index
 
         warnings.warn(msg)
         return frame
@@ -950,11 +964,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     def _fh_raw_read_frame(self):
         """Read a frame at the current position of the underlying file."""
         return self.fh_raw.read_frame(verify=self.verify)
-
-    def _tell_frame(self, frame):
-        """Get the index of the frame relative to the first frame."""
-        dt = self._get_time(frame) - self.start_time
-        return int(round((dt * self._frame_rate).to_value(u.one)))
 
 
 class VLBIStreamWriterBase(VLBIStreamBase):
@@ -1004,29 +1013,29 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             if frame_index != self._frame_index:
                 self._frame = self._make_frame(frame_index)
                 self._frame_index = frame_index
-                self._valid = valid
-            else:
-                self._valid &= valid
 
             nsample = min(count - sample, len(self._frame) - sample_offset)
             sample_end = sample_offset + nsample
             self._frame[sample_offset:sample_end] = data[sample:
                                                          sample + nsample]
+            self._frame.valid &= valid
             if sample_end == self.samples_per_frame:
-                self._write_frame(self._frame, valid=self._valid)
-                # Be sure we do not reuse this frame (might also be needed
-                # to write memmaps to disk).
-                del self._frame
-                self._frame_index = None
+                self._fh_raw_write_frame(self._frame)
 
             sample += nsample
             # Explicitly set offset (just in case write_frame adjusts it too).
             self.offset = offset0 + sample
 
-    def _write_frame(self, frame, valid=True):
-        # Default implementation is to assume this is a frame that can write
-        # the underlying binary file.
-        frame.valid = valid
+    def _make_frame(self, index):
+        # Default implementation assumes that an initial _frame was
+        # set up and just re-uses it with a new index.
+        self._set_index(self._frame, index)
+        self._frame.valid = True
+        return self._frame
+
+    def _fh_raw_write_frame(self, frame):
+        # Default implementation is to assume that the frame knows how to
+        # write itself to the underlying file.
         frame.tofile(self.fh_raw)
 
     def close(self):

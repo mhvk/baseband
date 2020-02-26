@@ -122,18 +122,11 @@ class Mark5BHeader(VLBIHeaderBase):
         bcd_fraction : from ``fraction`` or ``time`` (may need ``frame_rate``)
         frame_nr : from ``time`` (may need ``frame_rate``)
         """
-        time = kwargs.pop('time', None)
-        frame_rate = kwargs.pop('frame_rate', None)
-        # Pop verify and pass on False so verify happens after time is set.
-        self = super().fromvalues(verify=False, **kwargs)
-        if time is not None:
-            self.set_time(time, frame_rate=frame_rate)
-            self.update()    # Recalculate CRC.
-        if verify:
-            self.verify()
-        return self
+        # This method exists only to be able to override the docstring.
+        return super().fromvalues(verify=verify, **kwargs)
 
-    def update(self, *, crc=None, verify=True, **kwargs):
+    def update(self, *, time=None, frame_rate=None, crc=None, verify=True,
+               **kwargs):
         """Update the header by setting keywords or properties.
 
         Here, any keywords matching header keys are applied first, and any
@@ -142,6 +135,11 @@ class Mark5BHeader(VLBIHeaderBase):
 
         Parameters
         ----------
+        time : `~astropy.time.Time`, optional
+            A possible new time.  This is updated last.
+        frame_rate : `~astropy.units.Quantity`, optional
+            The frame rate to use in calculating the frame number from the
+            time.  Needed for times at non-integer seconds.
         crc : int or None, optional
             If `None` (default), recalculate the CRC after updating.
         verify : bool, optional
@@ -149,16 +147,20 @@ class Mark5BHeader(VLBIHeaderBase):
         **kwargs
             Arguments used to set keywords and properties.
         """
-        if crc is not None:
-            return super().update(verify=verify, crc=crc, **kwargs)
-
         super().update(verify=False, **kwargs)
-        # Do not use words 2 & 3 directly, so that this works also if part
-        # of a VDIF header, where the time information is in words 7 & 8.
-        stream = ((((self['bcd_jday'] << 20)
-                    + self['bcd_seconds']) << 16)
-                  + self['bcd_fraction'])
-        self['crc'] = crc16(stream)
+
+        if time is not None:
+            self.set_time(time, frame_rate=frame_rate)
+
+        if crc is None:
+            # Do not use words 2 & 3 directly, so that this works also if part
+            # of a VDIF header, where the time information is in words 7 & 8.
+            stream = ((((self['bcd_jday'] << 20)
+                        + self['bcd_seconds']) << 16)
+                      + self['bcd_fraction'])
+            crc = crc16(stream)
+
+        self['crc'] = crc
         if verify:
             self.verify()
 

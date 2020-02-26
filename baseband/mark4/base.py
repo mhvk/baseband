@@ -265,6 +265,10 @@ class Mark4StreamBase(VLBIStreamBase):
             bps=header0.bps, complex_data=False, squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
 
+    def _set_time(self, header, time):
+        # Use update to ensure CRC is updated as well.
+        header.update(time=time)
+
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
     """VLBI Mark 4 format reader.
@@ -395,16 +399,10 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
         samples_per_payload = (
             header0.samples_per_frame * header0.payload_nbytes
             // header0.frame_nbytes)
-        self._payload = Mark4Payload.fromdata(
+        payload = Mark4Payload.fromdata(
             np.zeros((samples_per_payload, header0.nchan), np.float32),
             header0)
-
-    def _make_frame(self, frame_index):
-        header = self.header0.copy()
-        header.update(time=self.start_time + frame_index
-                      / self._frame_rate)
-        # Reuse payload.
-        return Mark4Frame(header, self._payload)
+        self._frame = Mark4Frame(header0.copy(), payload)
 
 
 open = make_opener('Mark4', globals(), doc="""

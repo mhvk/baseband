@@ -518,7 +518,7 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
                 warnings.simplefilter('error')
                 good = -1
                 bad = None
-                frame = fh._tell_frame(fh._last_header)
+                frame = fh._get_index(fh._last_header)
                 while frame > good:
                     try:
                         fh.seek(frame * fh.samples_per_frame)

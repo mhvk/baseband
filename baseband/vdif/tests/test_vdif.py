@@ -50,6 +50,7 @@ class TestVDIF:
         mjd, frac = divmod(header.time.mjd, 1)
         assert mjd == 56824
         assert round(frac * 86400) == 21367
+        assert header.ref_time == Time('2014-01-01')
         assert header.payload_nbytes == 5000
         assert header.frame_nbytes == 5032
         assert header['thread_id'] == 1
@@ -137,21 +138,34 @@ class TestVDIF:
 
         # Test initializing EDV 0 with properties, but off of 1 second mark so
         # frame_nr is used.
-        header8 = vdif.VDIFHeader.fromvalues(
+        header7 = vdif.VDIFHeader.fromvalues(
             edv=0, ref_epoch=headerT['ref_epoch'], seconds=headerT['seconds'],
             frame_nr=headerT['frame_nr'], complex_data=headerT['complex_data'],
             samples_per_frame=headerT.samples_per_frame, bps=headerT.bps,
             station=headerT.station, thread_id=headerT['thread_id'])
-        assert header8['ref_epoch'] == headerT['ref_epoch']
-        assert header8['seconds'] == headerT['seconds']
-        assert header8['frame_nr'] == headerT['frame_nr']
+        assert header7['ref_epoch'] == headerT['ref_epoch']
+        assert header7['seconds'] == headerT['seconds']
+        assert header7['frame_nr'] == headerT['frame_nr']
         # The same header, but created by passing time and sample rate.
-        header8_usetime = vdif.VDIFHeader.fromvalues(
+        header7_usetime = vdif.VDIFHeader.fromvalues(
             edv=0, time=headerT.time, sample_rate=headerT.sample_rate,
             complex_data=headerT['complex_data'], bps=headerT.bps,
             samples_per_frame=headerT.samples_per_frame,
             station=headerT.station, thread_id=headerT['thread_id'])
-        assert header8_usetime == header8
+        assert header7_usetime == header7
+
+        # Finally, check that we can pass in a different reference time, but
+        # still get the right time and frame number.
+        header8 = vdif.VDIFHeader.fromvalues(
+            edv=0, ref_epoch=0, time=headerT.time,
+            sample_rate=headerT.sample_rate,
+            complex_data=headerT['complex_data'], bps=headerT.bps,
+            samples_per_frame=headerT.samples_per_frame,
+            station=headerT.station, thread_id=headerT['thread_id'])
+        assert header8.ref_time == Time('2000-01-01')
+        assert abs(header8.get_time(frame_rate=headerT.frame_rate)
+                   - headerT.time) < 1.*u.ns
+        assert header8['frame_nr'] == headerT['frame_nr']
 
         # Without a sample rate or frame_nr, cannot initialize using time.
         with pytest.raises(ValueError):
@@ -168,9 +182,14 @@ class TestVDIF:
                 bps=headerT.bps, complex_data=headerT['complex_data'],
                 thread_id=headerT['thread_id'])
 
-        # Check rounding in corner case.
+        # Check rounding in corner case, both with and without changing
+        # the reference time as well.
         header9 = headerT.copy()
-        header9.set_time(Time('2018-01-01T00:34:07.999999999996'))
+        time = Time('2018-01-01T00:34:07.999999999996')
+        header9.time = time
+        assert header9['seconds'] == 126232450
+        assert header9['frame_nr'] == 0
+        header9.ref_time = header9.time = time
         assert header9['seconds'] == 2048
         assert header9['frame_nr'] == 0
 
