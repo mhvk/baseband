@@ -303,9 +303,8 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
         self._set_index(header, index)
         return self.fh_raw.memmap_frame(header)
 
-    def _write_frame(self, frame, valid=True):
+    def _write_frame(self, frame):
         assert frame is self._frame
-        frame.valid = valid
         # Deleting frame flushes memmap'd data to disk.
         # (Of course, this gets deleted automatically when going out of
         # scope, and furthermore the link in self._frame will still exist

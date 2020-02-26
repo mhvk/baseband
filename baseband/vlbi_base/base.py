@@ -1013,16 +1013,14 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             if frame_index != self._frame_index:
                 self._frame = self._make_frame(frame_index)
                 self._frame_index = frame_index
-                self._valid = valid
-            else:
-                self._valid &= valid
 
             nsample = min(count - sample, len(self._frame) - sample_offset)
             sample_end = sample_offset + nsample
             self._frame[sample_offset:sample_end] = data[sample:
                                                          sample + nsample]
+            self._frame.valid &= valid
             if sample_end == self.samples_per_frame:
-                self._write_frame(self._frame, valid=self._valid)
+                self._write_frame(self._frame)
 
             sample += nsample
             # Explicitly set offset (just in case write_frame adjusts it too).
@@ -1030,14 +1028,14 @@ class VLBIStreamWriterBase(VLBIStreamBase):
 
     def _make_frame(self, index):
         # Default implementation assumes that an initial _frame was
-        # set up and just re-uses it with a new index
+        # set up and just re-uses it with a new index.
         self._set_index(self._frame, index)
+        self._frame.valid = True
         return self._frame
 
-    def _write_frame(self, frame, valid=True):
+    def _write_frame(self, frame):
         # Default implementation is to assume this is a frame that can write
         # the underlying binary file.
-        frame.valid = valid
         frame.tofile(self.fh_raw)
 
     def close(self):
