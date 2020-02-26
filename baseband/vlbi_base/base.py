@@ -829,7 +829,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             self._next_index = self._next_frame = None
             try:
                 frame = self._fh_raw_read_frame()
-                frame_index = self._tell_frame(frame)
+                frame_index = self._get_index(frame)
             except Exception as exc:
                 return self._bad_frame(index, None, exc)
 
@@ -842,7 +842,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         try:
             with self.fh_raw.temporary_offset():
                 self._next_frame = self._fh_raw_read_frame()
-                self._next_index = self._tell_frame(self._next_frame)
+                self._next_index = self._get_index(self._next_frame)
         except Exception as exc:
             return self._bad_frame(index, frame, exc)
 
@@ -861,8 +861,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         exc : Exception
             Exception that led to the call.
         """
-        if (frame is not None and self._tell_frame(frame) == index
-                and index == self._tell_frame(self._last_header)):
+        if (frame is not None and self._get_index(frame) == index
+                and index == self._get_index(self._last_header)):
             # If we got an exception because we're trying to read beyond the
             # last frame, the frame is almost certainly OK, so keep it.
             return frame
@@ -888,7 +888,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             raise exc
 
         # Don't yet know how to deal with excess data.
-        header_index = self._tell_frame(header)
+        header_index = self._get_index(header)
         if header_index < index:
             exc.args += (msg + ' There appears to be excess data.')
             raise exc
@@ -909,7 +909,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 exc.args += (msg + ' Could not find previous index.',)
                 raise exc
 
-            header_index = self._tell_frame(header)
+            header_index = self._get_index(header)
             # While we are at it, update the list of known indices.
             self._raw_offsets[header1_index] = raw_pos
 
@@ -938,7 +938,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             # At this point, reading the frame should always work,
             # and we know there is a header right after it.
             frame = self._fh_raw_read_frame()
-            assert self._tell_frame(frame) == index
+            assert self._get_index(frame) == index
 
         warnings.warn(msg)
         return frame
@@ -951,7 +951,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         """Read a frame at the current position of the underlying file."""
         return self.fh_raw.read_frame(verify=self.verify)
 
-    def _tell_frame(self, frame):
+    def _get_index(self, frame):
         """Get the index of the frame relative to the first frame."""
         dt = self._get_time(frame) - self.start_time
         return int(round((dt * self._frame_rate).to_value(u.one)))

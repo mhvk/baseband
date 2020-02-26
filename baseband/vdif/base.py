@@ -526,7 +526,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                                          edv=self.header0.edv,
                                          verify=self.verify)
 
-    def _tell_frame(self, frame):
+    def _get_index(self, frame):
         return int(round((frame['seconds'] - self.header0['seconds'])
                          * self._frame_rate.to_value(u.Hz)
                          + frame['frame_nr'] - self.header0['frame_nr']))
@@ -534,8 +534,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     def _bad_frame(self, index, frameset, exc):
         # Duplication of base class, but able to deal with missing
         # frames inside a frame set.
-        if (frameset is not None and self._tell_frame(frameset) == index
-                and index == self._tell_frame(self._last_header)):
+        if (frameset is not None and self._get_index(frameset) == index
+                and index == self._get_index(self._last_header)):
             # If we got an exception because we're trying to read beyond the
             # last frame, the frame is almost certainly OK, so keep it.
             return frameset
@@ -572,7 +572,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             raise exc
 
         # Don't yet know how to deal with excess data.
-        header_index = self._tell_frame(header)
+        header_index = self._get_index(header)
         if header_index < index:
             exc.args += (msg + ' There appears to be excess data.',)
             raise exc
@@ -597,7 +597,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                 exc.args += (msg + ' Could not find previous index.',)
                 raise exc
 
-            header_index = self._tell_frame(header)
+            header_index = self._get_index(header)
             if header_index < header1_index:
                 # While we are at it: if we pass an index boundary,
                 # update the list of known indices.
@@ -717,7 +717,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             # If the next header is of the next frame, set up the raw
             # offset (which likely will be needed, saving some time).
             if (next_header is not None
-                    and self._tell_frame(next_header) == index + 1):
+                    and self._get_index(next_header) == index + 1):
                 self._raw_offsets[index+1] = self.fh_raw.tell()
 
         # Create invalid frame template,

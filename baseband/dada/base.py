@@ -327,7 +327,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         self.fh_raw.seek(0, 2)
         return DADAFrame(self._last_header, last_payload)
 
-    def _tell_frame(self, frame):
+    def _get_index(self, frame):
         # Override for faster calculation of frame index.
         return int(round((frame['OBS_OFFSET']
                           - self.header0['OBS_OFFSET'])

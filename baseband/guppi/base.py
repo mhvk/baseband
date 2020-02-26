@@ -266,7 +266,7 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
             fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
             return fh_raw.read_header()
 
-    def _tell_frame(self, frame):
+    def _get_index(self, frame):
         # Override to avoid calculating index from time.
         return int(round((frame['PKTIDX'] - self.header0['PKTIDX'])
                          / self._packets_per_frame))
