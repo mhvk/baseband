@@ -224,6 +224,15 @@ class GUPPIStreamBase(VLBIStreamBase):
                                  doc=("Number of complete samples per frame, "
                                       "excluding overlap."))
 
+    def _get_index(self, header):
+        # Override to avoid calculating index from time.
+        return int(round((header['PKTIDX'] - self.header0['PKTIDX'])
+                         / self._packets_per_frame))
+
+    def _set_index(self, header, index):
+        header.update(pktidx=self.header0['PKTIDX']
+                      + index * self._packets_per_frame)
+
 
 class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
     """GUPPI format reader.
@@ -266,11 +275,6 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
             fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
             return fh_raw.read_header()
 
-    def _get_index(self, frame):
-        # Override to avoid calculating index from time.
-        return int(round((frame['PKTIDX'] - self.header0['PKTIDX'])
-                         / self._packets_per_frame))
-
 
 class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
     """GUPPI format writer.
@@ -296,8 +300,7 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
 
     def _make_frame(self, index):
         header = self.header0.copy()
-        header.update(pktidx=self.header0['PKTIDX']
-                      + index * self._packets_per_frame)
+        self._set_index(header, index)
         return self.fh_raw.memmap_frame(header)
 
     def _write_frame(self, frame, valid=True):

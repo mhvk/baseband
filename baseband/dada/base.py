@@ -220,6 +220,16 @@ class DADAStreamBase(VLBIStreamBase):
             complex_data=header0.complex_data, squeeze=squeeze, subset=subset,
             fill_value=0., verify=verify)
 
+    def _get_index(self, header):
+        # Override for faster calculation of frame index.
+        return int(round((header['OBS_OFFSET']
+                          - self.header0['OBS_OFFSET'])
+                         / self.header0.payload_nbytes))
+
+    def _set_index(self, header, index):
+        header.update(obs_offset=self.header0['OBS_OFFSET']
+                      + index * self.header0.payload_nbytes)
+
 
 class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
     """DADA format reader.
@@ -327,12 +337,6 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         self.fh_raw.seek(0, 2)
         return DADAFrame(self._last_header, last_payload)
 
-    def _get_index(self, frame):
-        # Override for faster calculation of frame index.
-        return int(round((frame['OBS_OFFSET']
-                          - self.header0['OBS_OFFSET'])
-                         / self.header0.payload_nbytes))
-
 
 class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
     """DADA format writer.
@@ -357,8 +361,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
 
     def _make_frame(self, index):
         header = self.header0.copy()
-        header.update(obs_offset=self.header0['OBS_OFFSET']
-                      + index * self.header0.payload_nbytes)
+        self._set_index(header, index)
         return self.fh_raw.memmap_frame(header)
 
     def _write_frame(self, frame, valid=True):

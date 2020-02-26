@@ -393,6 +393,20 @@ class VDIFStreamBase(VLBIStreamBase):
         """
         header.update(time=time, frame_rate=self._frame_rate)
 
+    def _get_index(self, header):
+        # Override to avoid explicit time calculations.
+        return int(round((header['seconds'] - self.header0['seconds'])
+                         * self._frame_rate.to_value(u.Hz)
+                         + header['frame_nr'] - self.header0['frame_nr']))
+
+    def _set_index(self, header, index):
+        # Override to avoid explicit time calculations.
+        dt, frame_nr = divmod(index + self.header0['frame_nr'],
+                              int(round(self._frame_rate.to_value(u.Hz))))
+        seconds = self.header0['seconds'] + dt
+        header['seconds'] = seconds
+        header['frame_nr'] = frame_nr
+
     def __repr__(self):
         return ("<{s.__class__.__name__} name={s.name} offset={s.offset}\n"
                 "    sample_rate={s.sample_rate},"
@@ -526,11 +540,6 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                                          edv=self.header0.edv,
                                          verify=self.verify)
 
-    def _get_index(self, frame):
-        return int(round((frame['seconds'] - self.header0['seconds'])
-                         * self._frame_rate.to_value(u.Hz)
-                         + frame['frame_nr'] - self.header0['frame_nr']))
-
     def _bad_frame(self, index, frameset, exc):
         # Duplication of base class, but able to deal with missing
         # frames inside a frame set.
@@ -620,10 +629,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
             # (after the very long else clause).
             # TODO: just use the writer's _make_frame??
             frames = {}
-            dt, frame_nr = divmod(index + self.header0['frame_nr'],
-                                  int(self._frame_rate.to_value(u.Hz)))
-            header['frame_nr'] = frame_nr
-            header['seconds'] = self.header0['seconds'] + dt
+            self._set_index(header, index)
         else:
             assert header1_index == index, \
                 'at this point, we should have a good header.'
@@ -829,14 +835,6 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
             np.zeros((self.samples_per_frame,) + self._unsliced_shape,
                      dtype=np.complex64 if self.complex_data else np.float32),
             self.header0)
-
-    def _set_index(self, frame, index):
-        # Override to avoid explicit time calculations.
-        dt, frame_nr = divmod(index + self.header0['frame_nr'],
-                              int(self._frame_rate.to_value(u.Hz)))
-        seconds = self.header0['seconds'] + dt
-        frame['seconds'] = seconds
-        frame['frame_nr'] = frame_nr
 
 
 open = make_opener('VDIF', globals(), doc="""

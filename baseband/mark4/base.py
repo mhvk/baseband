@@ -265,6 +265,10 @@ class Mark4StreamBase(VLBIStreamBase):
             bps=header0.bps, complex_data=False, squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
 
+    def _set_time(self, header, time):
+        # Use update to ensure CRC is updated as well.
+        header.update(time=time)
+
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
     """VLBI Mark 4 format reader.

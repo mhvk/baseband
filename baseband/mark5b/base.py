@@ -180,8 +180,30 @@ class Mark5BStreamBase(VLBIStreamBase):
         return header.get_time(frame_rate=self._frame_rate)
 
     def _set_time(self, header, time):
-        """Update time and frame_nr, as well as the CRC."""
+        # Pass frame_rate, which is needed to calculate the frame number,
+        # and use update so that also the CRC is updated.
         header.update(time=time, frame_rate=self._frame_rate)
+
+    def _get_index(self, header):
+        # Override to provide index faster, without calculating times.
+        # TODO: OK to ignore leap seconds? Not sure what writer does.
+        return int(round(self._frame_rate.to_value(u.Hz)
+                         * (header.seconds - self.header0.seconds
+                            + 86400 * (header.kday - self.header0.kday
+                                       + header.jday - self.header0.jday))
+                         + header['frame_nr'] - self.header0['frame_nr']))
+
+    def _set_index(self, header, index):
+        # Override to avoid explicit time calculations.
+        dt, frame_nr = divmod(index + self.header0['frame_nr'],
+                              int(round(self._frame_rate.to_value(u.Hz))))
+        fraction = (frame_nr/self._frame_rate).to_value(u.s)
+        dd, seconds = divmod(dt + self.header0.seconds, 86400)
+        dk, jday = divmod(dd + self.header0.jday, 1000)
+        kday = dk*1000 + self.header0.kday
+        # Use update to ensure CRC is updated as well.
+        header.update(frame_nr=frame_nr, fraction=fraction,
+                      seconds=seconds, jday=jday, kday=kday)
 
 
 class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
@@ -258,15 +280,6 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         last_header.infer_kday(self.start_time)
         return last_header
 
-    def _get_index(self, frame):
-        # Override to provide index faster, without calculating times.
-        # TODO: OK to ignore leap seconds? Not sure what writer does.
-        return int(round(self._frame_rate.to_value(u.Hz)
-                         * (frame.seconds - self.header0.seconds
-                            + 86400 * (frame.kday - self.header0.kday
-                                       + frame.jday - self.header0.jday))
-                         + frame['frame_nr'] - self.header0['frame_nr']))
-
 
 class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
     """VLBI Mark 5B format writer.
@@ -320,11 +333,6 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
                                 nchan=self._unsliced_shape.nchan,
                                 bps=self.bps)
         self._frame = Mark5BFrame(header0.copy(), payload)
-
-    def _set_index(self, frame, index):
-        """Update time and frame_nr, as well as the CRC."""
-        frame.update(time=self.start_time + index / self._frame_rate,
-                     frame_rate=self._frame_rate)
 
 
 open = make_opener('Mark5B', globals(), doc="""

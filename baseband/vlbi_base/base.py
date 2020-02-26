@@ -401,6 +401,20 @@ class VLBIStreamBase:
         # provided in the header.
         header.time = time
 
+    def _get_index(self, header):
+        """Infer the index of the frame header relative to the first frame."""
+        # This base implementation uses the time, but can be overridden
+        # with faster methods in subclasses.
+        dt = self._get_time(header) - self.start_time
+        return int(round((dt * self._frame_rate).to_value(u.one)))
+
+    def _set_index(self, header, index):
+        """Set frame header index relative to the first frame."""
+        # Can be overridden if there is a simpler way than using the time,
+        # or if other properties need to be set.
+        self._set_time(header,
+                       time=self.start_time + index / self._frame_rate)
+
     @lazyproperty
     def start_time(self):
         """Start time of the file.
@@ -921,7 +935,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             msg += ' The frame seems to be missing.'
             # Construct a missing frame.
             header = header1.copy()
-            self._set_time(header, self.time)
+            self._set_index(header, index)
             frame = self._frame.__class__(header, self._frame.payload,
                                           valid=False)
 
@@ -950,11 +964,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     def _fh_raw_read_frame(self):
         """Read a frame at the current position of the underlying file."""
         return self.fh_raw.read_frame(verify=self.verify)
-
-    def _get_index(self, frame):
-        """Get the index of the frame relative to the first frame."""
-        dt = self._get_time(frame) - self.start_time
-        return int(round((dt * self._frame_rate).to_value(u.one)))
 
 
 class VLBIStreamWriterBase(VLBIStreamBase):
@@ -1018,9 +1027,6 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             sample += nsample
             # Explicitly set offset (just in case write_frame adjusts it too).
             self.offset = offset0 + sample
-
-    def _set_index(self, frame, index):
-        frame.update(time=self.start_time + index / self._frame_rate)
 
     def _make_frame(self, index):
         # Default implementation assumes that an initial _frame was
