@@ -6,7 +6,7 @@ from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
-    FileBase, VLBIFileReaderBase,
+    FileBase,
     VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from .header import GUPPIHeader
@@ -79,7 +79,7 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
         self.items['FILE_NR'] = self.items.pop('file_nr')
 
 
-class GUPPIFileReader(VLBIFileReaderBase):
+class GUPPIFileReader(FileBase):
     """Simple reader for GUPPI files.
 
     Wraps a binary filehandle, providing methods to help interpret the data,
@@ -143,9 +143,8 @@ class GUPPIFileReader(VLBIFileReaderBase):
 class GUPPIFileWriter(FileBase):
     """Simple writer/mapper for GUPPI files.
 
-    Adds `write_frame` and `memmap_frame` methods to the VLBI binary file
-    wrapper.  The latter allows one to encode data in pieces, writing to disk
-    as needed.
+    Adds `write_frame` and `memmap_frame` methods to the binary file wrapper.
+    The latter allows one to encode data in pieces, writing to disk as needed.
     """
 
     def write_frame(self, data, header=None, **kwargs):

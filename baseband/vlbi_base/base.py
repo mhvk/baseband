@@ -31,7 +31,7 @@ class HeaderNotFoundError(LookupError):
 
 
 class FileBase:
-    """VLBI file wrapper, used to add frame methods to a binary data file.
+    """File wrapper, used to add frame methods to a binary data file.
 
     The underlying file is stored in ``fh_raw`` and all attributes that do not
     exist on the class itself are looked up on it.
@@ -124,13 +124,17 @@ class FileBase:
 class VLBIFileReaderBase(FileBase):
     """VLBI wrapped file reader base class.
 
-    Typically, a subclass will define ``read_header``, ``read_frame``,
-    and ``find_header`` methods.  This baseclass includes a `get_frame_rate`
-    method which determines the frame rate by scanning the file for headers,
-    looking for the maximum frame number that occurs before the jump down
-    for the next second. This method requires the subclass to define a
-    ``read_header`` method and assumes headers have a 'frame_nr' item, and
-    define a ``payload_nbytes`` property (as do all standard VLBI formats).
+    Typically, a subclass will define ``read_header`` and ``read_frame``
+    methods.  This baseclass includes base ``locate_frames`` method that
+    can search the file for a header patter. It can be overridden by
+    a version that just passes in the relevant pattern.
+
+    Also defined is a basic ``get_frame_rate`` methods which scans the file
+    for headers determines the maximum frame number that occurs before the
+    jump down for the next second. This method requires the subclass to
+    define a ``read_header`` method and assumes headers have a 'frame_nr'
+    item, and define a ``payload_nbytes`` property (as do all standard VLBI
+    formats).
 
     Parameters
     ----------

@@ -125,7 +125,7 @@ class GSBFileReader(FileBase):
 class GSBFileWriter(FileBase):
     """Simple writer for GSB data files.
 
-    Adds `write_payload` method to the basic VLBI binary file wrapper.
+    Adds `write_payload` method to the basic binary file wrapper.
     """
 
     def write_payload(self, data, bps=4):

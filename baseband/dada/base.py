@@ -9,7 +9,7 @@ from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
-    FileBase, VLBIFileReaderBase,
+    FileBase,
     VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
     FileOpener, FileInfo)
 from ..vlbi_base.file_info import FileReaderInfo
@@ -96,7 +96,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
                                         + file_nr * self._file_size)
 
 
-class DADAFileReader(VLBIFileReaderBase):
+class DADAFileReader(FileBase):
     """Simple reader for DADA files.
 
     Wraps a binary filehandle, providing methods to help interpret the data,
@@ -159,9 +159,8 @@ class DADAFileReader(VLBIFileReaderBase):
 class DADAFileWriter(FileBase):
     """Simple writer/mapper for DADA files.
 
-    Adds `write_frame` and `memmap_frame` methods to the VLBI binary file
-    wrapper.  The latter allows one to encode data in pieces, writing to disk
-    as needed.
+    Adds `write_frame` and `memmap_frame` methods to the binary file wrapper.
+    The latter allows one to encode data in pieces, writing to disk as needed.
     """
 
     def write_frame(self, data, header=None, **kwargs):
@@ -446,7 +445,7 @@ string that can be formatted using 'frame_nr', 'obs_offset', and other header
 keywords (by `~baseband.dada.DADAFileNameSequencer`).
 
 For writing, one can mimic what is done at quite a few telescopes by using
-the template '{utc_start}_{obs_offset:016d}.000000.dada'.  Unlike for the VLBI
+the template '{utc_start}_{obs_offset:016d}.000000.dada'.  Unlike for most
 openers, ``file_size`` is set to the size of one frame as given by the header.
 
 For reading, to read series such as the above, use something like
