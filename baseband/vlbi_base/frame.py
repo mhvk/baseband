@@ -217,6 +217,14 @@ class VLBIFrameBase:
             # Raise appropriate error.
             return self.__getattribute__(attr)
 
+    def __setattr__(self, attr, value):
+        if (attr not in {'header', 'payload', 'valid'}
+                and attr in getattr(getattr(self, 'header', None),
+                                    '_properties', ())):
+            return setattr(self.header, attr, value)
+        else:
+            return super().__setattr__(attr, value)
+
     # For tests, it is useful to define equality.
     def __eq__(self, other):
         return (type(self) is type(other)
