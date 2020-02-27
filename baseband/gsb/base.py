@@ -8,7 +8,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
     FileBase,
-    StreamBase, StreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
 from .header import GSBHeader
 from .payload import GSBPayload
@@ -429,7 +429,7 @@ class GSBStreamReader(GSBStreamBase, StreamReaderBase):
         super().__setstate__(state)
 
 
-class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
+class GSBStreamWriter(GSBStreamBase, StreamWriterBase):
     """GSB format writer.
 
     Encodes and writes sequences of samples to file.

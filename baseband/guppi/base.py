@@ -7,7 +7,7 @@ from astropy.utils import lazyproperty
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
     FileBase,
-    StreamBase, StreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
@@ -256,7 +256,7 @@ class GUPPIStreamReader(GUPPIStreamBase, StreamReaderBase):
                          subset=subset, verify=verify)
 
 
-class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
+class GUPPIStreamWriter(GUPPIStreamBase, StreamWriterBase):
     """GUPPI format writer.
 
     Encodes and writes sequences of samples to file.

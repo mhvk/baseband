@@ -7,7 +7,7 @@ import astropy.units as u
 from ..vlbi_base.base import (
     FileBase, VLBIFileReaderBase,
     StreamBase, VLBIStreamReaderBase,
-    VLBIStreamWriterBase, HeaderNotFoundError,
+    StreamWriterBase, HeaderNotFoundError,
     FileOpener, FileInfo)
 from .header import Mark4Header
 from .payload import Mark4Payload
@@ -316,7 +316,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         return last_header
 
 
-class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
+class Mark4StreamWriter(Mark4StreamBase, StreamWriterBase):
     """VLBI Mark 4 format writer.
 
     Encodes and writes sequences of samples to file.

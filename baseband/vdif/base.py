@@ -8,7 +8,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
     FileBase, VLBIFileReaderBase,
-    StreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, VLBIStreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo, HeaderNotFoundError)
 from .header import VDIFHeader
 from .payload import VDIFPayload
@@ -750,7 +750,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         return frameset
 
 
-class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
+class VDIFStreamWriter(VDIFStreamBase, StreamWriterBase):
     """VLBI VDIF format writer.
 
     Encodes and writes sequences of samples to file.

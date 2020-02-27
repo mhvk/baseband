@@ -9,7 +9,7 @@ from ...helpers import sequentialfile as sf
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..base import (FileOpener,
                     FileBase, VLBIFileReaderBase,
-                    StreamReaderBase, VLBIStreamWriterBase)
+                    StreamReaderBase, StreamWriterBase)
 
 
 class BareHeader(VLBIHeaderBase):
@@ -42,7 +42,7 @@ class BareStreamReader(StreamReaderBase):
     pass
 
 
-class BareStreamWriter(VLBIStreamWriterBase):
+class BareStreamWriter(StreamWriterBase):
     def __init__(self, fh_raw, header0, *,
                  squeeze=True, subset=(), fill_value=0., verify=True,
                  parrot='alife', **kwargs):

@@ -5,7 +5,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
     FileBase, VLBIFileReaderBase,
-    StreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, VLBIStreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
@@ -281,7 +281,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         return last_header
 
 
-class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
+class Mark5BStreamWriter(Mark5BStreamBase, StreamWriterBase):
     """VLBI Mark 5B format writer.
 
     Encodes and writes sequences of samples to file.

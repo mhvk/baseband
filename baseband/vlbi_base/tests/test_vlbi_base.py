@@ -12,7 +12,7 @@ from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import PayloadBase
 from ..frame import FrameBase
 from ..base import (FileBase, VLBIFileReaderBase, StreamBase,
-                    VLBIStreamReaderBase, VLBIStreamWriterBase)
+                    StreamReaderBase, StreamWriterBase)
 
 
 def encode_1bit(values):
@@ -572,7 +572,7 @@ class TestSqueezeAndSubset:
     def make_reader_with_shape(self, squeeze=True, subset=None,
                                sample_shape_maker=None, unsliced_shape=None):
 
-        class StreamReaderWithShape(VLBIStreamReaderBase):
+        class StreamReaderWithShape(StreamReaderBase):
             _sample_shape_maker = sample_shape_maker or self.sample_shape_maker
 
         header0 = self.header_class(
@@ -585,7 +585,7 @@ class TestSqueezeAndSubset:
     def make_writer_with_shape(self, squeeze=True, sample_shape_maker=None,
                                unsliced_shape=None):
 
-        class StreamWriterWithShape(VLBIStreamWriterBase):
+        class StreamWriterWithShape(StreamWriterBase):
             _sample_shape_maker = sample_shape_maker or self.sample_shape_maker
 
         header0 = self.header_class(
@@ -618,7 +618,7 @@ class TestSqueezeAndSubset:
         assert (sr._squeeze_and_subset(self.unsliced_data[:1]).shape
                 == (1,) + self.squeezed_shape)
 
-        # With VLBIStreamWriterBase, we can access _unsqueeze.
+        # With StreamWriterBase, we can access _unsqueeze.
         sw = self.make_writer_with_shape(squeeze=False)
         assert sw.sample_shape == self.unsliced_shape
         assert sw.sample_shape._fields == self.sample_shape_maker._fields

@@ -22,7 +22,7 @@ from .utils import byte_array
 __all__ = ['HeaderNotFoundError',
            'FileBase', 'VLBIFileReaderBase',
            'StreamBase', 'StreamReaderBase',
-           'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
+           'VLBIStreamReaderBase', 'StreamWriterBase',
            'FileInfo', 'FileOpener']
 
 
@@ -1053,7 +1053,7 @@ class VLBIStreamReaderBase(StreamReaderBase):
         return frame
 
 
-class VLBIStreamWriterBase(StreamBase):
+class StreamWriterBase(StreamBase):
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)

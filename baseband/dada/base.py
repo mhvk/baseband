@@ -10,7 +10,7 @@ from astropy.utils import lazyproperty
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
     FileBase,
-    StreamBase, StreamReaderBase, VLBIStreamWriterBase,
+    StreamBase, StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
 from ..vlbi_base.file_info import FileReaderInfo
 from ..vlbi_base.utils import lcm
@@ -332,7 +332,7 @@ class DADAStreamReader(DADAStreamBase, StreamReaderBase):
         return DADAFrame(self._last_header, last_payload)
 
 
-class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
+class DADAStreamWriter(DADAStreamBase, StreamWriterBase):
     """DADA format writer.
 
     Encodes and writes sequences of samples to file.
