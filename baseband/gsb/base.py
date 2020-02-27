@@ -281,6 +281,17 @@ class GSBStreamBase(VLBIStreamBase):
         #  __getattribute__ to raise appropriate error.
         return self.__getattribute__(attr)
 
+    def _set_index(self, header, index):
+        if self.header0.mode == 'phased':
+            time_offset = index / self._frame_rate
+            # mem_block is a rotating modulo-8 value with no meaning.
+            header.update(gps_time=self.header0.gps_time + time_offset,
+                          pc_time=self.header0.pc_time + time_offset,
+                          seq_nr=self.header0['seq_nr'] + index,
+                          mem_block=(self.header0['mem_block'] + index) % 8)
+        else:
+            super()._set_index(header, index)
+
     def close(self):
         self.fh_ts.close()
         try:
@@ -548,26 +559,10 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, payload_nbytes=payload_nbytes,
             nchan=nchan, bps=bps, complex_data=complex_data, squeeze=squeeze)
-        self._payload = GSBPayload.fromdata(
+        self._frame = GSBFrame.fromdata(
             np.zeros((self.samples_per_frame,) + self._unsliced_shape,
                      (np.complex64 if self.complex_data else np.float32)),
-            bps=self.bps)
-
-    def _make_frame(self, index):
-        # Set up header for new frame.  (mem_block is set to a rotating
-        # modulo-8 value with no meaning.)
-        time_offset = index * self.samples_per_frame / self.sample_rate
-        if self.header0.mode == 'phased':
-            header = self.header0.fromvalues(
-                gps_time=self.header0.gps_time + time_offset,
-                pc_time=self.header0.pc_time + time_offset,
-                seq_nr=(index + self.header0['seq_nr']),
-                mem_block=((self.header0['mem_block'] + index) % 8))
-        else:
-            header = self.header0.fromvalues(time=self.start_time
-                                             + time_offset)
-
-        return GSBFrame(header, self._payload, valid=True, verify=False)
+            header=self.header0.copy(), bps=self.bps)
 
     def _fh_raw_write_frame(self, frame):
         assert frame.valid
