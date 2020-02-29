@@ -553,8 +553,8 @@ class TestSqueezeAndSubset:
     def setup(self):
         self.other_args = dict(fh_raw=None, header0=None, bps=1,
                                complex_data=False, samples_per_frame=1000,
-                               sample_rate=10000*u.Hz, fill_value=0.,
-                               verify=True)
+                               frame_nbytes=1000, sample_rate=10000*u.Hz,
+                               fill_value=0., verify=True)
         self.sample_shape_maker = namedtuple('SampleShape',
                                              'n0, n1, n2, n3, n4')
         self.unsliced_shape = (1, 21, 33, 1, 2)

@@ -373,6 +373,7 @@ class VDIFStreamBase(VLBIStreamBase):
         super().__init__(
             fh_raw=fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame,
+            frame_nbytes=header0.frame_nbytes,
             unsliced_shape=(nthread, header0.nchan), bps=header0.bps,
             complex_data=header0['complex_data'], squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)

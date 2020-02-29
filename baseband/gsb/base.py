@@ -258,9 +258,9 @@ class GSBStreamBase(VLBIStreamBase):
 
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
-            samples_per_frame=samples_per_frame, unsliced_shape=unsliced_shape,
-            bps=bps, complex_data=complex_data, squeeze=squeeze, subset=subset,
-            fill_value=0., verify=verify)
+            samples_per_frame=samples_per_frame, frame_nbytes=payload_nbytes,
+            unsliced_shape=unsliced_shape, bps=bps, complex_data=complex_data,
+            squeeze=squeeze, subset=subset, fill_value=0., verify=verify)
 
         self._payload_nbytes = payload_nbytes
 

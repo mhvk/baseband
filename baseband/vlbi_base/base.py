@@ -355,14 +355,15 @@ class VLBIStreamBase:
     _frame_index = None
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, squeeze, subset=(),
-                 fill_value=0., verify=True):
+                 frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
+                 subset=(), fill_value=0., verify=True):
         self.fh_raw = fh_raw
         self._header0 = header0
-        self._bps = bps
-        self._complex_data = complex_data
-        self.samples_per_frame = samples_per_frame
-        self.sample_rate = sample_rate
+        self._bps = operator.index(bps)
+        self._complex_data = bool(complex_data)
+        self._samples_per_frame = operator.index(samples_per_frame)
+        self._frame_nbytes = operator.index(frame_nbytes)
+        self._sample_rate = sample_rate
         self._frame_rate = (sample_rate / samples_per_frame).to(u.Hz)
         self.offset = 0
         self._fill_value = fill_value
@@ -492,6 +493,11 @@ class VLBIStreamBase:
             raise exc
 
     @property
+    def frame_nbytes(self):
+        """Number of bytes per frame."""
+        return self._frame_nbytes
+
+    @property
     def sample_rate(self):
         """Number of complete samples per second."""
         return self._sample_rate
@@ -571,8 +577,8 @@ class VLBIStreamBase:
 class VLBIStreamReaderBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, squeeze, subset,
-                 fill_value, verify):
+                 frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
+                 subset, fill_value, verify):
 
         if sample_rate is None:
             try:
@@ -588,11 +594,11 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 raise
 
         super().__init__(
-            fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
-            bps, complex_data, squeeze, subset, fill_value, verify)
+            fh_raw, header0, sample_rate, samples_per_frame, frame_nbytes,
+            unsliced_shape, bps, complex_data, squeeze, subset, fill_value,
+            verify=verify)
 
-        if hasattr(header0, 'frame_nbytes'):
-            self._raw_offsets = RawOffsets(frame_nbytes=header0.frame_nbytes)
+        self._raw_offsets = RawOffsets(frame_nbytes=frame_nbytes)
 
     info = VLBIStreamReaderInfo()
 
@@ -928,7 +934,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         try:
             header = self.fh_raw.find_header(
                 self.header0, forward=True, check=(1, 2),
-                maximum=3*self.header0.frame_nbytes)
+                maximum=3*self.frame_nbytes)
         except HeaderNotFoundError:
             exc.args += (msg + ' Cannot find header nearby.',)
             raise exc
@@ -948,9 +954,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             header1_index = header_index
             self.fh_raw.seek(-1, 1)
             try:
-                header = self.fh_raw.find_header(
-                    self.header0, forward=False,
-                    maximum=4*self.header0.frame_nbytes)
+                header = self.fh_raw.find_header(self.header0, forward=False,
+                                                 maximum=4*self.frame_nbytes)
             except HeaderNotFoundError:
                 exc.args += (msg + ' Could not find previous index.',)
                 raise exc
@@ -1023,15 +1028,16 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 class VLBIStreamWriterBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, squeeze, subset,
-                 fill_value, verify):
+                 frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
+                 subset, fill_value, verify):
 
         if sample_rate is None:
             raise ValueError("must pass in an explicit `sample_rate`.")
 
         super().__init__(
-            fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
-            bps, complex_data, squeeze, subset, fill_value, verify)
+            fh_raw, header0, sample_rate, samples_per_frame,
+            frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
+            subset, fill_value, verify)
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)
