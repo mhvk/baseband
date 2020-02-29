@@ -354,7 +354,7 @@ class VLBIStreamBase:
     _sample_shape_maker = None
     _frame_index = None
 
-    def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
+    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
                  frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
                  subset=(), fill_value=0., verify=True):
         self.fh_raw = fh_raw
@@ -576,9 +576,9 @@ class VLBIStreamBase:
 
 class VLBIStreamReaderBase(VLBIStreamBase):
 
-    def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
-                 frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
-                 subset, fill_value, verify):
+    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
+                 frame_nbytes, unsliced_shape, bps, complex_data,
+                 squeeze=False, subset=(), fill_value=0., verify=True):
 
         if sample_rate is None:
             try:
@@ -594,8 +594,10 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                 raise
 
         super().__init__(
-            fh_raw, header0, sample_rate, samples_per_frame, frame_nbytes,
-            unsliced_shape, bps, complex_data, squeeze, subset, fill_value,
+            fh_raw, header0, sample_rate=sample_rate,
+            samples_per_frame=samples_per_frame, frame_nbytes=frame_nbytes,
+            unsliced_shape=unsliced_shape, bps=bps, complex_data=complex_data,
+            squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
 
         self._raw_offsets = RawOffsets(frame_nbytes=frame_nbytes)
@@ -1027,7 +1029,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
 class VLBIStreamWriterBase(VLBIStreamBase):
 
-    def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
+    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
                  frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
                  subset, fill_value, verify):
 
@@ -1035,9 +1037,11 @@ class VLBIStreamWriterBase(VLBIStreamBase):
             raise ValueError("must pass in an explicit `sample_rate`.")
 
         super().__init__(
-            fh_raw, header0, sample_rate, samples_per_frame,
-            frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
-            subset, fill_value, verify)
+            fh_raw, header0, sample_rate=sample_rate,
+            samples_per_frame=samples_per_frame, frame_nbytes=frame_nbytes,
+            unsliced_shape=unsliced_shape, bps=bps, complex_data=complex_data,
+            squeeze=squeeze, subset=subset, fill_value=fill_value,
+            verify=verify)
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)
