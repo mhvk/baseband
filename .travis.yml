@@ -27,8 +27,6 @@ stages:
    - name: Cron tests
      if: type = cron
 
-stage: Comprehensive tests
-
 env:
     global:
 
@@ -50,7 +48,7 @@ env:
         # line to use the X virtual framebuffer.
         # - SETUP_XVFB=True
 
-matrix:
+jobs:
 
     # Don't wait for allowed failures
     fast_finish: true
@@ -68,10 +66,12 @@ matrix:
           env: TOXENV=codestyle
 
         - name: Documentation build
+          stage: Comprehensive tests
           python: 3.8
           env: TOXENV=build_docs
 
         - name: Coverage using oldest supported versions
+          stage: Comprehensive tests
           python: 3.7
           env: TOXENV="py37-test-oldestdeps-cov"
 
@@ -84,8 +84,8 @@ matrix:
         # Also regularly try the big-endian s390 architecture, in the
         # process checking that installing dependencies with apt works.
         - name: big-endian s390 architecture with apt
-          stage: Cron tests
-          arch: s390
+          stage: Comprehensive tests
+          arch: s390x
           language: c
           env: APT_DEPENDENCIES='python3-astropy python3-pytest-astropy python3-setuptools'
 
