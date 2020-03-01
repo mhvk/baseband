@@ -619,15 +619,14 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         # Now apply subset to a dummy sample that has the sample number as its
         # value (where 13 is to bring bad luck to over-complicated subsets).
         dummy_data = np.arange(13.)
-        dummy_sample = np.rollaxis(  # Use moveaxis when numpy_min>=1.11
-            (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1)
+        dummy_sample = np.moveaxis(
+            (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1, 0)
         try:
             dummy_subset = dummy_sample[(slice(None),) + self.subset]
             # Check whether subset was in range and whether sample numbers were
             # preserved (latter should be, but check anyway).
             assert 0 not in dummy_subset.shape
-            assert np.all(dummy_subset == dummy_data.reshape(
-                (-1,) + (1,) * (dummy_subset.ndim - 1)))
+            assert np.all(np.moveaxis(dummy_subset, 0, -1) == dummy_data)
         except (IndexError, AssertionError) as exc:
             exc.args += ("subset {} cannot be used to properly index "
                          "{}samples with shape {}.".format(
