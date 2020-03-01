@@ -40,9 +40,9 @@ if sys.byteorder == 'big':  # pragma: no cover
 
         Special version for the Ft station, which has unusual settings.
         """
-        return (((x & 0xFFFFAFFAFFFFAFFA))
-                | ((x & 0x0000000500000005) >> 6)
-                | ((x & 0x0000500000005000) << 6))
+        return (((x & 0xAFFAFFFFAFFAFFFF))
+                | ((x & 0x0005000000050000) << 12)
+                | ((x & 0x5000000050000000) >> 12))
 else:
     def reorder32(x):
         """Reorder 32-track bits to bring signs & magnitudes together."""
@@ -233,7 +233,7 @@ def decode_16chan_2bit_fanout2_ft(frame):
     # byte 7: 9u/s0, du/s0, 9u/s1, du/s1, 9u/m0, du/m0, 9u/m1, du/m1
     # This means the re-ordering is different from the usual: we just
     # need to shift bits around in bytes 0,1,4,5:
-    frame = reorder64_Ft(frame)
+    frame = reorder64_Ft(frame.view(np.uint64))
     # This leaves samples as
     # byte 0: 0u/s0, 3u/s0, 0u/s1, 3u/s1, 0u/m0, 3u/m0, 0u/m1, 3u/m1
     # byte 1: 0l/s0, 4u/s0, 0l/s1, 4u/s1, 0l/m0, 4u/m0, 0l/m1, 4u/m1
