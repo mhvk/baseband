@@ -329,7 +329,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
             fh_raw, header0, sample_rate=sample_rate, nchan=nchan,
             bps=bps, squeeze=squeeze)
         # Initial frame, reused for every other one.
-        payload = Mark5BPayload(np.zeros((2500,), np.uint32),
+        payload = Mark5BPayload(np.zeros((2500,), Mark5BPayload._dtype_word),
                                 nchan=self._unsliced_shape.nchan,
                                 bps=self.bps)
         self._frame = Mark5BFrame(header0.copy(), payload)
