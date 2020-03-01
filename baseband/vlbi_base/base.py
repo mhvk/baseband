@@ -354,34 +354,44 @@ class VLBIStreamBase:
     _sample_shape_maker = None
     _frame_index = None
 
-    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
-                 frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
-                 subset=(), fill_value=0., verify=True):
+    def __init__(self, fh_raw, header0, *,
+                 sample_rate=None, samples_per_frame=None, frame_nbytes=None,
+                 unsliced_shape=None, bps=None, complex_data=None,
+                 squeeze=False, subset=(), fill_value=0., verify=True):
+        # Basic arguments
         self.fh_raw = fh_raw
         self._header0 = header0
-        self._bps = operator.index(bps)
-        self._complex_data = bool(complex_data)
-        self._samples_per_frame = operator.index(samples_per_frame)
-        self._frame_nbytes = operator.index(frame_nbytes)
-        self._sample_rate = sample_rate
-        self._frame_rate = (sample_rate / samples_per_frame).to(u.Hz)
-        self.offset = 0
+        # Passed in or inferred from header.
+        self._bps = operator.index(bps) if bps is not None else header0.bps
+        self._complex_data = (bool(complex_data) if complex_data is not None
+                              else header0.complex_data)
+        self._samples_per_frame = (operator.index(samples_per_frame)
+                                   if samples_per_frame is not None
+                                   else header0.samples_per_frame)
+        self._frame_nbytes = (operator.index(frame_nbytes)
+                              if frame_nbytes is not None
+                              else header0.frame_nbytes)
+        self._sample_rate = (sample_rate if sample_rate is not None
+                             else header0.sample_rate)
+        unsliced_shape = (unsliced_shape if unsliced_shape is not None
+                          else header0.sample_shape)
+        self._unsliced_shape = (unsliced_shape
+                                if self._sample_shape_maker is None
+                                else self._sample_shape_maker(*unsliced_shape))
+        # Arguments with defaults.
         self._fill_value = fill_value
-
-        if self._sample_shape_maker is not None:
-            self._unsliced_shape = self._sample_shape_maker(*unsliced_shape)
-        else:
-            self._unsliced_shape = unsliced_shape
-
         self._squeeze = bool(squeeze)
         if subset is None:
             subset = ()
         elif not isinstance(subset, tuple):
             subset = (subset,)
         self._subset = subset
-        self._sample_shape = self._get_sample_shape()
-
         self.verify = verify
+        # Calculated attributes.
+        self._frame_rate = (self.sample_rate / self.samples_per_frame).to(u.Hz)
+        self._sample_shape = self._get_sample_shape()
+        # Initialization.
+        self.offset = 0
 
     @property
     def squeeze(self):
@@ -576,14 +586,14 @@ class VLBIStreamBase:
 
 class VLBIStreamReaderBase(VLBIStreamBase):
 
-    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
-                 frame_nbytes, unsliced_shape, bps, complex_data,
+    def __init__(self, fh_raw, header0, *,
+                 sample_rate=None, samples_per_frame=None, frame_nbytes=None,
+                 unsliced_shape=None, bps=None, complex_data=None,
                  squeeze=False, subset=(), fill_value=0., verify=True):
 
-        if sample_rate is None:
+        if sample_rate is None and not hasattr(header0, 'sample_rate'):
             try:
-                sample_rate = (samples_per_frame
-                               * fh_raw.get_frame_rate()).to(u.MHz)
+                frame_rate = fh_raw.get_frame_rate()
 
             except Exception as exc:
                 exc.args += ("the sample rate could not be auto-detected. "
@@ -593,6 +603,11 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                              "`sample_rate`.",)
                 raise
 
+            if samples_per_frame is None:
+                samples_per_frame = header0.samples_per_frame
+
+            sample_rate = (samples_per_frame * frame_rate).to(u.MHz)
+
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, frame_nbytes=frame_nbytes,
@@ -600,7 +615,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
 
-        self._raw_offsets = RawOffsets(frame_nbytes=frame_nbytes)
+        self._raw_offsets = RawOffsets(frame_nbytes=self.frame_nbytes)
 
     info = VLBIStreamReaderInfo()
 
@@ -1029,11 +1044,12 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
 class VLBIStreamWriterBase(VLBIStreamBase):
 
-    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
-                 frame_nbytes, unsliced_shape, bps, complex_data, squeeze,
-                 subset, fill_value, verify):
+    def __init__(self, fh_raw, header0, *,
+                 sample_rate=None, samples_per_frame=None, frame_nbytes=None,
+                 unsliced_shape=None, bps=None, complex_data=None,
+                 squeeze=False, subset=(), fill_value=0., verify=True):
 
-        if sample_rate is None:
+        if sample_rate is None and not hasattr(header0, 'sample_rate'):
             raise ValueError("must pass in an explicit `sample_rate`.")
 
         super().__init__(

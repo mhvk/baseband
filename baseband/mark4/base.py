@@ -258,11 +258,9 @@ class Mark4StreamBase(VLBIStreamBase):
                  subset=(), fill_value=0., verify=True):
         super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
-            samples_per_frame=header0.samples_per_frame,
-            frame_nbytes=header0.frame_nbytes,
-            unsliced_shape=(header0.nchan,),
-            bps=header0.bps, complex_data=False, squeeze=squeeze,
-            subset=subset, fill_value=fill_value, verify=verify)
+            unsliced_shape=(header0.nchan,), complex_data=False,
+            squeeze=squeeze, subset=subset, fill_value=fill_value,
+            verify=verify)
 
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):

@@ -210,16 +210,6 @@ class DADAStreamBase(VLBIStreamBase):
 
     _sample_shape_maker = DADAPayload._sample_shape_maker
 
-    def __init__(self, fh_raw, header0, squeeze=True, subset=(), verify=True):
-
-        super().__init__(
-            fh_raw=fh_raw, header0=header0, sample_rate=header0.sample_rate,
-            samples_per_frame=header0.samples_per_frame,
-            frame_nbytes=header0.frame_nbytes,
-            unsliced_shape=header0.sample_shape, bps=header0.bps,
-            complex_data=header0.complex_data, squeeze=squeeze, subset=subset,
-            fill_value=0., verify=verify)
-
     def _get_index(self, header):
         # Override for faster calculation of frame index.
         return int(round((header['OBS_OFFSET']

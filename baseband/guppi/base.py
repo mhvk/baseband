@@ -211,12 +211,9 @@ class GUPPIStreamBase(VLBIStreamBase):
         samples_per_frame = header0.samples_per_frame - header0.overlap
 
         super().__init__(
-            fh_raw=fh_raw, header0=header0, sample_rate=header0.sample_rate,
+            fh_raw=fh_raw, header0=header0,
             samples_per_frame=samples_per_frame,
-            frame_nbytes=header0.frame_nbytes,
-            unsliced_shape=header0.sample_shape, bps=header0.bps,
-            complex_data=header0.complex_data, squeeze=squeeze, subset=subset,
-            fill_value=0., verify=verify)
+            squeeze=squeeze, subset=subset, verify=verify)
 
     # Overriding so the docstring indicates the exclusion of the overlap.
     samples_per_frame = property(VLBIStreamBase.samples_per_frame.fget,
