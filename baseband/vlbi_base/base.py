@@ -943,7 +943,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         # to jump over a bad bit.
         while header_index >= index:
             raw_pos = self.fh_raw.tell()
-            header1 = header
             header1_index = header_index
             self.fh_raw.seek(-1, 1)
             try:
@@ -958,17 +957,17 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             # While we are at it, update the list of known indices.
             self._raw_offsets[header1_index] = raw_pos
 
-        # Move back to position of last good header (header1).
+        # Move back to position of last good header (header1_index).
         self.fh_raw.seek(raw_pos)
 
         if header1_index > index:
             # Frame is missing!
             msg += ' The frame seems to be missing.'
-            # Construct a missing frame.
-            header = header1.copy()
-            self._set_index(header, index)
-            frame = self._frame.__class__(header, self._frame.payload,
-                                          valid=False)
+            # Just reuse old frame with new index and set to invalid.
+            frame = self._frame
+            frame.header.mutable = True
+            frame.valid = False
+            self._set_index(frame, index)
 
         else:
             assert header1_index == index, \
