@@ -274,6 +274,7 @@ class TestGUPPI:
             assert info.sample_shape == header.sample_shape
             assert info.start_time == header.start_time
             assert info.samples_per_frame == header.samples_per_frame
+            assert info.overlap == header.overlap
             # Note: sample_rate used to be wrong, since calculated from
             # from frame rate and samples_per_frame w/o corr. for overlap.
             assert info.sample_rate == header.sample_rate
