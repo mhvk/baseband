@@ -109,8 +109,8 @@ SAMPLE_PUPPI = _full_path('sample_puppi.raw')
 """GUPPI/PUPPI sample, npol=2, nchan=4.
 
 Created from the first four frames of a 2018-01-14 Arecibo observation of
-J1810+1744, with payload shortened to 8192 complete samples (with 512
-overlap).
+J1810+1744, with payload shortened to 8192 samples (with 512 overlap),
+equivalent to 1024 complete samples (with 64 overlap).
 """
 
 SAMPLE_GSB_RAWDUMP_HEADER = _full_path('gsb/sample_gsb_rawdump.timestamp')

@@ -7,6 +7,8 @@ git:
 os:
     - linux
 
+dist: bionic
+
 # The apt packages below are needed for sphinx builds. A full list of packages
 # that can be included can be found here:
 #
@@ -33,16 +35,21 @@ env:
         # The following versions are the 'default' for tests, unless
         # overridden underneath. They are defined here in order to save having
         # to repeat them for all configurations.
+        - SETUP_METHOD='tox'
 
         # The following three variables are for tox. TOXENV is a standard
-        # variable that tox uses to determine the environment to run
-        # (the default of empty means not to use tox),
+        # variable that tox uses to determine the environment to run,
         # TOXARGS are arguments passed to tox, and TOXPOSARGS are arguments
         # that tox passes through to the {posargs} indicator in tox.ini.
         # The latter can be used for example to pass arguments to pytest.
-        - TOXENV=''
+        - TOXENV='test'
         - TOXARGS='-v'
         - TOXPOSARGS=''
+
+        # Also allow tests without tox, getting our packages using apt;
+        # Here, we still need pip to install baseband.  We use the Debian
+        # version since the one packaged on travis gives some problems.
+        - APT_DEPENDENCIES='python3-astropy python3-pytest-astropy python3-setuptools'
 
         # If there are matplotlib or other GUI tests, uncomment the following
         # line to use the X virtual framebuffer.
@@ -75,25 +82,25 @@ jobs:
           python: 3.7
           env: TOXENV="py37-test-oldestdeps-cov"
 
-        # Now try Astropy dev with the latest Python
+        # Regularly try Astropy dev with the latest Python
         - name: Python 3.8 with developer version of astropy
           stage: Cron tests
           python: 3.8
           env: TOXENV=py38-test-devdeps
 
-        # Also regularly try the big-endian s390 architecture, in the
+        # Also regularly try the big-endian s390x architecture, in the
         # process checking that installing dependencies with apt works.
-        - name: big-endian s390 architecture with apt
+        - name: big-endian s390x architecture with apt
           stage: Comprehensive tests
           arch: s390x
           language: c
-          env: APT_DEPENDENCIES='python3-astropy python3-pytest-astropy python3-setuptools'
+          env: SETUP_METHOD='apt'
 
 install:
 
     # We now use the ci-helpers package to set up our testing environment.
 
-    - if [ ! -z $TOXENV ]; then
+    - if [[ $SETUP_METHOD == 'tox' ]]; then
         pip install tox;
       else
         curl https://ftp-master.debian.org/keys/archive-key-10.asc | sudo apt-key add -;
@@ -107,7 +114,7 @@ install:
       fi
 
 script:
-    - if [ ! -z $TOXENV ]; then
+    - if [[ $SETUP_METHOD == 'tox' ]]; then
         tox $TOXARGS -- $TOXPOSARGS;
       else
         pytest-3;
