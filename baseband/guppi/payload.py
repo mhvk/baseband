@@ -160,7 +160,7 @@ class GUPPIPayload(VLBIPayloadBase):
         decoder = self._decoders[self._coder]
 
         # If we want to decode the entire dataset.
-        if item is () or item == slice(None):
+        if item == () or item == slice(None):
             data = decoder(self.words)
             if self.complex_data:
                 data = data.view(self.dtype)
@@ -192,7 +192,7 @@ class GUPPIPayload(VLBIPayloadBase):
                     .transpose(0, 2, 1)[data_slice])
 
     def __setitem__(self, item, data):
-        if item is () or item == slice(None):
+        if item == () or item == slice(None):
             words_slice = data_slice = slice(None)
         else:
             words_slice, data_slice = self._item_to_slices(item)
