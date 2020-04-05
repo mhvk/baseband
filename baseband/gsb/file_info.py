@@ -10,8 +10,7 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
 
     @info_item
     def header0(self):
-        with self._parent.temporary_offset() as fh:
-            fh.seek(0)
+        with self._parent.temporary_offset(0) as fh:
             return fh.read_timestamp()
 
     @info_item(needs='header0')

@@ -99,9 +99,8 @@ class Mark5BFileReader(VLBIFileReaderBase):
         try:
             return super().get_frame_rate()
         except Exception as exc:
-            with self.temporary_offset():
+            with self.temporary_offset(0):
                 try:
-                    self.seek(0)
                     header0 = self.read_header()
                     self.seek(header0.payload_nbytes, 1)
                     header1 = self.read_header()

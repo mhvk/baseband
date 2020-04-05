@@ -92,8 +92,7 @@ class Mark4FileReader(VLBIFileReaderBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        with self.temporary_offset():
-            self.seek(0)
+        with self.temporary_offset(0):
             header0 = self.find_header()
             self.seek(header0.frame_nbytes, 1)
             header1 = self.read_header()
@@ -144,8 +143,7 @@ class Mark4FileReader(VLBIFileReaderBase):
         if frame_nbytes is None:
             ntrack = self.ntrack
             if ntrack is None:
-                with self.temporary_offset():
-                    self.seek(0)
+                with self.temporary_offset(0):
                     ntrack = self.determine_ntrack(maximum=maximum)
 
             frame_nbytes = ntrack * 2500

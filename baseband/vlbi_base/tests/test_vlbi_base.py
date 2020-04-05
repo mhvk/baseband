@@ -489,6 +489,26 @@ class TestVLBIBase:
             assert fh.closed
             assert fh.fh_raw.closed
 
+    def test_temporary_offset(self, tmpdir):
+        filename = str(tmpdir.join('test.dat'))
+        with io.open(filename, 'wb') as fw:
+            fw.write(b'abcdefghijklmnopqrstuvwxyz')
+
+        with io.open(filename, 'rb') as fr:
+            fh = VLBIFileBase(fr)
+            fh.seek(2)
+            assert fh.read(2) == b'cd'
+            assert fh.tell() == 4
+            with fh.temporary_offset():
+                assert fh.seek(1) == 1
+                assert fh.read(2) == b'bc'
+                assert fh.tell() == 3
+            assert fh.tell() == 4
+            with fh.temporary_offset(-2, 2):
+                assert fh.read(1) == b'y'
+                assert fh.tell() == 25
+            assert fh.tell() == 4
+
 
 class TestSqueezeAndSubset:
     def setup(self):

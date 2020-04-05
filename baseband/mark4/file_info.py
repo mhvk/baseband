@@ -121,28 +121,25 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
     @info_item
     def offset0(self):
         """Offset in bytes to the location of the first header."""
-        with self._parent.temporary_offset() as fh:
-            fh.seek(0)
+        with self._parent.temporary_offset(0) as fh:
             fh.find_header()
             return fh.tell()
 
     @info_item(needs='offset0')
     def header0(self):
-        with self._parent.temporary_offset() as fh:
-            fh.seek(self.offset0)
+        with self._parent.temporary_offset(self.offset0) as fh:
             return fh.read_header()
 
     @info_item(needs='header0')
     def frame0(self):
-        with self._parent.temporary_offset() as fh:
-            fh.seek(self.offset0)
+        with self._parent.temporary_offset(self.offset0) as fh:
             return fh.read_frame()
 
     @info_item(needs='header0')
     def number_of_frames(self):
         """Total number of frames."""
-        with self._parent.temporary_offset() as fh:
-            fh.seek(-self.header0.frame_nbytes, 2)
+        with self._parent.temporary_offset(
+                -self.header0.frame_nbytes, 2) as fh:
             fh.find_header(self.header0, forward=False)
             number_of_frames = ((fh.tell() - self.offset0)
                                 / self.header0.frame_nbytes) + 1
