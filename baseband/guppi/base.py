@@ -132,11 +132,10 @@ class GUPPIFileReader(VLBIFileReaderBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        with self.temporary_offset():
-            self.seek(0)
+        with self.temporary_offset(0):
             header = self.read_header()
-            return (header.sample_rate
-                    / (header.samples_per_frame - header.overlap)).to(u.Hz)
+        return (header.sample_rate
+                / (header.samples_per_frame - header.overlap)).to(u.Hz)
 
 
 class GUPPIFileWriter(VLBIFileBase):
@@ -270,8 +269,8 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
         # Seek forward rather than backward, as last frame often has missing
         # bytes.
         with self.fh_raw.temporary_offset() as fh_raw:
-            nframes, fframe = divmod(fh_raw.seek(0, 2),
-                                     self.header0.frame_nbytes)
+            file_size = fh_raw.seek(0, 2)
+            nframes, fframe = divmod(file_size, self.header0.frame_nbytes)
             fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
             return fh_raw.read_header()
 

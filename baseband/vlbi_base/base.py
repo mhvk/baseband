@@ -305,8 +305,7 @@ class VLBIFileReaderBase(VLBIFileBase):
         `EOFError`
             If the file contains less than one second of data.
         """
-        with self.temporary_offset():
-            self.seek(0)
+        with self.temporary_offset(0):
             header = header0 = self.read_header()
             frame_nr0 = header0['frame_nr']
             while header['frame_nr'] == frame_nr0:
@@ -642,8 +641,8 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the file."""
-        with self.fh_raw.temporary_offset() as fh_raw:
-            fh_raw.seek(-self.header0.frame_nbytes, 2)
+        with self.fh_raw.temporary_offset(
+                -self.header0.frame_nbytes, 2) as fh_raw:
             try:
                 return fh_raw.find_header(self.header0, forward=False,
                                           check=(-1, 1))

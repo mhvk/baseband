@@ -71,11 +71,10 @@ class GSBTimeStampIO(VLBIFileBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        with self.temporary_offset():
-            self.seek(0)
+        with self.temporary_offset(0):
             timestamp0 = self.read_timestamp()
             timestamp1 = self.read_timestamp()
-            return (1. / (timestamp1.time - timestamp0.time)).to(u.Hz)
+        return (1. / (timestamp1.time - timestamp0.time)).to(u.Hz)
 
 
 class GSBFileReader(VLBIFileBase):

@@ -350,10 +350,9 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         # Here, we do not even know whether the file is open or whether we
         # have the right format. We thus use a try/except and filter out all
         # warnings.
-        with self._parent.temporary_offset() as fh:
+        with self._parent.temporary_offset(0) as fh:
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')
-                fh.seek(0)
                 return fh.read_header()
 
     @info_item(needs='header0')
@@ -361,8 +360,7 @@ class VLBIFileReaderInfo(VLBIInfoBase):
         """First frame from the file."""
         # Try reading a frame.  This has no business failing if a
         # frame rate could be determined, but try anyway; maybe file is closed.
-        with self._parent.temporary_offset() as fh:
-            fh.seek(0)
+        with self._parent.temporary_offset(0) as fh:
             return fh.read_frame()
 
     @info_item(needs='frame0', default=False)
@@ -390,8 +388,9 @@ class VLBIFileReaderInfo(VLBIInfoBase):
     def number_of_frames(self):
         """Total number of frames."""
         with self._parent.temporary_offset() as fh:
-            number_of_frames = fh.seek(0, 2) / self.header0.frame_nbytes
+            file_size = fh.seek(0, 2)
 
+        number_of_frames = file_size / self.header0.frame_nbytes
         if number_of_frames % 1 == 0:
             return int(number_of_frames)
         else:

@@ -21,14 +21,12 @@ class VDIFFileReaderInfo(VLBIFileReaderInfo):
     def thread_ids(self):
         # To get the thread_ids and thus the real sample shape,
         # need to check frame sets.
-        with self._parent.temporary_offset() as fh:
-            fh.seek(0)
+        with self._parent.temporary_offset(0) as fh:
             return fh.get_thread_ids()
 
     @info_item
     def header0(self):
-        with self._parent.temporary_offset() as fh:
-            fh.seek(0)
+        with self._parent.temporary_offset(0) as fh:
             # Almost all bytes are interpretable as headers,
             # so we need a basic sanity check.
             return fh.find_header(maximum=0)

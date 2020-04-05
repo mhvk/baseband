@@ -147,10 +147,9 @@ class DADAFileReader(VLBIFileReaderBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        with self.temporary_offset():
-            self.seek(0)
+        with self.temporary_offset(0):
             header = self.read_header()
-            return (header.sample_rate / header.samples_per_frame).to(u.Hz)
+        return (header.sample_rate / header.samples_per_frame).to(u.Hz)
 
 
 class DADAFileWriter(VLBIFileBase):
