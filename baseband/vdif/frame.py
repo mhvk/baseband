@@ -404,7 +404,7 @@ class VDIFFrameSet:
         cannot be used.  The function is unable to parse payloads whose words
         have unused space (eg. VDIF files with 20 bits/sample).
         """
-        if item is ():
+        if item == ():
             return self.frames, (), False, False, False
 
         if not isinstance(item, tuple):

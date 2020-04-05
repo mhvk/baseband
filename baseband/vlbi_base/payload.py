@@ -248,7 +248,7 @@ class VLBIPayloadBase:
 
     def __getitem__(self, item=()):
         decoder = self._decoders[self._coder]
-        if item is () or item == slice(None):
+        if item == () or item == slice(None):
             data = decoder(self.words)
             if self.complex_data:
                 data = data.view(self.dtype)
@@ -260,7 +260,7 @@ class VLBIPayloadBase:
                 .reshape(-1, *self.sample_shape)[data_slice])
 
     def __setitem__(self, item, data):
-        if item is () or item == slice(None):
+        if item == () or item == slice(None):
             words_slice = data_slice = slice(None)
         else:
             words_slice, data_slice = self._item_to_slices(item)
