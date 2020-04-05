@@ -11,7 +11,7 @@ Bug Fixes
   can now be read and written. [#380]
 
 
-3.1.1 (unreleased)
+3.1.1 (2020-04-05)
 ==================
 
 Bug Fixes
