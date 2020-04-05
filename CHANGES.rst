@@ -10,6 +10,11 @@ Bug Fixes
 - Mark 4 data written with the non-standard channel assignment used at Ft
   can now be read and written. [#380]
 
+Other Changes and Additions
+---------------------------
+
+- The ``temporary_offset`` context manager of file readers now allows to
+  pass in a possible initial offset to go to. [#390]
 
 3.1.1 (2020-04-05)
 ==================

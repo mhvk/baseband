@@ -62,7 +62,7 @@ class VLBIFileBase:
         self.fh_raw.close()
 
     @contextmanager
-    def temporary_offset(self):
+    def temporary_offset(self, offset=None, whence=0):
         """Context manager for temporarily seeking to another file position.
 
         To be used as part of a ``with`` statement::
@@ -71,10 +71,14 @@ class VLBIFileBase:
                 with-block
 
         On exiting the ``with-block``, the file pointer is moved back to its
-        original position.
+        original position.  As a convenience, one can pass on the offset
+        to seek to when entering the context manager.  Parameters are as
+        for :meth:`io.IOBase.seek`.
         """
         oldpos = self.tell()
         try:
+            if offset is not None:
+                self.seek(offset, whence)
             yield self
         finally:
             self.seek(oldpos)
