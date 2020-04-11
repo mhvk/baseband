@@ -455,7 +455,7 @@ class Mark4Header(Mark4TrackHeader):
 
     def tofile(self, fh):
         stream = words2stream(self.words)
-        fh.write(stream.tostring())
+        fh.write(stream.tobytes())
 
     @classmethod
     def fromvalues(cls, ntrack, decade=None, ref_time=None, **kwargs):

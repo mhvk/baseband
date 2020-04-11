@@ -1335,7 +1335,7 @@ def test_legacy_vdif(tmpdir):
     with open(str(tmpdir.join('test.vdif')), 'w+b') as s:
         header.tofile(s)
         # Add fake payload
-        s.write(np.zeros(503, dtype=np.int64).tostring())
+        s.write(np.zeros(503, dtype=np.int64).tobytes())
         s.seek(0)
         header2 = vdif.VDIFHeader.fromfile(s)
     assert header2 == header
