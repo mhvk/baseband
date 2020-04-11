@@ -139,7 +139,7 @@ class GSBPayload(VLBIPayloadBase):
 
     def tofile(self, fh):
         try:
-            fh.write(self.words.tostring())
+            fh.write(self.words.tobytes())
         except AttributeError:
             nthread = len(fh)
             assert nthread == self.sample_shape[0]
@@ -148,4 +148,4 @@ class GSBPayload(VLBIPayloadBase):
                                        self._bpfs // nthread // 8)
             for fh_set, thread in zip(fh, words.transpose(2, 0, 1, 3)):
                 for fh, part in zip(fh_set, thread):
-                    fh.write(part.tostring())
+                    fh.write(part.tobytes())

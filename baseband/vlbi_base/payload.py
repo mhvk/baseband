@@ -89,7 +89,7 @@ class VLBIPayloadBase:
 
     def tofile(self, fh):
         """Write payload to filehandle."""
-        return fh.write(self.words.tostring())
+        return fh.write(self.words.tobytes())
 
     @classmethod
     def fromdata(cls, data, header=None, bps=2):

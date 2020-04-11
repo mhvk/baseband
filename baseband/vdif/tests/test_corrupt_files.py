@@ -51,7 +51,7 @@ class TestCorruptSampleCopy:
         reduced = sample[use]
         corrupt_file = str(tmpdir.join('missing_frames.vdif'))
         with open(corrupt_file, 'wb') as s:
-            s.write(reduced.tostring())
+            s.write(reduced.tobytes())
 
         with vdif.open(corrupt_file, 'rb') as fr:
             assert 'number_of_frames' not in fr.info.warnings

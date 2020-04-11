@@ -129,4 +129,4 @@ class Mark5BFrame(VLBIFrameBase):
             self.payload.tofile(fh)
         else:
             fh.write(np.full_like(self.payload.words,
-                                  self._fill_pattern).tostring())
+                                  self._fill_pattern).tobytes())
