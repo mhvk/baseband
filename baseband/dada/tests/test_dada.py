@@ -1,6 +1,8 @@
 # Licensed under the GPLv3 - see LICENSE
-import pytest
 import copy
+import pickle
+
+import pytest
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
@@ -149,6 +151,15 @@ class TestDADA:
         with pytest.raises(ValueError):
             dada.DADAHeader.fromvalues(nchan=1, npol=1, complex_data=False,
                                        bps=4, samples_per_frame=10001)
+
+    def test_pickle_header(self, tmpdir):
+        with open(SAMPLE_FILE, 'rb') as fh:
+            header = dada.DADAHeader.fromfile(fh)
+
+        pickled = pickle.dumps(header)
+        recovered = pickle.loads(pickled)
+        assert isinstance(recovered, dada.DADAHeader)
+        assert recovered == header
 
     def test_payload(self, tmpdir):
         payload = self.payload
@@ -474,6 +485,28 @@ class TestDADA:
             assert np.all(data[:10] == self.payload[:10])
             assert np.all(data[10:] == fwr.fill_value)
 
+    def test_pickle(self):
+        # Only simple tests here; more complete ones in vdif.
+        with dada.open(SAMPLE_FILE, 'rs', squeeze=False) as fh:
+            fh.seek(6)
+            pickled = pickle.dumps(fh)
+            fh.read(3)
+            with pickle.loads(pickled) as fh2:
+                assert fh2.tell() == 6
+                fh2.read(10)
+
+            assert fh.tell() == 9
+
+        with pickle.loads(pickled) as fh3:
+            assert fh3.tell() == 6
+            fh3.read(1)
+
+        closed = pickle.dumps(fh)
+        with pickle.loads(closed) as fh4:
+            assert fh4.closed
+            with pytest.raises(ValueError):
+                fh4.read(1)
+
     def test_multiple_files_stream(self, tmpdir):
         start_time = self.header.time
         data = self.payload.data.squeeze()
@@ -520,6 +553,16 @@ class TestDADA:
         with dada.open(filenames, 'rs', subset=1, squeeze=False) as fr:
             data4 = fr.read()
         assert np.all(data4.squeeze() == data[:, 1])
+
+        # Test pickling.
+        with dada.open(filenames, 'rs', subset=1, squeeze=False) as fr:
+            fr.seek(10)
+            pickled = pickle.dumps(fr)
+
+        with pickle.loads(pickled) as fr2:
+            assert fr2.tell() == 10
+            datap = fr2.read()
+        assert np.all(datap.squeeze() == data[10:, 1])
 
         # Check that we can't pass a filename sequence in 'wb' mode.
         with pytest.raises(ValueError):

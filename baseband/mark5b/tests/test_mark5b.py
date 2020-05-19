@@ -1,4 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
+import pickle
+
 import pytest
 import numpy as np
 import astropy.units as u
@@ -754,6 +756,29 @@ class TestMark5B:
         with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
                          ref_time=Time('2015-01-01'), nchan=8, bps=2) as fh:
             assert fh.info.readable
+
+    def test_pickle(self):
+        # Only simple tests here; more complete ones in vdif.
+        with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
+                         ref_time=Time('2015-01-01'), nchan=8, bps=2) as fh:
+            fh.seek(6)
+            pickled = pickle.dumps(fh)
+            fh.read(3)
+            with pickle.loads(pickled) as fh2:
+                assert fh2.tell() == 6
+                fh2.read(10)
+
+            assert fh.tell() == 9
+
+        with pickle.loads(pickled) as fh3:
+            assert fh3.tell() == 6
+            fh3.read(1)
+
+        closed = pickle.dumps(fh)
+        with pickle.loads(closed) as fh4:
+            assert fh4.closed
+            with pytest.raises(ValueError):
+                fh4.read(1)
 
     def test_sequentialfile(self, tmpdir):
         """Tests writing and reading of sequential files.

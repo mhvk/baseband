@@ -1,4 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
+import pickle
+
 import pytest
 import numpy as np
 from numpy.testing import assert_array_equal
@@ -794,6 +796,29 @@ class TestMark4:
             assert (abs(fh.time - Time('2020:1:00:00:00.0025', precision=9))
                     < 1. * u.ns)
             assert fh._frame.header.decade == 2020
+
+    def test_pickle(self):
+        # Only simple tests here; more complete ones in vdif.
+        with mark4.open(SAMPLE_FILE, 'rs', ntrack=64, decade=2010,
+                        subset=0) as fh:
+            fh.seek(6)
+            pickled = pickle.dumps(fh)
+            fh.read(3)
+            with pickle.loads(pickled) as fh2:
+                assert fh2.tell() == 6
+                fh2.read(10)
+
+            assert fh.tell() == 9
+
+        with pickle.loads(pickled) as fh3:
+            assert fh3.tell() == 6
+            fh3.read(1)
+
+        closed = pickle.dumps(fh)
+        with pickle.loads(closed) as fh4:
+            assert fh4.closed
+            with pytest.raises(ValueError):
+                fh4.read(1)
 
     # Test that writing an incomplete stream is possible, and that frame set is
     # appropriately marked as invalid.
