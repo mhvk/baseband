@@ -1,5 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE.rst
 import os
+import pickle
 
 import pytest
 import numpy as np
@@ -183,6 +184,54 @@ class TestSequentialFileReader:
         with pytest.raises(ValueError):  # file closed.
             fh.memmap(offset=0, shape=(5,))
 
+    @pytest.mark.parametrize('action', [None, 'seek', 'read'])
+    def test_pickle(self, tmpdir, action):
+        self._setup(tmpdir)
+        with sf.open(self.files) as fh:
+            if action == 'seek':
+                fh.seek(16)
+            elif action == 'read':
+                fh.seek(8)
+                fh.read(8)
+            pickled = pickle.dumps(fh)
+            with pickle.loads(pickled) as fh2:
+                if action is None:
+                    assert fh2.read(16) == self.data[:16]
+                assert fh2.tell() == 16
+                assert fh2.read(9) == self.data[16:25]
+                fh2.seek(-2, 1)
+                assert fh2.read(2) == self.data[23:25]
+                fh2.seek(0)
+                assert fh2.read() == self.data
+
+            # cannot read closed file
+            with pytest.raises(ValueError):
+                fh2.read()
+
+            if action:
+                assert fh.tell() == 16
+                assert fh.read(1) == self.data[16:17]
+            else:
+                assert fh.tell() == 0
+                assert fh.read(1) == self.data[:1]
+
+        with pickle.loads(pickled) as fh3:
+            if action is None:
+                fh3.seek(16)
+            else:
+                assert fh3.tell() == 16
+            assert fh3.read(9) == self.data[16:25]
+
+        # cannot read closed file
+        with pytest.raises(ValueError):
+            fh3.read()
+
+        closed = pickle.dumps(fh)
+        with pickle.loads(closed) as fh4:
+            assert fh4.closed
+            with pytest.raises(ValueError):
+                fh4.read()
+
 
 class TestSequentialFileWriter:
     def _setup(self, tmpdir):
@@ -304,6 +353,12 @@ class TestSequentialFileWriter:
         with sf.open(self.files, 'wb', file_size=10) as fh:
             with pytest.raises(ValueError):
                 fh.memmap(shape=(5,))
+
+    def test_pickle_fails(self, tmpdir):
+        self._setup(tmpdir)
+        with sf.open(self.files, 'wb', file_size=10) as fh:
+            with pytest.raises(TypeError):
+                pickle.dumps(fh)
 
 
 class TestFileNameSequencer:
