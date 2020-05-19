@@ -120,7 +120,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     _edv = None
     _struct = eight_word_struct
 
-    def __new__(cls, words, edv=None, verify=True, **kwargs):
+    def __new__(cls, words=None, edv=None, verify=True, **kwargs):
         # We use edv to define which class we return.
         if edv is None:
             # If not given, try the class default.
