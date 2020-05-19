@@ -1,6 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 from copy import copy
 import io
+import pickle
 from collections import namedtuple
 
 import pytest
@@ -10,7 +11,7 @@ import astropy.units as u
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..payload import VLBIPayloadBase
 from ..frame import VLBIFrameBase
-from ..base import (VLBIFileBase, VLBIStreamBase,
+from ..base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
                     VLBIStreamReaderBase, VLBIStreamWriterBase)
 
 
@@ -476,14 +477,14 @@ class TestVLBIBase:
             assert fh.closed
             assert fh.fh_raw.closed
         with io.open(filename, 'rb') as fr:
-            fh = VLBIFileBase(fr)
+            fh = VLBIFileReaderBase(fr)
             assert fh.fh_raw is fr
             assert fh.readable()
             assert not fh.writable()
             assert not fh.closed
             with pytest.raises(AttributeError):
                 fh.bla
-            assert repr(fh).startswith('VLBIFileBase(fh_raw')
+            assert repr(fh).startswith('VLBIFileReaderBase(fh_raw')
             assert fh.read() == b'abcd'
             fh.close()
             assert fh.closed
@@ -495,7 +496,7 @@ class TestVLBIBase:
             fw.write(b'abcdefghijklmnopqrstuvwxyz')
 
         with io.open(filename, 'rb') as fr:
-            fh = VLBIFileBase(fr)
+            fh = VLBIFileReaderBase(fr)
             fh.seek(2)
             assert fh.read(2) == b'cd'
             assert fh.tell() == 4
@@ -508,6 +509,44 @@ class TestVLBIBase:
                 assert fh.read(1) == b'y'
                 assert fh.tell() == 25
             assert fh.tell() == 4
+
+    def test_pickle(self, tmpdir):
+        filename = str(tmpdir.join('test.dat'))
+        with io.open(filename, 'wb') as fw:
+            fw.write(b'abcdefghijklmnopqrstuvwxyz')
+
+        with VLBIFileReaderBase(io.open(filename, 'rb')) as fh:
+            assert fh.read(2) == b'ab'
+            pickled = pickle.dumps(fh)
+            with pickle.loads(pickled) as fh2:
+                assert fh2.tell() == 2
+                assert fh2.read(2) == b'cd'
+                fh2.seek(-2, 2)
+                assert fh2.read(2) == b'yz'
+
+            # cannot read closed file
+            with pytest.raises(ValueError):
+                fh2.read()
+
+            assert fh.tell() == 2
+            assert fh.read(2) == b'cd'
+
+        with pickle.loads(pickled) as fh3:
+            assert fh3.read(2) == b'cd'
+
+        # cannot read closed file
+        with pytest.raises(ValueError):
+            fh3.read()
+
+        closed = pickle.dumps(fh)
+        with pickle.loads(closed) as fh4:
+            assert fh4.closed
+            with pytest.raises(ValueError):
+                fh4.read()
+
+        with VLBIFileBase(io.open(filename, 'wb')) as fw:
+            with pytest.raises(TypeError):
+                pickle.dumps(fw)
 
 
 class TestSqueezeAndSubset:

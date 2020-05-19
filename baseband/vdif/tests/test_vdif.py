@@ -1,4 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
+import pickle
+
 import pytest
 import numpy as np
 from astropy.time import Time
@@ -916,6 +918,39 @@ class TestVDIF:
             fh.read(out=out_nosqueeze)
             assert fh.tell() == 12
             assert np.all(out_nosqueeze.squeeze() == out_squeeze)
+
+    def test_pickle(self, tmpdir):
+        expected0 = np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1])
+        with vdif.open(SAMPLE_FILE, 'rs') as fh:
+            record = fh.read(6)
+            assert np.all(record[:, 0].astype(int) == expected0[:6])
+            fh.seek(6)
+            pickled = pickle.dumps(fh)
+            with pickle.loads(pickled) as fh2:
+                assert fh2.tell() == 6
+                record2 = fh2.read(6)
+                assert np.all(record2[:, 0].astype(int) == expected0[6:])
+
+            assert fh.tell() == 6
+            record = fh.read(6)
+            assert np.all(record[:, 0].astype(int) == expected0[6:])
+
+        with pickle.loads(pickled) as fh3:
+            assert fh3.tell() == 6
+            fh3.seek(-3, 1)
+            record3 = fh3.read(6)
+            assert np.all(record3[:, 0].astype(int) == expected0[3:9])
+
+        closed = pickle.dumps(fh)
+        with pickle.loads(closed) as fh4:
+            assert fh4.closed
+            with pytest.raises(ValueError):
+                fh4.read(1)
+
+        vdif_file = str(tmpdir.join('simple.vdif'))
+        with vdif.open(vdif_file, 'ws', header0=fh.header0) as fw:
+            with pytest.raises(TypeError):
+                pickle.dumps(fw)
 
     def test_stream_writer(self, tmpdir):
         vdif_file = str(tmpdir.join('simple.vdif'))
