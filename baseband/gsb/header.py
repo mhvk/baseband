@@ -128,19 +128,21 @@ class GSBHeader(VLBIHeaderBase):
     _mode = None
     _gsb_header_classes = {}
 
-    def __new__(cls, words, mode=None, nbytes=None, utc_offset=5.5*u.hr,
+    def __new__(cls, words=None, mode=None, nbytes=None, utc_offset=5.5*u.hr,
                 verify=True):
 
-        if mode is None:
-            if words is None:
-                raise TypeError("cannot construct an empty GSB header without "
-                                "knowing the mode.")
-            mode = 'rawdump' if len(words) == 7 else 'phased'
+        if cls is GSBHeader:
+            if mode is None:
+                if words is None:
+                    raise TypeError("cannot construct an empty GSB header without "
+                                    "knowing the mode.")
 
-        cls = cls._gsb_header_classes.get(mode)
-        self = super().__new__(cls)
+                mode = 'rawdump' if len(words) == 7 else 'phased'
+
+            cls = cls._gsb_header_classes.get(mode)
+
         # We intialise VDIFHeader subclasses, so their __init__ will be called.
-        return self
+        return super().__new__(cls)
 
     def __init__(self, words, mode=None, nbytes=None, utc_offset=5.5*u.hr,
                  verify=True):
