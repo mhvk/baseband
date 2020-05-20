@@ -4,6 +4,12 @@
 - This future version will likely only support python 3.7, numpy 1.17 and
   astropy 4.0.
 
+New Features
+------------
+
+- All file and stream readers can now be pickled.  Writers still cannot,
+  since those do not allow appending. [#395]
+
 Bug Fixes
 ---------
 
