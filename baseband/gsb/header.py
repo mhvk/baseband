@@ -134,8 +134,8 @@ class GSBHeader(VLBIHeaderBase):
         if cls is GSBHeader:
             if mode is None:
                 if words is None:
-                    raise TypeError("cannot construct an empty GSB header without "
-                                    "knowing the mode.")
+                    raise TypeError("cannot construct an empty GSB header "
+                                    "without knowing the mode.")
 
                 mode = 'rawdump' if len(words) == 7 else 'phased'
 

@@ -230,19 +230,19 @@ class TestVDIF:
 
     @pytest.mark.parametrize('edv', [0, 1])  # Others have fixed length
     def test_header_minimal_length(self, edv):
-        for l in range(4):
+        for fl in range(4):
             with pytest.raises(AssertionError):
                 # Less than header length.
-                vdif.VDIFHeader.fromvalues(edv=edv, frame_length=l)
+                vdif.VDIFHeader.fromvalues(edv=edv, frame_length=fl)
 
         header = vdif.VDIFHeader.fromvalues(edv=edv, frame_length=4)
         assert header.payload_nbytes == 0
 
     def test_legacy_header_minimal_length(self):
-        for l in range(2):
+        for fl in range(2):
             with pytest.raises(AssertionError):
                 # Less than header length.
-                vdif.VDIFHeader.fromvalues(edv=False, frame_length=l)
+                vdif.VDIFHeader.fromvalues(edv=False, frame_length=fl)
         header = vdif.VDIFHeader.fromvalues(edv=False, frame_length=2)
         assert header.payload_nbytes == 0
 
