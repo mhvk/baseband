@@ -1,4 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
+import pickle
+
 import pytest
 import numpy as np
 import astropy.units as u
@@ -195,6 +197,16 @@ class TestGSB:
         assert header.gps_time == header.time
         assert abs(header.time
                    - Time('2013-07-28T02:53:55.3241088')) < 1.*u.ns
+
+    @pytest.mark.parametrize('sample', [
+        SAMPLE_RAWDUMP_HEADER, SAMPLE_PHASED_HEADER])
+    def test_pickle_header(self, sample):
+        with open(sample, 'rt') as fh:
+            header = gsb.GSBHeader.fromfile(fh, verify=True)
+
+        pickled = pickle.dumps(header)
+        recovered = pickle.loads(pickled)
+        assert recovered == header
 
     @pytest.mark.parametrize('sample,mode', [
         (SAMPLE_RAWDUMP_HEADER, 'rawdump'),
@@ -458,6 +470,20 @@ class TestGSB:
         with pytest.raises(TypeError):
             gsb.open(testfile, 'rt', raw='bla')
 
+    @pytest.mark.parametrize('sample', (SAMPLE_RAWDUMP_HEADER,
+                                        SAMPLE_PHASED_HEADER))
+    def test_pickle_timestamp_io(self, sample):
+        """Tests GSBTimeStampIO in base.py."""
+        with gsb.open(sample, 'rt') as fh:
+            fh.read_timestamp()
+            pickled = pickle.dumps(fh)
+            header1 = fh.read_timestamp()
+
+        with pickle.loads(pickled) as fh2:
+            header2 = fh2.read_timestamp()
+
+        assert header2 == header1
+
     def test_rawfile_io(self, tmpdir):
         """Tests GSBFileReader and GSBFileWriter in base.py."""
         with open(SAMPLE_RAWDUMP, 'rb') as fh:
@@ -469,6 +495,19 @@ class TestGSB:
         with gsb.open(testfile, 'rb', payload_nbytes=2**12) as fh:
             payload2 = fh.read_payload()
             assert payload2 == payload1
+
+    def test_pickle_filereader(self):
+        """Tests GSBFileReader in base.py."""
+        with gsb.open(SAMPLE_RAWDUMP, 'rb', payload_nbytes=2**12, nchan=1,
+                      bps=4, complex_data=False) as fh:
+            fh.read_payload()
+            pickled = pickle.dumps(fh)
+            payload1 = fh.read_payload()
+
+        with pickle.loads(pickled) as fh2:
+            payload2 = fh2.read_payload()
+
+        assert payload2 == payload1
 
     def test_rawfile_repr(self):
         with gsb.open(SAMPLE_RAWDUMP, 'rb', payload_nbytes=2**12, nchan=1,
@@ -629,6 +668,35 @@ class TestGSB:
             assert fh_r.sample_rate == (100. / 3.) * u.MHz
             assert fh_r.samples_per_frame == 2**23
             assert fh_r._payload_nbytes == 2**22
+
+    @pytest.mark.parametrize('sample_header,sample_data', [
+        (SAMPLE_RAWDUMP_HEADER, SAMPLE_RAWDUMP),
+        (SAMPLE_PHASED_HEADER, SAMPLE_PHASED)])
+    def test_pickle(self, sample_header, sample_data):
+        # Only simple tests here; more complete ones in vdif.
+        sample_rate = self.frame_rate * self.payload_nbytes * 2
+        with gsb.open(sample_header, 'rs', raw=sample_data,
+                      sample_rate=sample_rate,
+                      payload_nbytes=self.payload_nbytes,
+                      squeeze=False) as fh:
+            fh.seek(6)
+            pickled = pickle.dumps(fh)
+            fh.read(3)
+            with pickle.loads(pickled) as fh2:
+                assert fh2.tell() == 6
+                fh2.read(10)
+
+            assert fh.tell() == 9
+
+        with pickle.loads(pickled) as fh3:
+            assert fh3.tell() == 6
+            fh3.read(1)
+
+        closed = pickle.dumps(fh)
+        with pickle.loads(closed) as fh4:
+            assert fh4.closed
+            with pytest.raises(ValueError):
+                fh4.read(1)
 
     def test_phased_stream(self, tmpdir):
         bps = 8

@@ -89,12 +89,12 @@ class SequentialFileBase:
 
     For details, see `SequentialFileReader` and `SequentialFileWriter`.
     """
+    file_nr = None
 
     def __init__(self, files, mode='rb', opener=None):
         self.files = files
         self.mode = mode
         self.opener = io.open if opener is None else opener
-        self.file_nr = None
         self._file_sizes = []
         self._file_offsets = [0]
         self._open(0)
@@ -180,7 +180,6 @@ class SequentialFileBase:
         """Close the currently open local file, and therewith the set."""
         if self.file_nr is not None:
             self.fh.close()
-            self.file_nr = None
 
     def __enter__(self):
         return self
@@ -297,6 +296,30 @@ class SequentialFileReader(SequentialFileBase):
 
         return data
     read.__doc__ = io.BufferedIOBase.read.__doc__
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # IOBase instances cannot be pickled, but we can just reopen them
+        # when we are unpickled.  Anything else may have internal state that
+        # needs preserving (e.g., another SequentialFile), so we will assume
+        # it takes care of this itself.
+        if isinstance(self.fh, io.IOBase):
+            fh = state.pop('fh')
+            state['fh_info'] = {
+                'file_nr': state.pop('file_nr'),
+                'offset': 'closed' if fh.closed else fh.tell()}
+
+        return state
+
+    def __setstate__(self, state):
+        fh_info = state.pop('fh_info', None)
+        self.__dict__.update(state)
+        if fh_info is not None:
+            self._open(fh_info['file_nr'])
+            if fh_info['offset'] != 'closed':
+                self.fh.seek(fh_info['offset'])
+            else:
+                self.fh.close()
 
 
 class SequentialFileWriter(SequentialFileBase):

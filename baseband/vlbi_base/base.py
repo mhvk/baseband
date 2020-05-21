@@ -38,6 +38,7 @@ class VLBIFileBase:
     fh_raw : filehandle
         Filehandle of the raw binary data file.
     """
+    fh_raw = None
 
     def __init__(self, fh_raw):
         self.fh_raw = fh_raw
@@ -319,11 +320,39 @@ class VLBIFileReaderBase(VLBIFileBase):
 
         return (max_frame + 1) * u.Hz
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # IOBase instances cannot be pickled, but we can just reopen them
+        # when we are unpickled.  Anything else may have internal state that
+        # needs preserving (e.g., SequentialFile), so we will assume
+        # it takes care of this itself.
+        if isinstance(self.fh_raw, io.IOBase):
+            fh = state.pop('fh_raw')
+            state['fh_info'] = {
+                'offset': 'closed' if fh.closed else fh.tell(),
+                'filename': fh.name,
+                'mode': fh.mode}
+
+        return state
+
+    def __setstate__(self, state):
+        fh_info = state.pop('fh_info', None)
+        if fh_info is not None:
+            fh = io.open(fh_info['filename'], fh_info['mode'])
+            if fh_info['offset'] != 'closed':
+                fh.seek(fh_info['offset'])
+            else:
+                fh.close()
+            state['fh_raw'] = fh
+
+        self.__dict__.update(state)
+
 
 class VLBIStreamBase:
     """VLBI file wrapper, allowing access as a stream of data."""
 
     _sample_shape_maker = None
+    _frame_index = None
 
     def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
                  unsliced_shape, bps, complex_data, squeeze, subset=(),
@@ -350,7 +379,6 @@ class VLBIStreamBase:
             subset = (subset,)
         self._subset = subset
         self._sample_shape = self._get_sample_shape()
-        self._frame_index = None
 
         self.verify = verify
 
@@ -967,6 +995,28 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     def _fh_raw_read_frame(self):
         """Read a frame at the current position of the underlying file."""
         return self.fh_raw.read_frame(verify=self.verify)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Remove any cached frames and associated indices, since these
+        # are almost certainly not needed and can be regenerated.
+        for item in ('_frame', '_frame_index', '_next_frame', '_next_index'):
+            state.pop(item, None)
+
+        # pickling _unsliced_shape and may not work, as it may need
+        # _sample_shape_maker, which cannot be pickled if defined on the class.
+        # Similarly, _sample_shape may have used an auto-generated namedtuple.
+        # So, change them to normal tuples and reinstantiate on unpickling.
+        state['_unsliced_shape'] = tuple(self._unsliced_shape)
+        state['_sample_shape'] = tuple(self._sample_shape)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        if self._sample_shape_maker is not None:
+            self._unsliced_shape = self._sample_shape_maker(
+                *self._unsliced_shape)
+            self._sample_shape = self._get_sample_shape()
 
 
 class VLBIStreamWriterBase(VLBIStreamBase):

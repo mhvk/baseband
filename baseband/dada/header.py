@@ -93,7 +93,7 @@ class DADAHeader(OrderedDict):
 
         super().__init__(*args, **kwargs)
         self.mutable = mutable
-        if verify:
+        if verify and (args or kwargs):
             self.verify()
 
     def verify(self):
@@ -228,6 +228,9 @@ class DADAHeader(OrderedDict):
         This just calls the class initializer; it is present for compatibility
         with other header classes only.
         """
+        # Setting one kwarg ensures we do not return an empty header.
+        if not args:
+            kwargs.setdefault('HEADER', 'DADA')
         return cls(*args, **kwargs)
 
     @classmethod

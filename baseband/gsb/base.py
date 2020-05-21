@@ -76,6 +76,38 @@ class GSBTimeStampIO(VLBIFileBase):
             timestamp1 = self.read_timestamp()
         return (1. / (timestamp1.time - timestamp0.time)).to(u.Hz)
 
+    def __getstate__(self):
+        if self.writable():
+            raise TypeError('cannot pickle file opened for writing')
+
+        state = self.__dict__.copy()
+        # TextIOBase instances cannot be pickled, but we can just reopen them
+        # when we are unpickled.  Also deal with its buffer similarly
+        # if an IOBase; anything else may have internal state that
+        # needs preserving (e.g., SequentialFile), so we will assume
+        # it takes care of this itself.
+        state['fh_info'] = {'offset': 'closed' if self.closed else self.tell()}
+        fh = state.pop('fh_raw').buffer
+        if isinstance(fh, io.IOBase):
+            state['fh_info'].update(filename=fh.name, mode=fh.mode)
+        else:
+            state['fh_info']['buffer'] = fh
+
+        return state
+
+    def __setstate__(self, state):
+        fh_info = state.pop('fh_info')
+        fh = fh_info.get('buffer')
+        if fh is None:
+            fh = io.open(fh_info['filename'], fh_info['mode'])
+
+        state['fh_raw'] = io.TextIOWrapper(fh)
+        self.__dict__.update(state)
+        if fh_info['offset'] != 'closed':
+            self.seek(fh_info['offset'])
+        else:
+            self.close()
+
 
 class GSBFileReader(VLBIFileBase):
     """Simple reader for GSB data files.
@@ -121,6 +153,34 @@ class GSBFileReader(VLBIFileBase):
                                    payload_nbytes=self.payload_nbytes,
                                    nchan=self.nchan, bps=self.bps,
                                    complex_data=self.complex_data)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # TODO: remove duplication with VLBIFileReaderBase.
+        # IOBase instances cannot be pickled, but we can just reopen them
+        # when we are unpickled.  Anything else may have internal state that
+        # needs preserving (e.g., SequentialFile), so we will assume
+        # it takes care of this itself.
+        if isinstance(self.fh_raw, io.IOBase):
+            fh = state.pop('fh_raw')
+            state['fh_info'] = {
+                'offset': 'closed' if fh.closed else fh.tell(),
+                'filename': fh.name,
+                'mode': fh.mode}
+
+        return state
+
+    def __setstate__(self, state):
+        fh_info = state.pop('fh_info', None)
+        if fh_info is not None:
+            fh = io.open(fh_info['filename'], fh_info['mode'])
+            if fh_info['offset'] != 'closed':
+                fh.seek(fh_info['offset'])
+            else:
+                fh.close()
+            state['fh_raw'] = fh
+
+        self.__dict__.update(state)
 
 
 class GSBFileWriter(VLBIFileBase):
@@ -193,6 +253,18 @@ class GSBStreamBase(VLBIStreamBase):
             fill_value=0., verify=verify)
 
         self._payload_nbytes = payload_nbytes
+
+    def __getattr__(self, attr):
+        """Try to get things on the current open file if it is not on self."""
+        if attr in {'readable', 'writable', 'seekable', 'closed', 'name'}:
+            fh_raw = (self.fh_raw if self.header0.mode == 'rawdump'
+                      else self.fh_raw[0][0])
+            try:
+                return getattr(fh_raw, attr)
+            except AttributeError:
+                pass
+        #  __getattribute__ to raise appropriate error.
+        return self.__getattribute__(attr)
 
     def close(self):
         self.fh_ts.close()
@@ -341,6 +413,52 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                                  nchan=self._unsliced_shape.nchan,
                                  bps=self.bps, complex_data=self.complex_data,
                                  verify=self.verify)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        fh_raw = state.pop('fh_raw')
+        if self.header0.mode == 'rawdump':
+            fh_raw = [[fh_raw]]
+
+        fh_info = []
+        for fh_pair in fh_raw:
+            pair_info = []
+            for fh in fh_pair:
+                if isinstance(fh, io.IOBase):
+                    pair_info.append({
+                        'offset': 'closed' if fh.closed else fh.tell(),
+                        'filename': fh.name,
+                        'mode': fh.mode})
+                else:
+                    pair_info.append(fh)
+                fh_info.append(pair_info)
+
+        state['fh_info'] = fh_info
+        return state
+
+    def __setstate__(self, state):
+        fh_info = state.pop('fh_info', None)
+        if fh_info is not None:
+            fh_raw = []
+            for pair_info in fh_info:
+                fh_pair = []
+                for info in pair_info:
+                    if isinstance(info, dict):
+                        fh = io.open(info['filename'], info['mode'])
+                        if info['offset'] != 'closed':
+                            fh.seek(info['offset'])
+                        else:
+                            fh.close()
+                        fh_pair.append(fh)
+                    else:
+                        fh_pair.append(info)
+            fh_raw.append(fh_pair)
+            if state['_header0'].mode == 'rawdump':
+                fh_raw = fh_raw[0][0]
+
+            state['fh_raw'] = fh_raw
+
+        super().__setstate__(state)
 
 
 class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
