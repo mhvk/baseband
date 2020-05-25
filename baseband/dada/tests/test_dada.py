@@ -1,4 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
+import os
 import copy
 import pickle
 
@@ -693,7 +694,13 @@ class TestDADA:
                           - (header.time + 16000 / (16. * u.MHz))) < 1. * u.ns
         assert np.all(data2 == data)
 
+    @pytest.mark.skipif(os.name == 'nt',
+                        reason='Windows does not allow colon in file names')
+    def test_complicated_template_stream(self, tmpdir):
         # More complicated template, 8 files.
+        start_time = self.header.time
+        data = self.payload.data.squeeze()
+        header = self.header.copy()
         header.payload_nbytes = self.header.payload_nbytes // 8
         template = str(tmpdir
                        .join('{utc_start}_{obs_offset:016d}.000000.dada'))

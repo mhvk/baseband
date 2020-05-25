@@ -70,6 +70,8 @@ writing is in units of samples, and provides access to header information::
 
 To set up a file for writing as a stream is possible as well::
 
+.. doctest-requires:: posix
+
     >>> from astropy.time import Time
     >>> fw = dada.open('{utc_start}.{obs_offset:016d}.000000.dada', 'ws',
     ...                sample_rate=16*u.MHz, samples_per_frame=5000,
