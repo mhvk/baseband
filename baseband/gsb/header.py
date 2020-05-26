@@ -7,6 +7,8 @@ http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/gmrt_gsb/GSB_beam_timestamp_n
 and for rawdump data
 http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/gmrt_gsb/GSB_rawdump_data_format_v2.pdf
 """
+import os
+
 import numpy as np
 from astropy import units as u, _erfa as erfa
 from astropy.time import Time, TimeString
@@ -175,7 +177,7 @@ class GSBHeader(VLBIHeaderBase):
         return.
         """
         if self._nbytes is None:
-            self._nbytes = len(' '.join(self.words)) + 2
+            self._nbytes = len(' '.join(self.words) + os.linesep)
         return self._nbytes
 
     @classmethod

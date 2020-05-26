@@ -1,4 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
+import os
 import pickle
 
 import pytest
@@ -109,9 +110,10 @@ class TestGSB:
         fh = open(SAMPLE_RAWDUMP_HEADER, 'rt')
 
         header = gsb.GSBHeader.fromfile(fh, verify=True)
-        # Includes 1 trailing blank space, one carriage return.
+        # Includes 1 trailing blank space, one line separator
         header_nbytes = header.nbytes
-        assert header_nbytes == len(' '.join(header.words)) + 2
+        assert (header_nbytes
+                == len(' '.join(header.words) + ' ' + os.linesep))
         assert header.seek_offset(1) == header_nbytes
         assert header.seek_offset(12) == 12 * header_nbytes
 
@@ -135,7 +137,6 @@ class TestGSB:
         fh.seek(0)
         header_nbytes = header1.nbytes
         assert header_nbytes == header1.seek_offset(1)
-        assert header_nbytes == len(fh.readline())
         # Check that seek_offset is working properly.
         n_1000_0 = 1000 - 9995
         offset_to_1000_0 = header1.seek_offset(n_1000_0)

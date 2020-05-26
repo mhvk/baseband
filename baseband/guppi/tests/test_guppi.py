@@ -353,13 +353,18 @@ class TestGUPPI:
             frame3 = fw.read_frame()
 
         assert frame3 == frame
+
         # Now memmap file to be written to.
-        with guppi.open(filename, 'wb') as fw:
+        # Use a new file since the mmap used in frame3 may still have a handle
+        # to the previous one, which causes (sensible) failures on windows.
+        # See https://bugs.python.org/issue40720
+        filename2 = str(tmpdir.join('testguppi2.raw'))
+        with guppi.open(filename2, 'wb') as fw:
             frame4 = fw.memmap_frame(frame.header)
         # Initially no data set, so frames should not match yet.
         assert frame4 != frame
         # So, if we read this file, it also should not match.
-        with guppi.open(filename, 'rb') as fw:
+        with guppi.open(filename2, 'rb') as fw:
             frame5 = fw.read_frame()
         assert frame5 != frame
 
@@ -372,24 +377,26 @@ class TestGUPPI:
         assert frame4 == frame
         # Delete to flush to disk just to be sure, then read and check it.
         del frame4
-        with guppi.open(filename, 'rb') as fn:
+        with guppi.open(filename2, 'rb') as fn:
             frame6 = fn.read_frame()
 
         assert frame6 == frame
         # Some further tests for completeness;
         # initiate frame using data and header keywords.
-        with guppi.open(filename, 'wb') as fw:
+        filename3 = str(tmpdir.join('testguppi3.raw'))
+        with guppi.open(filename3, 'wb') as fw:
             fw.write_frame(self.payload.data, **self.header)
-        with guppi.open(filename, 'rb') as fh:
+        with guppi.open(filename3, 'rb') as fh:
             frame7 = fh.read_frame()
         assert frame7 == frame
         # memmap frame using header keywords.
-        with guppi.open(filename, 'wb') as fw:
+        filename4 = str(tmpdir.join('testguppi4.raw'))
+        with guppi.open(filename4, 'wb') as fw:
             frame8 = fw.memmap_frame(**self.header)
             frame8[:] = self.payload.data
         assert frame8 == frame
         del frame8
-        with guppi.open(filename, 'rb') as fh:
+        with guppi.open(filename4, 'rb') as fh:
             frame9 = fh.read_frame()
         assert frame9 == frame
 
@@ -460,7 +467,8 @@ class TestGUPPI:
         # initialisation by header keywords.  This also tests writing
         # with squeeze=True.
         h = self.header
-        with guppi.open(filename, 'ws', time=h.time, bps=h.bps,
+        filename2 = str(tmpdir.join('testguppi2.raw'))
+        with guppi.open(filename2, 'ws', time=h.time, bps=h.bps,
                         sample_rate=h.sample_rate,
                         pktsize=h['PKTSIZE'], overlap=0,
                         payload_nbytes=self.header_w.payload_nbytes // 4,
@@ -470,7 +478,7 @@ class TestGUPPI:
             assert (np.abs(fw.time - (start_time + spf / (250 * u.Hz)))
                     < 1. * u.ns)
 
-        with guppi.open(filename, 'rs') as fh:
+        with guppi.open(filename2, 'rs') as fh:
             data_onepol = fh.read()
             assert np.abs(fh.start_time - start_time) < 1.*u.ns
             assert np.abs(fh.stop_time
@@ -491,7 +499,7 @@ class TestGUPPI:
             assert np.all(data_sub[:, 1] == record[:, 1, 0])
 
         # Test that squeeze attribute works on read (including in-place read).
-        with guppi.open(filename, 'rs', squeeze=False) as fh:
+        with guppi.open(filename2, 'rs', squeeze=False) as fh:
             assert fh.sample_shape == (1, 2)
             assert fh.sample_shape.npol == 1
             assert fh.sample_shape.nchan == 2
@@ -505,7 +513,8 @@ class TestGUPPI:
 
         # Test that squeeze=False works on write (we checked above it works
         # with squeeze=True).
-        with guppi.open(filename, 'ws', time=h.time, bps=h.bps,
+        filename3 = str(tmpdir.join('testguppi3.raw'))
+        with guppi.open(filename3, 'ws', time=h.time, bps=h.bps,
                         sample_rate=h.sample_rate,
                         pktsize=h['PKTSIZE'], overlap=0,
                         payload_nbytes=self.header_w.payload_nbytes // 4,
@@ -515,7 +524,7 @@ class TestGUPPI:
             assert (np.abs(fw.time - (start_time + spf / (250 * u.Hz)))
                     < 1. * u.ns)
 
-        with guppi.open(filename, 'rs', squeeze=False) as fh:
+        with guppi.open(filename3, 'rs', squeeze=False) as fh:
             data_onepol = fh.read()
         assert np.all(data_onepol.squeeze() == self.payload[:spf, 0, :2])
 
@@ -591,6 +600,8 @@ class TestGUPPI:
         assert np.all(data2 == data)
 
         # Pass sequentialfile objects to reader.
+        filenames = (str(tmpdir.join('guppi2_1.raw')),
+                     str(tmpdir.join('guppi2_2.raw')))
         with sf.open(filenames, 'w+b',
                      file_size=2*self.header_w.frame_nbytes) as fraw, \
                 guppi.open(fraw, 'ws', header0=self.header_w) as fw:

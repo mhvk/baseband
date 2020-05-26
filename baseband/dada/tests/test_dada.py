@@ -1,4 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
+import os
 import copy
 import pickle
 
@@ -268,12 +269,13 @@ class TestDADA:
 
         assert frame3 == frame
         # Now memmap file to be written to.
-        with dada.open(filename, 'wb') as fw:
+        filename2 = str(tmpdir.join('a2.dada'))
+        with dada.open(filename2, 'wb') as fw:
             frame4 = fw.memmap_frame(frame.header)
         # Initially no data set, so frames should not match yet.
         assert frame4 != frame
         # So, if we read this file, it also should not match
-        with dada.open(filename, 'rb') as fw:
+        with dada.open(filename2, 'rb') as fw:
             frame5 = fw.read_frame()
         assert frame5 != frame
 
@@ -292,18 +294,20 @@ class TestDADA:
         assert frame6 == frame
         # Some further tests for completeness;
         # initiate frame using data and header keywords.
-        with dada.open(filename, 'wb') as fw:
+        filename3 = str(tmpdir.join('a3.dada'))
+        with dada.open(filename3, 'wb') as fw:
             fw.write_frame(self.payload.data, **self.header)
-        with dada.open(filename, 'rb') as fh:
+        with dada.open(filename3, 'rb') as fh:
             frame7 = fh.read_frame()
         assert frame7 == frame
         # memmap frame using header keywords.
-        with dada.open(filename, 'wb') as fw:
+        filename4 = str(tmpdir.join('a4.dada'))
+        with dada.open(filename4, 'wb') as fw:
             frame8 = fw.memmap_frame(**self.header)
             frame8[:] = self.payload.data
         assert frame8 == frame
         del frame8
-        with dada.open(filename, 'rb') as fh:
+        with dada.open(filename4, 'rb') as fh:
             frame9 = fh.read_frame()
         assert frame9 == frame
 
@@ -373,8 +377,12 @@ class TestDADA:
         assert np.all(data == self.payload.data.squeeze())
 
         # Try single polarisation, and check initialisation by header keywords.
+        # Use a new file since the mmap used in frame3 may still have a handle
+        # to the previous one, which causes (sensible) failures on windows.
+        # See https://bugs.python.org/issue40720
+        filename2 = str(tmpdir.join('a2.dada'))
         h = self.header
-        with dada.open(filename, 'ws', time=h.time, bps=h.bps,
+        with dada.open(filename2, 'ws', time=h.time, bps=h.bps,
                        complex_data=h.complex_data, sample_rate=h.sample_rate,
                        payload_nbytes=32000, npol=1, nchan=1) as fw:
             fw.write(self.payload.data[:, 0, 0])
@@ -382,7 +390,7 @@ class TestDADA:
             assert (np.abs(fw.time - (start_time + 16000 / (16. * u.MHz)))
                     < 1. * u.ns)
 
-        with dada.open(filename, 'rs') as fh:
+        with dada.open(filename2, 'rs') as fh:
             data_onepol = fh.read()
             assert np.abs(fh.start_time - start_time) < 1.*u.ns
             assert np.abs(fh.stop_time
@@ -398,7 +406,8 @@ class TestDADA:
 
         # Create an npol=2, nchan=2 file and subset it.
         data2d = np.array([data, -data]).transpose(1, 2, 0)
-        with dada.open(filename, 'ws', time=h.time, bps=h.bps,
+        filename3 = str(tmpdir.join('a3.dada'))
+        with dada.open(filename3, 'ws', time=h.time, bps=h.bps,
                        complex_data=h.complex_data, sample_rate=h.sample_rate,
                        payload_nbytes=32000, npol=2, nchan=2) as fw:
             fw.write(data2d)
@@ -407,13 +416,13 @@ class TestDADA:
                     < 1. * u.ns)
 
         # First check if write was successful.
-        with dada.open(filename, 'rs') as fh:
+        with dada.open(filename3, 'rs') as fh:
             assert fh.sample_shape == (2, 2)
             data_all = fh.read()
             assert np.all(data_all == data2d)
 
         # Then read right polarization, but read channels in reverse order.
-        with dada.open(filename, 'rs', subset=(1, [1, 0])) as fh:
+        with dada.open(filename3, 'rs', subset=(1, [1, 0])) as fh:
             assert fh.sample_shape == (2,)
             data_sub = fh.read()
             assert np.all(data_sub[:, 1] == data2d[:, 1, 0])
@@ -455,7 +464,8 @@ class TestDADA:
         # identical to test above).
         h = self.header
 
-        with dada.open(filename, 'ws', time=h.time,
+        filename4 = str(tmpdir.join('a4.dada'))
+        with dada.open(filename4, 'ws', time=h.time,
                        payload_nbytes=h.payload_nbytes,
                        sample_rate=h.sample_rate, complex_data=h.complex_data,
                        sample_shape=h.sample_shape, bps=h.bps,
@@ -540,6 +550,8 @@ class TestDADA:
         assert np.all(data2 == data)
 
         # Pass sequentialfile objects to reader.
+        filenames = (str(tmpdir.join('a2.dada')),
+                     str(tmpdir.join('b2.dada')))
         with sf.open(filenames, 'w+b',
                      file_size=(header.payload_nbytes + 4096)) as fraw, \
                 dada.open(fraw, 'ws', header0=header) as fw:
@@ -633,9 +645,11 @@ class TestDADA:
         with dada.open(str(tmpdir.join('c_header_only.dada')), 'rb') as fp:
             assert fp.read_header() == header_c
             fp.seek(0)
-            with pytest.raises(ValueError) as excinfo:
+            with pytest.raises(Exception) as excinfo:
                 fp.read_frame()
-            assert "mmap length is greater" in str(excinfo.value)
+            # Different exceptions for linux and windows.
+            assert ("mmap length is greater" in str(excinfo.value)
+                    or "Not enough memory resources" in str(excinfo.value))
 
         with pytest.raises(EOFError) as excinfo:
             with dada.open(str(tmpdir.join('c_header_only.dada')), 'rs') as fp:
@@ -680,7 +694,13 @@ class TestDADA:
                           - (header.time + 16000 / (16. * u.MHz))) < 1. * u.ns
         assert np.all(data2 == data)
 
+    @pytest.mark.skipif(os.name == 'nt',
+                        reason='Windows does not allow colon in file names')
+    def test_complicated_template_stream(self, tmpdir):
         # More complicated template, 8 files.
+        start_time = self.header.time
+        data = self.payload.data.squeeze()
+        header = self.header.copy()
         header.payload_nbytes = self.header.payload_nbytes // 8
         template = str(tmpdir
                        .join('{utc_start}_{obs_offset:016d}.000000.dada'))
