@@ -848,32 +848,26 @@ class TestGSB:
             assert np.all(fh_r.read() == data1)
             fh_w.close()
 
+    @pytest.mark.parametrize('stop, nframes', [(-7, 9), (97, 1)])
+    def test_stream_incomplete_header(self, stop, nframes, tmpdir):
         # Test that an incomplete last header leads to the second-to-last
         # header being used, and raises a warning.
+        sample_rate = self.frame_rate * self.payload_nbytes / 512
         filename_incompletehead = str(
             tmpdir.join('test_incomplete_header.timestamp'))
         with open(SAMPLE_PHASED_HEADER, 'rt') as fh, \
                 open(filename_incompletehead, 'wt') as fw:
-            fw.write(fh.read()[:-7])
+            fw.write(fh.read()[:stop])
         with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_PHASED,
                       sample_rate=sample_rate,
                       payload_nbytes=self.payload_nbytes,
                       squeeze=False) as fh_r:
             with pytest.warns(UserWarning, match='second-to-last entry'):
-                fh_r._last_header
-            assert fh_r.shape[0] == 9 * fh_r.samples_per_frame
-        with open(SAMPLE_PHASED_HEADER, 'rt') as fh, \
-                open(filename_incompletehead, 'wt') as fw:
-            fw.write(fh.read()[:97])
-        with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_PHASED,
-                      sample_rate=sample_rate,
-                      payload_nbytes=self.payload_nbytes,
-                      squeeze=False) as fh_r:
-            with pytest.warns(UserWarning, match='second-to-last entry'):
-                fh_r._last_header
-            assert fh_r.shape[0] == fh_r.samples_per_frame
-            assert fh_r._last_header == fh_r.header0
+                shape = fh_r.shape
 
+            assert shape[0] == nframes * fh_r.samples_per_frame
+
+    def test_stream_reader_defaults(self):
         # Test not passing a sample rate and samples per frame to reader
         # (can't test reading, since the sample file is tiny).
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED) as fh_r:
