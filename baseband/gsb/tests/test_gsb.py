@@ -894,3 +894,43 @@ class TestGSB:
             # non-existing file
             gsb.open(str(tmpdir.join('ts.bla')),
                      raw=str(tmpdir.join('raw.bla')))
+
+    @pytest.mark.parametrize('ts,raw,mode', [
+        (SAMPLE_RAWDUMP_HEADER, SAMPLE_RAWDUMP, 'rawdump'),
+        (SAMPLE_PHASED_HEADER, SAMPLE_PHASED, 'phased-2pol'),
+        (SAMPLE_PHASED_HEADER, SAMPLE_PHASED[0], 'phased-1pol'),
+        (SAMPLE_PHASED_HEADER, SAMPLE_PHASED[:1], 'phased-1pol'),
+        (SAMPLE_PHASED_HEADER, [SAMPLE_PHASED[0][:1],
+                                SAMPLE_PHASED[1][:1]], 'unsplit-2pol'),
+        (SAMPLE_PHASED_HEADER, [SAMPLE_PHASED[0][1:]], 'unsplit-1pol'),
+    ])
+    def test_stream_info(self, ts, raw, mode):
+        bps = 4 if mode == 'rawdump' else 8
+        nchan = 1 if mode == 'rawdump' else 512
+        sample_rate = (self.frame_rate * self.payload_nbytes
+                       * (8 // bps) / nchan)
+        if mode.startswith('unsplit'):
+            sample_rate /= 2
+        with gsb.open(ts, 'rs', raw=raw, sample_rate=sample_rate,
+                      payload_nbytes=self.payload_nbytes) as fh:
+            info = fh.info
+            assert info.format == 'gsb'
+            assert info.readable
+            assert info.errors == {}
+            assert info.warnings == {}
+            assert info.checks == {'decodable': True}
+            assert info.bps == bps
+            assert abs(info.sample_rate - sample_rate) < 1. * u.nHz
+            if mode == 'rawdump':
+                assert not info.complex_data
+                assert info.shape == (81920,)
+            else:
+                assert info.complex_data
+                if mode.startswith('unsplit'):
+                    assert info.shape[0] == 40
+                else:
+                    assert info.shape[0] == 80
+                if mode.endswith('2pol'):
+                    assert info.shape[1:] == (2, nchan)
+                else:
+                    assert info.shape[1:] == (nchan,)
