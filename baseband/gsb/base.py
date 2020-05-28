@@ -363,33 +363,39 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     @lazyproperty
     def _last_header(self):
         """Last header of the timestamp file."""
-        with self.fh_ts.temporary_offset() as fh_ts:
-            fh_ts_len = fh_ts.seek(0, 2)
-            if fh_ts_len == self.header0.nbytes:
+        with self.fh_ts.temporary_offset() as fh:
+            fh_size = fh.seek(0, 2)
+            if fh_size == self.header0.nbytes:
                 # Only one line in file
                 return self.header0
 
-            # Read last bytes in binary, since cannot seek back from end in
-            # text files.
-            from_end = min(5 * self.header0.nbytes // 2, fh_ts_len)
-            fh_ts.buffer.seek(-from_end, 2)
-            last_lines = fh_ts.buffer.read(from_end).strip().split(b'\n')
+            # Guess based on a fixed header size.  In reality, this
+            # may be an overestimate as the headers can grow in size,
+            # or an underestimate as the last header may be partial.
+            # So, search around to be sure.
+            guess = max(fh_size // self.header0.nbytes, 1)
+            while self.header0.seek_offset(guess) > fh_size:
+                guess -= 1
+            while self.header0.seek_offset(guess) < fh_size:
+                guess += 1
 
-        last_line = last_lines[-1].decode('ascii')
-        last_line_tuple = tuple(last_line.split())
-        # If the last header is missing characters, use the header before it
-        # (which may be the first header).
-        try:
-            assert (len(" ".join(last_line_tuple))
-                    >= len(" ".join(self.header0.words)))
-            last_header = self.header0.__class__(last_line_tuple)
-        except Exception:
-            warnings.warn("The last header entry, '{0}', has an incorect "
-                          "length.  Using the second-to-last entry instead."
-                          .format(last_line))
-            second_last_line = last_lines[-2].decode('ascii')
-            second_last_line_tuple = tuple(second_last_line.split())
-            last_header = self.header0.__class__(second_last_line_tuple)
+            # Now see if there is indeed a nice header before.
+            fh.seek(self.header0.seek_offset(guess-1))
+            last_line = fh.readline()
+            last_line_tuple = last_line.split()
+            # But realize that sometimes an incomplete header is written.
+            try:
+                if (len(" ".join(last_line_tuple))
+                        < len(" ".join(self.header0.words))):
+                    raise EOFError
+                last_header = self.header0.__class__(last_line_tuple)
+            except Exception:
+                warnings.warn("The last header entry, '{0}', has an incorect "
+                              "length. Using the second-to-last entry instead."
+                              .format(last_line))
+                fh.seek(self.header0.seek_offset(guess-2))
+                last_line_tuple = fh.readline().split()
+                last_header = self.header0.__class__(last_line_tuple)
         return last_header
 
     def readable(self):
