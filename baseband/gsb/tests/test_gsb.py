@@ -848,6 +848,28 @@ class TestGSB:
             assert np.all(fh_r.read() == data1)
             fh_w.close()
 
+    @pytest.mark.parametrize('raw', [SAMPLE_PHASED, SAMPLE_PHASED[:1]])
+    def test_phased_stream_one_file_per_pol(self, raw):
+        sample_rate = self.frame_rate * self.payload_nbytes / 512
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=raw,
+                      sample_rate=sample_rate,
+                      payload_nbytes=self.payload_nbytes) as fh_2file:
+            full_data = fh_2file.read()
+
+        raw_one_file = [pol_files[:1] for pol_files in raw]
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=raw_one_file,
+                      sample_rate=sample_rate/2,
+                      payload_nbytes=self.payload_nbytes) as fh_1file:
+            data = fh_1file.read()
+        assert data.shape[0] == full_data.shape[0] // 2
+        assert data.shape[1:] == full_data.shape[1:]
+        samples_per_block = fh_2file.samples_per_frame // 2
+        assert samples_per_block == fh_1file.samples_per_frame
+        blocked = full_data.reshape((-1, 2, samples_per_block)
+                                    + fh_1file.sample_shape)
+        expected = blocked[:, 0].reshape((-1,)+fh_1file.sample_shape)
+        assert np.all(data == expected)
+
     @pytest.mark.parametrize('stop, nframes', [(-7, 9), (97, 1)])
     def test_stream_incomplete_header(self, stop, nframes, tmpdir):
         # Test that an incomplete last header leads to the second-to-last
