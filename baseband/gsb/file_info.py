@@ -21,9 +21,6 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
     def number_of_frames(self):
         with self._parent.temporary_offset() as fh:
             fh_size = fh.seek(0, 2)
-            if fh_size == self.header0.nbytes:
-                return 1
-
             # Guess based on a fixed header size.  In reality, this
             # may be an overestimate as the headers can grow in size,
             # or an underestimate as the last header may be partial.
