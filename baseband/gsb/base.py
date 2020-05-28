@@ -217,6 +217,8 @@ class GSBStreamBase(VLBIStreamBase):
 
         self.fh_ts = fh_ts
         rawdump = header0.mode == 'rawdump'
+        if not rawdump and not isinstance(fh_raw, (tuple, list)):
+            fh_raw = ((fh_raw,),)
         complex_data = (complex_data if complex_data is not None else
                         (False if rawdump else True))
         bps = bps if bps is not None else (4 if rawdump else 8)

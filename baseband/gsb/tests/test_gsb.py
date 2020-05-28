@@ -924,6 +924,7 @@ class TestGSB:
         (SAMPLE_PHASED_HEADER, [SAMPLE_PHASED[0][:1],
                                 SAMPLE_PHASED[1][:1]], 'unsplit-2pol'),
         (SAMPLE_PHASED_HEADER, [SAMPLE_PHASED[0][1:]], 'unsplit-1pol'),
+        (SAMPLE_PHASED_HEADER, SAMPLE_PHASED[0][1], 'unsplit-1pol'),
     ])
     def test_stream_info(self, ts, raw, mode):
         bps = 4 if mode == 'rawdump' else 8
