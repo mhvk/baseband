@@ -20,18 +20,41 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
     @info_item(needs='header0')
     def number_of_frames(self):
         with self._parent.temporary_offset() as fh:
-            file_nbytes = fh.seek(0, 2)
-            if file_nbytes == self.header0.nbytes:
-                return 1
-
-            guess = max(int(round(file_nbytes / self.header0.nbytes)) - 2, 0)
-            while True:
+            fh_size = fh.seek(0, 2)
+            # Guess based on a fixed header size.  In reality, this
+            # may be an overestimate as the headers can grow in size,
+            # or an underestimate as the last header may be partial.
+            # So, search around to be sure.
+            guess = max(fh_size // self.header0.nbytes, 1)
+            while self.header0.seek_offset(guess) > fh_size:
+                guess -= 1
+            while self.header0.seek_offset(guess) < fh_size:
                 guess += 1
-                fh.seek(self.header0.seek_offset(guess))
+
+            # Now see if there is indeed a nice header before.
+            fh.seek(self.header0.seek_offset(guess-1))
+            line_tuple = fh.readline().split()
+            # But realize that sometimes an incomplete header is written.
+            if (len(" ".join(line_tuple))
+                    < len(" ".join(self.header0.words))):
+                self.warnings['number_of_frames'] = (
+                    'last header is incomplete and is ignored')
+                retry = True
+            else:
+                # Check last header is readable.
                 try:
-                    self.header0.fromfile(fh).time
-                except EOFError:
-                    break
+                    self.header0.__class__(line_tuple).time
+                except Exception as exc:
+                    self.warnings['number_of_frames'] = (
+                        'last header failed to read ({}) and is ignored'
+                        .format(str(exc)))
+                    retry = True
+                else:
+                    retry = False
+            if retry:
+                guess -= 1
+                fh.seek(self.header0.seek_offset(guess-1))
+                self.header0.fromfile(fh).time
 
         return guess
 
@@ -58,4 +81,6 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
 
     @info_item
     def file_info(self):
-        return self._parent.fh_ts.info
+        fh_ts_info = self._parent.fh_ts.info
+        fh_ts_info.missing.pop('raw', None)
+        return fh_ts_info
