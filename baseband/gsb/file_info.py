@@ -84,4 +84,6 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
 
     @info_item
     def file_info(self):
-        return self._parent.fh_ts.info
+        fh_ts_info = self._parent.fh_ts.info
+        fh_ts_info.missing.pop('raw', None)
+        return fh_ts_info

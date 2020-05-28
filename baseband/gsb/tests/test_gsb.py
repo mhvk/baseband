@@ -869,7 +869,8 @@ class TestGSB:
 
             info = fh_r.info
             assert info.errors == {}
-            assert len(info.warnings) == 1
+            assert info.warnings.keys() == {'number_of_frames'}
+            assert 'incomplete' in info.warnings['number_of_frames']
 
     def test_stream_reader_defaults(self):
         # Test not passing a sample rate and samples per frame to reader
@@ -916,9 +917,10 @@ class TestGSB:
             assert info.readable
             assert info.errors == {}
             assert info.warnings == {}
+            assert info.file_info.missing == {}
             assert info.checks == {'decodable': True}
             assert info.bps == bps
-            assert abs(info.sample_rate - sample_rate) < 1. * u.nHz
+            assert u.isclose(info.sample_rate, sample_rate)
             if mode == 'rawdump':
                 assert not info.complex_data
                 assert info.shape == (81920,)
