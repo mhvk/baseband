@@ -867,6 +867,10 @@ class TestGSB:
 
             assert shape[0] == nframes * fh_r.samples_per_frame
 
+            info = fh_r.info
+            assert info.errors == {}
+            assert len(info.warnings) == 1
+
     def test_stream_reader_defaults(self):
         # Test not passing a sample rate and samples per frame to reader
         # (can't test reading, since the sample file is tiny).
