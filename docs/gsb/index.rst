@@ -24,8 +24,9 @@ its corresponding data comprise a :term:`data frame`, though these do not have
 explicit divisions in the data files.
 
 Baseband currently supports two forms of GSB data: **rawdump**, for storing
-real-valued raw voltage timestreams, and **phased**, for storing complex
-pre-channelized data from the GMRT in phased array baseband mode.
+real-valued raw voltage timestreams from individual telescopes, and
+**phased**, for storing complex pre-channelized data from the GMRT in phased
+array baseband mode.
 
 Data in `rawdump format <http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/
 gmrt_gsb/GSB_rawdump_data_format_v2.pdf>`_ is stored in a binary file
@@ -35,29 +36,31 @@ form::
 
     YYYY MM DD HH MM SS 0.SSSSSSSSS
 
-In the default rawdump observing setup, samples are recorded at a rate of
-33.3333... megasamples per second (Msps).  Each sample is 4 bits in size, and
-two samples are grouped into bytes such that the oldest sample occupies
-the least significant bit.  Each frame consists of **4 megabytes** of data,
-or :math:`2^{23}`, samples; as such, the timespan of one frame is exactly
-**0.25165824 s**.
+In the default rawdump observing setup for 16 MHz bandwidth, samples are
+recorded at a rate of 33.3333... megasamples per second (Msps).  Each sample
+is 4 bits in size, and two samples are grouped into bytes such that the oldest
+sample occupies the least significant bit.  Each frame consists of **4
+megabytes** of data, or :math:`2^{23}` samples; as such, the timespan of one
+frame is exactly **0.25165824 s**.
 
-Data in `phased format <http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/
-gmrt_gsb/GSB_beam_timestamp_note_v1.pdf>`_ is normally spread over four binary
-files and one accompanying header file.  The binary files come in two pairs,
-one for each polarization, with the pair contain the first and second half of
-the data of each frame.
-
-When recording GSB in phased array voltage beam (ie. baseband) mode, the "raw",
-or pre-channelized, :term:`sample rate` is either 33.3333... Msps at 8 bits per
-sample or 66.6666... Msps at 4 bits per sample (in the latter case, sample
-bit-ordering is the same as for rawdump).   Channelization via fast Fourier
+In phased array baseband mode using 16 or 32 MHz bandwidth, the "raw", or
+pre-channelized, :term:`sample rate` is either 33.3333... Msps or
+66.6666... Msps, with 8 bits per sample.  Channelization via fast Fourier
 transform sets the channelized :term:`complete sample` rate to the raw rate
 divided by :math:`2N_\mathrm{F}`, where :math:`N_\mathrm{F}` is the number of
-Fourier channels (either 256 or 512). The timespan of one frame is **0.25165824
-s**, and one frame is **8 megabytes** in size, for either raw sample rate.
+Fourier channels (usually 512). The timespan of one frame is **0.25165824 s**,
+and the total amount of data associated with a frame is thus either 4 or 8
+megabytes.
 
-The phased header's structure is::
+The data are normally spread over multiple binary files and one accompanying
+header file.  The binary files are split by polarization, with for each
+polarization either a single file or a pair of files, with the pair containing
+the first and second half of the data of each frame.  In each file, the data
+associated with a frame is always **4 megabytes**.
+
+The `phased header's structure
+<http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/gmrt_gsb/GSB_beam_timestamp_note_v1.pdf>`_
+is::
 
     <PC TIME> <GPS TIME> <SEQ NUMBER> <MEM BLOCK>
 
@@ -118,11 +121,12 @@ Alternatively, if the size of the frame buffer and the frame rate are known, the
 former can be used to determine ``samples_per_frame``, and the latter used to
 determine ``sample_rate`` by inverting the above equation.
 
-If ``samples_per_frame`` is not given, Baseband assumes it is the equivalent of
-4 megabytes of data for rawdump, or 8 megabytes if phased.  If ``sample_rate``
-is not given, it is calculated from ``samples_per_frame`` assuming
-``timespan_of_frame = 0.25165824`` (see :ref:`File Structure
-<gsb_file_structure>` above).
+If ``samples_per_frame`` is not given, Baseband assumes the standard payload
+size of 4 megabytes, which implies 4 megabytes of data per frame for rawdump,
+and 4 or 8 megabytes for phased (depending on the number of files per
+polarization).  If ``sample_rate`` is not given, it is calculated from
+``samples_per_frame`` assuming that each frame spans 0.25165824 s. (see
+:ref:`File Structure <gsb_file_structure>` above).
 
 A single payload file can be opened with `~baseband.gsb.open` in binary mode.
 Here, for our sample file, we have to take into account that in order to keep
@@ -145,7 +149,7 @@ the size of one frame in bytes.  Since rawdump samples are 4 bits,
     >>> fb.close()
 
 (``payload_nbytes`` for phased data is the size of one frame *divided by the
-number of binary files*.)
+number of binary files* for each polarization.)
 
 Opening in stream mode allows timestamp and binary files to be read in
 concert to create data frames, and also wraps the low-level routines such that
