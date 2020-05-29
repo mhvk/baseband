@@ -666,7 +666,8 @@ class TestGSB:
         # Test not passing a sample rate and samples per frame to reader
         # (can't test reading, since the sample file is tiny).
         with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP) as fh_r:
-            assert fh_r.sample_rate == (100. / 3.) * u.MHz
+            assert u.isclose(fh_r.sample_rate, (100. / 3.) * u.MHz,
+                             rtol=2**-52)
             assert fh_r.samples_per_frame == 2**23
             assert fh_r._payload_nbytes == 2**22
 
@@ -894,14 +895,23 @@ class TestGSB:
             assert info.warnings.keys() == {'number_of_frames'}
             assert 'incomplete' in info.warnings['number_of_frames']
 
-    def test_stream_reader_defaults(self):
+    @pytest.mark.parametrize('raw, nstream', [
+        (SAMPLE_PHASED, 2),
+        (SAMPLE_PHASED[:1], 2),
+        ((SAMPLE_PHASED[0][:1], SAMPLE_PHASED[1][:1]), 1),
+        (SAMPLE_PHASED[1][1], 1),
+    ])
+    def test_stream_reader_defaults(self, raw, nstream):
         # Test not passing a sample rate and samples per frame to reader
         # (can't test reading, since the sample file is tiny).
-        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED) as fh_r:
-            assert fh_r.sample_rate == (fh_r.samples_per_frame
-                                        * (100. / 3. / 2.**23) * u.MHz)
-            assert fh_r.samples_per_frame == 2**13  # 2**23 / 1024
+        default_frame_rate = (100/6/2**22)*u.MHz
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=raw) as fh_r:
+            assert fh_r.sample_shape[-1] == 512
             assert fh_r._payload_nbytes == 2**22
+            assert fh_r.samples_per_frame == nstream * 2**12  # 2**22 / 1024
+            assert u.isclose(fh_r.sample_rate,
+                             fh_r.samples_per_frame*default_frame_rate,
+                             rtol=2**-52)
 
     def test_stream_invalid(self, tmpdir):
         with pytest.raises(ValueError):

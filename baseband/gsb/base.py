@@ -223,28 +223,27 @@ class GSBStreamBase(VLBIStreamBase):
                         (False if rawdump else True))
         bps = bps if bps is not None else (4 if rawdump else 8)
         nchan = nchan if nchan is not None else (1 if rawdump else 512)
-
-        # By default, GSB frames span 4 MB for rawdump and 8 MB for phased.
-        if payload_nbytes is None and samples_per_frame is None:
-            if sample_rate is None:
-                payload_nbytes = 2**22 if rawdump else 2**23 // len(fh_raw[0])
-            else:
-                payload_nbytes = int((sample_rate
-                                      / self.fh_ts.info.frame_rate)
-                                     .to(u.one).round())
-
+        bpfs = bps * nchan * (2 if complex_data else 1)
+        default_frame_rate = (1e8/6/2**22)*u.Hz
+        nfiles = 1 if rawdump else len(fh_raw[0])
+        # By default, GSB payloads are always 4 MB (which can combine to
+        # frames of 8 MB for phased if two streams are used).
         if payload_nbytes is None:
-            payload_nbytes = (samples_per_frame * nchan
-                              * (2 if complex_data else 1) * bps
-                              // (8 * (1 if rawdump else len(fh_raw[0]))))
-        elif samples_per_frame is None:
-            samples_per_frame = (payload_nbytes * 8 // bps
-                                 * (1 if rawdump else len(fh_raw[0]))
-                                 // (nchan * (2 if complex_data else 1)))
+            if samples_per_frame is None:
+                if sample_rate is None:
+                    payload_nbytes = 2**22
+                else:
+                    payload_nbytes = int((sample_rate * bpfs / 8
+                                          / default_frame_rate)
+                                         .to(u.one).round())
+            else:
+                payload_nbytes = samples_per_frame * bpfs // (8 * nfiles)
 
-        # By default, GSB rawdump and phased frames span exactly 0.251658240 s.
+        if samples_per_frame is None:
+            samples_per_frame = payload_nbytes * 8 // bpfs * nfiles
+
         if sample_rate is None:
-            sample_rate = (samples_per_frame * (100. / 3. / 2.**23)) * u.MHz
+            sample_rate = samples_per_frame * default_frame_rate
 
         unsliced_shape = (nchan,) if rawdump else (len(fh_raw), nchan)
 
@@ -316,14 +315,12 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         channel of each polarization is sampled.  If `None`, will be
         inferred assuming the frame rate is exactly 0.25165824 s.
     samples_per_frame : int, optional
-        Number of complete samples per frame.  Can give ``payload_nbytes``
-        instead.
+        Number of complete samples per frame (possibly combining two files).
+        Can give ``payload_nbytes`` instead.
     payload_nbytes : int, optional
-        Number of bytes per payload, divided by the number of raw files.
+        Number of bytes per payload (in each raw file separately).
         If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
-        ``payload_nbytes`` is set to ``2**22`` (4 MB) for rawdump, and
-        ``2**23`` (8 MB) divided by the number of streams per polarization for
-        phased.
+        ``payload_nbytes`` is set to ``2**22`` (4 MiB).
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.
     bps : int, optional
@@ -493,14 +490,12 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         channel of each polarization is sampled.  If not given, will be
         inferred assuming the frame rate is exactly 0.25165824 s.
     samples_per_frame : int, optional
-        Number of complete samples per frame.  Can give ``payload_nbytes``
-        instead.
+        Number of complete samples per frame (possibly combining two files).
+        Can give ``payload_nbytes`` instead.
     payload_nbytes : int, optional
-        Number of bytes per payload, divided by the number of raw files.
+        Number of bytes per payload (in each raw file separately).
         If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
-        ``payload_nbytes`` is set to ``2**22`` (4 MB) for rawdump, and
-        ``2**23`` (8 MB) divided by the number of streams per polarization for
-        phased.
+        ``payload_nbytes`` is set to ``2**22`` (4 MiB).
     nchan : int, optional
         Number of channels. Default: 1 for rawdump, 512 for phased.
     bps : int, optional

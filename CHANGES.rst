@@ -4,6 +4,9 @@
 - This future version will likely only support python 3.7, numpy 1.17 and
   astropy 4.0.
 
+3.2 (unreleased)
+================
+
 New Features
 ------------
 
@@ -15,6 +18,13 @@ Bug Fixes
 
 - Mark 4 data written with the non-standard channel assignment used at Ft
   can now be read and written. [#380]
+
+- For GSB phased data, the default ``payload_nbytes`` has now been corrected
+  so that it is always 4 MiB. [#401]
+
+- For GSB phased data, the ``sample_rate`` argument is now correctly
+  interpreted as the rate of complete samples (previously, the number of
+  channels were ignored). [#401]
 
 Other Changes and Additions
 ---------------------------
