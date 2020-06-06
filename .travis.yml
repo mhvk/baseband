@@ -47,7 +47,9 @@ env:
         - TOXPOSARGS=''
 
         # Also allow tests without tox, getting our packages using apt;
-        - APT_DEPENDENCIES='python3-astropy python3-setuptools'
+        # Here, we need to include python3-attr, since the version on bionic
+        # is too old.
+        - APT_DEPENDENCIES='python3-astropy python3-setuptools python3-attr'
 
         # If there are matplotlib or other GUI tests, uncomment the following
         # line to use the X virtual framebuffer.
@@ -120,7 +122,6 @@ install:
         echo "deb http://ftp.us.debian.org/debian testing main" | sudo tee -a /etc/apt/sources.list;
         sudo apt-get -qq update;
         sudo apt-get install -y --no-install-recommends ${APT_DEPENDENCIES};
-        sudo dpkg --ignore-depends='python3-pytest-astropy' -r python3-hypothesis;
       fi
 
     - if [[ $TOXENV == *-cov ]]; then
