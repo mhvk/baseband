@@ -47,9 +47,7 @@ env:
         - TOXPOSARGS=''
 
         # Also allow tests without tox, getting our packages using apt;
-        # Here, we still need pip to install baseband.  We use the Debian
-        # version since the one packaged on travis gives some problems.
-        - APT_DEPENDENCIES='python3-astropy python3-pytest-astropy python3-setuptools'
+        - APT_DEPENDENCIES='python3-astropy python3-setuptools'
 
         # If there are matplotlib or other GUI tests, uncomment the following
         # line to use the X virtual framebuffer.
