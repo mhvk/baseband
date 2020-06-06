@@ -120,6 +120,7 @@ install:
         echo "deb http://ftp.us.debian.org/debian testing main" | sudo tee -a /etc/apt/sources.list;
         sudo apt-get -qq update;
         sudo apt-get install -y --no-install-recommends ${APT_DEPENDENCIES};
+        sudo dpkg --ignore-depends='python3-pytest-astropy' -r python3-hypothesis;
       fi
 
     - if [[ $TOXENV == *-cov ]]; then
