@@ -84,3 +84,7 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
         fh_ts_info = self._parent.fh_ts.info
         fh_ts_info.missing.pop('raw', None)
         return fh_ts_info
+
+    @info_item
+    def payload_nbytes(self):
+        return self._parent.payload_nbytes

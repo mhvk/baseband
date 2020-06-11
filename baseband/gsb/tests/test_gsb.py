@@ -953,6 +953,7 @@ class TestGSB:
             assert info.file_info.missing == {}
             assert info.checks == {'decodable': True}
             assert info.bps == bps
+            assert info.payload_nbytes == self.payload_nbytes
             assert u.isclose(info.sample_rate, sample_rate)
             if mode == 'rawdump':
                 assert not info.complex_data
