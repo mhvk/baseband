@@ -544,7 +544,7 @@ class TestGSB:
             with open(SAMPLE_RAWDUMP_HEADER, 'rt') as ft, \
                     open(SAMPLE_RAWDUMP, 'rb') as fraw:
                 ft.seek(frame1.header.seek_offset(9))
-                fraw.seek(9 * fh_r._payload_nbytes)
+                fraw.seek(9 * fh_r.payload_nbytes)
                 frame10 = gsb.GSBFrame.fromfile(
                     ft, fraw, bps=4, payload_nbytes=self.payload_nbytes)
             assert fh_r._last_header == frame10.header
@@ -669,7 +669,7 @@ class TestGSB:
             assert u.isclose(fh_r.sample_rate, (100. / 3.) * u.MHz,
                              rtol=2**-52)
             assert fh_r.samples_per_frame == 2**23
-            assert fh_r._payload_nbytes == 2**22
+            assert fh_r.payload_nbytes == 2**22
 
     @pytest.mark.parametrize('sample_header,sample_data', [
         (SAMPLE_RAWDUMP_HEADER, SAMPLE_RAWDUMP),
@@ -728,7 +728,7 @@ class TestGSB:
             # Seek last offset.
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
                 ft.seek(frame1.header.seek_offset(9))
-                self.seek_phased_rawfiles(fraw, 9 * fh_r._payload_nbytes)
+                self.seek_phased_rawfiles(fraw, 9 * fh_r.payload_nbytes)
                 frame10 = gsb.GSBFrame.fromfile(
                     ft, fraw, payload_nbytes=self.payload_nbytes, nchan=nchan,
                     bps=bps, complex_data=True)
@@ -907,7 +907,7 @@ class TestGSB:
         default_frame_rate = (100/6/2**22)*u.MHz
         with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=raw) as fh_r:
             assert fh_r.sample_shape[-1] == 512
-            assert fh_r._payload_nbytes == 2**22
+            assert fh_r.payload_nbytes == 2**22
             assert fh_r.samples_per_frame == nstream * 2**12  # 2**22 / 1024
             assert u.isclose(fh_r.sample_rate,
                              fh_r.samples_per_frame*default_frame_rate,

@@ -255,6 +255,11 @@ class GSBStreamBase(VLBIStreamBase):
 
         self._payload_nbytes = payload_nbytes
 
+    @property
+    def payload_nbytes(self):
+        """Number of bytes per payload, divided by the number of raw files."""
+        return self._payload_nbytes
+
     def __getattr__(self, attr):
         """Try to get things on the current open file if it is not on self."""
         if attr in {'readable', 'writable', 'seekable', 'closed', 'name'}:
