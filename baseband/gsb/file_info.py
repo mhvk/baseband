@@ -1,6 +1,16 @@
 # Licensed under the GPLv3 - see LICENSE
+from astropy import units as u
+
 from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
                                    info_item)
+
+
+def file_size(fh):
+    offset = fh.tell()
+    try:
+        return fh.seek(0, 2)
+    finally:
+        fh.seek(offset)
 
 
 class GSBTimeStampInfo(VLBIFileReaderInfo):
@@ -69,14 +79,20 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
 
 
 class GSBStreamReaderInfo(VLBIStreamReaderInfo):
+    attr_names = list(VLBIStreamReaderInfo.attr_names)
+    attr_names.insert(attr_names.index('readable'), 'bandwidth')
+    attr_names.insert(attr_names.index('readable'), 'n_raw')
+    attr_names.insert(attr_names.index('readable'), 'payload_nbytes')
+    attr_names = tuple(attr_names)
+
+    _parent_attrs = VLBIStreamReaderInfo._parent_attrs + ('payload_nbytes',)
 
     @info_item
     def frame0(self):
         return self._parent._read_frame(0)
 
     # Bit of a hack, but the base reader one suffices here with
-    # the frame0 override above and its default "decodable"
-    readable = VLBIFileReaderInfo.readable
+    # the frame0 override above.
     decodable = VLBIFileReaderInfo.decodable
 
     @info_item
@@ -84,3 +100,68 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
         fh_ts_info = self._parent.fh_ts.info
         fh_ts_info.missing.pop('raw', None)
         return fh_ts_info
+
+    @info_item(needs='shape')
+    def bandwidth(self):
+        return (self.sample_rate * self.shape[-1]
+                / (1 if self.complex_data else 2)).to(u.MHz)
+
+    @info_item
+    def n_raw(self):
+        fh_raw = self._parent.fh_raw
+        return len(fh_raw[0]) if isinstance(fh_raw, (list, tuple)) else 1
+
+    @info_item(needs=('file_info', 'payload_nbytes', 'n_raw'), default=False)
+    def consistent(self):
+        pl_nbytes = self.payload_nbytes
+        nchan = self._parent._unsliced_shape[-1]
+        expected_size = int(((self.stop_time-self.start_time)
+                             * self.sample_rate * nchan
+                             * self.bps * (2 if self.complex_data else 1)
+                             // (8 * self.n_raw)).to(u.one).round())
+        fh_raw = self._parent.fh_raw
+        if self.file_info.mode == 'rawdump':
+            fh_raw = [[fh_raw]]
+
+        msg = ''
+        try:
+            for pair in fh_raw:
+                for fh in pair:
+                    fs = file_size(fh)
+                    if fs % pl_nbytes != 0 and 'non-integer' not in msg:
+                        msg += ('raw file contains non-integer number ({}) '
+                                'of payloads.'.format(fs / pl_nbytes))
+
+                    consistent = fs >= expected_size
+                    if not consistent:
+                        emsg = 'raw file size smaller than expected.'
+                        ratio = fs / expected_size
+                        if len(pair) == 1 and 0.5 <= ratio < 0.6:
+                            emsg = (emsg[:-1] + ' by {} factor of two. '
+                                    'Are you missing the second raw file?'
+                                    .format('a' if ratio == 0.5
+                                            else 'about a'))
+                        raise EOFError(emsg)
+
+                    if fs > expected_size and 'more bytes' not in msg:
+                        msg += 'raw file contains more bytes than expected.'
+        finally:
+            if msg:
+                self.warnings['consistent'] = msg
+
+        # As a final sanity check, try reading the final sample of the file.
+        old_offset = self._parent.tell()
+        try:
+            self._parent.seek(-1, 2)
+            self._parent.read(1)
+        finally:
+            self._parent.seek(old_offset)
+
+        return True
+
+    @info_item(needs='frame0', default=False)
+    def readable(self):
+        """Whether the file is readable and decodable."""
+        self.checks['decodable'] = self.decodable
+        self.checks['consistent'] = self.consistent
+        return all(bool(v) for v in self.checks.values())

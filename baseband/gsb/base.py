@@ -217,8 +217,14 @@ class GSBStreamBase(VLBIStreamBase):
 
         self.fh_ts = fh_ts
         rawdump = header0.mode == 'rawdump'
-        if not rawdump and not isinstance(fh_raw, (tuple, list)):
-            fh_raw = ((fh_raw,),)
+        if not rawdump:
+            if isinstance(fh_raw, (tuple, list)):
+                for pair in fh_raw:
+                    assert isinstance(pair, (tuple, list))
+                    assert len(pair) == len(fh_raw[0])
+            else:
+                fh_raw = ((fh_raw,),)
+
         complex_data = (complex_data if complex_data is not None else
                         (False if rawdump else True))
         bps = bps if bps is not None else (4 if rawdump else 8)
@@ -241,6 +247,9 @@ class GSBStreamBase(VLBIStreamBase):
 
         if samples_per_frame is None:
             samples_per_frame = payload_nbytes * 8 // bpfs * nfiles
+        elif samples_per_frame != payload_nbytes*nfiles*8/bpfs:
+            raise ValueError('inconsistent samples_per_frame, bps, '
+                             'complex_data, and payload_nbytes')
 
         if sample_rate is None:
             sample_rate = samples_per_frame * default_frame_rate
@@ -254,6 +263,11 @@ class GSBStreamBase(VLBIStreamBase):
             fill_value=0., verify=verify)
 
         self._payload_nbytes = payload_nbytes
+
+    @property
+    def payload_nbytes(self):
+        """Number of bytes per payload, divided by the number of raw files."""
+        return self._payload_nbytes
 
     def __getattr__(self, attr):
         """Try to get things on the current open file if it is not on self."""
