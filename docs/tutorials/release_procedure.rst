@@ -57,8 +57,8 @@ releases are labelled "m", and patch ones labelled "p".
 We begin in the main development branch (the local equivalent to
 ``mhvk/baseband:master``).  First, check the following:
 
-- **Ensure tests pass**.  Run the test suite by running ``python3 setup.py
-  test`` in the Baseband root directory.
+- **Ensure tests pass**.  Run the test suite by running ``tox -e test``
+  in the Baseband root directory.
 - **Update** ``CHANGES.rst``.  All merge commits to master since the last
   release should be documented (except trivial ones such as typo corrections).
   Since ``CHANGES.rst`` is updated for each merge commit, in practice it is
@@ -81,6 +81,10 @@ For major/minor releases, the patch number is ``0``.
 
 Submit the commit as a pull request to master.
 
+Make and enter a new release branch::
+
+    git checkout -b v<version branch>.x
+
 1p. Cherry-pick code for a patch release
 ----------------------------------------
 
@@ -100,8 +104,8 @@ For more information, see `Astropy's documentation
 Once you have cherry-picked, check the following:
 
 - **Ensure tests pass and documentation builds**.  Run the test suite by
-  running ``python3 setup.py test``, and build documentation by running
-  ``python3 setup.py build_docs``, in the Baseband root directory.
+  running ``tox -e test``, and build documentation by running
+  ``tox -e build_docs``, in the Baseband root directory.
 - **Update** ``CHANGES.rst``.  Typically, merge commits record their changes,
   including any backported bugfixes, in ``CHANGES.rst``.  Cherry-picking should
   add these records to this branch's ``CHANGES.rst``, but if not, manually
@@ -113,44 +117,14 @@ Commit your changes::
 
     git commit -m "Finalizing changelog for v<version>"
 
-2m. Create a new release branch
--------------------------------
-
-Still in the main development branch, change the ``version`` keyword under the
-``[[metadata]]`` section of ``setup.cfg`` to::
-
-    version = <version>
-
-and make a commmit::
-
-    git commit -m "Preparing v<version>."
-
-Submit the commit as a pull request to master.
-
-Once the pull request has been merged, make and enter a new release branch::
-
-    git checkout -b v<version branch>.x
-
-2p. Append to the release branch
---------------------------------
-
-In the release branch, prepare the patch release commit by changing the
-``version`` keyword under the ``[[metadata]]`` section of ``setup.cfg`` to::
-
-    version = <version>
-
-then make a new commmit::
-
-    git commit -m "Preparing v<version>."
-
-3. Tag the release
+2. Tag the release
 ------------------
 
-Tag the commit made in step 2 as::
+Tag the commit made in step 1 as::
 
     git tag -s v<version> -m "Tagging v<version>"
 
-4. Clean and package the release
+3. Clean and package the release
 --------------------------------
 
 Checkout the tag::
@@ -160,7 +134,6 @@ Checkout the tag::
 Clean the repository::
 
     git clean -dfx
-    cd astropy_helpers; git clean -dfx; cd ..
 
 and ensure the repository has the proper permissions::
 
@@ -169,9 +142,9 @@ and ensure the repository has the proper permissions::
 
 Finally, package the release's source code::
 
-    python setup.py build sdist
+    python3 setup.py build sdist
 
-5. Test the release
+4. Test the release
 -------------------
 
 We now test installing and running Baseband in clean virtual environments, to
@@ -182,7 +155,7 @@ value (in bash, ``PYTHONPATH=``) before proceeding.
 
 To create the environments::
 
-    python3 -m venv --no-site-packages test_release
+    python3 -m venv test_release
 
 Now, for each environment, activate it, navigate to the Baseband root
 directory, and run the tests::
@@ -208,16 +181,15 @@ If the tests succeed, you may optionally re-run the cleaning and packaging code
 above following the tests::
 
     git clean -dfx
-    cd astropy_helpers; git clean -dfx; cd ..
     umask 0022
     chmod -R a+Xr .
-    python setup.py build sdist
+    python3 setup.py build sdist
 
 You may optionally sign the source as well::
 
     gpg --detach-sign -a dist/baseband-<version>.tar.gz
 
-7. Publish the release on GitHub
+5. Publish the release on GitHub
 --------------------------------
 
 If you are working a major/minor release, first push the branch to upstream
@@ -245,14 +217,14 @@ The Baseband GitHub repo `automatically updates
 Check if your release has made it to Zenodo by clicking the badge in
 ``Readme.rst``.
 
-8. Build the release wheel for PyPI
+6. Build the release wheel for PyPI
 -----------------------------------
 
 To build the release::
 
     python setup.py bdist_wheel --universal
 
-9. (Optional) test uploading the release
+7. (Optional) test uploading the release
 ----------------------------------------
 
 PyPI provides a test environment to safely try uploading new releases.  To take
@@ -273,21 +245,21 @@ contain recent versions of Astropy)::
     python -c 'import baseband; baseband.test()'
     deactivate
 
-10. Upload to PyPI
-------------------
+8. Upload to PyPI
+-----------------
 
 Finally, upload the package to PyPI::
 
     twine upload dist/baseband-<version>*
 
-11. Check if Readthedocs has updated
-------------------------------------
+9. Check if Readthedocs has updated
+-----------------------------------
 
 Go to `Read the Docs <https://readthedocs.org/>`_ and check that the
 ``stable`` version points to the latest stable release.  Each minor release has
 its own version as well, which should be pointing to its latest patch release.
 
-12m. Clean up master
+10m. Clean up master
 --------------------
 
 In the main development branch, add the next major/minor release to
@@ -301,7 +273,7 @@ Make a commmit::
 
 Then submit a pull request to master.
 
-12p. Update CHANGES.rst on master
+10p. Update CHANGES.rst on master
 ---------------------------------
 
 Change the release date of the patch release in ``CHANGES.rst`` on master to
