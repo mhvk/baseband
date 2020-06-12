@@ -464,8 +464,8 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
                   'checks', 'errors', 'warnings')
     """Attributes that the container provides."""
 
-    _parent_attrs = tuple(attr for attr in attr_names
-                          if attr not in ('format', 'readable'))
+    _parent_attrs = ('start_time', 'stop_time', 'sample_rate', 'shape',
+                     'bps', 'complex_data', 'verify')
 
     # Note that we cannot have missing information in streams;
     # they cannot be opened without it.

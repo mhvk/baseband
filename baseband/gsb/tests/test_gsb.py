@@ -892,8 +892,10 @@ class TestGSB:
 
             info = fh_r.info
             assert info.errors == {}
-            assert info.warnings.keys() == {'number_of_frames'}
+            assert info.warnings.keys() == {'number_of_frames',
+                                            'consistent'}
             assert 'incomplete' in info.warnings['number_of_frames']
+            assert 'contains more bytes' in info.warnings['consistent']
 
     @pytest.mark.parametrize('raw, nstream', [
         (SAMPLE_PHASED, 2),
@@ -925,6 +927,9 @@ class TestGSB:
             # non-existing file
             gsb.open(str(tmpdir.join('ts.bla')),
                      raw=str(tmpdir.join('raw.bla')))
+        with pytest.raises(ValueError, match='inconsistent'):
+            gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
+                     payload_nbytes=32, samples_per_frame=400)
 
     @pytest.mark.parametrize('ts,raw,mode', [
         (SAMPLE_RAWDUMP_HEADER, SAMPLE_RAWDUMP, 'rawdump'),
@@ -947,24 +952,48 @@ class TestGSB:
                       payload_nbytes=self.payload_nbytes) as fh:
             info = fh.info
             assert info.format == 'gsb'
+            assert info.consistent
             assert info.readable
             assert info.errors == {}
             assert info.warnings == {}
             assert info.file_info.missing == {}
-            assert info.checks == {'decodable': True}
+            assert info.checks == {'decodable': True,
+                                   'consistent': True}
             assert info.bps == bps
             assert info.payload_nbytes == self.payload_nbytes
             assert u.isclose(info.sample_rate, sample_rate)
             if mode == 'rawdump':
                 assert not info.complex_data
                 assert info.shape == (81920,)
+                assert info.n_raw == 1
             else:
                 assert info.complex_data
                 if mode.startswith('unsplit'):
                     assert info.shape[0] == 40
+                    assert info.n_raw == 1
                 else:
                     assert info.shape[0] == 80
+                    assert info.n_raw == 2
                 if mode.endswith('2pol'):
                     assert info.shape[1:] == (2, nchan)
                 else:
                     assert info.shape[1:] == (nchan,)
+
+    @pytest.mark.parametrize('ts,raw', [
+        (SAMPLE_PHASED_HEADER, [SAMPLE_PHASED[0][:1],
+                                SAMPLE_PHASED[1][:1]]),
+        (SAMPLE_PHASED_HEADER, [SAMPLE_PHASED[0][1:]]),
+        (SAMPLE_PHASED_HEADER, SAMPLE_PHASED[0][1]),
+    ])
+    def test_stream_info_inconsistent(self, ts, raw):
+        bps = 8
+        nchan = 512
+        sample_rate = (self.frame_rate * self.payload_nbytes
+                       * (8 // bps) / nchan)
+        with gsb.open(ts, 'rs', raw=raw, sample_rate=sample_rate,
+                      payload_nbytes=self.payload_nbytes, nchan=512) as fh:
+            info = fh.info
+            assert not fh.info.consistent
+            assert isinstance(fh.info.errors['consistent'], EOFError)
+            assert 'factor of two' in str(fh.info.errors['consistent'])
+            assert info.sample_rate == sample_rate
