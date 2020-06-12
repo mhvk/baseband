@@ -151,6 +151,9 @@ the size of one frame in bytes.  Since rawdump samples are 4 bits,
 (``payload_nbytes`` for phased data is the size of one frame *divided by the
 number of binary files* for each polarization.)
 
+Working in Stream Mode
+----------------------
+
 Opening in stream mode allows timestamp and binary files to be read in
 concert to create data frames, and also wraps the low-level routines such that
 reading and writing is in units of samples, and provides access to header
@@ -177,13 +180,45 @@ nested tuple with the format::
 
     ((L pol stream 1, L pol stream 2), (R pol stream 1, R pol stream 2))
 
-The nested tuple is passed to ``raw`` (note that we again have to pass a
-non-default sample rate)::
+The nested tuple is passed to ``raw``.  Below, we look at the sample files
+and open these.  In general, it is a good idea to check that the resulting
+stream has the right properties, e.g., the correct bandwidth and the
+expected start and stop times. So, we use ``.info`` (note that because our
+sample files have been reduced in size we have to pass a non-default
+samples per frame and get very small ``sample_rate``, ``bandwidth``, and
+``payload_nbytes``)::
 
+    >>> SAMPLE_GSB_PHASED
+    (('...sample_gsb_phased.Pol-L1.dat',
+      '...sample_gsb_phased.Pol-L2.dat'),
+     ('...sample_gsb_phased.Pol-R1.dat',
+      '...sample_gsb_phased.Pol-R2.dat'))
     >>> phased_samples_per_frame = 2**3
     >>> fh_ph = gsb.open(SAMPLE_GSB_PHASED_HEADER, mode='rs',
     ...                  raw=SAMPLE_GSB_PHASED,
     ...                  samples_per_frame=phased_samples_per_frame)
+    >>> fh_ph.info
+    Stream information:
+    start_time = 2013-07-27T21:23:55.324108800
+    stop_time = 2013-07-27T21:23:57.840691200
+    sample_rate = 3.178914388020833e-05 MHz
+    shape = (80, 2, 512)
+    format = gsb
+    bps = 8
+    complex_data = True
+    verify = True
+    bandwidth = 0.016276041666666664 MHz
+    n_raw = 2
+    payload_nbytes = 4096
+    readable = True
+    <BLANKLINE>
+    checks:  decodable: True
+             consistent: True
+    <BLANKLINE>
+    File information:
+    mode = phased
+    number_of_frames = 10
+    frame_rate = 3.9736429849163546 Hz
     >>> header0 = fh_ph.header0     # To be used for writing, below.
     >>> dp = fh_ph.read()
     >>> dp.shape
