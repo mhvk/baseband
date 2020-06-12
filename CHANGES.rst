@@ -32,6 +32,10 @@ Other Changes and Additions
 - The ``temporary_offset`` context manager of file readers now allows to
   pass in a possible initial offset to go to. [#390]
 
+- The GSB stream reader ``.info`` has been updated to include a consistency
+  check of the size of the raw files with the number of frames inferred
+  from the timestamp file. [#407]
+
 3.1.1 (2020-04-05)
 ==================
 
