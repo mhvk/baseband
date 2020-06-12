@@ -21,6 +21,7 @@ Authors
 Other contributors (alphabetical)
 =================================
 
+* Shaoguang Guo (@shaoguangleo)
 * Rebecca Lin (@00rebe)
 * Nikhil Mahajan (@theXYZT)
 * Robert Main (@ramain)
