@@ -149,6 +149,14 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
             if msg:
                 self.warnings['consistent'] = msg
 
+        # As a final sanity check, try reading the final sample of the file.
+        old_offset = self._parent.tell()
+        try:
+            self._parent.seek(-1, 2)
+            self._parent.read(1)
+        finally:
+            self._parent.seek(old_offset)
+
         return True
 
     @info_item(needs='frame0', default=False)
