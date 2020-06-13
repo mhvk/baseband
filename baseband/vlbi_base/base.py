@@ -1163,26 +1163,8 @@ class FileInfo:
             if info_value is not None:
                 consistent = info_value == value
 
-            elif key == 'nchan':
-                sample_shape = info_dict.get('sample_shape')
-                if sample_shape is not None:
-                    # If we passed nchan, and info doesn't have it, but does have a
-                    # sample shape, check that consistency with that, either in
-                    # being equal to `sample_shape.nchan` or equal to the product
-                    # of all elements (e.g., a VDIF file with 8 threads and 1
-                    # channel per thread is consistent with nchan=8).
-                    consistent = (getattr(sample_shape, 'nchan', -1) == value
-                                  or np.prod(sample_shape) == value)
-
-            elif key in {'ref_time', 'kday', 'decade'}:
-                start_time = info_dict.get('start_time')
-                if start_time is not None:
-                    if key == 'ref_time':
-                        consistent = abs(value - start_time).jd < 500
-                    elif key == 'kday':
-                        consistent = int(start_time.mjd / 1000.) * 1000 == value
-                    else:  # decade
-                        consistent = int(start_time.isot[:3]) * 10 == value
+            else:
+                consistent = self.check_key(key, value, info)
 
             if consistent is None:
                 info.irrelevant_kwargs[key] = value
@@ -1192,6 +1174,30 @@ class FileInfo:
                 info.inconsistent_kwargs[key] = value
 
         return info
+
+    def check_key(self, key, value, info):
+        if key == 'nchan':
+            sample_shape = info.shape[1:]
+            if sample_shape is not None:
+                # If we passed nchan, and info doesn't have it, but does have a
+                # sample shape, check that consistency with that, either in
+                # being equal to `sample_shape.nchan` or equal to the product
+                # of all elements (e.g., a VDIF file with 8 threads and 1
+                # channel per thread is consistent with nchan=8).
+                return (getattr(sample_shape, 'nchan', -1) == value
+                        or np.prod(sample_shape) == value)
+
+        elif key in {'ref_time', 'kday', 'decade'}:
+            start_time = info.start_time
+            if start_time is not None:
+                if key == 'ref_time':
+                    return abs(value - start_time).jd < 500
+                elif key == 'kday':
+                    return int(start_time.mjd / 1000.) * 1000 == value
+                else:  # decade
+                    return int(start_time.isot[:3]) * 10 == value
+
+        return None
 
 
 class FileOpener:
