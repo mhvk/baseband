@@ -11,8 +11,9 @@ Requirements
 
 Baseband requires:
 
-    - `Astropy`_ v3.0 or later
-    - `Numpy <https://www.numpy.org/>`_ v1.10 or later
+- `Python <https://www.python.org/>`_ |minimum_python_version| or later
+- `Numpy <https://www.numpy.org/>`_ |minimum_numpy_version| or later
+- `Astropy`_ |minimum_astropy_version| or later
 
 .. _install_baseband:
 
