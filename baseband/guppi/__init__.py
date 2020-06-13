@@ -2,7 +2,7 @@
 """Green Bank Ultimate Pulsar Processing Instrument (GUPPI) format
 reader/writer.
 """
-from .base import open  # noqa
+from .base import open, info  # noqa
 from .header import GUPPIHeader  # noqa
 from .payload import GUPPIPayload  # noqa
 from .frame import GUPPIFrame  # noqa

@@ -5,7 +5,7 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (make_opener, FileOpener,
+from ..vlbi_base.base import (make_opener, FileOpener, FileInfo,
                               VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase)
@@ -394,3 +394,6 @@ One may also pass in a `~baseband.helpers.sequentialfile` object
 (opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
 cases it is practically identical to passing in a list or template.
 """)
+
+
+info = FileInfo(open)

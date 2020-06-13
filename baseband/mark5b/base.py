@@ -3,7 +3,8 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
+from ..vlbi_base.base import (VLBIFileBase, FileInfo,
+                              VLBIFileReaderBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase,
                               make_opener, FileOpener)
 from .header import Mark5BHeader
@@ -408,3 +409,6 @@ written to.  One may also pass in a `~baseband.helpers.sequentialfile` object
 (opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
 cases it is practically identical to passing in a list or template.
 """)
+
+
+info = FileInfo(open)

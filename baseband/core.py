@@ -2,7 +2,6 @@
 """Routines to obtain information on baseband files."""
 from .helpers import sequentialfile as sf
 from . import io as baseband_io
-from .vlbi_base.base import FileInfo
 
 
 __all__ = ['file_info', 'open']
@@ -66,8 +65,7 @@ def file_info(name, format=None, **kwargs):
         return info
 
     module = getattr(baseband_io, format)
-    info_getter = FileInfo(module.open, format)
-    return info_getter(name, **kwargs)
+    return module.info(name, **kwargs)
 
 
 def open(name, mode='rs', format=None, **kwargs):

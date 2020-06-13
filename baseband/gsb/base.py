@@ -8,7 +8,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase,
-                              FileOpener, wrap_opener)
+                              FileOpener, wrap_opener, FileInfo)
 from .header import GSBHeader
 from .payload import GSBPayload
 from .frame import GSBFrame
@@ -627,6 +627,7 @@ file_opener = GSBFileOpener('GSB', header_class=GSBHeader, classes={
     'rs': GSBStreamReader,
     'ws': GSBStreamWriter})
 
+
 open = wrap_opener(file_opener, module=__name__, doc="""
 Open GSB file(s) for reading or writing.
 
@@ -721,3 +722,89 @@ Filehandle
     :class:`~baseband.gsb.base.GSBStreamReader` or
     :class:`~baseband.gsb.base.GSBStreamWriter` (stream)
 """)
+
+
+class GSBFileInfo(FileInfo):
+    def __call__(self, name, **kwargs):
+        # Opening as a binary file should normally work, and allows us to
+        # determine whether the file is of the correct format.  Here, getting
+        # info should never fail or even emit warnings (i.e., if tests start
+        # to give warnings, info should be fixed, not a filter done here).
+        info = self._get_info(name, 'rt')
+        # If not the right format, return immediately.
+        if not info:
+            return info
+
+        # If arguments were missing, see if they were passed in.
+        if info.missing:
+            used_kwargs = {key: kwargs[key] for key in info.missing
+                           if key in kwargs}
+
+            if used_kwargs:
+                # 'raw' keyword not useful for opening the timestamp file.
+                # Just remove from info.missing.
+                info.missing.pop('raw')
+
+        else:
+            used_kwargs = {}
+
+        if not info.missing:
+            # Now see if we should be able to use the stream opener to get
+            # even more information.  If there no longer are missing arguments,
+            # then this should always be possible if we have a frame rate, or
+            # if a sample_rate was passed on.
+            frame_rate = info.frame_rate
+            if 'sample_rate' in kwargs:
+                used_kwargs['sample_rate'] = kwargs['sample_rate']
+
+            if frame_rate is not None:
+                info = self._get_info(name, mode='rs', **used_kwargs)
+
+        # Store what happened to the kwargs, so one can decide if there are
+        # inconsistencies or other problems.
+        info.used_kwargs = used_kwargs
+        info.consistent_kwargs = {}
+        info.inconsistent_kwargs = {}
+        info.irrelevant_kwargs = {}
+        info_dict = info()
+        info_dict.update(info_dict.pop('file_info', {}))
+        for key, value in kwargs.items():
+            if key in used_kwargs:
+                continue
+            info_value = info_dict.get(key)
+            consistent = None
+            if info_value is not None:
+                consistent = info_value == value
+
+            elif key == 'nchan':
+                sample_shape = info_dict.get('sample_shape')
+                if sample_shape is not None:
+                    # If we passed nchan, and info doesn't have it, but does have a
+                    # sample shape, check that consistency with that, either in
+                    # being equal to `sample_shape.nchan` or equal to the product
+                    # of all elements (e.g., a VDIF file with 8 threads and 1
+                    # channel per thread is consistent with nchan=8).
+                    consistent = (getattr(sample_shape, 'nchan', -1) == value
+                                  or np.prod(sample_shape) == value)
+
+            elif key in {'ref_time', 'kday', 'decade'}:
+                start_time = info_dict.get('start_time')
+                if start_time is not None:
+                    if key == 'ref_time':
+                        consistent = abs(value - start_time).jd < 500
+                    elif key == 'kday':
+                        consistent = int(start_time.mjd / 1000.) * 1000 == value
+                    else:  # decade
+                        consistent = int(start_time.isot[:3]) * 10 == value
+
+            if consistent is None:
+                info.irrelevant_kwargs[key] = value
+            elif consistent:
+                info.consistent_kwargs[key] = value
+            else:
+                info.inconsistent_kwargs[key] = value
+
+        return info
+
+
+info = GSBFileInfo(open)

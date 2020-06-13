@@ -1085,19 +1085,19 @@ class VLBIStreamWriterBase(VLBIStreamBase):
 
 
 class FileInfo:
-    def __init__(self, opener, format):
+    def __init__(self, opener):
         self.open = opener
-        self.format = format
+
+    def _get_info(self, name, mode, **kwargs):
+        with self.open(name, mode=mode, **kwargs) as fh:
+            return fh.info
 
     def __call__(self, name, **kwargs):
         # Opening as a binary file should normally work, and allows us to
         # determine whether the file is of the correct format.  Here, getting
         # info should never fail or even emit warnings (i.e., if tests start
         # to give warnings, info should be fixed, not a filter done here).
-        mode = 'rb' if self.format != 'gsb' else 'rt'
-        with self.open(name, mode=mode) as fh:
-            info = fh.info
-
+        info = self._get_info(name, 'rb')
         # If not the right format, return immediately.
         if not info:
             return info
@@ -1108,13 +1108,7 @@ class FileInfo:
                            if key in kwargs}
 
             if used_kwargs:
-                if self.format == 'gsb':
-                    # 'raw' keyword not useful for opening the timestamp file.
-                    # Just remove from info.missing.
-                    info.missing.pop('raw')
-                else:
-                    with self.open(name, mode=mode, **used_kwargs) as fh:
-                        info = fh.info
+                info = self._get_info(name, mode='rb', **used_kwargs)
 
         else:
             used_kwargs = {}
@@ -1125,17 +1119,12 @@ class FileInfo:
             # then this should always be possible if we have a frame rate, or
             # if a sample_rate was passed on.
             frame_rate = info.frame_rate
-            if 'sample_rate' in kwargs:
-                if self.format == 'gsb':
-                    used_kwargs['sample_rate'] = kwargs['sample_rate']
-
-                elif frame_rate is None:
-                    used_kwargs['sample_rate'] = kwargs['sample_rate']
-                    frame_rate = 'known'
+            if 'sample_rate' in kwargs and frame_rate is None:
+                used_kwargs['sample_rate'] = kwargs['sample_rate']
+                frame_rate = 'known'
 
             if frame_rate is not None:
-                with self.open(name, mode='rs', **used_kwargs) as fh:
-                    info = fh.info
+                info = self._get_info(name, mode='rs', **used_kwargs)
 
         # Store what happened to the kwargs, so one can decide if there are
         # inconsistencies or other problems.
