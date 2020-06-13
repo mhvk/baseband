@@ -1,16 +1,15 @@
 # Licensed under the GPLv3 - see LICENSE
 """Routines to obtain information on baseband files."""
-import importlib
 import numpy as np
 
 from .helpers import sequentialfile as sf
+from . import io as baseband_io
+
 
 __all__ = ['file_info', 'open']
 
-FILE_FORMATS = ('dada', 'mark4', 'mark5b', 'vdif', 'guppi', 'gsb')
 
-
-def file_info(name, format=FILE_FORMATS, **kwargs):
+def file_info(name, format=None, **kwargs):
     """Get format and other information from a baseband file.
 
     The keyword arguments will only be used if needed, so if one is unsure
@@ -56,7 +55,10 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
     if isinstance(name, (tuple, list, sf.FileNameSequencer)):
         return file_info(name[0], format, **kwargs)
     # If we're looking at one file but multiple formats, cycle through formats.
-    elif isinstance(format, tuple):
+    if format is None:
+        format = tuple(baseband_io.FORMATS)
+
+    if isinstance(format, tuple):
         for format_ in format:
             info = file_info(name, format_, **kwargs)
             if info:
@@ -64,7 +66,7 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
 
         return info
 
-    module = importlib.import_module('.' + format, package='baseband')
+    module = getattr(baseband_io, format)
     # Opening as a binary file (text for GSB) should always work, and allows
     # us to determine whether the file is of the correct format.  Here, getting
     # info should never fail or even emit warnings (i.e., if tests start to
@@ -159,7 +161,7 @@ def file_info(name, format=FILE_FORMATS, **kwargs):
     return info
 
 
-def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
+def open(name, mode='rs', format=None, **kwargs):
     """Open a baseband file (or sequence of files) for reading or writing.
 
     Opened as a binary file, one gets a wrapped filehandle that adds
@@ -188,11 +190,13 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
         irrelevant for opening the file.
     """
     if 'w' in mode:
-        if isinstance(format, tuple):
+        if format is None or isinstance(format, tuple):
             raise ValueError("cannot specify multiple formats for writing.")
     else:
         info = file_info(name, format, **kwargs)
         if not info:
+            if format is None:
+                format = tuple(baseband_io.FORMATS)
             raise ValueError("file could not be opened as "
                              + ("any of {}".format(format) if
                                 isinstance(format, tuple) else str(format)))
@@ -213,5 +217,5 @@ def open(name, mode='rs', format=FILE_FORMATS, **kwargs):
 
         kwargs = info.used_kwargs
 
-    module = importlib.import_module('.' + format, package='baseband')
+    module = getattr(baseband_io, format)
     return module.open(name, mode=mode, **kwargs)
