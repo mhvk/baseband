@@ -735,6 +735,20 @@ class GSBFileInfo(FileInfo):
 
         return info
 
+    def get_stream_info(self, name, file_info, **kwargs):
+        frame_rate = file_info.frame_rate
+        if frame_rate is None:
+            return file_info
+
+        used_kwargs = file_info.used_kwargs
+        for key in ('sample_rate', 'payload_nbytes', 'samples_per_frame'):
+            if key in kwargs:
+                used_kwargs[key] = kwargs[key]
+
+        stream_info = self._get_info(name, mode='rs', **used_kwargs)
+        stream_info.used_kwargs = used_kwargs
+        return stream_info
+
     def __call__(self, name, **kwargs):
         # Opening as a binary file should normally work, and allows us to
         # determine whether the file is of the correct format.  Here, getting
@@ -744,29 +758,18 @@ class GSBFileInfo(FileInfo):
         if not info:
             return info
 
-        used_kwargs = info.used_kwargs
         if not info.missing:
-            # Now see if we should be able to use the stream opener to get
-            # even more information.  If there no longer are missing arguments,
-            # then this should always be possible if we have a frame rate, or
-            # if a sample_rate was passed on.
-            frame_rate = info.frame_rate
-            if 'sample_rate' in kwargs:
-                used_kwargs['sample_rate'] = kwargs['sample_rate']
-
-            if frame_rate is not None:
-                info = self._get_info(name, mode='rs', **used_kwargs)
+            info = self.get_stream_info(name, info, **kwargs)
 
         # Store what happened to the kwargs, so one can decide if there are
         # inconsistencies or other problems.
-        info.used_kwargs = used_kwargs
         info.consistent_kwargs = {}
         info.inconsistent_kwargs = {}
         info.irrelevant_kwargs = {}
         info_dict = info()
         info_dict.update(info_dict.pop('file_info', {}))
         for key, value in kwargs.items():
-            if key in used_kwargs:
+            if key in info.used_kwargs:
                 continue
             info_value = info_dict.get(key)
             consistent = None
@@ -802,5 +805,6 @@ class GSBFileInfo(FileInfo):
                 info.inconsistent_kwargs[key] = value
 
         return info
+
 
 info = GSBFileInfo(open)
