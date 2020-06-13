@@ -15,7 +15,7 @@ from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
 from .offsets import RawOffsets
-from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
+from .file_info import VLBIInfoBase, VLBIFileReaderInfo, VLBIStreamReaderInfo
 from .utils import byte_array
 
 
@@ -1089,13 +1089,19 @@ class FileInfo:
         self.open = opener
 
     def _get_info(self, name, mode, **kwargs):
-        with self.open(name, mode=mode, **kwargs) as fh:
-            return fh.info
+        try:
+            with self.open(name, mode=mode, **kwargs) as fh:
+                return fh.info
+        except Exception as exc:
+            return exc
+
+    def is_ok(self, info):
+        return isinstance(info, VLBIInfoBase) and info
 
     def get_file_info(self, name, **kwargs):
         info = self._get_info(name, 'rb')
         # If right format, check if arguments were missing.
-        if info:
+        if self.is_ok(info):
             used_kwargs = {key: kwargs[key] for key in info.missing
                            if key in kwargs}
             if used_kwargs:
@@ -1112,24 +1118,33 @@ class FileInfo:
             if 'sample_rate' in kwargs:
                 used_kwargs['sample_rate'] = kwargs['sample_rate']
             else:
-                return file_info
+                return None
 
         stream_info = self._get_info(name, mode='rs', **used_kwargs)
-        stream_info.used_kwargs = used_kwargs
-        return stream_info
+        if self.is_ok(stream_info):
+            stream_info.used_kwargs = used_kwargs
+            return stream_info
+        else:
+            file_info.errors['stream'] = str(stream_info)
+            return None
 
     def __call__(self, name, **kwargs):
         # Opening as a binary file should normally work, and allows us to
         # determine whether the file is of the correct format.  Here, getting
         # info should never fail or even emit warnings (i.e., if tests start
         # to give warnings, info should be fixed, not a filter done here).
-        info = self.get_file_info(name, **kwargs)
-        if not info:
-            return info
+        file_info = self.get_file_info(name, **kwargs)
+        if not file_info or file_info.missing:
+            return file_info
 
-        if not info.missing:
-            info = self.get_stream_info(name, info, **kwargs)
+        stream_info = self.get_stream_info(name, file_info, **kwargs)
+        if not self.is_ok(stream_info):
+            return file_info
 
+        self.check_consistency(stream_info, **kwargs)
+        return stream_info
+
+    def check_consistency(self, info, **kwargs):
         # Store what happened to the kwargs, so one can decide if there are
         # inconsistencies or other problems.
         info.consistent_kwargs = {}
