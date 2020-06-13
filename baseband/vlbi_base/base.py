@@ -15,7 +15,7 @@ from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
 from .offsets import RawOffsets
-from .file_info import VLBIInfoBase, VLBIFileReaderInfo, VLBIStreamReaderInfo
+from .file_info import VLBIFileReaderInfo, VLBIStreamReaderInfo
 from .utils import byte_array
 
 
@@ -1096,7 +1096,7 @@ class FileInfo:
             return exc
 
     def is_ok(self, info):
-        return isinstance(info, VLBIInfoBase) and info
+        return not isinstance(info, Exception) and info
 
     def get_file_info(self, name, **kwargs):
         info = self._get_info(name, 'rb')
@@ -1118,15 +1118,15 @@ class FileInfo:
             if 'sample_rate' in kwargs:
                 used_kwargs['sample_rate'] = kwargs['sample_rate']
             else:
+                # frame rate will already be marked as missing in
+                # file_info.
                 return None
 
         stream_info = self._get_info(name, mode='rs', **used_kwargs)
         if self.is_ok(stream_info):
             stream_info.used_kwargs = used_kwargs
-            return stream_info
-        else:
-            file_info.errors['stream'] = str(stream_info)
-            return None
+
+        return stream_info
 
     def __call__(self, name, **kwargs):
         # Opening as a binary file should normally work, and allows us to
@@ -1139,6 +1139,9 @@ class FileInfo:
 
         stream_info = self.get_stream_info(name, file_info, **kwargs)
         if not self.is_ok(stream_info):
+            if isinstance(stream_info, Exception):
+                # Unexpected errors.  Put it in file_info so there is a record.
+                file_info.errors['stream'] = str(stream_info)
             return file_info
 
         self.check_consistency(stream_info, **kwargs)
