@@ -122,3 +122,4 @@ Reference/API
 =============
 .. automodapi:: baseband
 .. automodapi:: baseband.io
+.. automodapi:: baseband.tasks
