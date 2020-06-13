@@ -1092,27 +1092,29 @@ class FileInfo:
         with self.open(name, mode=mode, **kwargs) as fh:
             return fh.info
 
+    def get_file_info(self, name, **kwargs):
+        info = self._get_info(name, 'rb')
+        # If right format, check if arguments were missing.
+        if info:
+            used_kwargs = {key: kwargs[key] for key in info.missing
+                           if key in kwargs}
+            if used_kwargs:
+                info = self._get_info(name, mode='rb', **used_kwargs)
+
+            info.used_kwargs = used_kwargs
+
+        return info
+
     def __call__(self, name, **kwargs):
         # Opening as a binary file should normally work, and allows us to
         # determine whether the file is of the correct format.  Here, getting
         # info should never fail or even emit warnings (i.e., if tests start
         # to give warnings, info should be fixed, not a filter done here).
-        info = self._get_info(name, 'rb')
-        # If not the right format, return immediately.
+        info = self.get_file_info(name, **kwargs)
         if not info:
             return info
 
-        # If arguments were missing, see if they were passed in.
-        if info.missing:
-            used_kwargs = {key: kwargs[key] for key in info.missing
-                           if key in kwargs}
-
-            if used_kwargs:
-                info = self._get_info(name, mode='rb', **used_kwargs)
-
-        else:
-            used_kwargs = {}
-
+        used_kwargs = info.used_kwargs
         if not info.missing:
             # Now see if we should be able to use the stream opener to get
             # even more information.  If there no longer are missing arguments,

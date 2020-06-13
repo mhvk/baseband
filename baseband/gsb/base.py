@@ -725,29 +725,26 @@ Filehandle
 
 
 class GSBFileInfo(FileInfo):
+    def get_file_info(self, name, **kwargs):
+        info = self._get_info(name, 'rt')
+        if info:
+            info.used_kwargs = {}
+            if 'raw' in kwargs:
+                info.missing.pop('raw')
+                info.used_kwargs['raw'] = kwargs['raw']
+
+        return info
+
     def __call__(self, name, **kwargs):
         # Opening as a binary file should normally work, and allows us to
         # determine whether the file is of the correct format.  Here, getting
         # info should never fail or even emit warnings (i.e., if tests start
         # to give warnings, info should be fixed, not a filter done here).
-        info = self._get_info(name, 'rt')
-        # If not the right format, return immediately.
+        info = self.get_file_info(name, **kwargs)
         if not info:
             return info
 
-        # If arguments were missing, see if they were passed in.
-        if info.missing:
-            used_kwargs = {key: kwargs[key] for key in info.missing
-                           if key in kwargs}
-
-            if used_kwargs:
-                # 'raw' keyword not useful for opening the timestamp file.
-                # Just remove from info.missing.
-                info.missing.pop('raw')
-
-        else:
-            used_kwargs = {}
-
+        used_kwargs = info.used_kwargs
         if not info.missing:
             # Now see if we should be able to use the stream opener to get
             # even more information.  If there no longer are missing arguments,
@@ -805,6 +802,5 @@ class GSBFileInfo(FileInfo):
                 info.inconsistent_kwargs[key] = value
 
         return info
-
 
 info = GSBFileInfo(open)
