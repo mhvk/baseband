@@ -4,6 +4,15 @@
 - This future version will likely only support python 3.7, numpy 1.17 and
   astropy 4.0.
 
+3.2.1 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- For GSB phased data, fix the interpretation of ``sample_rate`` in
+  calculating ``payload_nbytes``. [#410]
+
 3.2 (2020-06-11)
 ================
 
