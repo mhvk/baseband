@@ -514,6 +514,9 @@ class VLBIStreamBase:
 
     @sample_rate.setter
     def sample_rate(self, sample_rate):
+        if sample_rate is None:
+            raise ValueError("must pass in an explicit `sample_rate`.")
+
         # Check if sample_rate is a time rate.
         try:
             sample_rate.to(u.Hz)
@@ -1047,17 +1050,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
 
 class VLBIStreamWriterBase(VLBIStreamBase):
-
-    def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, squeeze, subset,
-                 fill_value, verify):
-
-        if sample_rate is None:
-            raise ValueError("must pass in an explicit `sample_rate`.")
-
-        super().__init__(
-            fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
-            bps, complex_data, squeeze, subset, fill_value, verify)
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)
