@@ -354,7 +354,7 @@ class VLBIStreamBase:
     _sample_shape_maker = None
     _frame_index = None
 
-    def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
+    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
                  unsliced_shape, bps, complex_data, squeeze, subset=(),
                  fill_value=0., verify=True):
         self.fh_raw = fh_raw
@@ -591,13 +591,15 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
     info = VLBIStreamReaderInfo()
 
-    def __init__(self, fh_raw, header0, sample_rate, samples_per_frame,
+    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
                  unsliced_shape, bps, complex_data, squeeze, subset,
                  fill_value, verify):
 
         super().__init__(
-            fh_raw, header0, sample_rate, samples_per_frame, unsliced_shape,
-            bps, complex_data, squeeze, subset, fill_value, verify)
+            fh_raw, header0, sample_rate=sample_rate,
+            samples_per_frame=samples_per_frame, unsliced_shape=unsliced_shape,
+            bps=bps, complex_data=complex_data, squeeze=squeeze, subset=subset,
+            fill_value=fill_value, verify=verify)
 
         if hasattr(header0, 'frame_nbytes'):
             self._raw_offsets = RawOffsets(frame_nbytes=header0.frame_nbytes)
