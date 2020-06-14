@@ -368,13 +368,9 @@ class VDIFStreamBase(VLBIStreamBase):
 
     def __init__(self, fh_raw, header0, sample_rate=None, nthread=1,
                  squeeze=True, subset=(), fill_value=0., verify=True):
-        samples_per_frame = header0.samples_per_frame
-
         super().__init__(
             fh_raw=fh_raw, header0=header0, sample_rate=sample_rate,
-            samples_per_frame=samples_per_frame,
-            unsliced_shape=(nthread, header0.nchan), bps=header0.bps,
-            complex_data=header0.complex_data, squeeze=squeeze,
+            unsliced_shape=(nthread, header0.nchan), squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
 
     def _get_time(self, header):
@@ -411,7 +407,7 @@ class VDIFStreamBase(VLBIStreamBase):
                 "    sample_rate={s.sample_rate},"
                 " samples_per_frame={s.samples_per_frame},\n"
                 "    sample_shape={s.sample_shape},\n"
-                "    bps={h.bps}, complex_data={s.complex_data},"
+                "    bps={s.bps}, complex_data={s.complex_data},"
                 " edv={h.edv}, station={h.station},\n"
                 "    {sub}start_time={s.start_time}>"
                 .format(s=self, h=self.header0,

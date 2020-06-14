@@ -354,29 +354,32 @@ class VLBIStreamBase:
     _sample_shape_maker = None
     _frame_index = None
 
-    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, squeeze, subset=(),
-                 fill_value=0., verify=True):
+    def __init__(self, fh_raw, header0, *,
+                 squeeze=True, subset=(), fill_value=0., verify=True,
+                 **kwargs):
         self.fh_raw = fh_raw
         self._header0 = header0
-        self.bps = bps
-        self.complex_data = complex_data
-        self.samples_per_frame = samples_per_frame
-        self.sample_rate = sample_rate
-        self._frame_rate = (self.sample_rate / samples_per_frame).to(u.Hz)
-        self.offset = 0
-        self._fill_value = fill_value
+        for header_attr in ('bps', 'complex_data', 'samples_per_frame',
+                            'sample_shape', 'sample_rate'):
+            attr = (header_attr if header_attr != 'sample_shape'
+                    else 'unsliced_shape')
+            value = kwargs.pop(attr, None)
+            if value is None:
+                value = getattr(header0, header_attr, None)
+            setattr(self, '_'+header_attr, value)
 
-        if self._sample_shape_maker is not None:
-            self._unsliced_shape = self._sample_shape_maker(*unsliced_shape)
-        else:
-            self._unsliced_shape = unsliced_shape
+        if kwargs:
+            raise TypeError('got unexpected keyword(s): {}'
+                            .format(', '.join(kwargs.keys())))
 
-        self.squeeze = bool(squeeze)
+        self.fill_value = fill_value
+        self.squeeze = squeeze
         self.subset = subset
-        self._sample_shape = self._get_sample_shape()
-
         self.verify = verify
+        self._frame_rate = (self.sample_rate / self.samples_per_frame).to(u.Hz)
+        self.offset = 0
+        # Ensure that we have a sample_shape
+        self.sample_shape
 
     @property
     def squeeze(self):
@@ -408,8 +411,9 @@ class VLBIStreamBase:
             subset = (subset,)
         self._subset = subset
 
-    def _get_sample_shape(self):
-        """Get shape of possibly squeezed samples."""
+    @lazyproperty
+    def sample_shape(self):
+        """Shape of a complete sample (possibly subset or squeezed)."""
         if not self.squeeze:
             return self._unsliced_shape
 
@@ -422,11 +426,6 @@ class VLBIStreamBase:
         fields = [field for field, dim in zip(fields, sample_shape) if dim > 1]
         shape_cls = namedtuple('SampleShape', ','.join(fields))
         return shape_cls(*squeezed_shape)
-
-    @property
-    def sample_shape(self):
-        """Shape of a complete sample (possibly subset or squeezed)."""
-        return self._sample_shape
 
     def _get_time(self, header):
         """Get time from a header."""
@@ -481,49 +480,28 @@ class VLBIStreamBase:
         """Bits per elementary sample."""
         return self._bps
 
-    @bps.setter
-    def bps(self, bps):
-        self._bps = operator.index(bps)
-
     @property
     def complex_data(self):
         """Whether the data are complex."""
         return self._complex_data
 
-    @complex_data.setter
-    def complex_data(self, complex_data):
-        self._complex_data = bool(complex_data)
+    @property
+    def _unsliced_shape(self):
+        unsliced_shape = self._sample_shape
+        if self._sample_shape_maker is not None:
+            return self._sample_shape_maker(*unsliced_shape)
+        else:
+            return unsliced_shape
 
     @property
     def samples_per_frame(self):
         """Number of complete samples per frame."""
         return self._samples_per_frame
 
-    @samples_per_frame.setter
-    def samples_per_frame(self, samples_per_frame):
-        try:
-            self._samples_per_frame = operator.index(samples_per_frame)
-        except Exception as exc:
-            exc.args += ("samples per frame must have an integer value.",)
-            raise exc
-
     @property
     def sample_rate(self):
         """Number of complete samples per second."""
         return self._sample_rate
-
-    @sample_rate.setter
-    def sample_rate(self, sample_rate):
-        if sample_rate is None:
-            raise ValueError("must pass in an explicit `sample_rate`.")
-
-        # Check if sample_rate is a time rate.
-        try:
-            sample_rate.to(u.Hz)
-        except u.UnitsError as exc:
-            exc.args += ("sample rate must have units of 1 / time.",)
-            raise
-        self._sample_rate = sample_rate
 
     @property
     def verify(self):
@@ -591,25 +569,21 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
     info = VLBIStreamReaderInfo()
 
-    def __init__(self, fh_raw, header0, *, sample_rate, samples_per_frame,
-                 unsliced_shape, bps, complex_data, squeeze, subset,
-                 fill_value, verify):
+    def __init__(self, fh_raw, header0, *,
+                 squeeze=True, subset=(), fill_value=0., verify=True,
+                 **kwargs):
 
-        super().__init__(
-            fh_raw, header0, sample_rate=sample_rate,
-            samples_per_frame=samples_per_frame, unsliced_shape=unsliced_shape,
-            bps=bps, complex_data=complex_data, squeeze=squeeze, subset=subset,
-            fill_value=fill_value, verify=verify)
+        super().__init__(fh_raw, header0,
+                         squeeze=squeeze, subset=subset,
+                         fill_value=fill_value, verify=verify,
+                         **kwargs)
 
         if hasattr(header0, 'frame_nbytes'):
             self._raw_offsets = RawOffsets(frame_nbytes=header0.frame_nbytes)
 
-    @property
+    @lazyproperty
     def sample_rate(self):
-        return self._sample_rate
-
-    @sample_rate.setter
-    def sample_rate(self, sample_rate):
+        sample_rate = super().sample_rate
         if sample_rate is None:
             try:
                 sample_rate = (self.samples_per_frame
@@ -622,8 +596,7 @@ class VLBIStreamReaderBase(VLBIStreamBase):
                              "corrupted.  Try passing in an explicit "
                              "`sample_rate`.",)
                 raise
-
-        self._sample_rate = sample_rate
+        return sample_rate
 
     def _squeeze_and_subset(self, data):
         """Possibly remove unit dimensions and subset the given data.
@@ -638,10 +611,11 @@ class VLBIStreamReaderBase(VLBIStreamBase):
 
         return data
 
-    def _get_sample_shape(self):
-        """Get shape by applying squeeze and subset to a dummy data sample."""
+    @lazyproperty
+    def sample_shape(self):
+        """Shape of a complete sample (possibly subset or squeezed)."""
         # First apply base class, which squeezes if needed.
-        sample_shape = super()._get_sample_shape()
+        sample_shape = super().sample_shape
         if not self.subset:
             return sample_shape
 
@@ -1032,23 +1006,14 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         state = self.__dict__.copy()
         # Remove any cached frames and associated indices, since these
         # are almost certainly not needed and can be regenerated.
-        for item in ('_frame', '_frame_index', '_next_frame', '_next_index'):
+        for item in ('_frame', '_frame_index', '_next_frame', '_next_index',
+                     'sample_shape'):
             state.pop(item, None)
 
-        # pickling _unsliced_shape and may not work, as it may need
-        # _sample_shape_maker, which cannot be pickled if defined on the class.
-        # Similarly, _sample_shape may have used an auto-generated namedtuple.
-        # So, change them to normal tuples and reinstantiate on unpickling.
-        state['_unsliced_shape'] = tuple(self._unsliced_shape)
-        state['_sample_shape'] = tuple(self._sample_shape)
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        if self._sample_shape_maker is not None:
-            self._unsliced_shape = self._sample_shape_maker(
-                *self._unsliced_shape)
-            self._sample_shape = self._get_sample_shape()
 
 
 class VLBIStreamWriterBase(VLBIStreamBase):

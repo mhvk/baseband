@@ -166,12 +166,14 @@ class Mark5BFileWriter(VLBIFileBase):
 class Mark5BStreamBase(VLBIStreamBase):
     """Base for Mark 5B streams."""
 
+    _sample_shape_maker = Mark5BPayload._sample_shape_maker
+
     def __init__(self, fh_raw, header0, sample_rate=None, nchan=1,
                  bps=2, squeeze=True, subset=(), fill_value=0., verify=True):
         super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
-            unsliced_shape=(nchan,), bps=bps, complex_data=False,
+            unsliced_shape=(nchan,), bps=bps,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
 
@@ -243,8 +245,6 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         Default: 'fix', which implies basic verification and replacement
         of gaps with zeros.
     """
-
-    _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, kday=None, ref_time=None,
                  nchan=None, bps=2, squeeze=True, subset=(), fill_value=0.,

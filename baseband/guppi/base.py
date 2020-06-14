@@ -207,21 +207,15 @@ class GUPPIStreamBase(VLBIStreamBase):
             (header0.payload_nbytes - header0.overlap * header0._bpcs // 8)
             // header0['PKTSIZE'])
 
-        # Set samples per frame to unique ones, excluding overlap.
-        samples_per_frame = header0.samples_per_frame - header0.overlap
+        super().__init__(fh_raw=fh_raw, header0=header0,
+                         squeeze=squeeze, subset=subset, verify=verify)
 
-        super().__init__(
-            fh_raw=fh_raw, header0=header0, sample_rate=header0.sample_rate,
-            samples_per_frame=samples_per_frame,
-            unsliced_shape=header0.sample_shape, bps=header0.bps,
-            complex_data=header0.complex_data, squeeze=squeeze, subset=subset,
-            fill_value=0., verify=verify)
-
-    # Overriding so the docstring indicates the exclusion of the overlap.
-    samples_per_frame = property(VLBIStreamBase.samples_per_frame.fget,
-                                 VLBIStreamBase.samples_per_frame.fset,
-                                 doc=("Number of complete samples per frame, "
-                                      "excluding overlap."))
+    # Overriding instead of passing on a different samples_per_frame
+    # in __init__ so the docstring indicates the exclusion of the overlap.
+    @property
+    def samples_per_frame(self):
+        """"Number of complete samples per frame, excluding overlap."""
+        return self.header0.samples_per_frame - self.header0.overlap
 
     def _get_index(self, header):
         # Override to avoid calculating index from time.
