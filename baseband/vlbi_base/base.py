@@ -429,8 +429,9 @@ class VLBIStreamBase:
     def _set_time(self, header, time):
         """Set time in a header."""
         # Subclasses can override this if information is needed beyond that
-        # provided in the header.
-        header.time = time
+        # provided in the header.  Use update since that some classes will
+        # do extra work after any setting (e.g., CRC update).
+        header.update(time=time)
 
     def _get_index(self, header):
         """Infer the index of the frame header relative to the first frame."""
