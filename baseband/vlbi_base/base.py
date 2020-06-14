@@ -357,28 +357,40 @@ class VLBIStreamBase:
     def __init__(self, fh_raw, header0, *,
                  squeeze=True, subset=(), fill_value=0., verify=True,
                  **kwargs):
+        # Required arguments.
         self.fh_raw = fh_raw
         self._header0 = header0
-        for header_attr in ('bps', 'complex_data', 'samples_per_frame',
-                            'sample_shape', 'sample_rate'):
+        # Arguments with defaults.
+        self._squeeze = bool(squeeze)
+        self._subset = (() if subset is None
+                        else subset if isinstance(subset, tuple)
+                        else (subset,))
+        self._fill_value = float(fill_value)
+        self.verify = verify
+        # Arguments that can override or complement information from header.
+        for header_attr, getter in [
+                ('bps', operator.index),
+                ('complex_data', bool),
+                ('samples_per_frame', operator.index),
+                ('sample_shape', tuple),
+                ('sample_rate', None)]:
             attr = (header_attr if header_attr != 'sample_shape'
                     else 'unsliced_shape')
             value = kwargs.pop(attr, None)
             if value is None:
                 value = getattr(header0, header_attr, None)
+            if getter is not None and value is not None:
+                value = getter(value)
             setattr(self, '_'+header_attr, value)
 
         if kwargs:
             raise TypeError('got unexpected keyword(s): {}'
                             .format(', '.join(kwargs.keys())))
-
-        self.fill_value = fill_value
-        self.squeeze = squeeze
-        self.subset = subset
-        self.verify = verify
+        # Pre-calculate.
         self._frame_rate = (self.sample_rate / self.samples_per_frame).to(u.Hz)
+        # Initialize.
         self.offset = 0
-        # Ensure that we have a sample_shape
+        # Ensure that we have a sample_shape.
         self.sample_shape
 
     @property
@@ -390,10 +402,6 @@ class VLBIStreamBase:
         """
         return self._squeeze
 
-    @squeeze.setter
-    def squeeze(self, squeeze):
-        self._squeeze = bool(squeeze)
-
     @property
     def subset(self):
         """Specific components of the complete sample to decode.
@@ -403,13 +411,13 @@ class VLBIStreamBase:
         """
         return self._subset
 
-    @subset.setter
-    def subset(self, subset):
-        if subset is None:
-            subset = ()
-        elif not isinstance(subset, tuple):
-            subset = (subset,)
-        self._subset = subset
+    @property
+    def _unsliced_shape(self):
+        unsliced_shape = self._sample_shape
+        if self._sample_shape_maker is not None:
+            return self._sample_shape_maker(*unsliced_shape)
+        else:
+            return unsliced_shape
 
     @lazyproperty
     def sample_shape(self):
@@ -484,14 +492,6 @@ class VLBIStreamBase:
     def complex_data(self):
         """Whether the data are complex."""
         return self._complex_data
-
-    @property
-    def _unsliced_shape(self):
-        unsliced_shape = self._sample_shape
-        if self._sample_shape_maker is not None:
-            return self._sample_shape_maker(*unsliced_shape)
-        else:
-            return unsliced_shape
 
     @property
     def samples_per_frame(self):
@@ -741,10 +741,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     def fill_value(self):
         """Value to use for invalid or missing data. Default: 0."""
         return self._fill_value
-
-    @fill_value.setter
-    def fill_value(self, fill_value):
-        self._fill_value = float(fill_value)
 
     def seek(self, offset, whence=0):
         """Change the stream position.
