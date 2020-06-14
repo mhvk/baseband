@@ -374,7 +374,7 @@ class VDIFStreamBase(VLBIStreamBase):
             fh_raw=fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame,
             unsliced_shape=(nthread, header0.nchan), bps=header0.bps,
-            complex_data=header0['complex_data'], squeeze=squeeze,
+            complex_data=header0.complex_data, squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
 
     def _get_time(self, header):
