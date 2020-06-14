@@ -171,7 +171,7 @@ class Mark5BStreamBase(VLBIStreamBase):
         super().__init__(
             fh_raw, header0=header0, sample_rate=sample_rate,
             samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
-            unsliced_shape=(nchan,), bps=bps, complex_data=False,
+            unsliced_shape=(nchan,), bps=bps,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
 
