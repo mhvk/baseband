@@ -239,8 +239,8 @@ class GSBStreamBase(VLBIStreamBase):
                 if sample_rate is None:
                     payload_nbytes = 2**22
                 else:
-                    payload_nbytes = int((sample_rate * bpfs / 8
-                                          / default_frame_rate)
+                    payload_nbytes = int((sample_rate / default_frame_rate
+                                          * bpfs / 8 / nfiles)
                                          .to(u.one).round())
             else:
                 payload_nbytes = samples_per_frame * bpfs // (8 * nfiles)
@@ -427,11 +427,15 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 for fh in fh_pair:
                     fh.seek(index * self._payload_nbytes)
 
-        return GSBFrame.fromfile(self.fh_ts, self.fh_raw,
-                                 payload_nbytes=self._payload_nbytes,
-                                 nchan=self._unsliced_shape.nchan,
-                                 bps=self.bps, complex_data=self.complex_data,
-                                 verify=self.verify)
+        frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
+                                  payload_nbytes=self._payload_nbytes,
+                                  nchan=self._unsliced_shape.nchan,
+                                  bps=self.bps, complex_data=self.complex_data,
+                                  verify=self.verify)
+        if self.verify and self._get_index(frame) != index:
+            raise ValueError('wrong frame number.')
+
+        return frame
 
     def __getstate__(self):
         state = super().__getstate__()
