@@ -16,7 +16,7 @@ import numpy as np
 from astropy.time import Time
 from astropy.utils import sharedmethod
 
-from ..vlbi_base.header import HeaderParser, VLBIHeaderBase
+from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, fixedvalue
 from ..vlbi_base.utils import bcd_decode, bcd_encode, CRCStack
 
 __all__ = ['CRC12', 'crc12', 'stream2words', 'words2stream',
@@ -291,8 +291,8 @@ class Mark4Header(Mark4TrackHeader):
 
     _track_header = Mark4TrackHeader
     _properties = (Mark4TrackHeader._properties
-                   + ('fanout', 'samples_per_frame', 'bps', 'nchan', 'nsb',
-                      'converters'))
+                   + ('fanout', 'samples_per_frame', 'bps', 'complex_data',
+                      'nchan', 'sample_shape', 'nsb', 'converters'))
     _dtypes = MARK4_DTYPES
 
     # keyed with bps, fanout; Tables 10-14 in reference documentation:
@@ -627,6 +627,11 @@ class Mark4Header(Mark4TrackHeader):
             raise ValueError("Mark 4 data can only have bps=1 or 2, "
                              "not {0}".format(bps))
 
+    @fixedvalue
+    def complex_data(cls):
+        """Whether the data are complex.  Always False for Mark 4."""
+        return False
+
     @property
     def nchan(self):
         """Number of channels (``ntrack * fanout``) in the frame.
@@ -638,6 +643,15 @@ class Mark4Header(Mark4TrackHeader):
     @nchan.setter
     def nchan(self, nchan):
         self.bps = self.ntrack // (self.fanout * nchan)
+
+    @property
+    def sample_shape(self):
+        """Shape of a sample in the payload (nchan,)."""
+        return (self.nchan,)
+
+    @sample_shape.setter
+    def sample_shape(self, sample_shape):
+        self.nchan, = sample_shape
 
     @property
     def nsb(self):
