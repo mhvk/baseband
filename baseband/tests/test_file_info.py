@@ -98,8 +98,8 @@ def test_gsb_with_raw_files(sample, raw, mode):
     assert list(bad_info.errors.keys()) == ['frame0']
     # But with the correct sample_rate, it works.
     base_info = file_info(sample)
-    sample_rate = (2**12 * base_info.frame_rate
-                   / (1 if base_info.mode == 'rawdump' else 1024))
+    sample_rate = (base_info.frame_rate
+                   * (8192 if base_info.mode == 'rawdump' else 8))
     info = file_info(sample, raw=raw, sample_rate=sample_rate)
     assert info.format == 'gsb'
     assert info.readable is True

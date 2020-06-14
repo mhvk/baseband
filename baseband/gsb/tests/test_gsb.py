@@ -675,8 +675,11 @@ class TestGSB:
         (SAMPLE_RAWDUMP_HEADER, SAMPLE_RAWDUMP),
         (SAMPLE_PHASED_HEADER, SAMPLE_PHASED)])
     def test_pickle(self, sample_header, sample_data):
+        if sample_header is SAMPLE_RAWDUMP_HEADER:
+            sample_rate = self.frame_rate * self.payload_nbytes * 2
+        else:
+            sample_rate = self.frame_rate * self.payload_nbytes / 512
         # Only simple tests here; more complete ones in vdif.
-        sample_rate = self.frame_rate * self.payload_nbytes * 2
         with gsb.open(sample_header, 'rs', raw=sample_data,
                       sample_rate=sample_rate,
                       payload_nbytes=self.payload_nbytes,
