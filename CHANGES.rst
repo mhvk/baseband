@@ -4,6 +4,14 @@
 - This future version will likely only support python 3.7, numpy 1.17 and
   astropy 4.0.
 
+Other Changes and Additions
+---------------------------
+
+- The headers for VDIF and Mark 4 now expose standard ``complex_data``
+  and ``sample_shape`` properties, to match what is done for the other
+  headers. Mark 5B headers expose only ``complex_data``, as the sample
+  shape cannot be inferred from the header. [#414]
+
 3.2.1 (unreleased)
 ==================
 
