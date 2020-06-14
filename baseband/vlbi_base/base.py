@@ -359,8 +359,8 @@ class VLBIStreamBase:
                  fill_value=0., verify=True):
         self.fh_raw = fh_raw
         self._header0 = header0
-        self._bps = bps
-        self._complex_data = complex_data
+        self.bps = bps
+        self.complex_data = complex_data
         self.samples_per_frame = samples_per_frame
         self.sample_rate = sample_rate
         self._frame_rate = (self.sample_rate / samples_per_frame).to(u.Hz)
@@ -372,12 +372,8 @@ class VLBIStreamBase:
         else:
             self._unsliced_shape = unsliced_shape
 
-        self._squeeze = bool(squeeze)
-        if subset is None:
-            subset = ()
-        elif not isinstance(subset, tuple):
-            subset = (subset,)
-        self._subset = subset
+        self.squeeze = bool(squeeze)
+        self.subset = subset
         self._sample_shape = self._get_sample_shape()
 
         self.verify = verify
@@ -391,6 +387,10 @@ class VLBIStreamBase:
         """
         return self._squeeze
 
+    @squeeze.setter
+    def squeeze(self, squeeze):
+        self._squeeze = bool(squeeze)
+
     @property
     def subset(self):
         """Specific components of the complete sample to decode.
@@ -399,6 +399,14 @@ class VLBIStreamBase:
         the class initializer.
         """
         return self._subset
+
+    @subset.setter
+    def subset(self, subset):
+        if subset is None:
+            subset = ()
+        elif not isinstance(subset, tuple):
+            subset = (subset,)
+        self._subset = subset
 
     def _get_sample_shape(self):
         """Get shape of possibly squeezed samples."""
@@ -473,10 +481,18 @@ class VLBIStreamBase:
         """Bits per elementary sample."""
         return self._bps
 
+    @bps.setter
+    def bps(self, bps):
+        self._bps = operator.index(bps)
+
     @property
     def complex_data(self):
         """Whether the data are complex."""
         return self._complex_data
+
+    @complex_data.setter
+    def complex_data(self, complex_data):
+        self._complex_data = bool(complex_data)
 
     @property
     def samples_per_frame(self):
@@ -746,6 +762,10 @@ class VLBIStreamReaderBase(VLBIStreamBase):
     def fill_value(self):
         """Value to use for invalid or missing data. Default: 0."""
         return self._fill_value
+
+    @fill_value.setter
+    def fill_value(self, fill_value):
+        self._fill_value = float(fill_value)
 
     def seek(self, offset, whence=0):
         """Change the stream position.
