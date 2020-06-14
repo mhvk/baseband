@@ -10,7 +10,7 @@ __all__ = ['Mark5BFileReaderInfo']
 
 
 class Mark5BFileReaderInfo(VLBIFileReaderInfo):
-    _header0_attrs = ()
+    _header0_attrs = ('complex_data',)
     _parent_attrs = ('nchan', 'bps', 'ref_time', 'kday')
 
     bps = info_item('bps', needs='_parent', missing='needed to decode data')
@@ -49,5 +49,3 @@ class Mark5BFileReaderInfo(VLBIFileReaderInfo):
     def frame0(self):
         """First frame from the file."""
         return super().frame0
-
-    complex_data = False

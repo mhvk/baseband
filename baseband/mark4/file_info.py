@@ -104,7 +104,6 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
                   + VLBIFileReaderInfo.attr_names[-4:])
     """Attributes that the container provides."""
 
-    _header0_attrs = ('bps', 'samples_per_frame')
     _parent_attrs = ('ntrack', 'decade', 'ref_time')
 
     @info_item
@@ -151,13 +150,6 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
                 'file contains non-integer number ({}) of frames'
                 .format(number_of_frames))
             return None
-
-    complex_data = False
-
-    @info_item(needs='header0')
-    def sample_shape(self):
-        """Dimensions of each complete sample."""
-        return (self.header0.nchan,)
 
     # Override just to replace what it "needs".
     @info_item(needs=('header0', 'time_info'))

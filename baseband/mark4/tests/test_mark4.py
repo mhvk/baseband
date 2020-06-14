@@ -73,8 +73,10 @@ class TestMark4:
         assert header.nbytes == 160 * 64 // 8
         assert header.fanout == 4
         assert header.bps == 2
+        assert not header.complex_data
         assert not np.all(~header['magnitude_bit'])
         assert header.nchan == 8
+        assert header.sample_shape == (8,)
         assert int(header.time.mjd) == 56824
         assert header.time.isot == '2014-06-16T07:38:12.47500'
         assert header.samples_per_frame == 20000 * 4
@@ -107,6 +109,13 @@ class TestMark4:
             system_id=108)
         assert header4 == header
         assert header4.mutable is True
+        # Check we can set the header to not complex
+        assert not header4.complex_data
+        header4.complex_data = False
+        assert not header4.complex_data
+        # But not to complex, since Mark 4 does not support that.
+        with pytest.raises(ValueError):
+            header4.complex_data = True
         # Check that passing a year into decade leads to an error.
         with pytest.raises(AssertionError):
             mark4.Mark4Header(header.words, decade=2014)
@@ -115,6 +124,10 @@ class TestMark4:
             mark4.Mark4Header.fromvalues(
                 ntrack=64, samples_per_frame=80001, bps=2, nsb=1,
                 time=header.time, system_id=108)
+        # And that data cannot be complex also by initializing from values.
+        with pytest.raises(ValueError, match='can only be set to False'):
+            mark4.Mark4Header.fromvalues(
+                ntrack=64, bps=2, complex_data=True, time=header.time)
         # Check that passing approximate ref_time is equivalent to passing a
         # decade.
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -1118,7 +1131,7 @@ def test_start_at_last_frame(tmpdir):
     frame_rate = sample_rate / 80000
     start_time = Time('2012-01-02') - 1/frame_rate
     with mark4.open(fl, 'ws', sample_rate=sample_rate, time=start_time,
-                    ntrack=32, nchan=4, fanout=4, bps=2) as fw:
+                    ntrack=32, sample_shape=(4,), fanout=4, bps=2) as fw:
         fw.write(np.ones((80000*2, 4)))
 
     with mark4.open(fl, 'rs', decade=2010) as fr:

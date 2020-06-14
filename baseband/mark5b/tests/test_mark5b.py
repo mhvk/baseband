@@ -59,6 +59,7 @@ class TestMark5B:
         with open(SAMPLE_FILE, 'rb') as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
         assert header.nbytes == 16
+        assert not header.complex_data
         assert header.kday == 56000.
         assert header.jday == 821
         mjd, frac = divmod(header.time.mjd, 1)
@@ -95,10 +96,13 @@ class TestMark5B:
         header6.time == header.time
         header6.payload_nbytes = 10000
         header6.frame_nbytes = 10016
+        header6.complex_data = False
         with pytest.raises(ValueError):
             header6.payload_nbytes = 9999
         with pytest.raises(ValueError):
             header6.frame_nbytes = 20
+        with pytest.raises(ValueError):
+            header6.complex_data = True
         # Regression tests
         header7 = header.copy()
         assert header7 == header  # This checks header.words

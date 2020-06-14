@@ -75,8 +75,8 @@ class Mark5BHeader(VLBIHeaderBase):
 
     _struct = four_word_struct
 
-    _properties = ('payload_nbytes', 'frame_nbytes', 'kday', 'jday', 'seconds',
-                   'fraction', 'time')
+    _properties = ('payload_nbytes', 'frame_nbytes', 'complex_data',
+                   'kday', 'jday', 'seconds', 'fraction', 'time')
     """Properties accessible/usable in initialisation."""
 
     kday = None
@@ -177,13 +177,18 @@ class Mark5BHeader(VLBIHeaderBase):
 
     @fixedvalue
     def payload_nbytes(cls):
-        """Size of the payload in bytes (10000 for Mark5B)."""
+        """Size of the payload in bytes (always 10000 for Mark5B)."""
         return 10000  # 2500 words
 
     @fixedvalue
     def frame_nbytes(cls):
-        """Size of the frame in bytes."""
+        """Size of the frame in bytes (always 10016 for Mark5B)."""
         return cls.nbytes + cls.payload_nbytes
+
+    @fixedvalue
+    def complex_data(cls):
+        """Whether the data are complex (always False for Mark5B)."""
+        return False
 
     @property
     def jday(self):
