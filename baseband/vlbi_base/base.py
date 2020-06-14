@@ -619,15 +619,14 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         # Now apply subset to a dummy sample that has the sample number as its
         # value (where 13 is to bring bad luck to over-complicated subsets).
         dummy_data = np.arange(13.)
-        dummy_sample = np.rollaxis(  # Use moveaxis when numpy_min>=1.11
-            (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1)
+        dummy_sample = np.moveaxis(
+            (np.zeros(sample_shape)[..., np.newaxis] + dummy_data), -1, 0)
         try:
             dummy_subset = dummy_sample[(slice(None),) + self.subset]
             # Check whether subset was in range and whether sample numbers were
             # preserved (latter should be, but check anyway).
             assert 0 not in dummy_subset.shape
-            assert np.all(dummy_subset == dummy_data.reshape(
-                (-1,) + (1,) * (dummy_subset.ndim - 1)))
+            assert np.all(np.moveaxis(dummy_subset, 0, -1) == dummy_data)
         except (IndexError, AssertionError) as exc:
             exc.args += ("subset {} cannot be used to properly index "
                          "{}samples with shape {}.".format(
@@ -944,7 +943,6 @@ class VLBIStreamReaderBase(VLBIStreamBase):
         # to jump over a bad bit.
         while header_index >= index:
             raw_pos = self.fh_raw.tell()
-            header1 = header
             header1_index = header_index
             self.fh_raw.seek(-1, 1)
             try:
@@ -959,17 +957,17 @@ class VLBIStreamReaderBase(VLBIStreamBase):
             # While we are at it, update the list of known indices.
             self._raw_offsets[header1_index] = raw_pos
 
-        # Move back to position of last good header (header1).
+        # Move back to position of last good header (header1_index).
         self.fh_raw.seek(raw_pos)
 
         if header1_index > index:
             # Frame is missing!
             msg += ' The frame seems to be missing.'
-            # Construct a missing frame.
-            header = header1.copy()
-            self._set_index(header, index)
-            frame = self._frame.__class__(header, self._frame.payload,
-                                          valid=False)
+            # Just reuse old frame with new index and set to invalid.
+            frame = self._frame
+            frame.header.mutable = True
+            frame.valid = False
+            self._set_index(frame, index)
 
         else:
             assert header1_index == index, \
