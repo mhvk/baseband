@@ -113,8 +113,8 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     # are broken for some threads of the EVN 2014 data, so apparently
     # that is not a safe bet.
 
-    _properties = ('frame_nbytes', 'payload_nbytes', 'bps', 'nchan',
-                   'samples_per_frame', 'station', 'ref_time', 'time')
+    _properties = ('frame_nbytes', 'payload_nbytes', 'bps', 'complex_data',
+                   'nchan', 'samples_per_frame', 'station', 'ref_time', 'time')
     """Properties accessible/usable in initialisation for all VDIF headers."""
 
     _edv = None
@@ -320,6 +320,15 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
             raise ValueError("bits per sample that is not a power of two "
                              "is only possible for single-channel data.")
         self['bits_per_sample'] = int(bps) - 1
+
+    @property
+    def complex_data(self):
+        """Whether the data are complex."""
+        return self['complex_data']
+
+    @complex_data.setter
+    def complex_data(self, complex_data):
+        self['complex_data'] = complex_data
 
     @property
     def nchan(self):
