@@ -197,25 +197,22 @@ class GUPPIStreamBase(VLBIStreamBase):
 
     _sample_shape_maker = GUPPIPayload._sample_shape_maker
 
-    def __init__(self, fh_raw, header0, squeeze=True, subset=(), verify=True):
-
-        # GUPPI headers report their offsets using 'PKTIDX', the number of
-        # unique UDP data packets (i.e. excluding overlap) written since the
-        # start of observation.  'PKTSIZE' is the packet size in bytes.  Here
-        # we calculate the packets per frame.
-        self._packets_per_frame = (
-            (header0.payload_nbytes - header0.overlap * header0._bpcs // 8)
-            // header0['PKTSIZE'])
-
-        super().__init__(fh_raw=fh_raw, header0=header0,
-                         squeeze=squeeze, subset=subset, verify=verify)
-
     # Overriding instead of passing on a different samples_per_frame
     # in __init__ so the docstring indicates the exclusion of the overlap.
     @property
     def samples_per_frame(self):
         """"Number of complete samples per frame, excluding overlap."""
         return self.header0.samples_per_frame - self.header0.overlap
+
+    @lazyproperty
+    def _packets_per_frame(self):
+        # GUPPI headers report their offsets using 'PKTIDX', the number of
+        # unique UDP data packets (i.e. excluding overlap) written since the
+        # start of observation.  'PKTSIZE' is the packet size in bytes.  Here
+        # we calculate the packets per frame.
+        return ((self.header0.payload_nbytes
+                 - self.header0.overlap * self.header0._bpcs // 8)
+                // self.header0['PKTSIZE'])
 
     def _get_index(self, header):
         # Override to avoid calculating index from time.

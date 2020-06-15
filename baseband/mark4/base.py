@@ -256,13 +256,6 @@ class Mark4StreamBase(VLBIStreamBase):
 
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
-    def __init__(self, fh_raw, header0, sample_rate=None, squeeze=True,
-                 subset=(), fill_value=0., verify=True):
-        super().__init__(
-            fh_raw, header0=header0, sample_rate=sample_rate,
-            unsliced_shape=(header0.nchan,), squeeze=squeeze,
-            subset=subset, fill_value=fill_value, verify=verify)
-
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
     """VLBI Mark 4 format reader.
