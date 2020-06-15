@@ -254,14 +254,7 @@ class Mark4FileWriter(VLBIFileBase):
 class Mark4StreamBase(VLBIStreamBase):
     """Base for Mark 4 streams."""
 
-    def __init__(self, fh_raw, header0, sample_rate=None, squeeze=True,
-                 subset=(), fill_value=0., verify=True):
-        super().__init__(
-            fh_raw, header0=header0, sample_rate=sample_rate,
-            samples_per_frame=header0.samples_per_frame,
-            unsliced_shape=(header0.nchan,),
-            bps=header0.bps, complex_data=False, squeeze=squeeze,
-            subset=subset, fill_value=fill_value, verify=verify)
+    _sample_shape_maker = Mark4Payload._sample_shape_maker
 
 
 class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
@@ -301,8 +294,6 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         Default: 'fix', which implies basic verification and replacement
         of gaps with zeros.
     """
-
-    _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, ntrack=None, decade=None,
                  ref_time=None, squeeze=True, subset=(), fill_value=0.,
@@ -380,8 +371,6 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
     fanout : int
         Number of tracks over which a given channel is spread out.
     """
-
-    _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, header0=None, sample_rate=None, squeeze=True,
                  **kwargs):

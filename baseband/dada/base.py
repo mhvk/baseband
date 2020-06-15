@@ -210,15 +210,6 @@ class DADAStreamBase(VLBIStreamBase):
 
     _sample_shape_maker = DADAPayload._sample_shape_maker
 
-    def __init__(self, fh_raw, header0, squeeze=True, subset=(), verify=True):
-
-        super().__init__(
-            fh_raw=fh_raw, header0=header0, sample_rate=header0.sample_rate,
-            samples_per_frame=header0.samples_per_frame,
-            unsliced_shape=header0.sample_shape, bps=header0.bps,
-            complex_data=header0.complex_data, squeeze=squeeze, subset=subset,
-            fill_value=0., verify=verify)
-
     def _get_index(self, header):
         # Override for faster calculation of frame index.
         return int(round((header['OBS_OFFSET']
@@ -272,7 +263,8 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
                     # If there's only one frame and it's incomplete.
                     if self._nframes == 1:
                         self._header0 = self._last_header
-                        self.samples_per_frame = self.header0.samples_per_frame
+                        self._samples_per_frame = (
+                            self._last_header.samples_per_frame)
                 # Otherwise, ignore the partial frame unless it's the only
                 # frame, in which case raise an EOFError.
                 elif self._nframes == 0:
