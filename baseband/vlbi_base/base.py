@@ -1103,16 +1103,9 @@ class FileOpener:
         by ``fmt``.  Typically, one will pass in ``classes=globals()``.
     """
 
-    _cls_types = {
-        'rb': 'FileReader',
-        'wb': 'FileWriter',
-        'rs': 'StreamReader',
-        'ws': 'StreamWriter'}
-
     def __init__(self, fmt, classes):
         self.fmt = fmt
-        self.classes = {mode: classes[fmt + cls_type]
-                        for (mode, cls_type) in self._cls_types.items()}
+        self.classes = classes
 
     def normalize_mode(self, mode):
         if mode in self.classes:
@@ -1125,7 +1118,7 @@ class FileOpener:
         raise ValueError(f'invalid mode: {mode} '
                          f'({self.fmt} supports {set(self.classes)}).')
 
-    def get_fh(self, name, mode, kwargs):
+    def get_fh(self, name, mode, kwargs=None):
         """Ensure name is a filehandle, opening it if necessary."""
         mode = 'rb' if mode[0] == 'r' else 'w+b'
         if hasattr(name, 'read' if mode[0] == 'r' else 'write'):
@@ -1142,7 +1135,7 @@ class FileOpener:
         if isinstance(name, (tuple, list, sf.FileNameSequencer)):
             # If passed some kind of list, open a sequentialfile object.
             opener = sf.open
-            if mode[0] == 'w' and 'file_size' in kwargs:
+            if mode[0] == 'w' and kwargs and 'file_size' in kwargs:
                 open_kwargs['file_size'] = kwargs.pop('file_size', None)
 
         else:
@@ -1178,23 +1171,32 @@ class FileOpener:
                 fh.close()
             raise
 
+    def wrapped(self, module=None, doc=None):
+        """Wrap the opener with a new docstring and module."""
 
-def make_opener(fmt, classes, doc=None, append_doc=True):
-    opener = FileOpener(fmt, classes)
+        @functools.wraps(self.__call__)
+        def open(*args, **kwargs):
+            return self(*args, **kwargs)
 
-    @functools.wraps(opener.__call__)
-    def open(*args, **kwargs):
-        return opener(*args, **kwargs)
+        if doc:
+            open.__doc__ = doc
 
-    if doc is not None:
-        if append_doc:
-            doc = textwrap.dedent(open.__doc__
-                                  .replace('baseband', fmt)) + doc
-        open.__doc__ = doc
+        # This ensures the instance becomes visible to sphinx.
+        if module:
+            open.__module__ = module
 
-    module = classes.get('__name__', None)
-    # This ensures the instance becomes visible to sphinx.
-    if module:
-        open.__module__ = module
+        return open
 
-    return open
+
+def make_opener(fmt, ns, doc=None, append_doc=True):
+    module = ns.get('__name__', None)
+    classes = {mode: ns[fmt + cls_type] for (mode, cls_type) in {
+        'rb': 'FileReader',
+        'wb': 'FileWriter',
+        'rs': 'StreamReader',
+        'ws': 'StreamWriter'}.items()}
+    file_opener = FileOpener(fmt, classes)
+    if doc and append_doc:
+        doc = textwrap.dedent(file_opener.__call__.__doc__
+                              .replace('baseband', fmt)) + doc
+    return file_opener.wrapped(module=module, doc=doc)
