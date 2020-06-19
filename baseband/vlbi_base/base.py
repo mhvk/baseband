@@ -1,5 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 import io
+import functools
+import textwrap
 import warnings
 import operator
 from collections import namedtuple
@@ -1084,48 +1086,54 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         return super().close()
 
 
-default_open_doc = """Open baseband file(s) for reading or writing.
+class FileOpener:
+    """Opener for a baseband format file."""
 
-Opened as a binary file, one gets a wrapped filehandle that adds
-methods to read/write a frame.  Opened as a stream, the handle is
-wrapped further, with methods such as reading and writing to the file
-as if it were a stream of samples.
+    def __init__(self, fmt, classes, doc=None, append_doc=True):
+        """File opener for a baseband format.
 
-Parameters
-----------
-name : str or filehandle, or sequence of str
-    File name, filehandle, or sequence of file names (see Notes).
-mode : {'rb', 'wb', 'rs', or 'ws'}, optional
-    Whether to open for reading or writing, and as a regular binary
-    file or as a stream. Default: 'rs', for reading a stream.
-**kwargs
-    Additional arguments when opening the file as a stream.
-"""
+        Each instance can be used as a function to open a baseband stream.
+        It is probably best used inside a wrapper, so that the documentation
+        can reflect the docstring of ``__call__`` rather than of this class.
 
+        Parameters
+        ----------
+        fmt : str
+            Name of the baseband format
+        classes : dict
+            With the file/stream reader/writer classes keyed by names equal to
+            'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed
+            by ``fmt``.  Typically, one will pass in ``classes=globals()``.
+        doc : str, optional
+            If given, used to define the docstring of the opener.
+        append_doc : bool, optional
+            If `True` (default), append ``doc`` to the default docstring rather
+            than override it.
+        """
+        self.fmt = fmt
+        self.classes = {cls_type: classes[fmt + cls_type]
+                        for cls_type in ('FileReader', 'FileWriter',
+                                         'StreamReader', 'StreamWriter')}
 
-def make_opener(fmt, classes, doc='', append_doc=True):
-    """Create a baseband file opener.
+    def __call__(self, name, mode='rs', **kwargs):
+        """
+        Open baseband file(s) for reading or writing.
 
-    Parameters
-    ----------
-    fmt : str
-        Name of the baseband format.
-    classes : dict
-        With the file/stream reader/writer classes keyed by names equal to
-        'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed by
-        ``fmt``.  Typically, one will pass in ``classes=globals()``.
-    doc : str, optional
-        If given, used to define the docstring of the opener.
-    append_doc : bool, optional
-        If `True` (default), append ``doc`` to the default docstring rather
-        than override it.
-    """
-    module = classes.get('__name__', None)
-    classes = {cls_type: classes[fmt + cls_type]
-               for cls_type in ('FileReader', 'FileWriter',
-                                'StreamReader', 'StreamWriter')}
+        Opened as a binary file, one gets a wrapped filehandle that adds
+        methods to read/write a frame.  Opened as a stream, the handle is
+        wrapped further, with methods such as reading and writing to the file
+        as if it were a stream of samples.
 
-    def open(name, mode='rs', **kwargs):
+        Parameters
+        ----------
+        name : str or filehandle, or sequence of str
+            File name, filehandle, or sequence of file names (see Notes).
+        mode : {'rb', 'wb', 'rs', or 'ws'}, optional
+            Whether to open for reading or writing, and as a regular binary
+            file or as a stream. Default: 'rs', for reading a stream.
+        **kwargs
+            Additional arguments when opening the file as a stream.
+        """
         # If sequentialfile object, check that it's opened properly.
         if isinstance(name, sf.SequentialFileBase):
             assert (('r' in mode and name.mode == 'rb')
@@ -1162,11 +1170,11 @@ def make_opener(fmt, classes, doc='', append_doc=True):
         else:
             raise ValueError("only support opening {0} file for reading "
                              "or writing (mode='r' or 'w')."
-                             .format(fmt))
+                             .format(self.fmt))
         # Try wrapping ``name`` with file or stream reader (``name`` is a
         # binary filehandle at this point).
         try:
-            return classes[cls_type](name, **kwargs)
+            return self.classes[cls_type](name, **kwargs)
         except Exception as exc:
             if not got_fh:
                 try:
@@ -1175,10 +1183,22 @@ def make_opener(fmt, classes, doc='', append_doc=True):
                     pass
             raise exc
 
-    # Load custom documentation for format.
-    open.__doc__ = (default_open_doc.replace('baseband', fmt) + doc
-                    if append_doc else doc)
-    # This ensures the function becomes visible to sphinx.
+
+def make_opener(fmt, classes, doc=None, append_doc=True):
+    opener = FileOpener(fmt, classes)
+
+    @functools.wraps(opener.__call__)
+    def open(*args, **kwargs):
+        return opener(*args, **kwargs)
+
+    if doc is not None:
+        if append_doc:
+            doc = textwrap.dedent(open.__doc__
+                                  .replace('baseband', fmt)) + doc
+        open.__doc__ = doc
+
+    module = classes.get('__name__', None)
+    # This ensures the instance becomes visible to sphinx.
     if module:
         open.__module__ = module
 
