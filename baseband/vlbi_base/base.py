@@ -1085,10 +1085,22 @@ class VLBIStreamWriterBase(VLBIStreamBase):
 
 
 class FileInfo:
+    """File information collector.
+
+    The instance can be used as a function on a file name to get
+    information from that file, by opening it and retrieving ``info``.
+
+    Parameters
+    ----------
+    opener : callable
+        The function to use to open files
+    """
+
     def __init__(self, opener):
         self.open = opener
 
     def _get_info(self, name, mode, **kwargs):
+        """Open a file in the given mode and retrieve info."""
         try:
             with self.open(name, mode=mode, **kwargs) as fh:
                 return fh.info
@@ -1096,9 +1108,34 @@ class FileInfo:
             return exc
 
     def is_ok(self, info):
+        """Wether the item returned by _get_info has valid information."""
         return not isinstance(info, Exception) and info
 
     def get_file_info(self, name, **kwargs):
+        """Open a file in binary mode and retrieve info.
+
+        Any keyword arguments that were required to open the file will
+        be stored as a ``used_kwargs`` attribute on the returned ``info``.
+
+        Parameters
+        ----------
+        name : str or filehandle
+            Item to be opened for reading in binary mode.
+        **kwargs
+            Any keyword arguments that might be required to open the
+            file successfully (e.g., ``decade`` for Mark 4).
+
+        Returns
+        -------
+        info : `~baseband.vlbi_base.file_info.VLBIFileReaderInfo`
+            Information on the file.  Will evaluate as `False` if the
+            file was not in the right format.
+
+        Notes
+        -----
+        Getting information should never fail. If an `Exception` is
+        raised or returned, it is a bug in the file reader.
+        """
         info = self._get_info(name, 'rb')
         # If right format, check if arguments were missing.
         if self.is_ok(info):
@@ -1112,6 +1149,29 @@ class FileInfo:
         return info
 
     def get_stream_info(self, name, file_info, **kwargs):
+        """Open a file in stream mode and retrieve info.
+
+        Any keyword arguments that were required to open the file will
+        be stored as a ``used_kwargs`` attribute on the returned ``info``.
+
+        Parameters
+        ----------
+        name : str or filehandle
+            Item to be opened for reading in stream mode.
+        file_info : `~baseband.vlbi_base.file_info.VLBIFileReaderInfo`
+            Information gleaned from opening in binary mode.
+        **kwargs
+            Any keyword arguments that might be required to open the
+            file successfully (e.g., ``decade`` for Mark 4).
+
+        Returns
+        -------
+        info : `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
+            Information on the file.  Will evaluate as `False` if the
+            file was not in the right format. Will return `None` if no
+            sample rate information was present, or an `Exception` if
+            the opening as a stream failed.
+        """
         frame_rate = file_info.frame_rate
         used_kwargs = file_info.used_kwargs
         if frame_rate is None:
@@ -1129,10 +1189,33 @@ class FileInfo:
         return stream_info
 
     def __call__(self, name, **kwargs):
-        # Opening as a binary file should normally work, and allows us to
-        # determine whether the file is of the correct format.  Here, getting
-        # info should never fail or even emit warnings (i.e., if tests start
-        # to give warnings, info should be fixed, not a filter done here).
+        """Collect baseband file information.
+
+        First try opening as a binary file and check whether the file is
+        of the correct format. If so, and no required information is missing,
+        re-open as a stream, and get information like the start time,
+        sample rate, etc.
+
+        Parameters
+        ----------
+        name : str or filehandle, or sequence of str
+            File name, filehandle, or sequence of file names (see Notes).
+        **kwargs
+            Any other arguments the opener needs to open as a stream.
+
+        Returns
+        -------
+        info
+            :class:`~baseband.vlbi_base.file_info.VLBIFileReaderInfo` or
+            :class:`~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`.
+            In addition to the normal ``info`` attributes, also stored
+            are attributes about what happened to the keyword arguments:
+            ``used_kwargs``, ``consistent_kwargs``, ``inconsistent_kwargs``
+            and ``irrelevant_kwargs``.
+        """
+        # NOTE: getting info should never fail or even emit warnings.
+        # Hence, warnings or errors should not be suppressed here, but
+        # rather in the info implementations.
         file_info = self.get_file_info(name, **kwargs)
         if not file_info or file_info.missing:
             return file_info
@@ -1148,23 +1231,32 @@ class FileInfo:
         return stream_info
 
     def check_consistency(self, info, **kwargs):
+        """Check consistency between info and the given arguments.
+
+        The keyword arguments will be sorted into those that were used
+        by the file opener and those that were unused, with the latter
+        split in those that had consistent, inconsistent, or irrelevant
+        information.  They are stored on the ``info`` instance in
+        ``used_kwargs``, ``consistent_kwargs``, ``inconsistent_kwargs``
+         and ``irrelevant_kwargs`` attributes, respectively.
+
+        Parameters
+        ----------
+        info : `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
+            Information gleaned from a file opened in stream reading mode.
+        **kwargs
+             Keyword arguments passed to the opener.
+        """
         # Store what happened to the kwargs, so one can decide if there are
         # inconsistencies or other problems.
         info.consistent_kwargs = {}
         info.inconsistent_kwargs = {}
         info.irrelevant_kwargs = {}
-        info_dict = info()
-        info_dict.update(info_dict.pop('file_info', {}))
         for key, value in kwargs.items():
             if key in info.used_kwargs:
                 continue
-            info_value = info_dict.get(key)
-            consistent = None
-            if info_value is not None:
-                consistent = info_value == value
 
-            else:
-                consistent = self.check_key(key, value, info)
+            consistent = self.check_key(key, value, info)
 
             if consistent is None:
                 info.irrelevant_kwargs[key] = value
@@ -1176,6 +1268,30 @@ class FileInfo:
         return info
 
     def check_key(self, key, value, info):
+        """Check consistency for a given key and value.
+
+        Parameters
+        ----------
+        key : str
+            Name of the key.
+        value : object
+            Corresponding value.
+        info : `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
+            Information collected by opening a file in stream reader mode.
+
+        Returns
+        -------
+        consistent : True, False, or None
+            Whether the information on ``info`` for ``key`` is consistent
+            with ``value``.  `None` if it could not be determined.
+        """
+        info_value = getattr(info, key, None)
+        if info_value is None:
+            info_value = getattr(info.file_info, key, None)
+
+        if info_value is not None:
+            return info_value == value
+
         if key == 'nchan':
             sample_shape = info.shape[1:]
             if sample_shape is not None:
