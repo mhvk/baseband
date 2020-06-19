@@ -1087,33 +1087,68 @@ class VLBIStreamWriterBase(VLBIStreamBase):
 
 
 class FileOpener:
-    """Opener for a baseband format file."""
+    """File opener for a baseband format.
 
-    def __init__(self, fmt, classes, doc=None, append_doc=True):
-        """File opener for a baseband format.
+    Each instance can be used as a function to open a baseband stream.
+    It is probably best used inside a wrapper, so that the documentation
+    can reflect the docstring of ``__call__`` rather than of this class.
 
-        Each instance can be used as a function to open a baseband stream.
-        It is probably best used inside a wrapper, so that the documentation
-        can reflect the docstring of ``__call__`` rather than of this class.
+    Parameters
+    ----------
+    fmt : str
+        Name of the baseband format
+    classes : dict
+        With the file/stream reader/writer classes keyed by names equal to
+        'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed
+        by ``fmt``.  Typically, one will pass in ``classes=globals()``.
+    """
 
-        Parameters
-        ----------
-        fmt : str
-            Name of the baseband format
-        classes : dict
-            With the file/stream reader/writer classes keyed by names equal to
-            'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed
-            by ``fmt``.  Typically, one will pass in ``classes=globals()``.
-        doc : str, optional
-            If given, used to define the docstring of the opener.
-        append_doc : bool, optional
-            If `True` (default), append ``doc`` to the default docstring rather
-            than override it.
-        """
+    _cls_types = {
+        'rb': 'FileReader',
+        'wb': 'FileWriter',
+        'rs': 'StreamReader',
+        'ws': 'StreamWriter'}
+
+    def __init__(self, fmt, classes):
         self.fmt = fmt
-        self.classes = {cls_type: classes[fmt + cls_type]
-                        for cls_type in ('FileReader', 'FileWriter',
-                                         'StreamReader', 'StreamWriter')}
+        self.classes = {mode: classes[fmt + cls_type]
+                        for (mode, cls_type) in self._cls_types.items()}
+
+    def normalize_mode(self, mode):
+        if mode in self.classes:
+            return mode
+        if mode[::-1] in self.classes:
+            return mode[::-1]
+        if mode in {'r', 'w'}:
+            return mode + 's'
+
+        raise ValueError(f'invalid mode: {mode} '
+                         f'({self.fmt} supports {set(self.classes)}).')
+
+    def get_fh(self, name, mode, kwargs):
+        """Ensure name is a filehandle, opening it if necessary."""
+        mode = 'rb' if mode[0] == 'r' else 'w+b'
+        if hasattr(name, 'read' if mode[0] == 'r' else 'write'):
+            # If sequentialfile object, check that it's opened properly.
+            if isinstance(name, sf.SequentialFileBase) and name.mode != mode:
+                raise ValueError(
+                    f"sequential files have to opened with mode='{mode}' "
+                    f"for {'reading' if mode[0] == 'r' else 'writing'}, "
+                    f"not {name.mode}")
+
+            return name
+
+        open_kwargs = {'mode': mode}
+        if isinstance(name, (tuple, list, sf.FileNameSequencer)):
+            # If passed some kind of list, open a sequentialfile object.
+            opener = sf.open
+            if mode[0] == 'w' and 'file_size' in kwargs:
+                open_kwargs['file_size'] = kwargs.pop('file_size', None)
+
+        else:
+            opener = io.open
+
+        return opener(name, **open_kwargs)
 
     def __call__(self, name, mode='rs', **kwargs):
         """
@@ -1134,54 +1169,14 @@ class FileOpener:
         **kwargs
             Additional arguments when opening the file as a stream.
         """
-        # If sequentialfile object, check that it's opened properly.
-        if isinstance(name, sf.SequentialFileBase):
-            assert (('r' in mode and name.mode == 'rb')
-                    or ('w' in mode and name.mode == 'w+b')), (
-                        "open only accepts sequential files opened in 'rb' "
-                        "mode for reading or 'w+b' mode for writing.")
-
-        # If passed some kind of list, open a sequentialfile object.
-        if isinstance(name, (tuple, list, sf.FileNameSequencer)):
-            if 'r' in mode:
-                name = sf.open(name, 'rb')
-            else:
-                file_size = kwargs.pop('file_size', None)
-                name = sf.open(name, 'w+b', file_size=file_size)
-
-        # Select FileReader/Writer for binary, StreamReader/Writer for stream.
-        if 'b' in mode:
-            cls_type = 'File'
-        else:
-            cls_type = 'Stream'
-
-        # Select reading or writing.  Check if ``name`` is a filehandle, and
-        # open it if not.
-        if 'w' in mode:
-            cls_type += 'Writer'
-            got_fh = hasattr(name, 'write')
-            if not got_fh:
-                name = io.open(name, 'w+b')
-        elif 'r' in mode:
-            cls_type += 'Reader'
-            got_fh = hasattr(name, 'read')
-            if not got_fh:
-                name = io.open(name, 'rb')
-        else:
-            raise ValueError("only support opening {0} file for reading "
-                             "or writing (mode='r' or 'w')."
-                             .format(self.fmt))
-        # Try wrapping ``name`` with file or stream reader (``name`` is a
-        # binary filehandle at this point).
+        mode = self.normalize_mode(mode)
+        fh = self.get_fh(name, mode, kwargs)
         try:
-            return self.classes[cls_type](name, **kwargs)
-        except Exception as exc:
-            if not got_fh:
-                try:
-                    name.close()
-                except Exception:  # pragma: no cover
-                    pass
-            raise exc
+            return self.classes[mode](fh, **kwargs)
+        except Exception:
+            if fh is not name:
+                fh.close()
+            raise
 
 
 def make_opener(fmt, classes, doc=None, append_doc=True):
