@@ -8,7 +8,6 @@ import astropy.units as u
 
 from ... import vdif, vlbi_base
 from ...vlbi_base.base import HeaderNotFoundError
-from ...helpers import sequentialfile as sf
 from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_VLBI_VDIF as
                      SAMPLE_VLBI, SAMPLE_MWA_VDIF as SAMPLE_MWA,
                      SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME,
@@ -1237,12 +1236,11 @@ class TestVDIF:
             vdif.open(tmp_file, 's')
 
 
-def test_sequentialfile(tmpdir):
-    """Tests writing and reading of sequential files.
-
-    These tests focus on reading and writing with templates.
-    """
-
+@pytest.mark.parametrize('template,extra_args', [
+    ('f.{file_nr:03d}.vdif', {}),
+    ('{day}.{file_nr:03d}.vdif', {'day': 'f'})])
+def test_template(tmpdir, template, extra_args):
+    """Tests writing and reading of sequential files using a template."""
     # Use sample file as basis of a file sequence.
     with vdif.open(SAMPLE_FILE, 'rs') as fh:
         header = fh.header0.copy()
@@ -1251,14 +1249,13 @@ def test_sequentialfile(tmpdir):
     data = np.concatenate((data, data, data))
 
     # Create a file sequence using template.
-    template = str(tmpdir.join('f.{file_nr:03d}.vdif'))
-    files = sf.FileNameSequencer(template)
-    with vdif.open(files, 'ws', file_size=16*header.frame_nbytes,
-                   nthread=8, **header) as fw:
+    template = str(tmpdir.join(template))
+    with vdif.open(template, 'ws', file_size=16*header.frame_nbytes,
+                   nthread=8, **header, **extra_args) as fw:
         fw.write(data)
 
     # Read in file-sequence and check data consistency.
-    with vdif.open(files, 'rs') as fn:
+    with vdif.open(template, 'rs', **extra_args) as fn:
         assert len(fn.fh_raw.files) == 3
         assert fn.fh_raw.files[-1] == str(tmpdir.join('f.002.vdif'))
         assert fn.header0.time == header.time
@@ -1266,9 +1263,22 @@ def test_sequentialfile(tmpdir):
         assert np.all(data == fn.read())
 
     # Read in one file and check if everything makes sense.
-    with vdif.open(template.format(file_nr=2), 'rs') as fn:
+    with vdif.open(template.format(file_nr=2, **extra_args), 'rs') as fn:
         assert fn.header0.time - header.time - 2. * dtime < 1 * u.ns
         assert np.all(data[80000:] == fn.read())
+
+    if extra_args:
+        # Check that we get proper failure if we do not pass in arguments
+        # required to fill the template.
+        with pytest.raises(KeyError):
+            vdif.open(template, 'rs')
+        with pytest.raises(KeyError):
+            vdif.open(template, 'ws', file_size=16*header.frame_nbytes,
+                      nthread=8, **header)
+
+    # Check that extra arguments are still recognized as problematic.
+    with pytest.raises(TypeError):
+        vdif.open(template, 'rs', walk='silly', **extra_args)
 
 
 def test_vlbi_vdif():

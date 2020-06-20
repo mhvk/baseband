@@ -303,6 +303,7 @@ class GUPPIFileOpener(FileOpener):
     # Need to wrap to be able to deal with templates.
 
     _stream_keys = {'squeeze', 'subset', 'verify', 'frames_per_file'}
+    FileNameSequencer = GUPPIFileNameSequencer
 
     def get_header0(self, kwargs):
         """Get header0 from kwargs or construct it from kwargs.
@@ -318,34 +319,22 @@ class GUPPIFileOpener(FileOpener):
 
         return header0
 
-    def get_fh(self, name, mode, kwargs):
-        is_template = isinstance(name, str) and ('{' in name and '}' in name)
-        if mode[1] == 'b':
-            if is_template:
-                raise ValueError(
-                    "GUPPI does not support opening a template in binary mode."
-                    " Try passing in a SequentialFile.")
-
-            if mode[0] == 'w' and isinstance(
-                    name, (tuple, list, sf.FileNameSequencer)):
-                raise ValueError(
-                    "GUPPI does not support opening a sequence of "
-                    "files for writing in binary mode.")
-
-            return super().get_fh(name, mode, kwargs)
-
-        # For stream writing, header0 is always needed;
+    def get_fns(self, name, mode, kwargs):
+        # For stream writing, header0 is always needed and already made;
         # for reading, it is used to initialize a template only.
-        if mode[0] == 'w':
-            header0 = kwargs['header0'] = self.get_header0(kwargs)
-            if is_template:
-                name = GUPPIFileNameSequencer(name, header0)
-            if isinstance(name, (tuple, list, sf.FileNameSequencer)):
-                kwargs['file_size'] = (kwargs.pop('frames_per_file', 128)
-                                       * header0.frame_nbytes)
+        if mode[0] == 'r':
+            header0 = self.get_header0(kwargs)
+        else:
+            header0 = kwargs['header0']
 
-        elif is_template:
-            name = GUPPIFileNameSequencer(name, self.get_header0(kwargs))
+        return self.FileNameSequencer(name, header0)
+
+    def get_fh(self, name, mode, kwargs):
+        if mode == 'ws':
+            kwargs['header0'] = self.get_header0(kwargs)
+            if self.is_sequence(name):
+                kwargs['file_size'] = (kwargs.pop('frames_per_file', 128)
+                                       * kwargs['header0'].frame_nbytes)
 
         return super().get_fh(name, mode, kwargs)
 

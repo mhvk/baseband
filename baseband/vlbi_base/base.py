@@ -1102,6 +1102,8 @@ class FileOpener:
         'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed
         by ``fmt``.  Typically, one will pass in ``classes=globals()``.
     """
+    FileNameSequencer = sf.FileNameSequencer
+    _name = None
 
     def __init__(self, fmt, classes):
         self.fmt = fmt
@@ -1118,24 +1120,75 @@ class FileOpener:
         raise ValueError(f'invalid mode: {mode} '
                          f'({self.fmt} supports {set(self.classes)}).')
 
-    def get_fh(self, name, mode, kwargs=None):
+    def _get_type(self, name):
+        if hasattr(name, 'read') or hasattr(name, 'write'):
+            return 'fh'
+
+        try:
+            f0 = name[0]
+        except IndexError:
+            raise ValueError("name '{name}' not understood.") from None
+
+        if isinstance(f0, str) and len(f0) > 1:
+            return 'sequence'
+
+        if '{' in name and '}' in name:
+            return 'template'
+        else:
+            return 'name'
+
+    def get_type(self, name):
+        if self._name is not name:
+            self._type = self._get_type(name)
+        return self._type
+
+    def is_sequence(self, name):
+        return self.get_type(name) in ('template', 'sequence')
+
+    def is_template(self, name):
+        return self.get_type(name) == 'template'
+
+    def is_name(self, name):
+        return self.get_type(name) == 'name'
+
+    def is_fh(self, name):
+        return self.get_type(name) == 'fh'
+
+    def get_fns(self, name, mode, kwargs):
+        """Convert a template into a file-name sequencer.
+
+        Any keywords needed to fill the template are popped from kwargs.
+        """
+        fns = self.FileNameSequencer(name, kwargs)
+        for k in fns.items:
+            kwargs.pop(k)
+        return fns
+
+    def get_fh(self, name, mode, kwargs={}):
         """Ensure name is a filehandle, opening it if necessary."""
-        mode = 'rb' if mode[0] == 'r' else 'w+b'
-        if hasattr(name, 'read' if mode[0] == 'r' else 'write'):
+        if mode == 'wb' and self.is_sequence(name):
+            raise ValueError(f"{self.fmt} does not support writing to a "
+                             f"sequence or template in binary mode.")
+
+        open_mode = 'rb' if mode[0] == 'r' else 'w+b'
+        if self.is_fh(name):
             # If sequentialfile object, check that it's opened properly.
-            if isinstance(name, sf.SequentialFileBase) and name.mode != mode:
+            if (isinstance(name, sf.SequentialFileBase)
+                    and name.mode != open_mode):
                 raise ValueError(
-                    f"sequential files have to opened with mode='{mode}' "
+                    f"sequential files have to opened with mode='{open_mode}' "
                     f"for {'reading' if mode[0] == 'r' else 'writing'}, "
                     f"not {name.mode}")
 
             return name
 
-        open_kwargs = {'mode': mode}
-        if isinstance(name, (tuple, list, sf.FileNameSequencer)):
-            # If passed some kind of list, open a sequentialfile object.
+        if self.is_template(name):
+            name = self.get_fns(name, mode, kwargs)
+
+        open_kwargs = {'mode': open_mode}
+        if self.is_sequence(name):
             opener = sf.open
-            if mode[0] == 'w' and kwargs and 'file_size' in kwargs:
+            if mode[0] == 'w' and kwargs:
                 open_kwargs['file_size'] = kwargs.pop('file_size', None)
 
         else:

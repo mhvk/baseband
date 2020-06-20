@@ -363,7 +363,7 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
 
 
 class DADAFileOpener(FileOpener):
-    # Need to wrap to be able to deal with templates.
+    FileNameSequencer = DADAFileNameSequencer
 
     _stream_keys = {'squeeze', 'subset', 'verify'}
 
@@ -381,40 +381,25 @@ class DADAFileOpener(FileOpener):
 
         return header0
 
-    def get_fh(self, name, mode, kwargs):
-        is_template = isinstance(name, str) and ('{' in name and '}' in name)
-        if mode[1] == 'b':
-            if is_template:
-                raise ValueError(
-                    "DADA does not support opening a template in binary mode."
-                    " Try passing in a SequentialFile.")
-
-            if mode[0] == 'w' and isinstance(
-                    name, (tuple, list, sf.FileNameSequencer)):
-                raise ValueError(
-                    "DADA does not support opening a sequence of "
-                    "files for writing in binary mode.")
-
-            return super().get_fh(name, mode, kwargs)
-
-        # For stream writing, header0 is always needed;
+    def get_fns(self, name, mode, kwargs):
+        # For stream writing, header0 is always needed and already made;
         # for reading, it is used to initialize a template only.
-        if mode[0] == 'w':
-            header0 = self.get_header0(kwargs)
-            kwargs['header0'] = header0
-            if is_template:
-                name = DADAFileNameSequencer(name, header0)
-            if isinstance(name, (tuple, list, sf.FileNameSequencer)):
-                kwargs['file_size'] = header0.frame_nbytes
-
-        elif is_template:
+        if mode[0] == 'r':
             header0 = self.get_header0(kwargs)
             if 'obs_offset' in name.lower():
-                first_file = DADAFileNameSequencer(name, header0)[0]
+                first_file = self.FileNameSequencer(name, header0)[0]
                 with io.open(first_file, 'rb') as fh:
                     header0 = DADAHeader.fromfile(fh)
+        else:
+            header0 = kwargs['header0']
 
-            name = DADAFileNameSequencer(name, header0)
+        return self.FileNameSequencer(name, header0)
+
+    def get_fh(self, name, mode, kwargs):
+        if mode == 'ws':
+            kwargs['header0'] = self.get_header0(kwargs)
+            if self.is_sequence(name):
+                kwargs['file_size'] = kwargs['header0'].frame_nbytes
 
         return super().get_fh(name, mode, kwargs)
 
