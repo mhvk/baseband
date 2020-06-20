@@ -5,7 +5,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase,
-                              make_opener)
+                              make_opener, FileOpener)
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 from .frame import Mark5BFrame
@@ -332,6 +332,19 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
                                 nchan=self._unsliced_shape.nchan,
                                 bps=self.bps)
         self._frame = Mark5BFrame(header0.copy(), payload)
+
+
+class Mark5BFileOpener(FileOpener):
+    def get_header0(self, kwargs):
+        if ('time' in kwargs and 'sample_rate' in kwargs
+                and 'frame_rate' not in kwargs):
+            bps = kwargs.get('bps', 2)
+            nchan = kwargs.get('nchan', 1)
+            samples_per_frame = Mark5BHeader.payload_nbytes * 8 // bps // nchan
+            kwargs['frame_rate'] = kwargs['sample_rate'] / samples_per_frame
+        header0 = super().get_header0(kwargs)
+        kwargs.pop('frame_rate', None)
+        return header0
 
 
 open = make_opener(globals(), doc="""

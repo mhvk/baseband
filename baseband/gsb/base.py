@@ -624,7 +624,7 @@ class GSBFileOpener(FileOpener):
             raise
 
 
-file_opener = GSBFileOpener('GSB', classes={
+file_opener = GSBFileOpener('GSB', header_class=GSBHeader, classes={
     'rt': GSBTimeStampIO,
     'wt': GSBTimeStampIO,
     'rb': GSBFileReader,

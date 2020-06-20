@@ -302,39 +302,14 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
 class GUPPIFileOpener(FileOpener):
     # Need to wrap to be able to deal with templates.
 
-    _stream_keys = {'squeeze', 'subset', 'verify', 'frames_per_file'}
     FileNameSequencer = GUPPIFileNameSequencer
-
-    def get_header0(self, kwargs):
-        """Get header0 from kwargs or construct it from kwargs.
-
-        ``keep`` is a set of keys that should never be used.
-        header0 or possible keyword arguments will be popped from kwargs.
-        """
-        header0 = kwargs.pop('header0', None)
-        if header0 is None:
-            header_kwargs = {key: kwargs.pop(key) for key in
-                             kwargs.keys() - self._stream_keys}
-            header0 = GUPPIHeader.fromvalues(**header_kwargs)
-
-        return header0
-
-    def get_fns(self, name, mode, kwargs):
-        # For stream writing, header0 is always needed and already made;
-        # for reading, it is used to initialize a template only.
-        if mode[0] == 'r':
-            header0 = self.get_header0(kwargs)
-        else:
-            header0 = kwargs['header0']
-
-        return self.FileNameSequencer(name, header0)
+    non_header_keys = FileOpener.non_header_keys | {'frames_per_file'}
 
     def get_fh(self, name, mode, kwargs):
-        if mode == 'ws':
-            kwargs['header0'] = self.get_header0(kwargs)
-            if self.is_sequence(name):
-                kwargs['file_size'] = (kwargs.pop('frames_per_file', 128)
-                                       * kwargs['header0'].frame_nbytes)
+        if mode == 'ws' and self.is_sequence(name):
+            kwargs.setdefault('file_size',
+                              kwargs.pop('frames_per_file', 128)
+                              * kwargs['header0'].frame_nbytes)
 
         return super().get_fh(name, mode, kwargs)
 

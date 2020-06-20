@@ -365,41 +365,19 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
 class DADAFileOpener(FileOpener):
     FileNameSequencer = DADAFileNameSequencer
 
-    _stream_keys = {'squeeze', 'subset', 'verify'}
-
-    def get_header0(self, kwargs):
-        """Get header0 from kwargs or construct it from kwargs.
-
-        ``keep`` is a set of keys that should never be used.
-        header0 or possible keyword arguments will be popped from kwargs.
-        """
-        header0 = kwargs.pop('header0', None)
-        if header0 is None:
-            header_kwargs = {key: kwargs.pop(key) for key in
-                             kwargs.keys() - self._stream_keys}
-            header0 = DADAHeader.fromvalues(**header_kwargs)
-
-        return header0
-
     def get_fns(self, name, mode, kwargs):
-        # For stream writing, header0 is always needed and already made;
-        # for reading, it is used to initialize a template only.
-        if mode[0] == 'r':
-            header0 = self.get_header0(kwargs)
-            if 'obs_offset' in name.lower():
-                first_file = self.FileNameSequencer(name, header0)[0]
-                with io.open(first_file, 'rb') as fh:
-                    header0 = DADAHeader.fromfile(fh)
-        else:
-            header0 = kwargs['header0']
-
-        return self.FileNameSequencer(name, header0)
+        fns = super().get_fns(name, mode, kwargs)
+        # For obs_offset we need the first file to know the
+        # actual file_size.
+        if mode[0] == 'r' and 'obs_offset' in name.lower():
+            with io.open(fns[0], 'rb') as fh:
+                header0 = DADAHeader.fromfile(fh)
+            fns = self.FileNameSequencer(name, header0)
+        return fns
 
     def get_fh(self, name, mode, kwargs):
-        if mode == 'ws':
-            kwargs['header0'] = self.get_header0(kwargs)
-            if self.is_sequence(name):
-                kwargs['file_size'] = kwargs['header0'].frame_nbytes
+        if mode == 'ws' and self.is_sequence(name):
+            kwargs.setdefault('file_size', kwargs['header0'].frame_nbytes)
 
         return super().get_fh(name, mode, kwargs)
 

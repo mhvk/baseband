@@ -1,6 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 import io
 import functools
+import inspect
 import textwrap
 import warnings
 import operator
@@ -1103,11 +1104,14 @@ class FileOpener:
         by ``fmt``.  Typically, one will pass in ``classes=globals()``.
     """
     FileNameSequencer = sf.FileNameSequencer
+    non_header_keys = {'squeeze', 'subset', 'fill_value', 'verify',
+                       'file_size'}
     _name = None
 
-    def __init__(self, fmt, classes):
+    def __init__(self, fmt, classes, header_class):
         self.fmt = fmt
         self.classes = classes
+        self.header_class = header_class
 
     def normalize_mode(self, mode):
         if mode in self.classes:
@@ -1154,14 +1158,48 @@ class FileOpener:
     def is_fh(self, name):
         return self.get_type(name) == 'fh'
 
+    def get_header0(self, kwargs):
+        """Get header0 from kwargs or construct it from kwargs.
+
+        Possible keyword arguments will be popped from kwargs.
+        """
+        header0 = kwargs.get('header0', None)
+        if header0 is None:
+            tried = {key: value for key, value in kwargs.items()
+                     if key not in self.non_header_keys}
+            with warnings.catch_warnings():
+                # Ignore possible warnings about extraneous arguments.
+                warnings.simplefilter('ignore')
+                header0 = self.header_class.fromvalues(**tried)
+            # Pop the kwargs that we likely used.  We do this by inspection,
+            # but note that this may still let extraneous keywords
+            # by eaten up by header classes that just store everything.
+            maybe_used = (
+                set(inspect.signature(self.header_class.fromvalues).parameters)
+                | set(self.header_class._properties)
+                | set(header0.keys()))
+
+            maybe_used = {key.lower() for key in maybe_used}
+            used = set(key for key in tried if key.lower() in maybe_used)
+            for key in used:
+                kwargs.pop(key)
+
+        return header0
+
     def get_fns(self, name, mode, kwargs):
         """Convert a template into a file-name sequencer.
 
         Any keywords needed to fill the template are popped from kwargs.
         """
-        fns = self.FileNameSequencer(name, kwargs)
-        for k in fns.items:
-            kwargs.pop(k)
+        try:
+            fns_kwargs = dict(self.get_header0(kwargs))
+        except Exception:
+            fns_kwargs = {}
+
+        fns_kwargs.update(kwargs)
+        fns = self.FileNameSequencer(name, fns_kwargs)
+        for key in set(fns.items).intersection(kwargs):
+            kwargs.pop(key)
         return fns
 
     def get_fh(self, name, mode, kwargs={}):
@@ -1216,6 +1254,11 @@ class FileOpener:
             Additional arguments when opening the file as a stream.
         """
         mode = self.normalize_mode(mode)
+        if mode == 'ws':
+            # Stream writing always needs a header.  Construct from
+            # other keywords if necessary.
+            kwargs['header0'] = self.get_header0(kwargs)
+
         fh = self.get_fh(name, mode, kwargs)
         try:
             return self.classes[mode](fh, **kwargs)
@@ -1267,8 +1310,9 @@ def make_opener(ns, doc=None):
         'wb': 'FileWriter',
         'rs': 'StreamReader',
         'ws': 'StreamWriter'}.items()}
+    header_class = ns.get(fmt+'Header')
     opener_class = ns.get(fmt+'FileOpener', FileOpener)
-    file_opener = opener_class(fmt, classes)
+    file_opener = opener_class(fmt, classes, header_class)
     if doc is not None:
         doc = textwrap.dedent(file_opener.__call__.__doc__
                               .replace('baseband', fmt)) + doc
