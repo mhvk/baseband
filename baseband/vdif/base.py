@@ -832,7 +832,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
             self.header0)
 
 
-open = make_opener('VDIF', globals(), doc="""
+open = make_opener(globals(), doc="""
 --- For reading a stream : (see :class:`~baseband.vdif.base.VDIFStreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional

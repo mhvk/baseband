@@ -334,7 +334,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
         self._frame = Mark5BFrame(header0.copy(), payload)
 
 
-open = make_opener('Mark5B', globals(), doc="""
+open = make_opener(globals(), doc="""
 --- For reading a stream : (see `~baseband.mark5b.base.Mark5BStreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional

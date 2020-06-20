@@ -388,7 +388,7 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
         self._frame = Mark4Frame(header0.copy(), payload)
 
 
-open = make_opener('Mark4', globals(), doc="""
+open = make_opener(globals(), doc="""
 --- For reading a stream : (see `~baseband.mark4.base.Mark4StreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional

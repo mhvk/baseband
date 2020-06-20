@@ -1188,15 +1188,35 @@ class FileOpener:
         return open
 
 
-def make_opener(fmt, ns, doc=None, append_doc=True):
+def make_opener(ns, doc=None):
+    """Create a standard opener for the given namespace.
+
+    This assumes that the file is called inside a module that contains
+    file and stream readers and writers with standard names,
+    <fmt>FileReader, <fmt>FileWriter, <fmt>StreamReader, <fmt>StreamWriter,
+    where ``fmt`` is the name of the format (which is inferred by looking
+    for a ``*StreamReader`` entry).  It then initializes a
+    `~baseband.vlbi_base.base.FileOpener` using the format and the
+    above classes, and returns a function that wraps it with ``__module__``
+    set to the calling module (inferred from the namespace).
+    """
     module = ns.get('__name__', None)
+    for key in ns:
+        if key.endswith('StreamReader'):
+            fmt = key.replace('StreamReader', '')
+            break
+    else:  # noqa
+        raise ValueError('namespace does not contain a StreamReader, '
+                         'so fmt cannot be guessed.')
+
     classes = {mode: ns[fmt + cls_type] for (mode, cls_type) in {
         'rb': 'FileReader',
         'wb': 'FileWriter',
         'rs': 'StreamReader',
         'ws': 'StreamWriter'}.items()}
-    file_opener = FileOpener(fmt, classes)
-    if doc and append_doc:
+    opener_class = ns.get(fmt+'FileOpener', FileOpener)
+    file_opener = opener_class(fmt, classes)
+    if doc is not None:
         doc = textwrap.dedent(file_opener.__call__.__doc__
                               .replace('baseband', fmt)) + doc
     return file_opener.wrapped(module=module, doc=doc)
