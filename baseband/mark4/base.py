@@ -346,46 +346,23 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
     raw : filehandle
         Which will write filled sets of frames to storage.
     header0 : `~baseband.mark4.Mark4Header`
-        Header for the first frame, holding time information, etc.  Can instead
-        give keyword arguments to construct a header (see ``**kwargs``).
+        Header for the first frame, holding time information, etc.
     sample_rate : `~astropy.units.Quantity`
         Number of complete samples per second, i.e. the rate at which each
         channel is sampled.  Needed to calculate header timestamps.
     squeeze : bool, optional
         If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
-    **kwargs
-        If no header is given, an attempt is made to construct one from these.
-        For a standard header, this would include the following.
-
-    --- Header keywords : (see :meth:`~baseband.mark4.Mark4Header.fromvalues`)
-
-    time : `~astropy.time.Time`
-        Start time of the file.  Sets bcd-encoded unit year, day, hour, minute,
-        second in the header.
-    ntrack : int
-        Number of Mark 4 bitstreams (equal to number of channels times
-        ``fanout`` times ``bps``)
-    bps : int
-        Bits per elementary sample.
-    fanout : int
-        Number of tracks over which a given channel is spread out.
     """
 
-    def __init__(self, fh_raw, header0=None, sample_rate=None, squeeze=True,
-                 **kwargs):
-        if header0 is None:
-            header0 = Mark4Header.fromvalues(**kwargs)
+    def __init__(self, fh_raw, header0=None, sample_rate=None, squeeze=True):
+        fh_raw = Mark4FileWriter(fh_raw)
         super().__init__(fh_raw=fh_raw, header0=header0,
                          sample_rate=sample_rate, squeeze=squeeze)
-        # Set up initial payload with right shape.
-        samples_per_payload = (
-            header0.samples_per_frame * header0.payload_nbytes
-            // header0.frame_nbytes)
-        payload = Mark4Payload.fromdata(
-            np.zeros((samples_per_payload, header0.nchan), np.float32),
-            header0)
-        self._frame = Mark4Frame(header0.copy(), payload)
+        # Initial frame, reused for every other one.
+        self._frame = Mark4Frame.fromdata(
+            np.zeros((self.samples_per_frame,) + self._unsliced_shape),
+            header0.copy())
 
 
 open = make_opener(globals(), doc="""
@@ -434,9 +411,21 @@ file_size : int or None, optional
     If `None` (default), the file size is unlimited, and only the first
     file will be written to.
 **kwargs
-    If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.  See
-    :class:`~baseband.mark4.base.Mark4StreamWriter`.
+    If no header is given, an attempt is made to construct one from these.
+    For a standard header, this would include the following.
+
+--- Header keywords : (see :meth:`~baseband.mark4.Mark4Header.fromvalues`)
+
+time : `~astropy.time.Time`
+    Start time of the file.  Sets bcd-encoded unit year, day, hour, minute,
+    second in the header.
+ntrack : int
+    Number of Mark 4 bitstreams (equal to number of channels times
+    ``fanout`` times ``bps``)
+bps : int
+    Bits per elementary sample.
+fanout : int
+    Number of tracks over which a given channel is spread out.
 
 Returns
 -------

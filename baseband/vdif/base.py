@@ -758,8 +758,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
     fh_raw : filehandle
         Which will write filled sets of frames to storage.
     header0 : :class:`~baseband.vdif.VDIFHeader`
-        Header for the first frame, holding time information, etc.  Can instead
-        give keyword arguments to construct a header (see ``**kwargs``).
+        Header for the first frame, holding time information, etc.
     sample_rate : `~astropy.units.Quantity`
         Number of complete samples per second, i.e. the rate at which each
         channel in each thread is sampled.  For EDV 1 and 3, can
@@ -769,62 +768,30 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
     squeeze : bool, optional
         If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
-    **kwargs
-        If no header is given, an attempt is made to construct one from these.
-        For a standard header, this would include the following.
-
-    --- Header keywords : (see :meth:`~baseband.vdif.VDIFHeader.fromvalues`)
-
-    time : `~astropy.time.Time`
-        Start time of the file.  Can instead pass on ``ref_epoch`` and
-        ``seconds``.
-    nchan : int, optional
-        Number of channels (default: 1).  Note: different numbers of channels
-        per thread is not supported.
-    complex_data : bool, optional
-        Whether data are complex.  Default: `False`.
-    bps : int, optional
-        Bits per elementary sample, i.e. per real or imaginary component for
-        complex data.  Default: 1.
-    samples_per_frame : int
-        Number of complete samples per frame.  Can alternatively use
-        ``frame_length``, the number of 8-byte words for header plus payload.
-        For some EDV, this number is fixed (e.g., ``frame_length=629`` for
-        ``edv=3``, which corresponds to 20000 real 2-bit samples per frame).
-    station : 2 characters, optional
-        Station ID.  Can also be an unsigned 2-byte integer.  Default: 0.
-    edv : {`False`, 0, 1, 2, 3, 4, 0xab}
-        Extended Data Version.
     """
 
     def __init__(self, fh_raw, header0=None, sample_rate=None, nthread=1,
-                 squeeze=True, **kwargs):
+                 squeeze=True):
         fh_raw = VDIFFileWriter(fh_raw)
-        if header0 is None:
-            if sample_rate is not None:
-                kwargs['sample_rate'] = sample_rate
-            header0 = VDIFHeader.fromvalues(**kwargs)
+        # Get header sample rate
+        try:
+            header_sample_rate = header0.sample_rate
+        except AttributeError:
+            header_sample_rate = None
 
-        # If header was passed but not sample_rate, extract sample_rate.
         if sample_rate is None:
-            try:
-                sample_rate = header0.sample_rate
-            except AttributeError:
+            if header_sample_rate is None:
                 raise ValueError("the sample rate must be passed either "
                                  "explicitly, or through the header if it "
                                  "can be stored there.")
 
+            sample_rate = header_sample_rate
+        elif header_sample_rate is not None:
+            assert sample_rate == header_sample_rate, (
+                'sample_rate on header inconsistent with that passed in.')
+
         super().__init__(fh_raw, header0, sample_rate=sample_rate,
                          nthread=nthread, squeeze=squeeze)
-        # Set sample rate in the header, if it's possible, and not set already.
-        try:
-            header_sample_rate = self.header0.sample_rate
-        except AttributeError:
-            pass
-        else:
-            if header_sample_rate == 0:
-                self.header0.sample_rate = self.sample_rate
-            assert self.header0.sample_rate == self.sample_rate
 
         self._frame = VDIFFrameSet.fromdata(
             np.zeros((self.samples_per_frame,) + self._unsliced_shape,
@@ -872,9 +839,31 @@ file_size : int or None, optional
     If `None` (default), the file size is unlimited, and only the first
     file will be written to.
 **kwargs
-    If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.  See
-    :class:`~baseband.vdif.base.VDIFStreamWriter`.
+    If no header is given, an attempt is made to construct one from these.
+    For a standard header, this would include the following.
+
+--- Header keywords : (see :meth:`~baseband.vdif.VDIFHeader.fromvalues`)
+
+time : `~astropy.time.Time`
+    Start time of the file.  Can instead pass on ``ref_epoch`` and
+    ``seconds``.
+nchan : int, optional
+    Number of channels (default: 1).  Note: different numbers of channels
+    per thread is not supported.
+complex_data : bool, optional
+    Whether data are complex.  Default: `False`.
+bps : int, optional
+    Bits per elementary sample, i.e. per real or imaginary component for
+    complex data.  Default: 1.
+samples_per_frame : int
+    Number of complete samples per frame.  Can alternatively use
+    ``frame_length``, the number of 8-byte words for header plus payload.
+    For some EDV, this number is fixed (e.g., ``frame_length=629`` for
+    ``edv=3``, which corresponds to 20000 real 2-bit samples per frame).
+station : 2 characters, optional
+    Station ID.  Can also be an unsigned 2-byte integer.  Default: 0.
+edv : {`False`, 0, 1, 2, 3, 4, 0xab}
+    Extended Data Version.
 
 Notes
 -----

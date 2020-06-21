@@ -874,6 +874,37 @@ class TestGSB:
         expected = blocked[:, 0].reshape((-1,)+fh_1file.sample_shape)
         assert np.all(data == expected)
 
+    def test_phased_stream_one_file(self):
+        raw = [[SAMPLE_PHASED[0][0]]]
+        sample_rate = self.frame_rate * self.payload_nbytes / 512 / 2
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=raw,
+                      sample_rate=sample_rate,
+                      payload_nbytes=self.payload_nbytes) as fh:
+            ref_data = fh.read()
+
+        raw_one_file = raw[0][0]
+        with gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=raw_one_file,
+                      sample_rate=sample_rate,
+                      payload_nbytes=self.payload_nbytes) as fh_1file:
+            assert fh_1file.header0.mode == 'phased'
+            data = fh_1file.read()
+
+        assert np.all(data == ref_data)
+
+    def test_phased_write_one_file(self, tmpdir):
+        # With a single file, one does have to pass in header_mode
+        # to get phased.
+        with gsb.open(str(tmpdir.join('test.timstamp')), 'ws',
+                      raw=str(tmpdir.join('test.raw')),
+                      header_mode='phased',
+                      time=Time('2010-10-10')) as fh_right:
+            assert fh_right.header0.mode == 'phased'
+
+        with gsb.open(str(tmpdir.join('test.timstamp')), 'ws',
+                      raw=str(tmpdir.join('test.raw')),
+                      time=Time('2010-10-10')) as fh_wrong:
+            assert fh_wrong.header0.mode == 'rawdump'
+
     @pytest.mark.parametrize('stop, nframes', [(-7, 9), (97, 1)])
     def test_stream_incomplete_header(self, stop, nframes, tmpdir):
         # Test that an incomplete last header leads to the second-to-last
@@ -922,10 +953,6 @@ class TestGSB:
         with pytest.raises(ValueError):
             # no r or w in mode
             gsb.open('ts.dat', 's')
-        with pytest.raises(TypeError), \
-                open(str(tmpdir.join('test.timestamp')), 'w+t') as s:
-            # TextIOBase for fh
-            gsb.open(s, 'rt')
         with pytest.raises(OSError):
             # non-existing file
             gsb.open(str(tmpdir.join('ts.bla')),

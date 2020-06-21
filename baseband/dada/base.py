@@ -404,8 +404,8 @@ squeeze : bool, optional
     If `True` (default), writer accepts squeezed arrays as input, and adds
     any dimensions of length unity.
 **kwargs
-    If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.
+    If no header is given, an attempt is made to construct one from these.
+    For a standard header, this would include the following.
 
 --- Header keywords : (see :meth:`~baseband.dada.DADAHeader.fromvalues`)
 

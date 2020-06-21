@@ -32,7 +32,8 @@ class GSBTimeStampIO(VLBIFileBase):
     """
 
     def __init__(self, fh_raw):
-        fh_raw = io.TextIOWrapper(fh_raw)
+        if not isinstance(fh_raw, io.TextIOWrapper):
+            fh_raw = io.TextIOWrapper(fh_raw)
         super().__init__(fh_raw)
 
     info = GSBTimeStampInfo()
@@ -327,8 +328,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
     Parameters
     ----------
-    fh_ts : `~baseband.gsb.base.GSBTimeStampIO`
-        Header filehandle.
+    fh_ts : filehandle
+        For reading timestamps.
     fh_raw : filehandle, or nested tuple of filehandles
         Raw binary data filehandle(s).  A single file is needed for rawdump,
         and a tuple for phased.  For a nested tuple, the outer tuple determines
@@ -375,6 +376,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     def __init__(self, fh_ts, fh_raw, sample_rate=None, samples_per_frame=None,
                  payload_nbytes=None, nchan=None, bps=None, complex_data=None,
                  squeeze=True, subset=(), verify=True):
+        fh_ts = GSBTimeStampIO(fh_ts)
         header0 = fh_ts.read_timestamp()
         super().__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
@@ -503,8 +505,8 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
 
     Parameters
     ----------
-    fh_ts : `~baseband.gsb.base.GSBTimeStampIO`
-        For writing headers to storage.
+    fh_ts : filehandle
+        For writing time stamps to storage.
     fh_raw : filehandle, or nested tuple of filehandles
         For writing raw binary data to storage.  A single file is needed for
         rawdump, and a tuple for phased.  For a nested tuple, the outer
@@ -513,8 +515,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         (polR1, polR2))`` for two streams per polarization.  A single tuple is
         interpreted as streams of a single polarization.
     header0 : `~baseband.gsb.GSBHeader`
-        Header for the first frame, holding time information, etc.  Can instead
-        give keyword arguments to construct a header (see ``**kwargs``).
+        Header for the first frame, holding time information, etc.
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second, i.e. the rate at which each
         channel of each polarization is sampled.  If not given, will be
@@ -537,29 +538,12 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
     squeeze : bool, optional
         If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
-    **kwargs
-        If no header is given, an attempt is made to construct one from these.
-        For a standard header, this would include the following.
-
-    --- Header keywords : (see :meth:`~baseband.gsb.GSBHeader.fromvalues`)
-
-    time : `~astropy.time.Time`
-        Start time of the file.
-    header_mode : 'rawdump' or 'phased', optional
-        Used to explicitly set the mode of the GSB stream.  Default: 'rawdump'
-        if only a single raw file is present, or 'phased' otherwise.
-    seq_nr : int, optional
-        Frame number, only used for phased (default: 0).
     """
 
     def __init__(self, fh_ts, fh_raw, header0=None, sample_rate=None,
                  samples_per_frame=None, payload_nbytes=None, nchan=None,
-                 bps=None, complex_data=None, squeeze=True, **kwargs):
-        if header0 is None:
-            mode = kwargs.pop('header_mode',
-                              'rawdump' if hasattr(fh_raw, 'read') else
-                              'phased')
-            header0 = GSBHeader.fromvalues(mode=mode, **kwargs)
+                 bps=None, complex_data=None, squeeze=True):
+        fh_ts = GSBTimeStampIO(fh_ts)
         super().__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, payload_nbytes=payload_nbytes,
@@ -584,33 +568,44 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
 
 
 class GSBFileOpener(FileOpener):
+
+    non_header_keys = FileOpener.non_header_keys | {'raw'}
+
     # TODO: think whether the scheme with using FileReader can be made to work.
     def __call__(self, name, mode='rs', **kwargs):
         mode = self.normalize_mode(mode)
-        if mode == 'rt' and isinstance(name, io.TextIOBase):
-            raise TypeError("Only binary filehandles can be used (even for "
-                            "for timestamp files).")
+        # For binary or timestamp files, the normal opener works fine.
+        if mode[1] != 's':
+            return super().__call__(name, mode, **kwargs)
 
-        fh = self.get_fh(name, mode, kwargs)
-        if mode[1] == 's':
-            fh = self(fh, mode[0]+'t')
-            raw = kwargs.pop('raw')
-            if not isinstance(raw, (list, tuple)):
-                fh_raw = self.get_fh(raw, mode[0]+'b')
+        # But for stream mode, we need to open both raw and timestamp.
+        fh = self.get_fh(name, mode[0]+'t')
+        raw = kwargs.pop('raw', None)
+        if raw is None:
+            raise TypeError("stream missing required argument 'raw'.")
 
-            else:
-                if not isinstance(raw[0], (list, tuple)):
-                    raw = (raw,)
+        stream_mode = kwargs.pop('header_mode',
+                                 'phased' if isinstance(raw, (list, tuple))
+                                 else 'rawdump')
 
-                fh_raw = [[self.get_fh(p, mode[0]+'b') for p in pol]
-                          for pol in raw]
+        if stream_mode == 'rawdump':
+            fh_raw = self.get_fh(raw, mode[0]+'b')
 
-            kwargs['fh_raw'] = fh_raw
         else:
-            raw = fh_raw = None
+            if not isinstance(raw, (list, tuple)):
+                raw = ((raw,),)
+            elif not isinstance(raw[0], (list, tuple)):
+                raw = (raw,)
+
+            fh_raw = tuple(tuple(self.get_fh(p, mode[0]+'b') for p in pol)
+                           for pol in raw)
+
+        if mode == 'ws' and 'header0' not in kwargs:
+            kwargs['mode'] = stream_mode
+            kwargs['header0'] = self.get_header0(kwargs)
 
         try:
-            return self.classes[mode](fh, **kwargs)
+            return self.classes[mode](fh, fh_raw=fh_raw, **kwargs)
         except Exception:
             if fh is not name:
                 fh.close()
@@ -670,11 +665,9 @@ samples_per_frame : int, optional
     Number of complete samples per frame.  Can give ``payload_nbytes``
     instead.
 payload_nbytes : int, optional
-    Number of bytes per payload, divided by the number of raw files.
+    Number of bytes per payload (in each raw file separately).
     If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
-    ``payload_nbytes`` is set to ``2**22`` (4 MB) for rawdump, and
-    ``2**23`` (8 MB) divided by the number of streams per polarization for
-    phased.
+    ``payload_nbytes`` is set to ``2**22`` (4 MiB).
 nchan : int, optional
     Number of channels. Default: 1 for rawdump, 512 for phased.
 bps : int, optional
@@ -706,11 +699,18 @@ header0 : `~baseband.gsb.GSBHeader`
     Header for the first frame, holding time information, etc.  Can instead
     give keyword arguments to construct a header.
 **kwargs
-    If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.  If one requires to explicitly set
-    the mode of the GSB stream, use ``header_mode``.  If not given, it
-    will be 'rawdump' if only a single raw file is present, or 'phased'
-    otherwise.  See :class:`~baseband.gsb.base.GSBStreamWriter`.
+    If no header is given, an attempt is made to construct one from these.
+    For a standard header, this would include the following.
+
+--- Header keywords : (see :meth:`~baseband.gsb.GSBHeader.fromvalues`)
+
+time : `~astropy.time.Time`
+    Start time of the file.
+header_mode : 'rawdump' or 'phased', optional
+    Used to explicitly set the mode of the GSB stream.  Default: 'rawdump'
+    if only a single raw file is present, or 'phased' otherwise.
+seq_nr : int, optional
+    Frame number, only used for phased (default: 0).
 
 Returns
 -------

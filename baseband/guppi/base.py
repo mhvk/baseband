@@ -300,8 +300,6 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
 
 
 class GUPPIFileOpener(FileOpener):
-    # Need to wrap to be able to deal with templates.
-
     FileNameSequencer = GUPPIFileNameSequencer
     non_header_keys = FileOpener.non_header_keys | {'frames_per_file'}
 
@@ -339,8 +337,8 @@ frames_per_file : int, optional
     When writing to a sequence of files, sets the number of frames
     within each file.  Default: 128.
 **kwargs
-    If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.
+    If no header is given, an attempt is made to construct one from these.
+    For a standard header, this would include the following.
 
 --- Header keywords : (see :meth:`~baseband.guppi.GUPPIHeader.fromvalues`)
 
