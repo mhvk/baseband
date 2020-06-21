@@ -542,10 +542,7 @@ class VLBIStreamBase:
     def __getattr__(self, attr):
         """Try to get things on the current open file if it is not on self."""
         if attr in {'readable', 'writable', 'seekable', 'closed', 'name'}:
-            try:
-                return getattr(self.fh_raw, attr)
-            except AttributeError:
-                pass
+            return getattr(self.fh_raw, attr)
         #  __getattribute__ to raise appropriate error.
         return self.__getattribute__(attr)
 
@@ -1137,10 +1134,11 @@ class FileOpener:
 
         try:
             f0 = name[0]
-        except IndexError:
+        except (TypeError, IndexError):
             raise ValueError("name '{name}' not understood.") from None
 
-        if isinstance(f0, str) and len(f0) > 1:
+        if (isinstance(name, (tuple, list, sf.FileNameSequencer))
+                or isinstance(f0, str) and len(f0) > 1):
             return 'sequence'
 
         if '{' in name and '}' in name:
