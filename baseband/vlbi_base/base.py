@@ -1153,6 +1153,7 @@ class FileOpener:
         """
         if self._name is not name:
             self._type = self._get_type(name)
+            self._name = name
         return self._type
 
     def is_sequence(self, name):
