@@ -7,7 +7,8 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase)
+                              VLBIStreamReaderBase, VLBIStreamWriterBase,
+                              FileOpener, wrap_opener)
 from .header import GSBHeader
 from .payload import GSBPayload
 from .frame import GSBFrame
@@ -31,7 +32,8 @@ class GSBTimeStampIO(VLBIFileBase):
     """
 
     def __init__(self, fh_raw):
-        fh_raw = io.TextIOWrapper(fh_raw)
+        if not isinstance(fh_raw, io.TextIOWrapper):
+            fh_raw = io.TextIOWrapper(fh_raw)
         super().__init__(fh_raw)
 
     info = GSBTimeStampInfo()
@@ -326,8 +328,8 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
 
     Parameters
     ----------
-    fh_ts : `~baseband.gsb.base.GSBTimeStampIO`
-        Header filehandle.
+    fh_ts : filehandle
+        For reading timestamps.
     fh_raw : filehandle, or nested tuple of filehandles
         Raw binary data filehandle(s).  A single file is needed for rawdump,
         and a tuple for phased.  For a nested tuple, the outer tuple determines
@@ -374,6 +376,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
     def __init__(self, fh_ts, fh_raw, sample_rate=None, samples_per_frame=None,
                  payload_nbytes=None, nchan=None, bps=None, complex_data=None,
                  squeeze=True, subset=(), verify=True):
+        fh_ts = GSBTimeStampIO(fh_ts)
         header0 = fh_ts.read_timestamp()
         super().__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
@@ -502,8 +505,8 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
 
     Parameters
     ----------
-    fh_ts : `~baseband.gsb.base.GSBTimeStampIO`
-        For writing headers to storage.
+    fh_ts : filehandle
+        For writing time stamps to storage.
     fh_raw : filehandle, or nested tuple of filehandles
         For writing raw binary data to storage.  A single file is needed for
         rawdump, and a tuple for phased.  For a nested tuple, the outer
@@ -512,8 +515,7 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
         (polR1, polR2))`` for two streams per polarization.  A single tuple is
         interpreted as streams of a single polarization.
     header0 : `~baseband.gsb.GSBHeader`
-        Header for the first frame, holding time information, etc.  Can instead
-        give keyword arguments to construct a header (see ``**kwargs``).
+        Header for the first frame, holding time information, etc.
     sample_rate : `~astropy.units.Quantity`, optional
         Number of complete samples per second, i.e. the rate at which each
         channel of each polarization is sampled.  If not given, will be
@@ -536,29 +538,12 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
     squeeze : bool, optional
         If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
-    **kwargs
-        If no header is given, an attempt is made to construct one from these.
-        For a standard header, this would include the following.
-
-    --- Header keywords : (see :meth:`~baseband.gsb.GSBHeader.fromvalues`)
-
-    time : `~astropy.time.Time`
-        Start time of the file.
-    header_mode : 'rawdump' or 'phased', optional
-        Used to explicitly set the mode of the GSB stream.  Default: 'rawdump'
-        if only a single raw file is present, or 'phased' otherwise.
-    seq_nr : int, optional
-        Frame number, only used for phased (default: 0).
     """
 
     def __init__(self, fh_ts, fh_raw, header0=None, sample_rate=None,
                  samples_per_frame=None, payload_nbytes=None, nchan=None,
-                 bps=None, complex_data=None, squeeze=True, **kwargs):
-        if header0 is None:
-            mode = kwargs.pop('header_mode',
-                              'rawdump' if hasattr(fh_raw, 'read') else
-                              'phased')
-            header0 = GSBHeader.fromvalues(mode=mode, **kwargs)
+                 bps=None, complex_data=None, squeeze=True):
+        fh_ts = GSBTimeStampIO(fh_ts)
         super().__init__(
             fh_ts, fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, payload_nbytes=payload_nbytes,
@@ -582,150 +567,157 @@ class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
                     fh.flush()
 
 
-def open(name, mode='rs', **kwargs):
-    """Open GSB file(s) for reading or writing.
+class GSBFileOpener(FileOpener):
 
-    A GSB data set contains a text header file and one or more raw data files.
-    When the file is opened as text, one gets a standard filehandle, but with
-    methods to read/write timestamps.  When it is opened as a binary, one
-    similarly gets methods to read/write frames.  Opened as a stream, the file
-    is interpreted as a timestamp file, but raw files need to be given too.
-    This allows access to the stream(s) as series of samples.
+    non_header_keys = FileOpener.non_header_keys | {'raw'}
 
-    Parameters
-    ----------
-    name : str
-        Filename of timestamp or raw data file.
-    mode : {'rb', 'wb', 'rt', 'wt', 'rs', or 'ws'}, optional
-        Whether to open for reading or writing, and as a regular text or binary
-        file (for timestamps and data, respectively) or as a stream.
-        Default: 'rs', for reading a stream.
-    **kwargs
-        Additional arguments when opening the file as a stream.
+    # TODO: think whether the scheme with using FileReader can be made to work.
+    def __call__(self, name, mode='rs', **kwargs):
+        mode = self.normalize_mode(mode)
+        # For binary or timestamp files, the normal opener works fine.
+        if mode[1] != 's':
+            return super().__call__(name, mode, **kwargs)
 
-    --- For both reading and writing of streams :
+        # But for stream mode, we need to open both raw and timestamp.
+        fh = self.get_fh(name, mode[0]+'t')
+        raw = kwargs.pop('raw', None)
+        if raw is None:
+            raise TypeError("stream missing required argument 'raw'.")
 
-    raw : str or (tuple of) tuple of str
-        Name of files holding payload data.  A single file is needed for
-        rawdump, and a tuple for phased.  For a nested tuple, the outer tuple
-        determines the number of polarizations, and the inner tuple(s) the
-        number of streams per polarization.  E.g.,  ``((polL1, polL2),
-        (polR1, polR2))`` for two streams per polarization.  A
-        single tuple is interpreted as streams of a single polarization.
-    sample_rate : `~astropy.units.Quantity`, optional
-        Number of complete samples per second, i.e. the rate at which each
-        channel of each polarization is sampled.  If `None`, will be
-        inferred assuming the frame rate is exactly 251.658240 ms.
-    samples_per_frame : int, optional
-        Number of complete samples per frame.  Can give ``payload_nbytes``
-        instead.
-    payload_nbytes : int, optional
-        Number of bytes per payload, divided by the number of raw files.
-        If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
-        ``payload_nbytes`` is set to ``2**22`` (4 MB) for rawdump, and
-        ``2**23`` (8 MB) divided by the number of streams per polarization for
-        phased.
-    nchan : int, optional
-        Number of channels. Default: 1 for rawdump, 512 for phased.
-    bps : int, optional
-        Bits per elementary sample, i.e. per real or imaginary component for
-        complex data.  Default: 4 for rawdump, 8 for phased.
-    complex_data : bool, optional
-        Whether data are complex.  Default: `False` for rawdump, `True` for
-        phased.
-    squeeze : bool, optional
-        If `True` (default) and reading, remove any dimensions of length unity
-        from decoded data.  If `True` and writing, accept squeezed arrays as
-        input, and adds any dimensions of length unity.
+        stream_mode = kwargs.pop('header_mode',
+                                 'phased' if isinstance(raw, (list, tuple))
+                                 else 'rawdump')
 
-    --- For reading only :  (see `~baseband.gsb.base.GSBStreamReader`)
+        if stream_mode == 'rawdump':
+            fh_raw = self.get_fh(raw, mode[0]+'b')
 
-    subset : indexing object or tuple of objects, optional
-        Specific components of the complete sample to decode (after possibly
-        squeezing).  If a single indexing object is passed, it selects
-        (available) polarizations.  If a tuple is passed, the first selects
-        polarizations and the second selects channels.  If the tuple is empty
-        (default), all components are read.
-    verify : bool, optional
-        Whether to do basic checks of frame integrity when reading.  The first
-        frame of the stream is always checked.  Default: `True`.
-
-    --- For writing only : (see `~baseband.gsb.base.GSBStreamWriter`)
-
-    header0 : `~baseband.gsb.GSBHeader`
-        Header for the first frame, holding time information, etc.  Can instead
-        give keyword arguments to construct a header.
-    **kwargs
-        If the header is not given, an attempt will be made to construct one
-        with any further keyword arguments.  If one requires to explicitly set
-        the mode of the GSB stream, use ``header_mode``.  If not given, it
-        will be 'rawdump' if only a single raw file is present, or 'phased'
-        otherwise.  See :class:`~baseband.gsb.base.GSBStreamWriter`.
-
-    Returns
-    -------
-    Filehandle
-        :class:`~baseband.gsb.base.GSBFileReader` or
-        :class:`~baseband.gsb.base.GSBFileWriter` (binary), or
-        :class:`~baseband.gsb.base.GSBStreamReader` or
-        :class:`~baseband.gsb.base.GSBStreamWriter` (stream)
-    """
-    # TODO: think whether the inheritance of StreamReader from FileReader
-    # can be made to work (or from TimeStampIO?).
-    # TODO: this partially replicates the default opener in vlbi_base;
-    # can some parts be factored out?
-    if not ('r' in mode or 'w' in mode):
-        raise ValueError("Only support opening GSB file for reading "
-                         "or writing (mode='r' or 'w').")
-    fh_attr = 'read' if 'r' in mode else 'write'
-    if 't' in mode or 'b' in mode:
-        opened_files = []
-        if not hasattr(name, fh_attr):
-            name = io.open(name, mode.replace('t', '').replace('b', '') + 'b')
-            opened_files = [name]
-        elif isinstance(name, io.TextIOBase):
-            raise TypeError("Only binary filehandles can be used (even for "
-                            "for timestamp files).")
-        if 't' in mode:
-            cls = GSBTimeStampIO
         else:
-            cls = GSBFileWriter if 'w' in mode else GSBFileReader
-    else:
-        # stream mode.
-        name = open(name, mode.replace('s', '') + 't')
-        opened_files = [name]
-        # Single or multiple files.
-        raw = kwargs.pop('raw')
-        if not isinstance(raw, (list, tuple)):
-            if hasattr(raw, fh_attr):
-                fh_raw = raw
-            else:
-                fh_raw = io.open(raw, mode.replace('s', '') + 'b')
-                opened_files.append(raw)
-        else:
-            if not isinstance(raw[0], (list, tuple)):
+            if not isinstance(raw, (list, tuple)):
+                raw = ((raw,),)
+            elif not isinstance(raw[0], (list, tuple)):
                 raw = (raw,)
-            fh_raw = []
-            for pol in raw:
-                raw_pol = []
-                for p in pol:
-                    if hasattr(p, fh_attr):
-                        raw_pol.append(p)
-                    else:
-                        raw_pol.append(io.open(p, mode.replace('s', '') + 'b'))
-                        opened_files.append(p)
-                fh_raw.append(raw_pol)
 
-        kwargs['fh_raw'] = fh_raw
-        cls = GSBStreamWriter if 'w' in mode else GSBStreamReader
+            fh_raw = tuple(tuple(self.get_fh(p, mode[0]+'b') for p in pol)
+                           for pol in raw)
 
-    try:
-        return cls(name, **kwargs)
-    except Exception as exc:
-        if opened_files:
-            try:
-                for name in opened_files:
-                    name.close()
-            except Exception:  # pragma: no cover
-                pass
-        raise exc
+        if mode == 'ws' and 'header0' not in kwargs:
+            kwargs['mode'] = stream_mode
+            kwargs['header0'] = self.get_header0(kwargs)
+
+        try:
+            return self.classes[mode](fh, fh_raw=fh_raw, **kwargs)
+        except Exception:
+            if fh is not name:
+                fh.close()
+            if isinstance(raw, (list, tuple)):
+                for pol, polfh in zip(raw, fh_raw):
+                    for p, pfh in zip(pol, polfh):
+                        if pfh is not p:
+                            pfh.close()
+            elif fh_raw is not raw:
+                fh_raw.close()
+            raise
+
+
+file_opener = GSBFileOpener('GSB', header_class=GSBHeader, classes={
+    'rt': GSBTimeStampIO,
+    'wt': GSBTimeStampIO,
+    'rb': GSBFileReader,
+    'wb': GSBFileWriter,
+    'rs': GSBStreamReader,
+    'ws': GSBStreamWriter})
+
+open = wrap_opener(file_opener, module=__name__, doc="""
+Open GSB file(s) for reading or writing.
+
+A GSB data set contains a text header file and one or more raw data files.
+When the file is opened as text, one gets a standard filehandle, but with
+methods to read/write timestamps.  When it is opened as a binary, one
+similarly gets methods to read/write frames.  Opened as a stream, the file
+is interpreted as a timestamp file, but raw files need to be given too.
+This allows access to the stream(s) as series of samples.
+
+Parameters
+----------
+name : str
+    Filename of timestamp or raw data file.
+mode : {'rb', 'wb', 'rt', 'wt', 'rs', or 'ws'}, optional
+    Whether to open for reading or writing, and as a regular text or binary
+    file (for timestamps and data, respectively) or as a stream.
+    Default: 'rs', for reading a stream.
+**kwargs
+    Additional arguments when opening the file as a stream.
+
+--- For both reading and writing of streams :
+
+raw : str or (tuple of) tuple of str
+    Name of files holding payload data.  A single file is needed for
+    rawdump, and a tuple for phased.  For a nested tuple, the outer tuple
+    determines the number of polarizations, and the inner tuple(s) the
+    number of streams per polarization.  E.g.,  ``((polL1, polL2),
+    (polR1, polR2))`` for two streams per polarization.  A
+    single tuple is interpreted as streams of a single polarization.
+sample_rate : `~astropy.units.Quantity`, optional
+    Number of complete samples per second, i.e. the rate at which each
+    channel of each polarization is sampled.  If `None`, will be
+    inferred assuming the frame rate is exactly 251.658240 ms.
+samples_per_frame : int, optional
+    Number of complete samples per frame.  Can give ``payload_nbytes``
+    instead.
+payload_nbytes : int, optional
+    Number of bytes per payload (in each raw file separately).
+    If both ``samples_per_frame`` and ``payload_nbytes`` are `None`,
+    ``payload_nbytes`` is set to ``2**22`` (4 MiB).
+nchan : int, optional
+    Number of channels. Default: 1 for rawdump, 512 for phased.
+bps : int, optional
+    Bits per elementary sample, i.e. per real or imaginary component for
+    complex data.  Default: 4 for rawdump, 8 for phased.
+complex_data : bool, optional
+    Whether data are complex.  Default: `False` for rawdump, `True` for
+    phased.
+squeeze : bool, optional
+    If `True` (default) and reading, remove any dimensions of length unity
+    from decoded data.  If `True` and writing, accept squeezed arrays as
+    input, and adds any dimensions of length unity.
+
+--- For reading only :  (see `~baseband.gsb.base.GSBStreamReader`)
+
+subset : indexing object or tuple of objects, optional
+    Specific components of the complete sample to decode (after possibly
+    squeezing).  If a single indexing object is passed, it selects
+    (available) polarizations.  If a tuple is passed, the first selects
+    polarizations and the second selects channels.  If the tuple is empty
+    (default), all components are read.
+verify : bool, optional
+    Whether to do basic checks of frame integrity when reading.  The first
+    frame of the stream is always checked.  Default: `True`.
+
+--- For writing only : (see `~baseband.gsb.base.GSBStreamWriter`)
+
+header0 : `~baseband.gsb.GSBHeader`
+    Header for the first frame, holding time information, etc.  Can instead
+    give keyword arguments to construct a header.
+**kwargs
+    If no header is given, an attempt is made to construct one from these.
+    For a standard header, this would include the following.
+
+--- Header keywords : (see :meth:`~baseband.gsb.GSBHeader.fromvalues`)
+
+time : `~astropy.time.Time`
+    Start time of the file.
+header_mode : 'rawdump' or 'phased', optional
+    Used to explicitly set the mode of the GSB stream.  Default: 'rawdump'
+    if only a single raw file is present, or 'phased' otherwise.
+seq_nr : int, optional
+    Frame number, only used for phased (default: 0).
+
+Returns
+-------
+Filehandle
+    :class:`~baseband.gsb.base.GSBTimeStampIO` (timestamp), or
+    :class:`~baseband.gsb.base.GSBFileReader` or
+    :class:`~baseband.gsb.base.GSBFileWriter` (binary), or
+    :class:`~baseband.gsb.base.GSBStreamReader` or
+    :class:`~baseband.gsb.base.GSBStreamWriter` (stream)
+""")

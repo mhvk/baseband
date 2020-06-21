@@ -4,8 +4,21 @@
 - This future version will likely only support python 3.7, numpy 1.17 and
   astropy 4.0.
 
+Bug Fixes
+---------
+
+- Extraneous arguments to stream writers are no longer ignored, but give
+  rise to a ``TypeError``. [#417]
+
 Other Changes and Additions
 ---------------------------
+
+- All baseband formats now support passing in template strings for stream
+  readers and writers (e.g., ``'{file_nr:07d}.vdif'``). [#417]
+
+- All ``StreamWriters`` now require an explicit ``header0`` to be passed
+  in (as was already the case for DADA and GUPPI). Creation of a ``header0``
+  from keyword arguments is now done inside the opener. [#417]
 
 - The headers for VDIF and Mark 4 now expose standard ``complex_data``
   and ``sample_shape`` properties, to match what is done for the other

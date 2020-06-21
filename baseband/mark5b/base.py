@@ -5,7 +5,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase,
-                              make_opener)
+                              make_opener, FileOpener)
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 from .frame import Mark5BFrame
@@ -290,8 +290,7 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
     fh_raw : filehandle
         For writing filled sets of frames to storage.
     header0 : `~baseband.mark5b.Mark5BHeader`
-        Header for the first frame, holding time information, etc.  Can instead
-        give keyword arguments to construct a header (see ``**kwargs``).
+        Header for the first frame, holding time information, etc.
     sample_rate : `~astropy.units.Quantity`
         Number of complete samples per second, i.e. the rate at which each
         channel is sampled.  Needed to calculate header timestamps.
@@ -302,39 +301,36 @@ class Mark5BStreamWriter(Mark5BStreamBase, VLBIStreamWriterBase):
     squeeze : bool, optional
         If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
-    **kwargs
-        If no header is given, an attempt is made to construct one from these.
-        For a standard header, the following suffices.
-
-    --- Header kwargs : (see :meth:`~baseband.mark5b.Mark5BHeader.fromvalues`)
-
-    time : `~astropy.time.Time`
-        Start time of the file.  Sets bcd-encoded unit day, hour, minute,
-        second, and fraction, as well as the frame number, in the header.
     """
 
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
 
     def __init__(self, fh_raw, header0=None, sample_rate=None, nchan=1, bps=2,
-                 squeeze=True, **kwargs):
-        samples_per_frame = Mark5BHeader.payload_nbytes * 8 // bps // nchan
-        if header0 is None:
-            if 'time' in kwargs:
-                kwargs['frame_rate'] = sample_rate / samples_per_frame
-            header0 = Mark5BHeader.fromvalues(**kwargs)
-
+                 squeeze=True):
         fh_raw = Mark5BFileWriter(fh_raw)
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate, nchan=nchan,
             bps=bps, squeeze=squeeze)
         # Initial frame, reused for every other one.
-        payload = Mark5BPayload(np.zeros((2500,), Mark5BPayload._dtype_word),
-                                nchan=self._unsliced_shape.nchan,
-                                bps=self.bps)
-        self._frame = Mark5BFrame(header0.copy(), payload)
+        self._frame = Mark5BFrame.fromdata(
+            np.zeros((self.samples_per_frame,) + self._unsliced_shape),
+            header0.copy(), bps=bps)
 
 
-open = make_opener('Mark5B', globals(), doc="""
+class Mark5BFileOpener(FileOpener):
+    def get_header0(self, kwargs):
+        if ('time' in kwargs and 'sample_rate' in kwargs
+                and 'frame_rate' not in kwargs):
+            bps = kwargs.get('bps', 2)
+            nchan = kwargs.get('nchan', 1)
+            samples_per_frame = Mark5BHeader.payload_nbytes * 8 // bps // nchan
+            kwargs['frame_rate'] = kwargs['sample_rate'] / samples_per_frame
+        header0 = super().get_header0(kwargs)
+        kwargs.pop('frame_rate', None)
+        return header0
+
+
+open = make_opener(globals(), doc="""
 --- For reading a stream : (see `~baseband.mark5b.base.Mark5BStreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional
@@ -386,8 +382,14 @@ file_size : int or None, optional
     If `None` (default), the file size is unlimited, and only the first
     file will be written to.
 **kwargs
-    If no header is given, an attempt is made to construct one with any further
-    keyword arguments.  See :class:`~baseband.mark5b.base.Mark5BStreamWriter`.
+    If no header is given, an attempt is made to construct one from these.
+    For a standard header, the following suffices.
+
+--- Header kwargs : (see :meth:`~baseband.mark5b.Mark5BHeader.fromvalues`)
+
+time : `~astropy.time.Time`
+    Start time of the file.  Sets bcd-encoded unit day, hour, minute,
+    second, and fraction, as well as the frame number, in the header.
 
 Returns
 -------

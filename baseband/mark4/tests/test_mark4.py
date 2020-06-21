@@ -842,8 +842,7 @@ class TestMark4:
             record = fr.read(10)
             with pytest.warns(UserWarning, match='partial buffer'):
                 with mark4.open(m4_incomplete, 'ws', header0=fr.header0,
-                                sample_rate=32*u.MHz,
-                                ntrack=64, decade=2010) as fw:
+                                sample_rate=32*u.MHz) as fw:
                     fw.write(record)
 
         with mark4.open(m4_incomplete, 'rs', sample_rate=32*u.MHz,

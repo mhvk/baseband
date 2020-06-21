@@ -5,7 +5,8 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
+from ..vlbi_base.base import (make_opener, FileOpener,
+                              VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase, VLBIStreamReaderBase,
                               VLBIStreamWriterBase)
 from .header import GUPPIHeader
@@ -298,7 +299,20 @@ class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
         del self._frame
 
 
-opener = make_opener('GUPPI', globals(), doc="""
+class GUPPIFileOpener(FileOpener):
+    FileNameSequencer = GUPPIFileNameSequencer
+    non_header_keys = FileOpener.non_header_keys | {'frames_per_file'}
+
+    def get_fh(self, name, mode, kwargs):
+        if mode == 'ws' and self.is_sequence(name):
+            kwargs.setdefault('file_size',
+                              kwargs.pop('frames_per_file', 128)
+                              * kwargs['header0'].frame_nbytes)
+
+        return super().get_fh(name, mode, kwargs)
+
+
+open = make_opener(globals(), doc="""
 --- For reading a stream : (see `~baseband.guppi.base.GUPPIStreamReader`)
 
 squeeze : bool, optional
@@ -323,8 +337,8 @@ frames_per_file : int, optional
     When writing to a sequence of files, sets the number of frames
     within each file.  Default: 128.
 **kwargs
-    If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.
+    If no header is given, an attempt is made to construct one from these.
+    For a standard header, this would include the following.
 
 --- Header keywords : (see :meth:`~baseband.guppi.GUPPIHeader.fromvalues`)
 
@@ -380,53 +394,3 @@ One may also pass in a `~baseband.helpers.sequentialfile` object
 (opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
 cases it is practically identical to passing in a list or template.
 """)
-
-
-# Need to wrap the opener to be able to deal with file lists or templates.
-def open(name, mode='rs', **kwargs):
-    # Extract needed kwargs (and keep some from being passed to opener).
-    header0 = kwargs.get('header0', None)
-    frames_per_file = kwargs.pop('frames_per_file', 128)
-
-    # Check if ``name`` is a template or sequence.
-    is_template = isinstance(name, str) and ('{' in name and '}' in name)
-    is_sequence = isinstance(name, (tuple, list, sf.FileNameSequencer))
-
-    # For stream writing, header0 is needed; for reading, it is needed for
-    # initializing a template only.
-    if 'b' not in mode:
-        # Initialize header0 if it doesn't yet exist.
-        if header0 is None:
-            if 'w' in mode:
-                # Store squeeze.
-                passed_kwargs = ({'squeeze': kwargs.pop('squeeze')}
-                                 if 'squeeze' in kwargs.keys() else {})
-                # Make header0.
-                header0 = GUPPIHeader.fromvalues(**kwargs)
-                # Pass squeeze and header0 on to stream writer.
-                kwargs = passed_kwargs
-                kwargs['header0'] = header0
-
-            elif is_template:
-                # Store parameters to pass.
-                passed_kwargs = {key: kwargs.pop(key) for key in
-                                 ('squeeze', 'subset', 'verify')
-                                 if key in kwargs}
-                header0 = {key.upper(): value for key, value in kwargs.items()}
-                kwargs = passed_kwargs
-
-        if is_template:
-            name = GUPPIFileNameSequencer(name, header0)
-
-    # If writing with a template or sequence, pass ``file_size``.
-    if 'w' in mode and (is_template or is_sequence):
-        if 'b' in mode:
-            raise ValueError("does not support opening a file sequence in "
-                             "'wb' mode.  Try passing in a SequentialFile "
-                             "object instead.")
-        kwargs['file_size'] = frames_per_file * header0.frame_nbytes
-
-    return opener(name, mode, **kwargs)
-
-
-open.__doc__ = opener.__doc__

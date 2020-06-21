@@ -1,6 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 import io
 import functools
+import inspect
 import textwrap
 import warnings
 import operator
@@ -21,7 +22,7 @@ from .utils import byte_array
 __all__ = ['HeaderNotFoundError',
            'VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
            'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
-           'make_opener']
+           'FileOpener', 'wrap_opener', 'make_opener']
 
 
 class HeaderNotFoundError(LookupError):
@@ -541,10 +542,7 @@ class VLBIStreamBase:
     def __getattr__(self, attr):
         """Try to get things on the current open file if it is not on self."""
         if attr in {'readable', 'writable', 'seekable', 'closed', 'name'}:
-            try:
-                return getattr(self.fh_raw, attr)
-            except AttributeError:
-                pass
+            return getattr(self.fh_raw, attr)
         #  __getattribute__ to raise appropriate error.
         return self.__getattribute__(attr)
 
@@ -1087,33 +1085,159 @@ class VLBIStreamWriterBase(VLBIStreamBase):
 
 
 class FileOpener:
-    """Opener for a baseband format file."""
+    """File opener for a baseband format.
 
-    def __init__(self, fmt, classes, doc=None, append_doc=True):
-        """File opener for a baseband format.
+    Each instance can be used as a function to open a baseband stream.
+    It is probably best used inside a wrapper, so that the documentation
+    can reflect the docstring of ``__call__`` rather than of this class.
 
-        Each instance can be used as a function to open a baseband stream.
-        It is probably best used inside a wrapper, so that the documentation
-        can reflect the docstring of ``__call__`` rather than of this class.
+    Parameters
+    ----------
+    fmt : str
+        Name of the baseband format
+    classes : dict
+        With the file/stream reader/writer classes keyed by names equal to
+        'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed
+        by ``fmt``.  Typically, one will pass in ``classes=globals()``.
+    header_class : `~baseband.vlbi_base.header.VLBIHeaderBase` subclass
+        Used to instantiate a header from keywords as needed.
+    """
 
-        Parameters
-        ----------
-        fmt : str
-            Name of the baseband format
-        classes : dict
-            With the file/stream reader/writer classes keyed by names equal to
-            'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed
-            by ``fmt``.  Typically, one will pass in ``classes=globals()``.
-        doc : str, optional
-            If given, used to define the docstring of the opener.
-        append_doc : bool, optional
-            If `True` (default), append ``doc`` to the default docstring rather
-            than override it.
-        """
+    FileNameSequencer = sf.FileNameSequencer
+    """Sequencer used for templates."""
+
+    non_header_keys = {'squeeze', 'subset', 'fill_value', 'verify',
+                       'file_size'}
+    """keyword arguments that should never be used to create a header."""
+
+    _name = None
+
+    def __init__(self, fmt, classes, header_class):
         self.fmt = fmt
-        self.classes = {cls_type: classes[fmt + cls_type]
-                        for cls_type in ('FileReader', 'FileWriter',
-                                         'StreamReader', 'StreamWriter')}
+        self.classes = classes
+        self.header_class = header_class
+
+    def normalize_mode(self, mode):
+        if mode in self.classes:
+            return mode
+        if mode[::-1] in self.classes:
+            return mode[::-1]
+        if mode in {'r', 'w'}:
+            return mode + 's'
+
+        raise ValueError(f'invalid mode: {mode} '
+                         f'({self.fmt} supports {set(self.classes)}).')
+
+    def _get_type(self, name):
+        if hasattr(name, 'read') or hasattr(name, 'write'):
+            return 'fh'
+
+        try:
+            f0 = name[0]
+        except (TypeError, IndexError):
+            raise ValueError("name '{name}' not understood.") from None
+
+        if (isinstance(name, (tuple, list, sf.FileNameSequencer))
+                or isinstance(f0, str) and len(f0) > 1):
+            return 'sequence'
+
+        if '{' in name and '}' in name:
+            return 'template'
+        else:
+            return 'name'
+
+    def get_type(self, name):
+        """Infer the type of file name is pointing to.
+
+        Options are 'fh', 'name', 'sequence', and 'template'.
+        """
+        if self._name is not name:
+            self._type = self._get_type(name)
+            self._name = name
+        return self._type
+
+    def is_sequence(self, name):
+        """Whether name is an (implied) sequence of files."""
+        return self.get_type(name) in ('template', 'sequence')
+
+    def is_template(self, name):
+        """Whether name is a template for a sequence of files."""
+        return self.get_type(name) == 'template'
+
+    def is_name(self, name):
+        """Whether name is a name of a file."""
+        return self.get_type(name) == 'name'
+
+    def is_fh(self, name):
+        """Whether name is a filehandle."""
+        return self.get_type(name) == 'fh'
+
+    def get_header0(self, kwargs):
+        """Get header0 from kwargs or construct it from kwargs.
+
+        Possible keyword arguments will be popped from kwargs.
+        """
+        header0 = kwargs.get('header0', None)
+        if header0 is None:
+            tried = {key: value for key, value in kwargs.items()
+                     if key not in self.non_header_keys}
+            with warnings.catch_warnings():
+                # Ignore possible warnings about extraneous arguments.
+                warnings.simplefilter('ignore')
+                header0 = self.header_class.fromvalues(**tried)
+            # Pop the kwargs that we likely used.  We do this by inspection,
+            # but note that this may still let extraneous keywords
+            # by eaten up by header classes that just store everything.
+            maybe_used = (
+                set(inspect.signature(self.header_class.fromvalues).parameters)
+                | set(self.header_class._properties)
+                | set(header0.keys()))
+
+            maybe_used = {key.lower() for key in maybe_used}
+            used = set(key for key in tried if key.lower() in maybe_used)
+            for key in used:
+                kwargs.pop(key)
+
+        return header0
+
+    def get_fns(self, name, mode, kwargs):
+        """Convert a template into a file-name sequencer.
+
+        Any keywords needed to fill the template are popped from kwargs.
+        """
+        try:
+            fns_kwargs = dict(self.get_header0(kwargs))
+        except Exception:
+            fns_kwargs = {}
+
+        fns_kwargs.update(kwargs)
+        fns = self.FileNameSequencer(name, fns_kwargs)
+        for key in set(fns.items).intersection(kwargs):
+            kwargs.pop(key)
+        return fns
+
+    def get_fh(self, name, mode, kwargs={}):
+        """Ensure name is a filehandle, opening it if necessary."""
+        if mode == 'wb' and self.is_sequence(name):
+            raise ValueError(f"{self.fmt} does not support writing to a "
+                             f"sequence or template in binary mode.")
+
+        if self.is_fh(name):
+            return name
+
+        if self.is_template(name):
+            name = self.get_fns(name, mode, kwargs)
+
+        open_kwargs = {'mode': 'rb' if mode[0] == 'r' else 'w+b'}
+        if self.is_sequence(name):
+            opener = sf.open
+            if 'file_size' in kwargs:
+                open_kwargs['file_size'] = kwargs.pop('file_size')
+
+        else:
+            opener = io.open
+
+        return opener(name, **open_kwargs)
 
     def __call__(self, name, mode='rs', **kwargs):
         """
@@ -1127,79 +1251,94 @@ class FileOpener:
         Parameters
         ----------
         name : str or filehandle, or sequence of str
-            File name, filehandle, or sequence of file names (see Notes).
+            File name, filehandle, sequence of file names, or template.
         mode : {'rb', 'wb', 'rs', or 'ws'}, optional
             Whether to open for reading or writing, and as a regular binary
             file or as a stream. Default: 'rs', for reading a stream.
         **kwargs
             Additional arguments when opening the file as a stream.
         """
-        # If sequentialfile object, check that it's opened properly.
-        if isinstance(name, sf.SequentialFileBase):
-            assert (('r' in mode and name.mode == 'rb')
-                    or ('w' in mode and name.mode == 'w+b')), (
-                        "open only accepts sequential files opened in 'rb' "
-                        "mode for reading or 'w+b' mode for writing.")
+        mode = self.normalize_mode(mode)
+        if mode == 'ws':
+            # Stream writing always needs a header.  Construct from
+            # other keywords if necessary.
+            kwargs['header0'] = self.get_header0(kwargs)
 
-        # If passed some kind of list, open a sequentialfile object.
-        if isinstance(name, (tuple, list, sf.FileNameSequencer)):
-            if 'r' in mode:
-                name = sf.open(name, 'rb')
-            else:
-                file_size = kwargs.pop('file_size', None)
-                name = sf.open(name, 'w+b', file_size=file_size)
-
-        # Select FileReader/Writer for binary, StreamReader/Writer for stream.
-        if 'b' in mode:
-            cls_type = 'File'
-        else:
-            cls_type = 'Stream'
-
-        # Select reading or writing.  Check if ``name`` is a filehandle, and
-        # open it if not.
-        if 'w' in mode:
-            cls_type += 'Writer'
-            got_fh = hasattr(name, 'write')
-            if not got_fh:
-                name = io.open(name, 'w+b')
-        elif 'r' in mode:
-            cls_type += 'Reader'
-            got_fh = hasattr(name, 'read')
-            if not got_fh:
-                name = io.open(name, 'rb')
-        else:
-            raise ValueError("only support opening {0} file for reading "
-                             "or writing (mode='r' or 'w')."
-                             .format(self.fmt))
-        # Try wrapping ``name`` with file or stream reader (``name`` is a
-        # binary filehandle at this point).
+        fh = self.get_fh(name, mode, kwargs)
         try:
-            return self.classes[cls_type](name, **kwargs)
-        except Exception as exc:
-            if not got_fh:
-                try:
-                    name.close()
-                except Exception:  # pragma: no cover
-                    pass
-            raise exc
+            return self.classes[mode](fh, **kwargs)
+        except Exception:
+            if fh is not name:
+                fh.close()
+            raise
 
 
-def make_opener(fmt, classes, doc=None, append_doc=True):
-    opener = FileOpener(fmt, classes)
+def wrap_opener(opener, module=None, doc=None):
+    """Wrap an opener with a new docstring and module."""
 
-    @functools.wraps(opener.__call__)
+    @functools.wraps(getattr(opener, '__call__', opener))
     def open(*args, **kwargs):
         return opener(*args, **kwargs)
 
-    if doc is not None:
-        if append_doc:
-            doc = textwrap.dedent(open.__doc__
-                                  .replace('baseband', fmt)) + doc
+    if doc:
         open.__doc__ = doc
 
-    module = classes.get('__name__', None)
     # This ensures the instance becomes visible to sphinx.
     if module:
         open.__module__ = module
 
     return open
+
+
+def make_opener(ns, doc=None):
+    """Create a standard opener for the given namespace.
+
+    This assumes that the file is called inside a module that contains
+    file and stream readers and writers, as well as a header class,
+    with standard names, ``<fmt>FileReader``, ``<fmt>FileWriter``,
+    ``<fmt>StreamReader``, ``<fmt>StreamWriter``, and ``<fmt>Header``,
+    where ``fmt`` is the name of the format (which is inferred by looking
+    for a ``*StreamReader`` entry).
+
+    The opener is created by initializing either a ``<fmt>FileOpener`` or,
+    if that does not exist, a plain `~baseband.vlbi_base.base.FileOpener`
+    using the format and the above classes, and then creating a wrapping
+    function with ``__module__`` set to the calling module (inferred from
+    the namespace), and with the documentation of its ``__call__`` method
+    extended with ``doc``.
+
+    Parameters
+    ----------
+    ns : dict
+        Namespace to look in.  Generally, pass in ``globals()`` at the
+        call site.
+    doc : str, optional
+        Extra documentation to add to that of the opener's ``__call__``
+        method.
+
+    See Also
+    --------
+    FileOpener : general file opener class
+    wrap_opener : function to wrap the an FileOpener instance
+    """
+    module = ns.get('__name__', None)
+    for key in ns:
+        if key.endswith('StreamReader'):
+            fmt = key.replace('StreamReader', '')
+            break
+    else:  # noqa
+        raise ValueError('namespace does not contain a StreamReader, '
+                         'so fmt cannot be guessed.')
+
+    classes = {mode: ns[fmt + cls_type] for (mode, cls_type) in {
+        'rb': 'FileReader',
+        'wb': 'FileWriter',
+        'rs': 'StreamReader',
+        'ws': 'StreamWriter'}.items()}
+    header_class = ns.get(fmt+'Header')
+    opener_class = ns.get(fmt+'FileOpener', FileOpener)
+    file_opener = opener_class(fmt, classes, header_class)
+    if doc is not None:
+        doc = textwrap.dedent(file_opener.__call__.__doc__
+                              .replace('baseband', fmt)) + doc
+    return wrap_opener(file_opener, module=module, doc=doc)

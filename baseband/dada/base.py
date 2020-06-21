@@ -8,7 +8,8 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
+from ..vlbi_base.base import (make_opener, FileOpener,
+                              VLBIFileBase, VLBIFileReaderBase,
                               VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase)
 from ..vlbi_base.utils import lcm
@@ -361,7 +362,27 @@ class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
         del self._frame
 
 
-opener = make_opener('DADA', globals(), doc="""
+class DADAFileOpener(FileOpener):
+    FileNameSequencer = DADAFileNameSequencer
+
+    def get_fns(self, name, mode, kwargs):
+        fns = super().get_fns(name, mode, kwargs)
+        # For obs_offset we need the first file to know the
+        # actual file_size.
+        if mode[0] == 'r' and 'obs_offset' in name.lower():
+            with io.open(fns[0], 'rb') as fh:
+                header0 = DADAHeader.fromfile(fh)
+            fns = self.FileNameSequencer(name, header0)
+        return fns
+
+    def get_fh(self, name, mode, kwargs):
+        if mode == 'ws' and self.is_sequence(name):
+            kwargs.setdefault('file_size', kwargs['header0'].frame_nbytes)
+
+        return super().get_fh(name, mode, kwargs)
+
+
+open = make_opener(globals(), doc="""
 --- For reading a stream : (see :class:`~baseband.dada.base.DADAStreamReader`)
 
 squeeze : bool, optional
@@ -383,8 +404,8 @@ squeeze : bool, optional
     If `True` (default), writer accepts squeezed arrays as input, and adds
     any dimensions of length unity.
 **kwargs
-    If the header is not given, an attempt will be made to construct one
-    with any further keyword arguments.
+    If no header is given, an attempt is made to construct one from these.
+    For a standard header, this would include the following.
 
 --- Header keywords : (see :meth:`~baseband.dada.DADAHeader.fromvalues`)
 
@@ -437,65 +458,3 @@ One may also pass in a `~baseband.helpers.sequentialfile` object
 (opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
 cases it is practically identical to passing in a list or template.
 """)
-
-
-# Need to wrap the opener to be able to deal with file lists or templates.
-def open(name, mode='rs', **kwargs):
-    # Extract needed kwargs (and keep some from being passed to opener).
-    header0 = kwargs.get('header0', None)
-
-    # Check if ``name`` is a template or sequence.
-    is_template = isinstance(name, str) and ('{' in name and '}' in name)
-    is_sequence = isinstance(name, (tuple, list, sf.FileNameSequencer))
-
-    # For stream writing, header0 is needed; for reading, it is needed for
-    # initializing a template only.
-    if 'b' not in mode:
-        # Initialize header0 if it doesn't yet exist.
-        if header0 is None:
-            if 'w' in mode:
-                # Store squeeze.
-                passed_kwargs = ({'squeeze': kwargs.pop('squeeze')}
-                                 if 'squeeze' in kwargs.keys() else {})
-                # Make header0.
-                header0 = DADAHeader.fromvalues(**kwargs)
-                # Pass squeeze and header0 on to stream writer.
-                kwargs = passed_kwargs
-                kwargs['header0'] = header0
-
-            elif is_template:
-                # Store parameters to pass.
-                passed_kwargs = {key: kwargs.pop(key) for key in
-                                 ('squeeze', 'subset', 'verify')
-                                 if key in kwargs}
-                kwargs = {key.upper(): value for key, value in kwargs.items()}
-
-                # If obs_offset is needed, make a temporary file sequence to
-                # read in header0.
-                if ('OBS_OFFSET' in name or 'obs_offset' in name):
-                    for key in ('OBS_OFFSET', 'FILE_SIZE'):
-                        kwargs.setdefault(key, 0)
-                    first_file = DADAFileNameSequencer(name, kwargs)[0]
-                    with io.open(first_file, 'rb') as fh:
-                        header0 = DADAHeader.fromfile(fh)
-                # If obs_offset isn't needed, just use the kwargs.
-                else:
-                    header0 = kwargs
-
-                kwargs = passed_kwargs
-
-        if is_template:
-            name = DADAFileNameSequencer(name, header0)
-
-    # If writing with a template or sequence, pass ``file_size``.
-    if 'w' in mode and (is_template or is_sequence):
-        if 'b' in mode:
-            raise ValueError("does not support opening a file sequence in "
-                             "'wb' mode.  Try passing in a SequentialFile "
-                             "object instead.")
-        kwargs['file_size'] = header0.frame_nbytes
-
-    return opener(name, mode, **kwargs)
-
-
-open.__doc__ = opener.__doc__
