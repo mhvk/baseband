@@ -8,7 +8,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
                               VLBIStreamReaderBase, VLBIStreamWriterBase,
-                              FileOpener)
+                              FileOpener, wrap_opener)
 from .header import GSBHeader
 from .payload import GSBPayload
 from .frame import GSBFrame
@@ -627,7 +627,7 @@ file_opener = GSBFileOpener('GSB', header_class=GSBHeader, classes={
     'rs': GSBStreamReader,
     'ws': GSBStreamWriter})
 
-open = file_opener.wrapped(module=__name__, doc="""
+open = wrap_opener(file_opener, module=__name__, doc="""
 Open GSB file(s) for reading or writing.
 
 A GSB data set contains a text header file and one or more raw data files.
@@ -715,7 +715,7 @@ seq_nr : int, optional
 Returns
 -------
 Filehandle
-    :class:`~baseband.gsb.base.GSBTimeStampIO (timestamp), or
+    :class:`~baseband.gsb.base.GSBTimeStampIO` (timestamp), or
     :class:`~baseband.gsb.base.GSBFileReader` or
     :class:`~baseband.gsb.base.GSBFileWriter` (binary), or
     :class:`~baseband.gsb.base.GSBStreamReader` or
