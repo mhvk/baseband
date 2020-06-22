@@ -1,5 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 """Routines to obtain information on baseband files."""
+import warnings
+
 from .helpers import sequentialfile as sf
 from . import io as baseband_io
 
@@ -57,15 +59,23 @@ def file_info(name, format=None, **kwargs):
         format = tuple(baseband_io.FORMATS)
 
     if isinstance(format, tuple):
+        no_info = set()
         for format_ in format:
             info = file_info(name, format_, **kwargs)
             if info:
-                break
+                return info
 
-        return info
+            if info is None:
+                no_info.add(format_)
+
+        tried = set(format) - no_info
+        warnings.warn(f"{name} does not seem formatted as any of {tried}"
+                      + (f" ({no_info} did not provide info; "
+                         "open with explicit format?)." if no_info else "."))
+        return
 
     module = getattr(baseband_io, format)
-    return module.info(name, **kwargs)
+    return module.info(name, **kwargs) if hasattr(module, 'info') else None
 
 
 def open(name, mode='rs', format=None, **kwargs):
@@ -102,9 +112,7 @@ def open(name, mode='rs', format=None, **kwargs):
 
         info = file_info(name, format, **kwargs)
         if not info:
-            if format is None:
-                format = tuple(baseband_io.FORMATS)
-            raise ValueError(f"file could not be opened as any of {format}")
+            raise ValueError("format of file could not be auto-determined")
 
         format = info.format
 
