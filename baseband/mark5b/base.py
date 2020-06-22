@@ -3,10 +3,10 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (VLBIFileBase, FileInfo,
-                              VLBIFileReaderBase, VLBIStreamBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase,
-                              make_opener, FileOpener)
+from ..vlbi_base.base import (
+    VLBIFileBase, VLBIFileReaderBase,
+    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    FileOpener, FileInfo)
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 from .frame import Mark5BFrame
@@ -15,7 +15,7 @@ from .file_info import Mark5BFileReaderInfo
 
 __all__ = ['Mark5BFileReader', 'Mark5BFileWriter',
            'Mark5BStreamBase', 'Mark5BStreamReader', 'Mark5BStreamWriter',
-           'open']
+           'open', 'info']
 
 
 class Mark5BFileReader(VLBIFileReaderBase):
@@ -331,7 +331,7 @@ class Mark5BFileOpener(FileOpener):
         return header0
 
 
-open = make_opener(globals(), doc="""
+open = Mark5BFileOpener.create(globals(), doc="""
 --- For reading a stream : (see `~baseband.mark5b.base.Mark5BStreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional
@@ -411,4 +411,4 @@ cases it is practically identical to passing in a list or template.
 """)
 
 
-info = FileInfo(open)
+info = FileInfo.create(globals())

@@ -82,6 +82,7 @@ publishing new code releases.
    :maxdepth: 1
 
    tutorials/new_edv
+   tutorials/new_format
    tutorials/release_procedure
 
 .. _project_details_toc:

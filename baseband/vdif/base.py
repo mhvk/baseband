@@ -6,18 +6,19 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (make_opener, FileInfo,
-                              VLBIFileBase, VLBIFileReaderBase,
-                              VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase, HeaderNotFoundError)
+from ..vlbi_base.base import (
+    VLBIFileBase, VLBIFileReaderBase,
+    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    FileOpener, FileInfo, HeaderNotFoundError)
 from .header import VDIFHeader
 from .payload import VDIFPayload
 from .frame import VDIFFrame, VDIFFrameSet
 from .file_info import VDIFFileReaderInfo
 
 
-__all__ = ['VDIFFileReader', 'VDIFFileWriter', 'VDIFStreamBase',
-           'VDIFStreamReader', 'VDIFStreamWriter', 'open']
+__all__ = ['VDIFFileReader', 'VDIFFileWriter',
+           'VDIFStreamBase', 'VDIFStreamReader', 'VDIFStreamWriter',
+           'open', 'info']
 
 # Check code on 2015-MAY-30
 # 00000000  77 2c db 00 00 00 00 1c  75 02 00 20 fc ff 01 04  # header 0 - 3
@@ -800,7 +801,7 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
             self.header0)
 
 
-open = make_opener(globals(), doc="""
+open = FileOpener.create(globals(), doc="""
 --- For reading a stream : (see :class:`~baseband.vdif.base.VDIFStreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional
@@ -877,4 +878,4 @@ cases it is practically identical to passing in a list or template.
 """)
 
 
-info = FileInfo(open)
+info = FileInfo.create(globals())

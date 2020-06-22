@@ -8,10 +8,10 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (make_opener, FileOpener, FileInfo,
-                              VLBIFileBase, VLBIFileReaderBase,
-                              VLBIStreamBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase)
+from ..vlbi_base.base import (
+    VLBIFileBase, VLBIFileReaderBase,
+    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    FileOpener, FileInfo)
 from ..vlbi_base.utils import lcm
 from .header import DADAHeader
 from .payload import DADAPayload
@@ -19,7 +19,8 @@ from .frame import DADAFrame
 
 
 __all__ = ['DADAFileNameSequencer', 'DADAFileReader', 'DADAFileWriter',
-           'DADAStreamBase', 'DADAStreamReader', 'DADAStreamWriter', 'open']
+           'DADAStreamBase', 'DADAStreamReader', 'DADAStreamWriter',
+           'open', 'info']
 
 
 class DADAFileNameSequencer(sf.FileNameSequencer):
@@ -382,7 +383,7 @@ class DADAFileOpener(FileOpener):
         return super().get_fh(name, mode, kwargs)
 
 
-open = make_opener(globals(), doc="""
+open = DADAFileOpener.create(globals(), doc="""
 --- For reading a stream : (see :class:`~baseband.dada.base.DADAStreamReader`)
 
 squeeze : bool, optional
@@ -460,4 +461,4 @@ cases it is practically identical to passing in a list or template.
 """)
 
 
-info = FileInfo(open)
+info = FileInfo.create(globals())

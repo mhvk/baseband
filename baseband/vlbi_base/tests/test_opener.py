@@ -7,7 +7,7 @@ from astropy import units as u
 
 from ...helpers import sequentialfile as sf
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
-from ..base import (FileOpener, wrap_opener, make_opener,
+from ..base import (FileOpener,
                     VLBIFileBase, VLBIFileReaderBase,
                     VLBIStreamReaderBase, VLBIStreamWriterBase)
 
@@ -62,16 +62,16 @@ class TestFileOpener:
         cls.header_class = BareHeader
         cls.file_opener = FileOpener('Bare', classes=cls.classes,
                                      header_class=cls.header_class)
-        cls.open = staticmethod(make_opener(globals(), doc='extra'))
+        cls.open = staticmethod(FileOpener.create(globals(), doc='extra'))
 
-    def test_make_opener(self):
+    def test_create_opener(self):
         assert self.open.__wrapped__.__func__ is FileOpener.__call__
         assert 'Open Bare file(s) for reading or writing.' in self.open.__doc__
         assert self.open.__doc__.endswith('extra')
 
-    def test_make_opener_wrong_ns(self):
+    def test_create_opener_wrong_ns(self):
         with pytest.raises(ValueError, match='does not contain'):
-            make_opener(locals(), doc='extra')
+            FileOpener.create(locals(), doc='extra')
 
     def test_methods(self):
         assert self.file_opener.is_name('abc')
@@ -161,8 +161,8 @@ class TestFileOpener:
         (None, None),
         (None, 'new_doc'),
         (__name__, 'new_doc')])
-    def test_wrap_opener(self, module, doc):
-        open = wrap_opener(self.file_opener, module, doc)
+    def test_wrapped(self, module, doc):
+        open = self.file_opener.wrapped(module, doc)
         if doc is None:
             assert open.__doc__ is self.file_opener.__call__.__doc__
         else:

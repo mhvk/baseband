@@ -5,10 +5,10 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (make_opener, FileOpener, FileInfo,
-                              VLBIFileBase, VLBIFileReaderBase,
-                              VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase)
+from ..vlbi_base.base import (
+    VLBIFileBase, VLBIFileReaderBase,
+    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    FileOpener, FileInfo)
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
 from .frame import GUPPIFrame
@@ -16,7 +16,8 @@ from .file_info import GUPPIFileReaderInfo
 
 
 __all__ = ['GUPPIFileNameSequencer', 'GUPPIFileReader', 'GUPPIFileWriter',
-           'GUPPIStreamBase', 'GUPPIStreamReader', 'GUPPIStreamWriter', 'open']
+           'GUPPIStreamBase', 'GUPPIStreamReader', 'GUPPIStreamWriter',
+           'open', 'info']
 
 
 class GUPPIFileNameSequencer(sf.FileNameSequencer):
@@ -312,7 +313,7 @@ class GUPPIFileOpener(FileOpener):
         return super().get_fh(name, mode, kwargs)
 
 
-open = make_opener(globals(), doc="""
+open = GUPPIFileOpener.create(globals(), doc="""
 --- For reading a stream : (see `~baseband.guppi.base.GUPPIStreamReader`)
 
 squeeze : bool, optional
@@ -396,4 +397,4 @@ cases it is practically identical to passing in a list or template.
 """)
 
 
-info = FileInfo(open)
+info = FileInfo.create(globals())

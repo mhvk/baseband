@@ -6,9 +6,10 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase,
-                              FileOpener, wrap_opener, FileInfo)
+from ..vlbi_base.base import (
+    VLBIFileBase,
+    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    FileOpener, FileInfo)
 from .header import GSBHeader
 from .payload import GSBPayload
 from .frame import GSBFrame
@@ -16,7 +17,8 @@ from .file_info import GSBTimeStampInfo, GSBStreamReaderInfo
 
 
 __all__ = ['GSBTimeStampIO', 'GSBFileReader', 'GSBFileWriter',
-           'GSBStreamBase', 'GSBStreamReader', 'GSBStreamWriter', 'open']
+           'GSBStreamBase', 'GSBStreamReader', 'GSBStreamWriter',
+           'open', 'info']
 
 
 class GSBTimeStampIO(VLBIFileBase):
@@ -619,16 +621,13 @@ class GSBFileOpener(FileOpener):
             raise
 
 
-file_opener = GSBFileOpener('GSB', header_class=GSBHeader, classes={
+open = GSBFileOpener('GSB', header_class=GSBHeader, classes={
     'rt': GSBTimeStampIO,
     'wt': GSBTimeStampIO,
     'rb': GSBFileReader,
     'wb': GSBFileWriter,
     'rs': GSBStreamReader,
-    'ws': GSBStreamWriter})
-
-
-open = wrap_opener(file_opener, module=__name__, doc="""
+    'ws': GSBStreamWriter}).wrapped(module=__name__, doc="""
 Open GSB file(s) for reading or writing.
 
 A GSB data set contains a text header file and one or more raw data files.
@@ -752,4 +751,4 @@ class GSBFileInfo(FileInfo):
         return stream_info
 
 
-info = GSBFileInfo(open)
+info = GSBFileInfo.create(globals())
