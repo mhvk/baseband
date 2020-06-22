@@ -86,9 +86,9 @@ def open(name, mode='rs', format=None, **kwargs):
         Whether to open for reading or writing, and as a regular binary
         file or as a stream. Default: 'rs', for reading a stream.
     format : str or tuple of str
-        The format the file is in. For reading, this can be a tuple of possible
-        formats, all of which will be tried in turn. By default, all supported
-        formats are tried.
+        The format the file is in. For reading, if a tuple of possible formats,
+        all will be tried in turn. By default, all supported formats are tried.
+        For writing, an explicit format must be passed in.
     **kwargs
         Additional arguments needed for opening the file as a stream.
         For most formats, trying without these will raise an exception that
@@ -96,31 +96,29 @@ def open(name, mode='rs', format=None, **kwargs):
         arguments are passed in that are inconsistent with the file, or are
         irrelevant for opening the file.
     """
-    if 'w' in mode:
-        if format is None or isinstance(format, tuple):
+    if format is None or isinstance(format, tuple):
+        if 'w' in mode:
             raise ValueError("cannot specify multiple formats for writing.")
-    else:
+
         info = file_info(name, format, **kwargs)
         if not info:
             if format is None:
                 format = tuple(baseband_io.FORMATS)
-            raise ValueError("file could not be opened as "
-                             + ("any of {}".format(format) if
-                                isinstance(format, tuple) else str(format)))
+            raise ValueError(f"file could not be opened as any of {format}")
+
         format = info.format
 
         if getattr(info, 'missing', False) and 's' in mode:
-            raise TypeError("file format {} is missing required arguments {}."
-                            .format(format, info.missing))
+            raise TypeError(f"file format {format} is missing required "
+                            f"arguments {info.missing}.")
 
         if info.inconsistent_kwargs:
-            raise ValueError('arguments inconsistent with this {} file were '
-                             'passed in: {}'
-                             .format(format, info.inconsistent_kwargs))
+            raise ValueError(f"arguments inconsistent with this {format} file "
+                             f"were passed in: {info.inconsistent_kwargs}")
 
         if info.irrelevant_kwargs:
-            raise TypeError('open() got unexpected keyword arguments {}'
-                            .format(info.irrelevant_kwargs))
+            raise TypeError(f"open() got unexpected keyword arguments "
+                            f"{info.irrelevant_kwargs}")
 
         kwargs = info.used_kwargs
 
