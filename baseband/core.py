@@ -70,12 +70,23 @@ def file_info(name, format=None, **kwargs):
 
         tried = set(format) - no_info
         warnings.warn(f"{name} does not seem formatted as any of {tried}"
-                      + (f" ({no_info} did not provide info; "
-                         "open with explicit format?)." if no_info else "."))
+                      + (f" ({no_info} did not provide info)."
+                         if no_info else "."))
         return
 
     module = getattr(baseband_io, format)
-    return module.info(name, **kwargs) if hasattr(module, 'info') else None
+    # A well-behaved module should define info, but we allow for more
+    # minimally defined ones by trying to open the file and getting info
+    # from it (which may well work if VLBIStreamReaderBase is subclasses).
+    if hasattr(module, 'info'):
+        return module.info(name, **kwargs)
+
+    # Try just opening as stream and getting info.
+    try:
+        with module.open(name, 'rs', **kwargs) as fh:
+            return fh.info
+    except Exception:
+        return None
 
 
 def open(name, mode='rs', format=None, **kwargs):
@@ -120,15 +131,15 @@ def open(name, mode='rs', format=None, **kwargs):
             raise TypeError(f"file format {format} is missing required "
                             f"arguments {info.missing}.")
 
-        if info.inconsistent_kwargs:
+        if getattr(info, 'inconsistent_kwargs', False):
             raise ValueError(f"arguments inconsistent with this {format} file "
                              f"were passed in: {info.inconsistent_kwargs}")
 
-        if info.irrelevant_kwargs:
+        if getattr(info, 'irrelevant_kwargs', False):
             raise TypeError(f"open() got unexpected keyword arguments "
                             f"{info.irrelevant_kwargs}")
 
-        kwargs = info.used_kwargs
+        kwargs = getattr(info, 'used_kwargs', kwargs)
 
     module = getattr(baseband_io, format)
     return module.open(name, mode=mode, **kwargs)
