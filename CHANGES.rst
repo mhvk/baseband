@@ -4,6 +4,13 @@
 - This future version will likely only support python 3.7, numpy 1.17 and
   astropy 4.0.
 
+New Features
+------------
+
+- Baseband now provides an ``baseband.io`` entry point, which allows other
+  packages to make new readers accessible to baseband by defining an entry
+  point in their ``setup.cfg``. [#418]
+
 Bug Fixes
 ---------
 
@@ -24,6 +31,9 @@ Other Changes and Additions
   and ``sample_shape`` properties, to match what is done for the other
   headers. Mark 5B headers expose only ``complex_data``, as the sample
   shape cannot be inferred from the header. [#414]
+
+- General classes to help writing ``open`` and ``info`` functions are now
+  provided in ``baseband.vlbi_base.FileOpener`` and ``FileInfo``. [#418]
 
 3.2.1 (unreleased)
 ==================
