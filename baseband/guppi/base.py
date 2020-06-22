@@ -44,7 +44,7 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
     --------
 
     >>> from baseband import guppi
-    >>> gfs = guppi.base.GUPPIFileNameSequencer(
+    >>> gfs = guppi.GUPPIFileNameSequencer(
     ...     '{date}_{file_nr:03d}.raw', {'DATE': "2018-01-01"})
     >>> gfs[10]
     '2018-01-01_010.raw'
@@ -52,7 +52,7 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
     >>> with open(SAMPLE_PUPPI, 'rb') as fh:
     ...     header = guppi.GUPPIHeader.fromfile(fh)
     >>> template = 'puppi_{stt_imjd}_{src_name}_{scannum}.{file_nr:04d}.raw'
-    >>> gfs = guppi.base.GUPPIFileNameSequencer(template, header)
+    >>> gfs = guppi.GUPPIFileNameSequencer(template, header)
     >>> gfs[0]
     'puppi_58132_J1810+1744_2176.0000.raw'
     >>> gfs[10]
@@ -376,7 +376,7 @@ Notes
 -----
 For streams, one can also pass to ``name`` a list of files, or a template
 string that can be formatted using 'stt_imjd', 'src_name', and other header
-keywords (by `~baseband.guppi.base.GUPPIFileNameSequencer`).
+keywords (by `~baseband.guppi.GUPPIFileNameSequencer`).
 
 For writing, one can mimic, for example, what is done at Arecibo by using
 the template 'puppi_{stt_imjd}_{src_name}_{scannum}.{file_nr:04d}.raw'.  GUPPI

@@ -50,7 +50,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
     --------
 
     >>> from baseband import dada
-    >>> dfs = dada.base.DADAFileNameSequencer(
+    >>> dfs = dada.DADAFileNameSequencer(
     ...     '{date}_{file_nr:03d}.dada', {'DATE': "2018-01-01"})
     >>> dfs[10]
     '2018-01-01_010.dada'
@@ -58,7 +58,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
     >>> with open(SAMPLE_DADA, 'rb') as fh:
     ...     header = dada.DADAHeader.fromfile(fh)
     >>> template = '{utc_start}.{obs_offset:016d}.000000.dada'
-    >>> dfs = dada.base.DADAFileNameSequencer(template, header)
+    >>> dfs = dada.DADAFileNameSequencer(template, header)
     >>> dfs[0]
     '2013-07-02-01:37:40.0000006400000000.000000.dada'
     >>> dfs[1]
@@ -441,7 +441,7 @@ Notes
 -----
 For streams, one can also pass to ``name`` a list of files, or a template
 string that can be formatted using 'frame_nr', 'obs_offset', and other header
-keywords (by `~baseband.dada.base.DADAFileNameSequencer`).
+keywords (by `~baseband.dada.DADAFileNameSequencer`).
 
 For writing, one can mimic what is done at quite a few telescopes by using
 the template '{utc_start}_{obs_offset:016d}.000000.dada'.  Unlike for the VLBI
