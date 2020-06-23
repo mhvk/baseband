@@ -45,6 +45,11 @@ class Mark5BFileReaderInfo(VLBIFileReaderInfo):
                 // (self.bps * self.nchan))
 
     # Override just to replace what it "needs".
+    @info_item
+    def format(self):
+        with self._parent.temporary_offset(0):
+            return 'mark5b' if self._parent.locate_frames() else None
+
     @info_item(needs=('header0', 'bps', 'nchan'))
     def frame0(self):
         """First frame from the file."""

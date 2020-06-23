@@ -37,10 +37,21 @@ def test_basic_file_info(sample, format_, missing, readable, error_keys):
     ('sample', 'missing'),
     ((SAMPLE_M4, {'decade', 'ref_time'}),
      (SAMPLE_M5B, {'kday', 'ref_time', 'nchan'})))
-def test_open_missing_args(sample, missing):
+def test_info_missing_args(sample, missing):
     info = file_info(sample)
     assert info.missing
     assert set(info.missing) == missing
+
+
+@pytest.mark.parametrize(
+    ('sample', 'format', 'wrong'),
+    [(SAMPLE_M4, 'mark4', dict(decade='2010')),
+     (SAMPLE_M5B, 'mark5b', dict(ref_time='56000', nchan=8))])
+def test_info_wrong_args(sample, format, wrong):
+    info = file_info(sample, **wrong)
+    assert info.format == format
+    assert not info.missing
+    assert 'header0' in info.errors
 
 
 @pytest.mark.parametrize(
