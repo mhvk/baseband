@@ -1,6 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 import importlib
 import pytest
+from astropy import units as u
 from astropy.time import Time
 
 from .. import file_info
@@ -109,3 +110,38 @@ def test_gsb_with_raw_files(sample, raw, mode):
     with module.open(sample, mode='rs', **info.used_kwargs) as fh:
         info2 = fh.info
     assert info2() == info()
+
+
+def test_mwa_vdif_with_sample_rate():
+    info1 = file_info(SAMPLE_MWA)
+    assert info1.format == 'vdif'
+    assert 'frame_rate' in info1.errors
+    info2 = file_info(SAMPLE_MWA, sample_rate=1.28*u.MHz)
+    assert info2.format == 'vdif'
+    assert info2.start_time == Time('2015-10-03T20:49:45.000')
+    info3 = file_info(SAMPLE_MWA, sample_rate='bla')
+    assert info3.format == 'vdif'
+    assert 'stream' in info3.errors
+
+
+def test_unsupported_file(tmpdir):
+    name = str(tmpdir.join('test.unsupported'))
+    with open(name, 'wb') as fw:
+        fw.write(b'abcdefghijklmnopqrstuvwxyz')
+
+    with pytest.warns(UserWarning, match='not.*formatted as any of'):
+        info = file_info(name)
+
+    assert info is None
+
+
+def test_format_with_no_info(monkeypatch):
+    monkeypatch.delattr('baseband.vdif.info')
+    info = file_info(SAMPLE_VDIF)
+    assert info
+    assert info.format == 'vdif'
+    assert not hasattr(info, 'used_kwargs')
+
+    with pytest.warns(UserWarning, match=(
+            r"as any of {'mark5b'} \({'vdif'} did not")):
+        info = file_info(SAMPLE_M4, format=('vdif', 'mark5b'))

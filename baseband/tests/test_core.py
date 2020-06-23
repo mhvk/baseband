@@ -100,5 +100,30 @@ def test_open_sequence(tmpdir):
 
 def test_open_write_checks():
     # Cannot have multiple formats for writing.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='cannot specify multiple'):
         baseband_open('a.a', 'wb', fmt=('dada', 'mark4'))
+
+
+def test_unsupported_file(tmpdir):
+    name = str(tmpdir.join('test.unsupported'))
+    with open(name, 'wb') as fw:
+        fw.write(b'abcdefghijklmnopqrstuvwxyz')
+
+    with pytest.raises(ValueError, match='could not be auto-determined'):
+        with pytest.warns(UserWarning, match='not.*formatted'):
+            baseband_open(name)
+
+
+def test_format_with_no_info(monkeypatch):
+    monkeypatch.delattr('baseband.vdif.info')
+    info = file_info(SAMPLE_VDIF)
+    assert info
+    assert info.format == 'vdif'
+    assert not hasattr(info, 'used_kwargs')
+
+    with baseband_open(SAMPLE_VDIF, format=('vdif', 'mark5b')) as fh:
+        assert fh.info.format == 'vdif'
+
+    with pytest.raises(ValueError, match='could not be auto-determined'):
+        with pytest.warns(UserWarning, match='not.*formatted'):
+            baseband_open(SAMPLE_M4, format=('vdif', 'mark5b'))

@@ -479,7 +479,7 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        if parent is not None:
+        if parent is not None and getattr(self.file_info, 'errors'):
             # Remove errors from file_info if we actually got the item.
             # (e.g., start_time if frame_rate couldn't be calculated.)
             for key in self.errors:
@@ -490,12 +490,18 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     @info_item
     def file_info(self):
         """Information from the underlying file reader."""
-        return self._parent.fh_raw.info
+        # Our regular baseband readers always have info on their raw
+        # files, but we should not presume this is the case. E.g., hdf5
+        # readers have an h5File underneath, without info.
+        return getattr(getattr(self._parent, 'fh_raw', None), 'info', None)
 
-    @info_item(needs='file_info')
+    @info_item
     def format(self):
         """Format of the underlying file."""
-        return self.file_info.format
+        if self.file_info is not None:
+            return self.file_info.format
+        elif self.continuous is not None:
+            return self._parent.__class__.__name__.split('Stream')[0].lower()
 
     @info_item
     def continuous(self):
@@ -549,11 +555,11 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     @info_item
     def readable(self):
         """Whether the stream can be read (possibly fixing errors)."""
-        if self.file_info.readable:
-            self.checks['continuous'] = self.continuous
-            return all(bool(v) for v in self.checks.values())
-        else:
+        if self.file_info is not None and not self.file_info.readable:
             return False
+
+        self.checks['continuous'] = self.continuous
+        return all(bool(v) for v in self.checks.values())
 
     def _up_to_date(self):
         # Stream readers can only change in how they verify.
@@ -562,7 +568,8 @@ class VLBIStreamReaderInfo(VLBIInfoBase):
     def __call__(self):
         """Create a dict with information about the stream and the raw file."""
         info = super().__call__()
-        info['file_info'] = self.file_info()
+        if self.file_info:
+            info['file_info'] = self.file_info()
         return info
 
     def __repr__(self):

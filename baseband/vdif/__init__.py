@@ -12,7 +12,7 @@
 
 For the VDIF specification, see https://vlbi.org/vlbi-standards/vdif/
 """
-from .base import open  # noqa
+from .base import open, info  # noqa
 from .header import VDIFHeader  # noqa
 from .payload import VDIFPayload  # noqa
 from .frame import VDIFFrame, VDIFFrameSet  # noqa

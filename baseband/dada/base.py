@@ -8,10 +8,10 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (make_opener, FileOpener,
-                              VLBIFileBase, VLBIFileReaderBase,
-                              VLBIStreamBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase)
+from ..vlbi_base.base import (
+    VLBIFileBase, VLBIFileReaderBase,
+    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    FileOpener, FileInfo)
 from ..vlbi_base.utils import lcm
 from .header import DADAHeader
 from .payload import DADAPayload
@@ -19,7 +19,8 @@ from .frame import DADAFrame
 
 
 __all__ = ['DADAFileNameSequencer', 'DADAFileReader', 'DADAFileWriter',
-           'DADAStreamBase', 'DADAStreamReader', 'DADAStreamWriter', 'open']
+           'DADAStreamBase', 'DADAStreamReader', 'DADAStreamWriter',
+           'open', 'info']
 
 
 class DADAFileNameSequencer(sf.FileNameSequencer):
@@ -49,7 +50,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
     --------
 
     >>> from baseband import dada
-    >>> dfs = dada.base.DADAFileNameSequencer(
+    >>> dfs = dada.DADAFileNameSequencer(
     ...     '{date}_{file_nr:03d}.dada', {'DATE': "2018-01-01"})
     >>> dfs[10]
     '2018-01-01_010.dada'
@@ -57,7 +58,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
     >>> with open(SAMPLE_DADA, 'rb') as fh:
     ...     header = dada.DADAHeader.fromfile(fh)
     >>> template = '{utc_start}.{obs_offset:016d}.000000.dada'
-    >>> dfs = dada.base.DADAFileNameSequencer(template, header)
+    >>> dfs = dada.DADAFileNameSequencer(template, header)
     >>> dfs[0]
     '2013-07-02-01:37:40.0000006400000000.000000.dada'
     >>> dfs[1]
@@ -382,7 +383,7 @@ class DADAFileOpener(FileOpener):
         return super().get_fh(name, mode, kwargs)
 
 
-open = make_opener(globals(), doc="""
+open = DADAFileOpener.create(globals(), doc="""
 --- For reading a stream : (see :class:`~baseband.dada.base.DADAStreamReader`)
 
 squeeze : bool, optional
@@ -440,7 +441,7 @@ Notes
 -----
 For streams, one can also pass to ``name`` a list of files, or a template
 string that can be formatted using 'frame_nr', 'obs_offset', and other header
-keywords (by `~baseband.dada.base.DADAFileNameSequencer`).
+keywords (by `~baseband.dada.DADAFileNameSequencer`).
 
 For writing, one can mimic what is done at quite a few telescopes by using
 the template '{utc_start}_{obs_offset:016d}.000000.dada'.  Unlike for the VLBI
@@ -458,3 +459,6 @@ One may also pass in a `~baseband.helpers.sequentialfile` object
 (opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
 cases it is practically identical to passing in a list or template.
 """)
+
+
+info = FileInfo.create(globals())

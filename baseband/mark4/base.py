@@ -3,9 +3,11 @@ import numpy as np
 from astropy.utils import lazyproperty, deprecated
 import astropy.units as u
 
-from ..vlbi_base.base import (make_opener, VLBIFileBase, VLBIFileReaderBase,
-                              VLBIStreamBase, VLBIStreamReaderBase,
-                              VLBIStreamWriterBase, HeaderNotFoundError)
+from ..vlbi_base.base import (
+    VLBIFileBase, VLBIFileReaderBase,
+    VLBIStreamBase, VLBIStreamReaderBase,
+    VLBIStreamWriterBase, HeaderNotFoundError,
+    FileOpener, FileInfo)
 from .header import Mark4Header
 from .payload import Mark4Payload
 from .frame import Mark4Frame
@@ -14,7 +16,7 @@ from .file_info import Mark4FileReaderInfo
 
 __all__ = ['Mark4FileReader', 'Mark4FileWriter',
            'Mark4StreamBase', 'Mark4StreamReader', 'Mark4StreamWriter',
-           'open']
+           'open', 'info']
 
 # Look-up table for the number of bits in a byte.
 nbits = ((np.arange(256)[:, np.newaxis] >> np.arange(8) & 1)
@@ -365,7 +367,7 @@ class Mark4StreamWriter(Mark4StreamBase, VLBIStreamWriterBase):
             header0.copy())
 
 
-open = make_opener(globals(), doc="""
+open = FileOpener.create(globals(), doc="""
 --- For reading a stream : (see `~baseband.mark4.base.Mark4StreamReader`)
 
 sample_rate : `~astropy.units.Quantity`, optional
@@ -445,3 +447,6 @@ written to.  One may also pass in a `~baseband.helpers.sequentialfile` object
 (opened in 'rb' mode for reading or 'w+b' for writing), though for typical use
 cases it is practically identical to passing in a list or template.
 """)
+
+
+info = FileInfo.create(globals())

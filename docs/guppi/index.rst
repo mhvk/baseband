@@ -116,7 +116,7 @@ from above)::
 
 Here we show how to write a sequence of files by passing a string template
 to `~baseband.guppi.open`, which prompts it to create and use a filename
-sequencer generated with `~baseband.guppi.base.GUPPIFileNameSequencer`.  One
+sequencer generated with `~baseband.guppi.GUPPIFileNameSequencer`.  One
 may also pass a time-ordered list or tuple of filenames to
 `~baseband.guppi.open`.  Unlike when writing DADA files, which have one frame
 per file, we specify the number of frames in one file using``frames_per_file``.

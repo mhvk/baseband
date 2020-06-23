@@ -22,7 +22,7 @@ from .utils import byte_array
 __all__ = ['HeaderNotFoundError',
            'VLBIFileBase', 'VLBIFileReaderBase', 'VLBIStreamBase',
            'VLBIStreamReaderBase', 'VLBIStreamWriterBase',
-           'FileOpener', 'wrap_opener', 'make_opener']
+           'FileInfo', 'FileOpener']
 
 
 class HeaderNotFoundError(LookupError):
@@ -1084,6 +1084,292 @@ class VLBIStreamWriterBase(VLBIStreamBase):
         return super().close()
 
 
+class FileInfo:
+    """File information collector.
+
+    The instance can be used as a function on a file name to get
+    information from that file, by opening it and retrieving ``info``.
+
+    Parameters
+    ----------
+    opener : callable
+        The function to use to open files
+
+    Notes
+    -----
+    The class is perhaps most easily used via the class method
+    `~baseband.vlbi_base.base.FileInfo.create`.
+    """
+
+    def __init__(self, opener):
+        self.open = opener
+
+    def _get_info(self, name, mode, **kwargs):
+        """Open a file in the given mode and retrieve info."""
+        try:
+            with self.open(name, mode=mode, **kwargs) as fh:
+                return fh.info
+        except Exception as exc:
+            return exc
+
+    def is_ok(self, info):
+        """Wether the item returned by _get_info has valid information."""
+        return not isinstance(info, Exception) and info
+
+    def get_file_info(self, name, **kwargs):
+        """Open a file in binary mode and retrieve info.
+
+        Any keyword arguments that were required to open the file will
+        be stored as a ``used_kwargs`` attribute on the returned ``info``.
+
+        Parameters
+        ----------
+        name : str or filehandle
+            Item to be opened for reading in binary mode.
+        **kwargs
+            Any keyword arguments that might be required to open the
+            file successfully (e.g., ``decade`` for Mark 4).
+
+        Returns
+        -------
+        info : `~baseband.vlbi_base.file_info.VLBIFileReaderInfo`
+            Information on the file.  Will evaluate as `False` if the
+            file was not in the right format.
+
+        Notes
+        -----
+        Getting information should never fail. If an `Exception` is
+        raised or returned, it is a bug in the file reader.
+        """
+        info = self._get_info(name, 'rb')
+        # If right format, check if arguments were missing.
+        if self.is_ok(info):
+            used_kwargs = {key: kwargs[key] for key in info.missing
+                           if key in kwargs}
+            if used_kwargs:
+                info = self._get_info(name, mode='rb', **used_kwargs)
+
+            info.used_kwargs = used_kwargs
+
+        return info
+
+    def get_stream_info(self, name, file_info, **kwargs):
+        """Open a file in stream mode and retrieve info.
+
+        Any keyword arguments that were required to open the file will
+        be stored as a ``used_kwargs`` attribute on the returned ``info``.
+
+        Parameters
+        ----------
+        name : str or filehandle
+            Item to be opened for reading in stream mode.
+        file_info : `~baseband.vlbi_base.file_info.VLBIFileReaderInfo`
+            Information gleaned from opening in binary mode.
+        **kwargs
+            Any keyword arguments that might be required to open the
+            file successfully (e.g., ``decade`` for Mark 4).
+
+        Returns
+        -------
+        info : `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
+            Information on the file.  Will evaluate as `False` if the
+            file was not in the right format. Will return `None` if no
+            sample rate information was present, or an `Exception` if
+            the opening as a stream failed.
+        """
+        frame_rate = file_info.frame_rate
+        used_kwargs = file_info.used_kwargs
+        if frame_rate is None:
+            if 'sample_rate' in kwargs:
+                used_kwargs['sample_rate'] = kwargs['sample_rate']
+            else:
+                # frame rate will already be marked as missing in
+                # file_info.
+                return None
+
+        stream_info = self._get_info(name, mode='rs', **used_kwargs)
+        if self.is_ok(stream_info):
+            stream_info.used_kwargs = used_kwargs
+
+        return stream_info
+
+    def __call__(self, name, **kwargs):
+        """Collect baseband file information.
+
+        First try opening as a binary file and check whether the file is
+        of the correct format. If so, and no required information is missing,
+        re-open as a stream, and get information like the start time,
+        sample rate, etc.
+
+        Parameters
+        ----------
+        name : str or filehandle, or sequence of str
+            File name, filehandle, or sequence of file names.
+        **kwargs
+            Any other arguments the opener needs to open as a stream.
+
+        Returns
+        -------
+        info
+            :class:`~baseband.vlbi_base.file_info.VLBIFileReaderInfo` or
+            :class:`~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`.
+            In addition to the normal ``info`` attributes, also stored
+            are attributes about what happened to the keyword arguments:
+            ``used_kwargs``, ``consistent_kwargs``, ``inconsistent_kwargs``
+            and ``irrelevant_kwargs``.
+        """
+        # NOTE: getting info should never fail or even emit warnings.
+        # Hence, warnings or errors should not be suppressed here, but
+        # rather in the info implementations.
+        file_info = self.get_file_info(name, **kwargs)
+        if not file_info or file_info.missing:
+            return file_info
+
+        stream_info = self.get_stream_info(name, file_info, **kwargs)
+        if not self.is_ok(stream_info):
+            if isinstance(stream_info, Exception):
+                # Unexpected errors.  Put it in file_info so there is a record.
+                file_info.errors['stream'] = str(stream_info)
+            return file_info
+
+        self.check_consistency(stream_info, **kwargs)
+        return stream_info
+
+    def check_consistency(self, info, **kwargs):
+        """Check consistency between info and the given arguments.
+
+        The keyword arguments will be sorted into those that were used
+        by the file opener and those that were unused, with the latter
+        split in those that had consistent, inconsistent, or irrelevant
+        information.  They are stored on the ``info`` instance in
+        ``used_kwargs``, ``consistent_kwargs``, ``inconsistent_kwargs``
+        and ``irrelevant_kwargs`` attributes, respectively.
+
+        Parameters
+        ----------
+        info : `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
+            Information gleaned from a file opened in stream reading mode.
+        **kwargs
+            Keyword arguments passed to the opener.
+        """
+        # Store what happened to the kwargs, so one can decide if there are
+        # inconsistencies or other problems.
+        info.consistent_kwargs = {}
+        info.inconsistent_kwargs = {}
+        info.irrelevant_kwargs = {}
+        for key, value in kwargs.items():
+            if key in info.used_kwargs:
+                continue
+
+            consistent = self.check_key(key, value, info)
+
+            if consistent is None:
+                info.irrelevant_kwargs[key] = value
+            elif consistent:
+                info.consistent_kwargs[key] = value
+            else:
+                info.inconsistent_kwargs[key] = value
+
+        return info
+
+    def check_key(self, key, value, info):
+        """Check consistency for a given key and value.
+
+        Parameters
+        ----------
+        key : str
+            Name of the key.
+        value : object
+            Corresponding value.
+        info : `~baseband.vlbi_base.file_info.VLBIStreamReaderInfo`
+            Information collected by opening a file in stream reader mode.
+
+        Returns
+        -------
+        consistent : True, False, or None
+            Whether the information on ``info`` for ``key`` is consistent
+            with ``value``.  `None` if it could not be determined.
+        """
+        info_value = getattr(info, key, None)
+        if info_value is None:
+            info_value = getattr(info.file_info, key, None)
+
+        if info_value is not None:
+            return info_value == value
+
+        if key == 'nchan':
+            sample_shape = info.shape[1:]
+            if sample_shape is not None:
+                # If we passed nchan, and info doesn't have it, but does have a
+                # sample shape, check that consistency with that, either in
+                # being equal to `sample_shape.nchan` or equal to the product
+                # of all elements (e.g., a VDIF file with 8 threads and 1
+                # channel per thread is consistent with nchan=8).
+                return (getattr(sample_shape, 'nchan', -1) == value
+                        or np.prod(sample_shape) == value)
+
+        elif key in {'ref_time', 'kday', 'decade'}:
+            start_time = info.start_time
+            if start_time is not None:
+                if key == 'ref_time':
+                    return abs(value - start_time).jd < 500
+                elif key == 'kday':
+                    return int(start_time.mjd / 1000.) * 1000 == value
+                else:  # decade
+                    return int(start_time.isot[:3]) * 10 == value
+
+        return None
+
+    def wrapped(self, module=None, doc=None):
+        """Wrap as a function named info, replacing docstring and module."""
+
+        @functools.wraps(self.__call__)
+        def info(*args, **kwargs):
+            return self(*args, **kwargs)
+
+        if doc:
+            info.__doc__ = doc
+
+        # This ensures the function becomes visible to sphinx.
+        if module:
+            info.__module__ = module
+
+        return info
+
+    @classmethod
+    def create(cls, ns):
+        """Create an info getter for the given namespace.
+
+        This assumes that the namespace contains an ``open`` function, which
+        is used to create an instance of the info class that is wrapped in a
+        function with ``__module__`` set to the calling module (inferred
+        from the namespace).
+
+        Parameters
+        ----------
+        ns : dict
+            Namespace to look in.  Generally, pass in ``globals()`` at the
+            call site.
+        """
+        module = ns.get('__name__', None)
+        for key in ns:
+            if key.endswith('StreamReader'):
+                fmt = key.replace('StreamReader', '')
+                break
+        else:  # noqa
+            fmt = None
+
+        opener = ns['open']
+        info = cls(opener)
+        doc = textwrap.dedent(info.__call__.__doc__)
+        if (fmt is not None
+                and info.__call__.__doc__ is FileInfo.__call__.__doc__):
+            doc = doc.replace(
+                'Collect baseband file information.',
+                f'Collect {fmt} file information.')
+        return info.wrapped(module=module, doc=doc)
+
+
 class FileOpener:
     """File opener for a baseband format.
 
@@ -1272,73 +1558,67 @@ class FileOpener:
                 fh.close()
             raise
 
+    def wrapped(self, module=None, doc=None):
+        """Wrap as a function named open, replacing docstring and module."""
 
-def wrap_opener(opener, module=None, doc=None):
-    """Wrap an opener with a new docstring and module."""
+        @functools.wraps(self.__call__)
+        def open(*args, **kwargs):
+            return self(*args, **kwargs)
 
-    @functools.wraps(getattr(opener, '__call__', opener))
-    def open(*args, **kwargs):
-        return opener(*args, **kwargs)
+        if doc:
+            open.__doc__ = doc
 
-    if doc:
-        open.__doc__ = doc
+        # This ensures the function becomes visible to sphinx.
+        if module:
+            open.__module__ = module
 
-    # This ensures the instance becomes visible to sphinx.
-    if module:
-        open.__module__ = module
+        return open
 
-    return open
+    @classmethod
+    def create(cls, ns, doc=None):
+        """Create a standard opener for the given namespace.
 
+        This assumes that the namespace contains file and stream readers
+        and writers, as well as a header class, with standard names,
+        ``<fmt>FileReader``, ``<fmt>FileWriter``, ``<fmt>StreamReader``,
+        ``<fmt>StreamWriter``, and ``<fmt>Header``, where ``fmt`` is the
+        name of the format (which is inferred by looking for a
+        ``*StreamReader`` entry).
 
-def make_opener(ns, doc=None):
-    """Create a standard opener for the given namespace.
+        The opener is instantiated using the format and the above classes,
+        and then a wrapping function is created with ``__module__`` set to
+        the ``__name__`` of the namespace, and with the documentation of
+        its ``__call__`` method extended with ``doc``.
 
-    This assumes that the file is called inside a module that contains
-    file and stream readers and writers, as well as a header class,
-    with standard names, ``<fmt>FileReader``, ``<fmt>FileWriter``,
-    ``<fmt>StreamReader``, ``<fmt>StreamWriter``, and ``<fmt>Header``,
-    where ``fmt`` is the name of the format (which is inferred by looking
-    for a ``*StreamReader`` entry).
+        Parameters
+        ----------
+        ns : dict
+            Namespace to look in.  Generally, pass in ``globals()`` at the
+            call site.
+        doc : str, optional
+            Extra documentation to add to that of the opener's ``__call__``
+            method.
+        """
+        module = ns.get('__name__', None)
+        for key in ns:
+            if key.endswith('StreamReader'):
+                fmt = key.replace('StreamReader', '')
+                break
+        else:  # noqa
+            raise ValueError('namespace does not contain a StreamReader, '
+                             'so fmt cannot be guessed.')
 
-    The opener is created by initializing either a ``<fmt>FileOpener`` or,
-    if that does not exist, a plain `~baseband.vlbi_base.base.FileOpener`
-    using the format and the above classes, and then creating a wrapping
-    function with ``__module__`` set to the calling module (inferred from
-    the namespace), and with the documentation of its ``__call__`` method
-    extended with ``doc``.
-
-    Parameters
-    ----------
-    ns : dict
-        Namespace to look in.  Generally, pass in ``globals()`` at the
-        call site.
-    doc : str, optional
-        Extra documentation to add to that of the opener's ``__call__``
-        method.
-
-    See Also
-    --------
-    FileOpener : general file opener class
-    wrap_opener : function to wrap the an FileOpener instance
-    """
-    module = ns.get('__name__', None)
-    for key in ns:
-        if key.endswith('StreamReader'):
-            fmt = key.replace('StreamReader', '')
-            break
-    else:  # noqa
-        raise ValueError('namespace does not contain a StreamReader, '
-                         'so fmt cannot be guessed.')
-
-    classes = {mode: ns[fmt + cls_type] for (mode, cls_type) in {
-        'rb': 'FileReader',
-        'wb': 'FileWriter',
-        'rs': 'StreamReader',
-        'ws': 'StreamWriter'}.items()}
-    header_class = ns.get(fmt+'Header')
-    opener_class = ns.get(fmt+'FileOpener', FileOpener)
-    file_opener = opener_class(fmt, classes, header_class)
-    if doc is not None:
-        doc = textwrap.dedent(file_opener.__call__.__doc__
-                              .replace('baseband', fmt)) + doc
-    return wrap_opener(file_opener, module=module, doc=doc)
+        classes = {mode: ns[fmt + cls_type] for (mode, cls_type) in {
+            'rb': 'FileReader',
+            'wb': 'FileWriter',
+            'rs': 'StreamReader',
+            'ws': 'StreamWriter'}.items()}
+        header_class = ns.get(fmt+'Header')
+        opener = cls(fmt, classes, header_class)
+        if doc is not None:
+            doc = textwrap.dedent(opener.__call__.__doc__) + doc
+            if (opener.__call__.__doc__ is FileOpener.__call__.__doc__):
+                doc = doc.replace(
+                    'Open baseband file(s) for reading or writing.',
+                    f'Open {fmt} file(s) for reading or writing.')
+        return opener.wrapped(module=module, doc=doc)

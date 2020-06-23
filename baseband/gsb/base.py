@@ -6,9 +6,10 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (VLBIFileBase, VLBIStreamBase,
-                              VLBIStreamReaderBase, VLBIStreamWriterBase,
-                              FileOpener, wrap_opener)
+from ..vlbi_base.base import (
+    VLBIFileBase,
+    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+    FileOpener, FileInfo)
 from .header import GSBHeader
 from .payload import GSBPayload
 from .frame import GSBFrame
@@ -16,7 +17,8 @@ from .file_info import GSBTimeStampInfo, GSBStreamReaderInfo
 
 
 __all__ = ['GSBTimeStampIO', 'GSBFileReader', 'GSBFileWriter',
-           'GSBStreamBase', 'GSBStreamReader', 'GSBStreamWriter', 'open']
+           'GSBStreamBase', 'GSBStreamReader', 'GSBStreamWriter',
+           'open', 'info']
 
 
 class GSBTimeStampIO(VLBIFileBase):
@@ -619,15 +621,13 @@ class GSBFileOpener(FileOpener):
             raise
 
 
-file_opener = GSBFileOpener('GSB', header_class=GSBHeader, classes={
+open = GSBFileOpener('GSB', header_class=GSBHeader, classes={
     'rt': GSBTimeStampIO,
     'wt': GSBTimeStampIO,
     'rb': GSBFileReader,
     'wb': GSBFileWriter,
     'rs': GSBStreamReader,
-    'ws': GSBStreamWriter})
-
-open = wrap_opener(file_opener, module=__name__, doc="""
+    'ws': GSBStreamWriter}).wrapped(module=__name__, doc="""
 Open GSB file(s) for reading or writing.
 
 A GSB data set contains a text header file and one or more raw data files.
@@ -721,3 +721,34 @@ Filehandle
     :class:`~baseband.gsb.base.GSBStreamReader` or
     :class:`~baseband.gsb.base.GSBStreamWriter` (stream)
 """)
+
+
+class GSBFileInfo(FileInfo):
+    def get_file_info(self, name, **kwargs):
+        info = self._get_info(name, 'rt')
+        if self.is_ok(info):
+            info.used_kwargs = {}
+            if 'raw' in kwargs:
+                info.missing.pop('raw')
+                info.used_kwargs['raw'] = kwargs['raw']
+
+        return info
+
+    def get_stream_info(self, name, file_info, **kwargs):
+        frame_rate = file_info.frame_rate
+        if frame_rate is None:
+            return file_info
+
+        used_kwargs = file_info.used_kwargs
+        for key in ('sample_rate', 'payload_nbytes', 'samples_per_frame'):
+            if key in kwargs:
+                used_kwargs[key] = kwargs[key]
+
+        stream_info = self._get_info(name, mode='rs', **used_kwargs)
+        if self.is_ok(stream_info):
+            stream_info.used_kwargs = used_kwargs
+
+        return stream_info
+
+
+info = GSBFileInfo.create(globals())
