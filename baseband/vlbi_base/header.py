@@ -476,17 +476,13 @@ class ParsedHeaderBase:
                 and np.all(np.array(self.words, copy=False)
                            == np.array(other.words, copy=False)))
 
-    @staticmethod
-    def _repr_as_hex(key):
-        return (key.startswith('bcd') or key.startswith('crc')
-                or key == 'sync_pattern')
+    def _repr_value(self, key, value):
+        return str(value)
 
     def __repr__(self):
         name = self.__class__.__name__
-        return ("<{0} {1}>".format(name, (",\n  " + len(name) * " ").join(
-            ["{0}: {1}".format(k, hex(self[k]) if self._repr_as_hex(k)
-                               else self[k])
-             for k in self.keys()])))
+        outs = [f"{k}: {self._repr_value(k, self[k])}" for k in self.keys()]
+        return "<{} {}>".format(name, (",\n  " + " "*len(name)).join(outs))
 
 
 class VLBIHeaderBase(ParsedHeaderBase):
@@ -646,3 +642,11 @@ class VLBIHeaderBase(ParsedHeaderBase):
     def tofile(self, fh):
         """Write VLBI frame header to filehandle."""
         return fh.write(self._struct.pack(*self.words))
+
+    def _repr_value(self, key, value):
+        if key.startswith(('bcd', 'crc', 'sync_pattern')):
+            try:
+                value = hex(value)
+            except Exception:
+                pass
+        return super()._repr_value(key, value)
