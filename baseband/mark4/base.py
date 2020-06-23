@@ -192,11 +192,11 @@ class Mark4FileReader(VLBIFileReaderBase):
         trials = 16, 32, 64
         for ntrack in trials:
             self.ntrack = ntrack
-            try:
-                self.find_header(maximum=maximum)
+            with self.temporary_offset():
+                offsets = self.locate_frames(maximum=maximum)
+            if offsets:
+                self.seek(offsets[0])
                 return ntrack
-            except Exception:
-                pass
 
         self.ntrack = old_ntrack
         raise HeaderNotFoundError("cannot determine ntrack automatically. "

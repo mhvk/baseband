@@ -376,6 +376,26 @@ class TestMark4:
         assert repr_fh.startswith('Mark4FileReader')
         assert 'ntrack=64, decade=2010, ref_time=None' in repr_fh
 
+    def test_binary_file_info(self):
+        with mark4.open(SAMPLE_FILE, 'rb') as fh1:
+            info1 = fh1.info
+            assert info1.format == 'mark4'
+            assert {'decade', 'ref_time'} == set(info1.missing)
+
+        with mark4.open(SAMPLE_FILE, 'rb', decade=2010) as fh2:
+            info2 = fh2.info
+            assert info2.format == 'mark4'
+            assert not info2.missing
+            assert info2.offset0 == 0xa88
+            assert abs(info2.frame_rate
+                       - 32 * u.MHz / info2.samples_per_frame) < 1 * u.nHz
+
+        with mark4.open(SAMPLE_FILE, 'rb', decade='2010') as fh3:
+            info3 = fh3.info
+            assert info3.format == 'mark4'
+            assert info3.offset0 == 0xa88
+            assert 'header0' in info3.errors
+
     def test_frame(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb', decade=2010, ntrack=64) as fh:
             fh.seek(0xa88)
