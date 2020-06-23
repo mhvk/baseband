@@ -49,17 +49,10 @@ class TimeGSB(TimeString):
         self.jd1, self.jd2 = erfa.dtf2d(
             self.scale.upper().encode('utf8'), *iterator.operands[1:])
 
-    # This can be removed once we only support astropy >=3.1.
-    _new_ihmsfs_dtype = np.dtype([(c, np.intc) for c in 'hmsf'])
-
     def to_value(self, parent=None):
         scale = self.scale.upper().encode('ascii'),
         iys, ims, ids, ihmsfs = erfa.d2dtf(scale, self.precision,
                                            self.jd1, self.jd2)
-        # For ASTROPY_LT_3_1, convert to the new structured array dtype that is
-        # returned by the new erfa gufuncs.
-        if not ihmsfs.dtype.names:
-            ihmsfs = ihmsfs.view(self._new_ihmsfs_dtype)
         ihrs = ihmsfs['h']
         imins = ihmsfs['m']
         isecs = ihmsfs['s']
