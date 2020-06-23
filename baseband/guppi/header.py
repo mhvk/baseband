@@ -8,15 +8,11 @@ import operator
 
 import numpy as np
 import astropy.units as u
-import astropy
 from astropy.io import fits
 from astropy.time import Time
 
 
 __all__ = ['GUPPIHeader']
-
-
-ASTROPY_LT_3_2 = astropy.__version__[:3] < '3.2'
 
 
 class GUPPIHeader(fits.Header):
@@ -91,13 +87,9 @@ class GUPPIHeader(fits.Header):
 
     def copy(self):
         """Create a mutable and independent copy of the header."""
-        # This method exists because io.fits.Header.copy doesn't properly
-        # return copy of the same class.
-        newfitsheader = super().copy()
-        return self.__class__(newfitsheader)
-
-    def __copy__(self):
-        return self.copy()
+        # This method exists because io.fits.Header.copy has a docstring that
+        # refers to `Header` which breaks sphinx...
+        return super().copy()
 
     @classmethod
     def fromfile(cls, fh, verify=True):
@@ -129,8 +121,7 @@ class GUPPIHeader(fits.Header):
         # Create the header using the base class.
         self = cls.fromstring(hdr)
         self.mutable = False
-        # Above does not verify in astropy >= 3.2, so do it here if needed.
-        if verify and not ASTROPY_LT_3_2:
+        if verify:
             self.verify()
         # GUPPI headers are not a proper FITS standard, and we're reading
         # from a file that the user likely cannot control, so let's not bother
