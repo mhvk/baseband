@@ -173,6 +173,25 @@ class TestGUPPI:
             guppi.GUPPIHeader.fromvalues(nchan=1, npol=1, bps=4,
                                          samples_per_frame=10001)
 
+    def test_header_comment_cards(self, tmpdir):
+        # Actually not obvious GUPPI itself allows it, but we might as
+        # well test that we do not fail in setting comments.
+        with open(SAMPLE_FILE, 'rb') as fh:
+            header = guppi.GUPPIHeader.fromfile(fh)
+        assert 'OBSNCHAN' not in header.comments
+        header1 = header.copy()
+        header1['OBSNCHAN'] = header['OBSNCHAN'], 'number of channels'
+        assert header1.comments['OBSNCHAN'] == 'number of channels'
+        name = str(tmpdir.join('guppi_header.test'))
+        with open(name, 'wb') as fw:
+            header1.tofile(fw)
+
+        with open(name, 'rb') as fr:
+            header2 = guppi.GUPPIHeader.fromfile(fr)
+
+        assert header2 == header
+        assert header2.comments['OBSNCHAN'] == 'number of channels'
+
     def test_payload(self, tmpdir):
         payload = self.payload
         assert payload.nbytes == 16384
