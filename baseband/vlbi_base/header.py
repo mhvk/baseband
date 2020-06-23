@@ -37,8 +37,8 @@ class fixedvalue(classproperty):
     def __set__(self, instance, value):
         fixed_value = self.__get__(instance, type(instance))
         if value != fixed_value:
-            raise ValueError('fixed property can only be set to {}.'
-                             .format(fixed_value))
+            raise ValueError(
+                f"'{self.fget.__name__}' can only be set to {fixed_value}.")
 
 
 def make_parser(word_index, bit_index, bit_length, default=None):
