@@ -450,7 +450,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                         'mode': fh.mode})
                 else:
                     pair_info.append(fh)
-                fh_info.append(pair_info)
+            fh_info.append(pair_info)
 
         state['fh_info'] = fh_info
         return state
@@ -471,7 +471,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                         fh_pair.append(fh)
                     else:
                         fh_pair.append(info)
-            fh_raw.append(fh_pair)
+                fh_raw.append(fh_pair)
             if state['_header0'].mode == 'rawdump':
                 fh_raw = fh_raw[0][0]
 
