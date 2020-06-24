@@ -97,7 +97,7 @@ class TestMark5B:
         header6.payload_nbytes = 10000
         header6.frame_nbytes = 10016
         header6.complex_data = False
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="'payload_nbytes'.*set to 10000"):
             header6.payload_nbytes = 9999
         with pytest.raises(ValueError):
             header6.frame_nbytes = 20

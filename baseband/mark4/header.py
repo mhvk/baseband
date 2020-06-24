@@ -800,17 +800,14 @@ class Mark4Header(Mark4TrackHeader):
         for k in self.keys():
             v = self[k]
             if len(v) == 1:
-                outs.append('{0}: {1}'.format(
-                    k, hex(v[0]) if self._repr_as_hex(k) else v[0]))
+                repr_value = self._repr_value(k, v[0])
             elif np.all(v == v[0]):
-                outs.append('{0}: [{1}]*{2}'.format(
-                    k, hex(v[0]) if self._repr_as_hex(k) else v[0], v.size))
+                repr_value = f'[{self._repr_value(k, v[0])}]*{v.size}'
             else:
                 if len(v) > 4:
                     v = (v[0], '...', v[-1])
-                outs.append('{0}: [{1}]'.format(k, ', '.join(
-                    (hex(_v) if _v != '...' and self._repr_as_hex(k)
-                     else str(_v)) for _v in v)))
+                repr_value = '[{}]'.format(', '.join([self._repr_value(k, _v)
+                                                      for _v in v]))
+            outs.append(f'{k}: {repr_value}')
 
-        return "<{0} {1}>".format(name,
-                                  (",\n  " + len(name) * " ").join(outs))
+        return "<{} {}>".format(name, (",\n  " + " "*len(name)).join(outs))

@@ -18,7 +18,8 @@ from astropy.utils import sharedmethod, classproperty
 
 __all__ = ['fixedvalue', 'four_word_struct', 'eight_word_struct',
            'make_parser', 'make_setter', 'get_default',
-           'ParserDict', 'HeaderParser', 'VLBIHeaderBase']
+           'ParserDict', 'HeaderParser', 'ParsedHeaderBase', 'VLBIHeaderBase']
+
 
 four_word_struct = struct.Struct('<4I')
 """Struct instance that packs/unpacks 4 unsigned 32-bit integers."""
@@ -36,8 +37,8 @@ class fixedvalue(classproperty):
     def __set__(self, instance, value):
         fixed_value = self.__get__(instance, type(instance))
         if value != fixed_value:
-            raise ValueError('fixed property can only be set to {}.'
-                             .format(fixed_value))
+            raise ValueError(
+                f"'{self.fget.__name__}' can only be set to {fixed_value}.")
 
 
 def make_parser(word_index, bit_index, bit_length, default=None):
@@ -259,22 +260,16 @@ class HeaderParser(OrderedDict):
     defaults = ParserDict('get_default')
 
 
-class VLBIHeaderBase:
-    """Base class for all VLBI headers.
+class ParsedHeaderBase:
+    """Base class for all baseband headers using parsers.
 
     Defines a number of common routines.
 
     Generally, the actual class should define:
 
-      _struct : `~struct.Struct` instance that can pack/unpack header words.
-
       _header_parser : `HeaderParser` instance corresponding to this class.
 
       _properties : tuple of properties accessible/usable in initialisation
-
-      _invariants : set of keys of invariant header parts for a given type.
-
-      _stream_invarants : set of keys of invariant header parts for a stream.
 
     It also should define properties that tell the size (getters *and*
     setters, or use a `baseband.vlbi_base.header.fixedvalue` if the
@@ -289,39 +284,27 @@ class VLBIHeaderBase:
 
     Parameters
     ----------
-    words : tuple or list of int, or None
-        header words (generally, 32 bit unsigned int).  If given as a tuple,
-        the header is immutable.  If `None`, set to a list of zeros for
-        later initialisation (and skip any verification).
+    words : tuple or list
+        Header words.  If given as a tuple, the header is immutable.
     verify : bool, optional
-        Whether to do basic verification of integrity.  For the base class,
-        checks that the number of words is consistent with the struct size.
+        Whether to do basic verification of integrity.
+
     """
-
-    # TODO: should [_stream]_invarants be defined through some subclass init??
-    # TODO: perhaps from some hints in the headerparser definition?
-
-    # Define a bare _struct to avoid sphinx complaints about nbytes.
-    _struct = struct.Struct('')
-    """Structure for the header words.  To be overridden by subclasses."""
 
     _properties = ('payload_nbytes', 'frame_nbytes', 'time')
     """Properties accessible/usable in initialisation for all headers."""
 
     def __init__(self, words, verify=True):
-        if words is None:
-            self.words = [0] * (self._struct.size // 4)
-        else:
-            self.words = words
-            if verify:
-                self.verify()
+        self.words = words
+        if verify:
+            self.verify()
 
     def verify(self):
-        """Verify that the length of the words is consistent.
+        """Base verification always passes.
 
-        Subclasses should override this to do more thorough checks.
+        Only here for subclasses to be able to do super().
         """
-        assert len(self.words) == (self._struct.size // 4)
+        pass
 
     def copy(self, **kwargs):
         """Create a mutable and independent copy of the header.
@@ -335,88 +318,6 @@ class VLBIHeaderBase:
 
     def __copy__(self):
         return self.copy()
-
-    @sharedmethod
-    def invariants(self):
-        """Set of keys of invariant header parts.
-
-        On the class, this returns keys of parts that are shared by
-        all headers for the type, on an instance, those that are
-        shared with other headers in the same file.
-
-        If neither are defined, returns 'sync_pattern' if the header
-        containts that key.
-        """
-
-        if not isinstance(self, type) and hasattr(self, '_stream_invariants'):
-            return self._stream_invariants
-
-        elif hasattr(self, '_invariants'):
-            return self._invariants
-
-        elif 'sync_pattern' in getattr(self, '_header_parser', {}):
-            return {'sync_pattern'}
-
-        else:
-            return set()
-
-    @sharedmethod
-    def invariant_pattern(self, invariants=None, **kwargs):
-        """Pattern and mask shared between headers of a type or stream.
-
-        This is mostly for use inside
-        :meth:`~baseband.vlbi_base.base.VLBIFileReaderBase.locate_frames`.
-
-        Parameters
-        ----------
-        invariants : set of str, optional
-            Set of keys to header parts that are shared between all headers
-            of a given type or within a given stream/file.  Default: from
-            `~baseband.vlbi_base.header.VLBIHeaderBase.invariants()`.
-        **kwargs
-            Keyword arguments needed to instantiate an empty header.
-            (Mostly for Mark 4).
-
-        Returns
-        -------
-        pattern : list of int
-            The pattern that is shared between headers. If called on
-            an instance, just the header words; if called on a class,
-            words with defaults for the relevant parts set.
-        mask : list of int
-            For each entry in ``pattern`` a bit mask with bits set for
-            the parts that are invariant.
-        """
-
-        if invariants is None:
-            invariants = self.invariants()
-
-        if not invariants:
-            raise ValueError("cannot create an invariant_mask without "
-                             "some invariants")
-
-        if isinstance(self, type):
-            # If we are called as a classmethod, first get an instance
-            # with all defaults set.  This will be our pattern.
-            self = self(None, **kwargs)
-            for invariant in invariants:
-                value = self._header_parser.defaults[invariant]
-                if value is None:
-                    raise ValueError('can only set as invariant a header '
-                                     'part that has a default.')
-                self[invariant] = value
-
-        # Create an all-zero version and set bits for all invariants.
-        mask = self.__class__(None, **kwargs)
-        for invariant in invariants:
-            mask[invariant] = True
-
-        return self.words, mask.words
-
-    @fixedvalue
-    def nbytes(cls):
-        """Size of the header in bytes."""
-        return cls._struct.size
 
     @property
     def mutable(self):
@@ -445,22 +346,6 @@ class VLBIHeaderBase:
         else:
             raise TypeError("do not know how to set mutability of '.words' "
                             "of class {0}".format(type(self.words)))
-
-    @classmethod
-    def fromfile(cls, fh, *args, **kwargs):
-        """Read VLBI Header from file.
-
-        Arguments are the same as for class initialisation.  The header
-        constructed will be immutable.
-        """
-        s = fh.read(cls._struct.size)
-        if len(s) != cls._struct.size:
-            raise EOFError
-        return cls(cls._struct.unpack(s), *args, **kwargs)
-
-    def tofile(self, fh):
-        """Write VLBI frame header to filehandle."""
-        return fh.write(self._struct.pack(*self.words))
 
     @classmethod
     def fromvalues(cls, *args, **kwargs):
@@ -550,7 +435,7 @@ class VLBIHeaderBase:
             self.verify()
 
     def __getitem__(self, item):
-        """Get the value a particular header item from the header words."""
+        """Get the value of a particular header item from the header words."""
         try:
             return self._header_parser.parsers[item](self.words)
         except KeyError:
@@ -591,14 +476,177 @@ class VLBIHeaderBase:
                 and np.all(np.array(self.words, copy=False)
                            == np.array(other.words, copy=False)))
 
-    @staticmethod
-    def _repr_as_hex(key):
-        return (key.startswith('bcd') or key.startswith('crc')
-                or key == 'sync_pattern')
+    def _repr_value(self, key, value):
+        return str(value)
 
     def __repr__(self):
         name = self.__class__.__name__
-        return ("<{0} {1}>".format(name, (",\n  " + len(name) * " ").join(
-            ["{0}: {1}".format(k, hex(self[k]) if self._repr_as_hex(k)
-                               else self[k])
-             for k in self.keys()])))
+        outs = [f"{k}: {self._repr_value(k, self[k])}" for k in self.keys()]
+        return "<{} {}>".format(name, (",\n  " + " "*len(name)).join(outs))
+
+
+class VLBIHeaderBase(ParsedHeaderBase):
+    """Base class for all VLBI headers.
+
+    Defines a number of common routines.
+
+    Generally, the actual class should define:
+
+      _struct : `~struct.Struct` instance that can pack/unpack header words.
+
+      _header_parser : `HeaderParser` instance corresponding to this class.
+
+      _properties : tuple of properties accessible/usable in initialisation
+
+      _invariants : set of keys of invariant header parts for a given type.
+
+      _stream_invarants : set of keys of invariant header parts for a stream.
+
+    It also should define properties that tell the size (getters *and*
+    setters, or use a `baseband.vlbi_base.header.fixedvalue` if the
+    value is the same for all instances):
+
+      payload_nbytes : number of bytes used by payload
+
+      frame_nbytes : total number of bytes for header + payload
+
+      get_time, set_time, and a corresponding time property :
+           time at start of payload
+
+    Parameters
+    ----------
+    words : tuple or list of int, or None
+        header words (generally, 32 bit unsigned int).  If given as a tuple,
+        the header is immutable.  If `None`, set to a list of zeros for
+        later initialisation (and skip any verification).
+    verify : bool, optional
+        Whether to do basic verification of integrity.  For the base class,
+        checks that the number of words is consistent with the struct size.
+    """
+
+    # TODO: should [_stream]_invarants be defined through some subclass init??
+    # TODO: perhaps from some hints in the headerparser definition?
+
+    # Define a bare _struct to avoid sphinx complaints about nbytes.
+    _struct = struct.Struct('')
+    """Structure for the header words.  To be overridden by subclasses."""
+
+    def __init__(self, words, verify=True):
+        if words is None:
+            words = [0] * (self._struct.size // 4)
+            verify = False
+
+        super().__init__(words, verify=verify)
+
+    def verify(self):
+        """Verify that the length of the words is consistent.
+
+        Subclasses should override this to do more thorough checks.
+        """
+        assert len(self.words) == (self._struct.size // 4)
+
+    @sharedmethod
+    def invariants(self):
+        """Set of keys of invariant header parts.
+
+        On the class, this returns keys of parts that are shared by
+        all headers for the type, on an instance, those that are
+        shared with other headers in the same file.
+
+        If neither are defined, returns 'sync_pattern' if the header
+        containts that key.
+        """
+
+        if not isinstance(self, type) and hasattr(self, '_stream_invariants'):
+            return self._stream_invariants
+
+        elif hasattr(self, '_invariants'):
+            return self._invariants
+
+        elif 'sync_pattern' in getattr(self, '_header_parser', {}):
+            return {'sync_pattern'}
+
+        else:
+            return set()
+
+    @sharedmethod
+    def invariant_pattern(self, invariants=None, **kwargs):
+        """Pattern and mask shared between headers of a type or stream.
+
+        This is mostly for use inside
+        :meth:`~baseband.vlbi_base.base.VLBIFileReaderBase.locate_frames`.
+
+        Parameters
+        ----------
+        invariants : set of str, optional
+            Set of keys to header parts that are shared between all headers
+            of a given type or within a given stream/file.  Default: from
+            `~baseband.vlbi_base.header.VLBIHeaderBase.invariants()`.
+        **kwargs
+            Keyword arguments needed to instantiate an empty header.
+            (Mostly for Mark 4).
+
+        Returns
+        -------
+        pattern : list of int
+            The pattern that is shared between headers. If called on
+            an instance, just the header words; if called on a class,
+            words with defaults for the relevant parts set.
+        mask : list of int
+            For each entry in ``pattern`` a bit mask with bits set for
+            the parts that are invariant.
+        """
+
+        if invariants is None:
+            invariants = self.invariants()
+
+        if not invariants:
+            raise ValueError("cannot create an invariant_mask without "
+                             "some invariants")
+
+        if isinstance(self, type):
+            # If we are called as a classmethod, first get an instance
+            # with all defaults set.  This will be our pattern.
+            self = self(None, **kwargs)
+            for invariant in invariants:
+                value = self._header_parser.defaults[invariant]
+                if value is None:
+                    raise ValueError('can only set as invariant a header '
+                                     'part that has a default.')
+                self[invariant] = value
+
+        # Create an all-zero version and set bits for all invariants.
+        mask = self.__class__(None, **kwargs)
+        for invariant in invariants:
+            mask[invariant] = True
+
+        return self.words, mask.words
+
+    @fixedvalue
+    def nbytes(cls):
+        """Size of the header in bytes."""
+        return cls._struct.size
+
+    @classmethod
+    def fromfile(cls, fh, *args, **kwargs):
+        """Read VLBI Header from file.
+
+        Arguments are the same as for class initialisation.  The header
+        constructed will be immutable.
+        """
+        s = fh.read(cls._struct.size)
+        if len(s) != cls._struct.size:
+            raise EOFError
+        return cls(cls._struct.unpack(s), *args, **kwargs)
+
+    def tofile(self, fh):
+        """Write VLBI frame header to filehandle."""
+        return fh.write(self._struct.pack(*self.words))
+
+    def _repr_value(self, key, value):
+        if key.startswith(('bcd', 'crc', 'sync_pattern')):
+            try:
+                value = hex(value)
+            except Exception:
+                pass
+        return super()._repr_value(key, value)
