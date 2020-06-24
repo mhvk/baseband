@@ -4,7 +4,7 @@
 - This future version will likely only support python 3.7, numpy 1.17 and
   astropy 4.0.
 
-3.2.1 (unreleased)
+3.2.1 (2020-06-24)
 ==================
 
 Bug Fixes
