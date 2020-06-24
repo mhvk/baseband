@@ -75,39 +75,6 @@ class GSBTimeStampIO(VLBIFileBase):
             timestamp1 = self.read_timestamp()
         return (1. / (timestamp1.time - timestamp0.time)).to(u.Hz)
 
-    def __getstate__(self):
-        if self.writable():
-            raise TypeError('cannot pickle file opened for writing')
-
-        state = self.__dict__.copy()
-        # TextIOBase instances cannot be pickled, but we can just reopen them
-        # when we are unpickled.  Also deal with its buffer similarly
-        # if an IOBase; anything else may have internal state that
-        # needs preserving (e.g., SequentialFile), so we will assume
-        # it takes care of this itself.
-        state['fh_info'] = {'offset': 'closed' if self.closed else self.tell()}
-        fh = state.pop('fh_raw')
-        if isinstance(fh, io.IOBase):
-            state['fh_info'].update(filename=fh.name, mode=fh.mode)
-        else:
-            state['fh_info']['buffer'] = fh
-
-        return state
-
-    def __setstate__(self, state):
-        fh_info = state.pop('fh_info')
-        fh = fh_info.get('buffer')
-        if fh is None:
-            fh = io.open(fh_info['filename'], fh_info['mode'])
-
-        state['fh_raw'] = (fh if isinstance(fh, io.TextIOWrapper)
-                           else io.TextIOWrapper(fh))
-        self.__dict__.update(state)
-        if fh_info['offset'] != 'closed':
-            self.seek(fh_info['offset'])
-        else:
-            self.close()
-
 
 class GSBFileReader(VLBIFileBase):
     """Simple reader for GSB data files.
@@ -153,34 +120,6 @@ class GSBFileReader(VLBIFileBase):
                                    payload_nbytes=self.payload_nbytes,
                                    nchan=self.nchan, bps=self.bps,
                                    complex_data=self.complex_data)
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        # TODO: remove duplication with VLBIFileReaderBase.
-        # IOBase instances cannot be pickled, but we can just reopen them
-        # when we are unpickled.  Anything else may have internal state that
-        # needs preserving (e.g., SequentialFile), so we will assume
-        # it takes care of this itself.
-        if isinstance(self.fh_raw, io.IOBase):
-            fh = state.pop('fh_raw')
-            state['fh_info'] = {
-                'offset': 'closed' if fh.closed else fh.tell(),
-                'filename': fh.name,
-                'mode': fh.mode}
-
-        return state
-
-    def __setstate__(self, state):
-        fh_info = state.pop('fh_info', None)
-        if fh_info is not None:
-            fh = io.open(fh_info['filename'], fh_info['mode'])
-            if fh_info['offset'] != 'closed':
-                fh.seek(fh_info['offset'])
-            else:
-                fh.close()
-            state['fh_raw'] = fh
-
-        self.__dict__.update(state)
 
 
 class GSBFileWriter(VLBIFileBase):

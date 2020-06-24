@@ -90,6 +90,36 @@ class VLBIFileBase:
     def __repr__(self):
         return "{0}(fh_raw={1})".format(self.__class__.__name__, self.fh_raw)
 
+    def __getstate__(self):
+        if self.writable():
+            raise TypeError('cannot pickle file opened for writing')
+
+        state = self.__dict__.copy()
+        # IOBase instances cannot be pickled, but we can just reopen them
+        # when we are unpickled.  Anything else may have internal state that
+        # needs preserving (e.g., SequentialFile), so we will assume
+        # it takes care of this itself.
+        if isinstance(self.fh_raw, io.IOBase):
+            fh = state.pop('fh_raw')
+            state['fh_info'] = {
+                'offset': 'closed' if fh.closed else fh.tell(),
+                'filename': fh.name,
+                'mode': fh.mode}
+
+        return state
+
+    def __setstate__(self, state):
+        fh_info = state.pop('fh_info', None)
+        if fh_info is not None:
+            fh = io.open(fh_info['filename'], fh_info['mode'])
+            if fh_info['offset'] != 'closed':
+                fh.seek(fh_info['offset'])
+            else:
+                fh.close()
+            state['fh_raw'] = fh
+
+        self.__dict__.update(state)
+
 
 class VLBIFileReaderBase(VLBIFileBase):
     """VLBI wrapped file reader base class.
@@ -322,33 +352,6 @@ class VLBIFileReaderBase(VLBIFileBase):
                 header = self.read_header()
 
         return (max_frame + 1) * u.Hz
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        # IOBase instances cannot be pickled, but we can just reopen them
-        # when we are unpickled.  Anything else may have internal state that
-        # needs preserving (e.g., SequentialFile), so we will assume
-        # it takes care of this itself.
-        if isinstance(self.fh_raw, io.IOBase):
-            fh = state.pop('fh_raw')
-            state['fh_info'] = {
-                'offset': 'closed' if fh.closed else fh.tell(),
-                'filename': fh.name,
-                'mode': fh.mode}
-
-        return state
-
-    def __setstate__(self, state):
-        fh_info = state.pop('fh_info', None)
-        if fh_info is not None:
-            fh = io.open(fh_info['filename'], fh_info['mode'])
-            if fh_info['offset'] != 'closed':
-                fh.seek(fh_info['offset'])
-            else:
-                fh.close()
-            state['fh_raw'] = fh
-
-        self.__dict__.update(state)
 
 
 class VLBIStreamBase:
