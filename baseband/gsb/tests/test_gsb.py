@@ -687,16 +687,19 @@ class TestGSB:
                       squeeze=False) as fh:
             fh.seek(6)
             pickled = pickle.dumps(fh)
-            fh.read(3)
+            d1_3 = fh.read(3)
             with pickle.loads(pickled) as fh2:
                 assert fh2.tell() == 6
-                fh2.read(10)
+                d2_10 = fh2.read(10)
 
+            assert np.all(d2_10[:3] == d1_3)
             assert fh.tell() == 9
 
         with pickle.loads(pickled) as fh3:
             assert fh3.tell() == 6
-            fh3.read(1)
+            d3_5 = fh3.read(5)
+
+        assert np.all(d3_5[:3] == d1_3)
 
         closed = pickle.dumps(fh)
         with pickle.loads(closed) as fh4:
