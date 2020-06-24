@@ -702,7 +702,7 @@ def open(name, mode='rs', **kwargs):
                 fh_raw = raw
             else:
                 fh_raw = io.open(raw, mode.replace('s', '') + 'b')
-                opened_files.append(raw)
+                opened_files.append(fh_raw)
         else:
             if not isinstance(raw[0], (list, tuple)):
                 raw = (raw,)
@@ -710,11 +710,10 @@ def open(name, mode='rs', **kwargs):
             for pol in raw:
                 raw_pol = []
                 for p in pol:
-                    if hasattr(p, fh_attr):
-                        raw_pol.append(p)
-                    else:
-                        raw_pol.append(io.open(p, mode.replace('s', '') + 'b'))
+                    if not hasattr(p, fh_attr):
+                        p = io.open(p, mode.replace('s', '') + 'b')
                         opened_files.append(p)
+                    raw_pol.append(p)
                 fh_raw.append(raw_pol)
 
         kwargs['fh_raw'] = fh_raw
@@ -725,8 +724,8 @@ def open(name, mode='rs', **kwargs):
     except Exception as exc:
         if opened_files:
             try:
-                for name in opened_files:
-                    name.close()
+                for fh in opened_files:
+                    fh.close()
             except Exception:  # pragma: no cover
                 pass
         raise exc
