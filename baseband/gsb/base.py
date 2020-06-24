@@ -105,7 +105,8 @@ class GSBTimeStampIO(VLBIFileBase):
         if fh is None:
             fh = io.open(fh_info['filename'], fh_info['mode'])
 
-        state['fh_raw'] = io.TextIOWrapper(fh)
+        state['fh_raw'] = (fh if isinstance(fh, io.TextIOWrapper)
+                           else io.TextIOWrapper(fh))
         self.__dict__.update(state)
         if fh_info['offset'] != 'closed':
             self.seek(fh_info['offset'])
