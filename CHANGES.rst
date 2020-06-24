@@ -35,7 +35,7 @@ Other Changes and Additions
 - General classes to help writing ``open`` and ``info`` functions are now
   provided in ``baseband.vlbi_base.FileOpener`` and ``FileInfo``. [#418]
 
-3.2.1 (unreleased)
+3.2.1 (2020-06-24)
 ==================
 
 Bug Fixes
