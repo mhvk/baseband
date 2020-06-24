@@ -628,13 +628,14 @@ class TestGSB:
             assert np.all(check == data2)
 
         # Test that opening that raises an exception correctly handles
-        # file closing. (Note that the timestamp file always gets closed).
-        with open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
+        # file closing.
+        with open(str(tmpdir.join('test.timestamp')), 'wt') as sh, \
                 open(str(tmpdir.join('test.dat')), 'w+b') as sp:
             with pytest.raises(u.UnitsError):
                 gsb.open(sh, 'ws', raw=sp, sample_rate=3.9736/u.m,
                          samples_per_frame=(self.payload_nbytes * (8 // bps)),
                          **header0)
+            assert not sh.closed
             assert not sp.closed
 
         # Test that an incomplete last header leads to the second-to-last
@@ -686,16 +687,19 @@ class TestGSB:
                       squeeze=False) as fh:
             fh.seek(6)
             pickled = pickle.dumps(fh)
-            fh.read(3)
+            d1_3 = fh.read(3)
             with pickle.loads(pickled) as fh2:
                 assert fh2.tell() == 6
-                fh2.read(10)
+                d2_10 = fh2.read(10)
 
+            assert np.all(d2_10[:3] == d1_3)
             assert fh.tell() == 9
 
         with pickle.loads(pickled) as fh3:
             assert fh3.tell() == 6
-            fh3.read(1)
+            d3_5 = fh3.read(5)
+
+        assert np.all(d3_5[:3] == d1_3)
 
         closed = pickle.dumps(fh)
         with pickle.loads(closed) as fh4:
@@ -816,7 +820,7 @@ class TestGSB:
                       sample_rate=sample_rate,
                       samples_per_frame=(self.payload_nbytes
                                          // nchan)) as fh_r, \
-                open(str(tmpdir.join('test_time.timestamp')), 'w+b') as sh,\
+                open(str(tmpdir.join('test_time.timestamp')), 'w+t') as sh,\
                 open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
                 open(str(tmpdir.join('test1.dat')), 'w+b') as sp1, \
                 open(str(tmpdir.join('test2.dat')), 'w+b') as sp2, \
