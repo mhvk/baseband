@@ -13,6 +13,8 @@ Bug Fixes
 - For GSB phased data, fix the interpretation of ``sample_rate`` in
   calculating ``payload_nbytes``. [#410]
 
+- Fix pickling for GSB phased data.
+
 3.2 (2020-06-11)
 ================
 
