@@ -628,13 +628,14 @@ class TestGSB:
             assert np.all(check == data2)
 
         # Test that opening that raises an exception correctly handles
-        # file closing. (Note that the timestamp file always gets closed).
-        with open(str(tmpdir.join('test.timestamp')), 'w+b') as sh, \
+        # file closing.
+        with open(str(tmpdir.join('test.timestamp')), 'wt') as sh, \
                 open(str(tmpdir.join('test.dat')), 'w+b') as sp:
             with pytest.raises(u.UnitsError):
                 gsb.open(sh, 'ws', raw=sp, sample_rate=3.9736/u.m,
                          samples_per_frame=(self.payload_nbytes * (8 // bps)),
                          **header0)
+            assert not sh.closed
             assert not sp.closed
 
         # Test that an incomplete last header leads to the second-to-last
