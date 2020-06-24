@@ -1514,7 +1514,8 @@ class FileOpener:
         if self.is_template(name):
             name = self.get_fns(name, mode, kwargs)
 
-        open_kwargs = {'mode': 'rb' if mode[0] == 'r' else 'w+b'}
+        open_kwargs = {'mode': (mode[0].replace('w', 'w+')
+                                + mode[1].replace('s', 'b'))}
         if self.is_sequence(name):
             opener = sf.open
             if 'file_size' in kwargs:

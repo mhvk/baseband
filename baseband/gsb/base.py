@@ -33,11 +33,6 @@ class GSBTimeStampIO(VLBIFileBase):
         Filehandle to the timestamp file, opened in binary mode.
     """
 
-    def __init__(self, fh_raw):
-        if not isinstance(fh_raw, io.TextIOWrapper):
-            fh_raw = io.TextIOWrapper(fh_raw)
-        super().__init__(fh_raw)
-
     info = GSBTimeStampInfo()
 
     def read_timestamp(self):
@@ -91,7 +86,7 @@ class GSBTimeStampIO(VLBIFileBase):
         # needs preserving (e.g., SequentialFile), so we will assume
         # it takes care of this itself.
         state['fh_info'] = {'offset': 'closed' if self.closed else self.tell()}
-        fh = state.pop('fh_raw').buffer
+        fh = state.pop('fh_raw')
         if isinstance(fh, io.IOBase):
             state['fh_info'].update(filename=fh.name, mode=fh.mode)
         else:
