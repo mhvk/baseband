@@ -263,7 +263,7 @@ class TestVDIF:
         class VDIFHeaderX(vdif.header.VDIFSampleRateHeader):
             _edv = 0x58
             _header_parser = (vdif.header.VDIFSampleRateHeader._header_parser
-                              + vlbi_base.header.HeaderParser(
+                              | vlbi_base.header.HeaderParser(
                                   (('nonsense_0', (6, 0, 32, 0x0)),
                                    ('nonsense_1', (7, 0, 8, None)),
                                    ('nonsense_2', (7, 8, 24, 0x1)))))

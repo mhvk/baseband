@@ -13,7 +13,7 @@ import numpy as np
 from astropy import units as u, _erfa as erfa
 from astropy.time import Time, TimeString
 
-from ..vlbi_base.header import ParsedHeaderBase, HeaderParser
+from ..vlbi_base.header import ParsedHeaderBase, ParserDict
 
 
 __all__ = ['TimeGSB', 'GSBHeader', 'GSBRawdumpHeader', 'GSBPhasedHeader']
@@ -96,6 +96,35 @@ def make_setter(index, length, forward, backward, default=None):
 
 def get_default(index, length, forward, backward, default=None):
     return default
+
+
+class GSBHeaderParser(dict):
+    """Parser & setter for GSB timestamp keywords.
+
+    A dictionary of header keywords, with values that describe how they are
+    encoded in the GSB header.  Initialisation is as a normal dict,
+    with (ordered) key, value pairs, with each value a tuple containing:
+
+    index : int
+        Index into the header words for this key.
+    length : int
+        Number of words included in this key.
+    forward : callable
+        Function to decode the data.
+    backward : callable
+        Function to encode the value.
+    default : object or None
+        Possible default value.
+
+    Notes
+    -----
+    For GSB, this parsing technique is a bit of overkill, but it allows re-use
+    of handy methods from the VLBI header parser.
+    """
+
+    parsers = ParserDict(make_parser)
+    setters = ParserDict(make_setter)
+    defaults = ParserDict(get_default)
 
 
 class GSBHeader(ParsedHeaderBase):
@@ -242,11 +271,8 @@ class GSBRawdumpHeader(GSBHeader):
     _gps_time_precision = 9
     _properties = ('gps_time', 'time')
 
-    _header_parser = HeaderParser(
-        (('gps', (0, 7, ' '.join, str.split)),),
-        make_parser=make_parser,
-        make_setter=make_setter,
-        get_default=get_default)
+    _header_parser = GSBHeaderParser(
+        (('gps', (0, 7, ' '.join, str.split)),))
 
     @property
     def gps_time(self):
@@ -270,14 +296,11 @@ class GSBPhasedHeader(GSBRawdumpHeader):
     _pc_time_precision = 6
     _properties = ('time', 'pc_time') + GSBRawdumpHeader._properties
 
-    _header_parser = HeaderParser(
+    _header_parser = GSBHeaderParser(
         (('pc', (0, 7, ' '.join, str.split)),
          ('gps', (7, 7, ' '.join, str.split)),
          ('seq_nr', (14, 1, int, str, 0)),
-         ('mem_block', (15, 1, int, str, 0))),
-        make_parser=make_parser,
-        make_setter=make_setter,
-        get_default=get_default)
+         ('mem_block', (15, 1, int, str, 0))))
 
     @property
     def pc_time(self):

@@ -11,6 +11,18 @@ New Features
   packages to make new readers accessible to baseband by defining an entry
   point in their ``setup.cfg``. [#418]
 
+API Changes
+-----------
+
+- Following python 3.9, ``HeaderParser`` instances (which are subclasses of
+  ``dict``), can now be merged together using the ``|`` operator. For
+  backward compatibility, using the ``+`` operator will remain supported.
+  [#424]
+
+- All ``StreamWriters`` now require an explicit ``header0`` to be passed
+  in (as was already the case for DADA and GUPPI). Creation of a ``header0``
+  from keyword arguments is now done inside the opener. [#417]
+
 Bug Fixes
 ---------
 
@@ -22,10 +34,6 @@ Other Changes and Additions
 
 - All baseband formats now support passing in template strings for stream
   readers and writers (e.g., ``'{file_nr:07d}.vdif'``). [#417]
-
-- All ``StreamWriters`` now require an explicit ``header0`` to be passed
-  in (as was already the case for DADA and GUPPI). Creation of a ``header0``
-  from keyword arguments is now done inside the opener. [#417]
 
 - The headers for VDIF and Mark 4 now expose standard ``complex_data``
   and ``sample_shape`` properties, to match what is done for the other

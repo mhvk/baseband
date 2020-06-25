@@ -543,7 +543,7 @@ class VDIFLegacyHeader(VDIFNoSampleRateHeader):
 class VDIFBaseHeader(VDIFHeader):
     """Base for non-legacy VDIF headers that use 8 32-bit words."""
 
-    _header_parser = VDIFLegacyHeader._header_parser + HeaderParser(
+    _header_parser = VDIFLegacyHeader._header_parser | HeaderParser(
         (('legacy_mode', (0, 30, 1, False)),  # Repeat, to change default.
          ('edv', (4, 24, 8))))
 
@@ -581,7 +581,7 @@ class VDIFHeader0(VDIFBaseHeader, VDIFNoSampleRateHeader):
 class VDIFSampleRateHeader(VDIFBaseHeader):
     """Base for VDIF headers that include the sample rate (EDV= 1, 3, 4)."""
 
-    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
+    _header_parser = VDIFBaseHeader._header_parser | HeaderParser(
         (('sampling_unit', (4, 23, 1)),
          ('sampling_rate', (4, 0, 23)),
          ('sync_pattern', (5, 0, 32, 0xACABFEED))))
@@ -687,7 +687,7 @@ class VDIFHeader1(VDIFSampleRateHeader):
     See https://vlbi.org/wp-content/uploads/2019/03/vdif_extension_0x01.pdf
     """
     _edv = 1
-    _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
+    _header_parser = VDIFSampleRateHeader._header_parser | HeaderParser(
         (('das_id', (6, 0, 64, 0x0)),))
 
     _invariants = (VDIFSampleRateHeader._invariants
@@ -701,7 +701,7 @@ class VDIFHeader3(VDIFSampleRateHeader):
     See https://vlbi.org/wp-content/uploads/2019/03/vdif_extension_0x03.pdf
     """
     _edv = 3
-    _header_parser = VDIFSampleRateHeader._header_parser + HeaderParser(
+    _header_parser = VDIFSampleRateHeader._header_parser | HeaderParser(
         (('frame_length', (2, 0, 24, 629)),  # Repeat, to set default.
          ('loif_tuning', (6, 0, 32, 0x0)),
          ('_7_28_4', (7, 28, 4, 0x0)),
@@ -746,7 +746,7 @@ class VDIFHeader2(VDIFBaseHeader, VDIFNoSampleRateHeader):
     """
     _edv = 2
 
-    _header_parser = VDIFBaseHeader._header_parser + HeaderParser(
+    _header_parser = VDIFBaseHeader._header_parser | HeaderParser(
         (('complex_data', (3, 31, 1, 0x0)),  # Repeat, to set default.
          ('bits_per_sample', (3, 26, 5, 0x1)),  # Repeat, to set default.
          ('pol', (4, 0, 1)),
@@ -777,8 +777,8 @@ class VDIFMark5BHeader(VDIFBaseHeader, VDIFNoSampleRateHeader, Mark5BHeader):
     _edv = 0xab
     # Repeat 'frame_length' to set default.
     _header_parser = (VDIFBaseHeader._header_parser
-                      + HeaderParser((('frame_length', (2, 0, 24, 1254)),))
-                      + HeaderParser(tuple(
+                      | HeaderParser((('frame_length', (2, 0, 24, 1254)),))
+                      | HeaderParser(tuple(
                           ((k if k != 'frame_nr' else 'mark5b_frame_nr'),
                            (v[0] + 4,) + v[1:])
                           for (k, v) in Mark5BHeader._header_parser.items())))
