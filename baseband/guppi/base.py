@@ -7,7 +7,7 @@ from astropy.utils import lazyproperty
 from ..helpers import sequentialfile as sf
 from ..vlbi_base.base import (
     FileBase,
-    StreamBase, StreamReaderBase, StreamWriterBase,
+    StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
@@ -193,8 +193,8 @@ class GUPPIFileWriter(FileBase):
         return GUPPIFrame(header, payload)
 
 
-class GUPPIStreamBase(StreamBase):
-    """Base for GUPPI streams."""
+class GUPPIStreamBase:
+    """Provides samples_per_frame and fast index getting/setting."""
 
     _sample_shape_maker = GUPPIPayload._sample_shape_maker
 

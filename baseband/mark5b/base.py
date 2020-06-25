@@ -5,7 +5,7 @@ from astropy.utils import lazyproperty
 
 from ..vlbi_base.base import (
     FileBase, VLBIFileReaderBase,
-    StreamBase, VLBIStreamReaderBase, StreamWriterBase,
+    VLBIStreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
@@ -164,19 +164,10 @@ class Mark5BFileWriter(FileBase):
         return data.tofile(self.fh_raw)
 
 
-class Mark5BStreamBase(StreamBase):
-    """Base for Mark 5B streams."""
+class Mark5BStreamBase:
+    """Provides sample shape maker and fast time and index getting/setting."""
 
     _sample_shape_maker = Mark5BPayload._sample_shape_maker
-
-    def __init__(self, fh_raw, header0, sample_rate=None, nchan=1,
-                 bps=2, squeeze=True, subset=(), fill_value=0., verify=True):
-        super().__init__(
-            fh_raw, header0=header0, sample_rate=sample_rate,
-            samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
-            unsliced_shape=(nchan,), bps=bps,
-            squeeze=squeeze, subset=subset, fill_value=fill_value,
-            verify=verify)
 
     def _get_time(self, header):
         return header.get_time(frame_rate=self._frame_rate)
@@ -263,7 +254,9 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
                                   ref_time=ref_time, kday=kday)
         header0 = fh_raw.find_header()
         super().__init__(
-            fh_raw, header0, sample_rate=sample_rate, nchan=nchan, bps=bps,
+            fh_raw, header0, sample_rate=sample_rate,
+            samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
+            unsliced_shape=(nchan,), bps=bps,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
         # Use ref_time in preference to kday so we can handle files that
@@ -304,14 +297,13 @@ class Mark5BStreamWriter(Mark5BStreamBase, StreamWriterBase):
         adds any dimensions of length unity.
     """
 
-    _sample_shape_maker = Mark5BPayload._sample_shape_maker
-
     def __init__(self, fh_raw, header0=None, sample_rate=None, nchan=1, bps=2,
                  squeeze=True):
         fh_raw = Mark5BFileWriter(fh_raw)
         super().__init__(
-            fh_raw, header0, sample_rate=sample_rate, nchan=nchan,
-            bps=bps, squeeze=squeeze)
+            fh_raw, header0, sample_rate=sample_rate,
+            samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
+            unsliced_shape=(nchan,), bps=bps, squeeze=squeeze)
         # Initial frame, reused for every other one.
         self._frame = Mark5BFrame.fromdata(
             np.zeros((self.samples_per_frame,) + self._unsliced_shape),

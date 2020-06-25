@@ -6,8 +6,7 @@ import astropy.units as u
 
 from ..vlbi_base.base import (
     FileBase, VLBIFileReaderBase,
-    StreamBase, VLBIStreamReaderBase,
-    StreamWriterBase, HeaderNotFoundError,
+    VLBIStreamReaderBase, StreamWriterBase, HeaderNotFoundError,
     FileOpener, FileInfo)
 from .header import Mark4Header
 from .payload import Mark4Payload
@@ -16,7 +15,7 @@ from .file_info import Mark4FileReaderInfo
 
 
 __all__ = ['Mark4FileReader', 'Mark4FileWriter',
-           'Mark4StreamBase', 'Mark4StreamReader', 'Mark4StreamWriter',
+           'Mark4StreamReader', 'Mark4StreamWriter',
            'open', 'info']
 
 # Look-up table for the number of bits in a byte.
@@ -231,13 +230,7 @@ class Mark4FileWriter(FileBase):
         return data.tofile(self.fh_raw)
 
 
-class Mark4StreamBase(StreamBase):
-    """Base for Mark 4 streams."""
-
-    _sample_shape_maker = Mark4Payload._sample_shape_maker
-
-
-class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
+class Mark4StreamReader(VLBIStreamReaderBase):
     """VLBI Mark 4 format reader.
 
     Allows access to a Mark 4 file as a continuous series of samples.  Parts
@@ -274,6 +267,8 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         Default: 'fix', which implies basic verification and replacement
         of gaps with zeros.
     """
+
+    _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, sample_rate=None, ntrack=None, decade=None,
                  ref_time=None, squeeze=True, subset=(), fill_value=0.,
@@ -316,7 +311,7 @@ class Mark4StreamReader(Mark4StreamBase, VLBIStreamReaderBase):
         return last_header
 
 
-class Mark4StreamWriter(Mark4StreamBase, StreamWriterBase):
+class Mark4StreamWriter(StreamWriterBase):
     """VLBI Mark 4 format writer.
 
     Encodes and writes sequences of samples to file.
@@ -334,6 +329,8 @@ class Mark4StreamWriter(Mark4StreamBase, StreamWriterBase):
         If `True` (default), `write` accepts squeezed arrays as input, and
         adds any dimensions of length unity.
     """
+
+    _sample_shape_maker = Mark4Payload._sample_shape_maker
 
     def __init__(self, fh_raw, header0=None, sample_rate=None, squeeze=True):
         fh_raw = Mark4FileWriter(fh_raw)
