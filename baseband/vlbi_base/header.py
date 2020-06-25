@@ -7,6 +7,7 @@ corresponding to a frame header, providing access to the values encoded in
 via a dict-like interface.  Definitions for headers are constructed using
 the HeaderParser class.
 """
+import sys
 import struct
 import warnings
 from copy import copy
@@ -228,12 +229,19 @@ class HeaderParser(dict):
     they are precalculated on first access rather than calculated on the fly.
 
     """
-    def __add__(self, other):
-        if not isinstance(other, HeaderParser):
+    def __or__(self, other):
+        if not isinstance(other, type(self)):
             return NotImplemented
+
+        if sys.version_info >= (3, 9):
+            return self.__class__(super().__or__(other))
+
         result = self.__class__(self)
         result.update(other)
         return result
+
+    # Backwards compatibility for code written for baseband < 4.0.
+    __add__ = __or__
 
     parsers = ParserDict(make_parser)
     setters = ParserDict(make_setter)

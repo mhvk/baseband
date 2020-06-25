@@ -207,7 +207,7 @@ class TestVLBIBase:
 
     def test_header_with_implicit_invariants(self):
         class SyncHeader(self.Header):
-            _header_parser = self.Header._header_parser + HeaderParser(
+            _header_parser = self.Header._header_parser | HeaderParser(
                 (('sync_pattern', (1, 0, 32, 0x12345678)),))
 
         assert SyncHeader.invariants() == {'sync_pattern'}
@@ -228,6 +228,9 @@ class TestVLBIBase:
             SyncHeader.invariant_pattern({'x0_16_4', 'sync_pattern'})
 
     def test_header_with_explicit_invariants(self):
+        # On purpose, check the old way of "adding" HeaderParser,
+        # instead of following python 3.9 and using "|" for update,
+        # to be sure we support code written against baseband < 4.0.
         class SyncHeader(self.Header):
             _header_parser = self.Header._header_parser + HeaderParser(
                 (('sync_pattern', (1, 0, 32, 0x12345678)),))

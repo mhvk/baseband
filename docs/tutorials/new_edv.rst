@@ -175,18 +175,18 @@ subclasses, namely :mod:`~baseband.vdif.header.VDIFBaseHeader` and
 :mod:`~baseband.vdif.header.VDIFSampleRateHeader`.  This is because many
 EDV specifications share common header values, and so their functions and
 derived properties should be shared as well.  Moreover, header parsers can be
-appended to one another, which saves repetitious coding because the first four
+appended to one another [*]_, which saves repetitious coding because the first four
 words of any VDIF header are the same.  Indeed, we can create the same header
 as above by subclassing :mod:`~baseband.vdif.header.VDIFBaseHeader`::
 
     >>> class VDIFHeader4Enhanced(vdif.header.VDIFBaseHeader):
     ...     _edv = 42
     ...
-    ...     _header_parser = vdif.header.VDIFBaseHeader._header_parser +\
-    ...                      vlbi.header.HeaderParser((
-    ...                             ('validity_mask_length', (4, 16, 8, 0)),
-    ...                             ('sync_pattern', (5, 0, 32, 0xACABFEED)),
-    ...                             ('validity_mask', (6, 0, 64, 0))))
+    ...     _header_parser = (vdif.header.VDIFBaseHeader._header_parser
+    ...                       | vlbi.header.HeaderParser((
+    ...                           ('validity_mask_length', (4, 16, 8, 0)),
+    ...                           ('sync_pattern', (5, 0, 32, 0xACABFEED)),
+    ...                           ('validity_mask', (6, 0, 64, 0)))))
     ...
     ...     _properties = vdif.header.VDIFBaseHeader._properties + ('validity',)
     ...
@@ -211,6 +211,10 @@ as above by subclassing :mod:`~baseband.vdif.header.VDIFBaseHeader`::
     ...         bitmask[:len(validity)] = validity
     ...         self['validity_mask_length'] = len(validity)
     ...         self['validity_mask'] = np.packbits(bitmask[::-1]).view('>u8')
+
+.. [*] In baseband < 4.0, header parsers were appended to each other using
+       the ``+`` operator.  It was changed to ``|`` to match the syntax in
+       python 3.9, but adding remains supported for backwards compatibility.
 
 Here, we set ``edv = 42`` because :class:`~baseband.vdif.header.VDIFHeader`'s
 metaclass is designed to prevent accidental overwriting of existing
@@ -350,10 +354,11 @@ We then define a replacement class::
     ...     The header also corrects 'bits_per_sample' to be properly bps-1.
     ...     """
     ...
-    ...     _header_parser = vdif.header.VDIFHeader0._header_parser + \
-    ...         vlbi.header.HeaderParser((('link', (3, 16, 4)),
-    ...                                   ('slot', (3, 20, 6)),
-    ...                                   ('eud2', (5, 0, 32))))
+    ...     _header_parser = (vdif.header.VDIFHeader0._header_parser
+    ...                       | vlbi.header.HeaderParser((
+    ...                           ('link', (3, 16, 4)),
+    ...                           ('slot', (3, 20, 6)),
+    ...                           ('eud2', (5, 0, 32)))))
     ...
     ...     def verify(self):
     ...         pass  # this is a hack, don't bother with verification...
@@ -413,10 +418,11 @@ class, and define a replacement::
     ...
     ...     The header also corrects 'bits_per_sample' to be properly bps-1.
     ...     """
-    ...     _header_parser = vdif.header.VDIFHeader0._header_parser + \
-    ...         vlbi.header.HeaderParser((('link', (3, 16, 4)),
-    ...                                   ('slot', (3, 20, 6)),
-    ...                                   ('eud2', (5, 0, 32))))
+    ...     _header_parser = (vdif.header.VDIFHeader0._header_parser
+    ...                       | vlbi.header.HeaderParser((
+    ...                           ('link', (3, 16, 4)),
+    ...                           ('slot', (3, 20, 6)),
+    ...                           ('eud2', (5, 0, 32)))))
     ...
     ...     def __init__(self, words, edv=None, verify=True, **kwargs):
     ...         super(DRAOVDIFHeaderEnhanced, self).__init__(
