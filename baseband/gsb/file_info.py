@@ -1,8 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 from astropy import units as u
 
-from ..vlbi_base.file_info import (FileReaderInfo, StreamReaderInfo,
-                                   info_item)
+from ..base.file_info import FileReaderInfo, StreamReaderInfo, info_item
 
 
 def file_size(fh):

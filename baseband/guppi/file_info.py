@@ -3,7 +3,7 @@
 
 Overrides what can be gotten from the first header.
 """
-from ..vlbi_base.file_info import FileReaderInfo
+from ..base.file_info import FileReaderInfo
 
 
 __all__ = ['GUPPIFileReaderInfo']

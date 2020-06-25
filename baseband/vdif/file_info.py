@@ -3,7 +3,7 @@
 
 Includes information about threads and frame sets.
 """
-from ..vlbi_base.file_info import FileReaderInfo, info_item
+from ..base.file_info import FileReaderInfo, info_item
 
 
 __all__ = ['VDIFFileReaderInfo']

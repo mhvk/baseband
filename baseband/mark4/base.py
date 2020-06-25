@@ -4,7 +4,7 @@ from astropy.utils import lazyproperty
 import astropy.units as u
 
 
-from ..vlbi_base.base import (
+from ..base.base import (
     FileBase, VLBIFileReaderBase,
     VLBIStreamReaderBase, StreamWriterBase, HeaderNotFoundError,
     FileOpener, FileInfo)
@@ -184,7 +184,7 @@ class Mark4FileReader(VLBIFileReaderBase):
 
         Raises
         ------
-        ~baseband.vlbi_base.base.HeaderNotFoundError
+        ~baseband.base.base.HeaderNotFoundError
             If no frame was found for any value of ntrack.
         """
         # Currently only 16, 32 and 64-track frames supported.

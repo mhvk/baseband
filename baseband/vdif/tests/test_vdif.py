@@ -6,8 +6,8 @@ import numpy as np
 from astropy.time import Time
 import astropy.units as u
 
-from ... import vdif, vlbi_base
-from ...vlbi_base.base import HeaderNotFoundError
+from ... import vdif, base
+from ...base.base import HeaderNotFoundError
 from ...data import (SAMPLE_VDIF as SAMPLE_FILE, SAMPLE_VLBI_VDIF as
                      SAMPLE_VLBI, SAMPLE_MWA_VDIF as SAMPLE_MWA,
                      SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME,
@@ -263,7 +263,7 @@ class TestVDIF:
         class VDIFHeaderX(vdif.header.VDIFSampleRateHeader):
             _edv = 0x58
             _header_parser = (vdif.header.VDIFSampleRateHeader._header_parser
-                              | vlbi_base.header.HeaderParser(
+                              | base.header.HeaderParser(
                                   (('nonsense_0', (6, 0, 32, 0x0)),
                                    ('nonsense_1', (7, 0, 8, None)),
                                    ('nonsense_2', (7, 8, 24, 0x1)))))
@@ -317,7 +317,7 @@ class TestVDIF:
 
     def test_decoding(self, tmpdir):
         """Check that look-up levels are consistent with mark5access."""
-        o2h = vlbi_base.encoding.OPTIMAL_2BIT_HIGH
+        o2h = base.encoding.OPTIMAL_2BIT_HIGH
         assert np.all(vdif.payload.lut1bit[0] == -1.)
         assert np.all(vdif.payload.lut1bit[0xff] == 1.)
         assert np.all(vdif.payload.lut1bit.astype(int)

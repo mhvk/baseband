@@ -36,8 +36,8 @@ def file_info(name, format=None, **kwargs):
     -------
     info
         The information on the file, an instance of either
-        `~baseband.vlbi_base.file_info.FileReaderInfo` or
-        `~baseband.vlbi_base.file_info.StreamReaderInfo`.
+        `~baseband.base.file_info.FileReaderInfo` or
+        `~baseband.base.file_info.StreamReaderInfo`.
         Can be turned info a `dict` by calling it (i.e., ``info()``).
 
     Notes

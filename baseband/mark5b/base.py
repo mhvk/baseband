@@ -3,7 +3,7 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (
+from ..base.base import (
     FileBase, VLBIFileReaderBase,
     VLBIStreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
@@ -121,7 +121,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
         Note that the current position is always included.
 
         Parameters are as for
-        `baseband.vlbi_base.base.VLBIFileReaderBase.locate_frames`
+        `baseband.base.base.VLBIFileReaderBase.locate_frames`
         except that by default the Mark 5B sync pattern is used.
         """
         if pattern is None:

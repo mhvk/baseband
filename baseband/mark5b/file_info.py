@@ -3,7 +3,7 @@
 
 Includes information about what is needed to calcuate times.
 """
-from ..vlbi_base.file_info import FileReaderInfo, info_item
+from ..base.file_info import FileReaderInfo, info_item
 
 
 __all__ = ['Mark5BFileReaderInfo']

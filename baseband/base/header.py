@@ -260,7 +260,7 @@ class ParsedHeaderBase:
       _properties : tuple of properties accessible/usable in initialisation
 
     It also should define properties that tell the size (getters *and*
-    setters, or use a `baseband.vlbi_base.header.fixedvalue` if the
+    setters, or use a `baseband.base.header.fixedvalue` if the
     value is the same for all instances):
 
       payload_nbytes : number of bytes used by payload
@@ -491,7 +491,7 @@ class VLBIHeaderBase(ParsedHeaderBase):
       _stream_invarants : set of keys of invariant header parts for a stream.
 
     It also should define properties that tell the size (getters *and*
-    setters, or use a `baseband.vlbi_base.header.fixedvalue` if the
+    setters, or use a `baseband.base.header.fixedvalue` if the
     value is the same for all instances):
 
       payload_nbytes : number of bytes used by payload
@@ -562,14 +562,14 @@ class VLBIHeaderBase(ParsedHeaderBase):
         """Pattern and mask shared between headers of a type or stream.
 
         This is mostly for use inside
-        :meth:`~baseband.vlbi_base.base.VLBIFileReaderBase.locate_frames`.
+        :meth:`~baseband.base.base.VLBIFileReaderBase.locate_frames`.
 
         Parameters
         ----------
         invariants : set of str, optional
             Set of keys to header parts that are shared between all headers
             of a given type or within a given stream/file.  Default: from
-            `~baseband.vlbi_base.header.VLBIHeaderBase.invariants()`.
+            `~baseband.base.header.VLBIHeaderBase.invariants()`.
         **kwargs
             Keyword arguments needed to instantiate an empty header.
             (Mostly for Mark 4).

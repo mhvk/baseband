@@ -10,7 +10,7 @@ For the VDIF specification, see https://www.vlbi.org/vdif
 """
 import numpy as np
 
-from ..vlbi_base.frame import FrameBase
+from ..base.frame import FrameBase
 from .header import VDIFHeader, VDIFBaseHeader
 from .payload import VDIFPayload
 

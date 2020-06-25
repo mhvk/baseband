@@ -4,7 +4,7 @@ from collections import namedtuple
 
 import numpy as np
 
-from ..vlbi_base.payload import PayloadBase
+from ..base.payload import PayloadBase
 
 
 __all__ = ['GUPPIPayload']

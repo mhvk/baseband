@@ -133,7 +133,7 @@ def decode_8bit(words):
 
     We follow mark5access, which assumes the values 0 to 255 encode
     -127.5 to 127.5, scaled down to match 2 bit data by a factor of 35.5
-    (`~baseband.vlbi_base.encoding.EIGHT_BIT_1_SIGMA`)
+    (`~baseband.base.encoding.EIGHT_BIT_1_SIGMA`)
 
     For comparison, GMRT phased data treats the 8-bit data values simply
     as signed integers.
@@ -149,7 +149,7 @@ def encode_8bit(values):
 
     We follow mark5access, which assumes the values 0 to 255 encode
     -127.5 to 127.5, scaled down to match 2 bit data by a factor of 35.5
-    (`~baseband.vlbi_base.encoding.EIGHT_BIT_1_SIGMA`)
+    (`~baseband.base.encoding.EIGHT_BIT_1_SIGMA`)
 
     For comparison, GMRT phased data treats the 8-bit data values simply
     as signed integers.

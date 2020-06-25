@@ -6,15 +6,15 @@ Supporting a New Format
 
 To support a new format, it may be easiest to start with an existing format
 that is as similar as possible to the new format, basing classes on those
-provided in `~baseband.vlbi_base`, in particular
-:class:`~baseband.vlbi_base.base.VLBIStreamReaderBase`.
+provided in `~baseband.base`, in particular
+:class:`~baseband.base.base.VLBIStreamReaderBase`.
 
 To connect a new format to the baseband eco-system, it should be in its own
 module and there should be an ``open`` function -- and ideally also an
 ``info`` function that checks whether the file is of the right format and
 collects some basic information.  For these, the basebands formats themselves
-construct callable instances with :class:`~baseband.vlbi_base.base.FileOpener`
-and :class:`~baseband.vlbi_base.base.FileInfo`.
+construct callable instances with :class:`~baseband.base.base.FileOpener`
+and :class:`~baseband.base.base.FileInfo`.
 
 If one has constructed a module, it can be made available in baseband by
 defining an entry point for ``baseband.io`` in ``setup.cfg``, e.g.::

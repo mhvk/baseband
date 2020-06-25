@@ -10,7 +10,7 @@ https://www.haystack.mit.edu/tech/vlbi/mark5/docs/Mark%205B%20users%20manual.pdf
 """
 import numpy as np
 
-from ..vlbi_base.frame import FrameBase
+from ..base.frame import FrameBase
 from .header import Mark5BHeader
 from .payload import Mark5BPayload
 

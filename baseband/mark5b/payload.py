@@ -12,8 +12,8 @@ from collections import namedtuple
 
 import numpy as np
 
-from ..vlbi_base.payload import PayloadBase
-from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
+from ..base.payload import PayloadBase
+from ..base.encoding import encode_2bit_base, decoder_levels
 
 
 __all__ = ['init_luts', 'decode_1bit', 'decode_2bit',

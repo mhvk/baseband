@@ -1,5 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..vlbi_base.frame import FrameBase
+from ..base.frame import FrameBase
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
 

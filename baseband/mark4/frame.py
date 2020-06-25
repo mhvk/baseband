@@ -12,7 +12,7 @@ import operator
 
 import numpy as np
 
-from ..vlbi_base.frame import FrameBase
+from ..base.frame import FrameBase
 from .header import Mark4Header
 from .payload import Mark4Payload
 

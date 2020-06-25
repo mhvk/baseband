@@ -59,14 +59,14 @@ Core Framework and Utilities
 
 These sections contain APIs and usage notes for the sequential file opener,
 the API for the set of core utility functions and classes located in
-:mod:`~baseband.vlbi_base`, and sample data that come with baseband (mostly
+:mod:`~baseband.base`, and sample data that come with baseband (mostly
 used for testing).
 
 .. toctree::
    :maxdepth: 1
 
    helpers/index
-   vlbi_base/index
+   base/index
    data/index
 
 .. _dev_docs_toc:

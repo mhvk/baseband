@@ -8,12 +8,12 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (
+from ..base.base import (
     FileBase,
     StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
-from ..vlbi_base.file_info import FileReaderInfo
-from ..vlbi_base.utils import lcm
+from ..base.file_info import FileReaderInfo
+from ..base.utils import lcm
 from .header import DADAHeader
 from .payload import DADAPayload
 from .frame import DADAFrame

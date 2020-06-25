@@ -5,7 +5,7 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (
+from ..base.base import (
     FileBase,
     StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)

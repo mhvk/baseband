@@ -6,7 +6,7 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (
+from ..base.base import (
     FileBase,
     StreamBase, StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)

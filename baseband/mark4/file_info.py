@@ -5,7 +5,7 @@ Includes information about what is needed to calcuate times,
 number of tracks and offset of first header.
 """
 
-from ..vlbi_base.file_info import FileReaderInfo, info_item
+from ..base.file_info import FileReaderInfo, info_item
 
 
 __all__ = ['Mark4FileReaderInfo']

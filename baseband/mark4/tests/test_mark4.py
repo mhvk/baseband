@@ -8,8 +8,8 @@ import astropy.units as u
 from astropy.time import Time
 
 from ... import mark4
-from ...vlbi_base.base import HeaderNotFoundError
-from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
+from ...base.base import HeaderNotFoundError
+from ...base.encoding import OPTIMAL_2BIT_HIGH
 from ..header import Mark4TrackHeader
 from ..payload import reorder32, reorder64
 from ...data import (SAMPLE_MARK4 as SAMPLE_FILE,

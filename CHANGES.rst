@@ -256,7 +256,7 @@ Bug Fixes
   astropy 3.1). [#249]
 
 - Fixed rounding error when encoding 4-bit data using
-  `baseband.vlbi_base.encoding.encode_4bit_base`. [#250]
+  ``baseband.vlbi_base.encoding.encode_4bit_base``. [#250]
 
 - Added GUPPI/PUPPI to the list of file formats used by `baseband.open` and
   `baseband.file_info`.  [#251]

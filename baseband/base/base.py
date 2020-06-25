@@ -155,9 +155,9 @@ class VLBIFileReaderBase(FileBase):
         ----------
         pattern : header, ~numpy.ndaray, bytes, int, or iterable of int
             Synchronization pattern to look for.  If a header or header class,
-            :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariant_pattern`
+            :meth:`~baseband.base.header.VLBIHeaderBase.invariant_pattern`
             is used to create a masked pattern, using invariant keys from
-            :meth:`~baseband.vlbi_base.header.VLBIHeaderBase.invariants`.
+            :meth:`~baseband.base.header.VLBIHeaderBase.invariants`.
             If an `~numpy.ndarray` or `bytes` instance, a byte array view is
             taken. If an (iterable of) int, the integers need to be unsigned
             32 bit and will be interpreted as little-endian.
@@ -315,7 +315,7 @@ class VLBIFileReaderBase(FileBase):
 
         Raises
         ------
-        ~baseband.vlbi_base.base.HeaderNotFoundError
+        ~baseband.base.base.HeaderNotFoundError
             If no header could be located.
         AssertionError
             If the header did not pass verification.
@@ -965,7 +965,7 @@ class VLBIStreamReaderBase(StreamReaderBase):
         ----------
         index : int
             Frame index that is to be read.
-        frame : `~baseband.vlbi_base.frame.VLBIFrameBase` or None
+        frame : `~baseband.base.frame.VLBIFrameBase` or None
             Frame that was read without failure.  If not `None`, either
             the frame index is wrong or the next frame could not be read.
         exc : Exception
@@ -1139,7 +1139,7 @@ class FileInfo:
     Notes
     -----
     The class is perhaps most easily used via the class method
-    `~baseband.vlbi_base.base.FileInfo.create`.
+    `~baseband.base.base.FileInfo.create`.
     """
 
     def __init__(self, opener):
@@ -1173,7 +1173,7 @@ class FileInfo:
 
         Returns
         -------
-        info : `~baseband.vlbi_base.file_info.FileReaderInfo`
+        info : `~baseband.base.file_info.FileReaderInfo`
             Information on the file.  Will evaluate as `False` if the
             file was not in the right format.
 
@@ -1204,7 +1204,7 @@ class FileInfo:
         ----------
         name : str or filehandle
             Item to be opened for reading in stream mode.
-        file_info : `~baseband.vlbi_base.file_info.FileReaderInfo`
+        file_info : `~baseband.base.file_info.FileReaderInfo`
             Information gleaned from opening in binary mode.
         **kwargs
             Any keyword arguments that might be required to open the
@@ -1212,7 +1212,7 @@ class FileInfo:
 
         Returns
         -------
-        info : `~baseband.vlbi_base.file_info.StreamReaderInfo`
+        info : `~baseband.base.file_info.StreamReaderInfo`
             Information on the file.  Will evaluate as `False` if the
             file was not in the right format. Will return `None` if no
             sample rate information was present, or an `Exception` if
@@ -1252,8 +1252,8 @@ class FileInfo:
         Returns
         -------
         info
-            :class:`~baseband.vlbi_base.file_info.FileReaderInfo` or
-            :class:`~baseband.vlbi_base.file_info.StreamReaderInfo`.
+            :class:`~baseband.base.file_info.FileReaderInfo` or
+            :class:`~baseband.base.file_info.StreamReaderInfo`.
             In addition to the normal ``info`` attributes, also stored
             are attributes about what happened to the keyword arguments:
             ``used_kwargs``, ``consistent_kwargs``, ``inconsistent_kwargs``
@@ -1288,7 +1288,7 @@ class FileInfo:
 
         Parameters
         ----------
-        info : `~baseband.vlbi_base.file_info.StreamReaderInfo`
+        info : `~baseband.base.file_info.StreamReaderInfo`
             Information gleaned from a file opened in stream reading mode.
         **kwargs
             Keyword arguments passed to the opener.
@@ -1322,7 +1322,7 @@ class FileInfo:
             Name of the key.
         value : object
             Corresponding value.
-        info : `~baseband.vlbi_base.file_info.StreamReaderInfo`
+        info : `~baseband.base.file_info.StreamReaderInfo`
             Information collected by opening a file in stream reader mode.
 
         Returns
@@ -1426,7 +1426,7 @@ class FileOpener:
         With the file/stream reader/writer classes keyed by names equal to
         'FileReader', 'FileWriter', 'StreamReader', 'StreamWriter' prefixed
         by ``fmt``.  Typically, one will pass in ``classes=globals()``.
-    header_class : `~baseband.vlbi_base.header.VLBIHeaderBase` subclass
+    header_class : `~baseband.base.header.VLBIHeaderBase` subclass
         Used to instantiate a header from keywords as needed.
     """
 

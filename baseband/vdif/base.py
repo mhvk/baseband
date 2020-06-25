@@ -6,7 +6,7 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (
+from ..base.base import (
     FileBase, VLBIFileReaderBase,
     VLBIStreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo, HeaderNotFoundError)
@@ -266,7 +266,7 @@ class VDIFFileReader(VLBIFileReaderBase):
 
         Raises
         ------
-        ~baseband.vlbi_base.base.HeaderNotFoundError
+        ~baseband.base.base.HeaderNotFoundError
             If no header could be located.
         AssertionError
             If the header did not pass verification.

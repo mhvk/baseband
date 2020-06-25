@@ -132,7 +132,7 @@ class InfoBase(metaclass=InfoMeta):
     """Container providing a standardized interface to file information.
 
     In order to ensure that information is always returned, all access
-    to the parent should be via `~baseband.vlbi_base.file_info.info_item`,
+    to the parent should be via `~baseband.base.file_info.info_item`,
     which ensures that any errors are stored in ``self.errors``.
     In addition, it may be useful to capture warnings and store them in
     ``self.warnings``.
