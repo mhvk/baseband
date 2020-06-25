@@ -5,13 +5,13 @@ Includes information about what is needed to calcuate times,
 number of tracks and offset of first header.
 """
 
-from ..vlbi_base.file_info import VLBIFileReaderInfo, info_item
+from ..base.file_info import FileReaderInfo, info_item
 
 
 __all__ = ['Mark4FileReaderInfo']
 
 
-class Mark4FileReaderInfo(VLBIFileReaderInfo):
+class Mark4FileReaderInfo(FileReaderInfo):
     """Standardized information on Mark 4 file readers.
 
     The ``info`` descriptor has a number of standard attributes, which are
@@ -99,9 +99,9 @@ class Mark4FileReaderInfo(VLBIFileReaderInfo):
         checks:  decodable: True
         >>> fh.close()
     """
-    attr_names = (VLBIFileReaderInfo.attr_names[:-4]
+    attr_names = (FileReaderInfo.attr_names[:-4]
                   + ('ntrack', 'offset0')
-                  + VLBIFileReaderInfo.attr_names[-4:])
+                  + FileReaderInfo.attr_names[-4:])
     """Attributes that the container provides."""
 
     _parent_attrs = ('ntrack', 'decade', 'ref_time')

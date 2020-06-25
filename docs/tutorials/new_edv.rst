@@ -15,7 +15,7 @@ The tutorials below assumes the following modules have been imported::
 
     >>> import numpy as np
     >>> import astropy.units as u
-    >>> from baseband import vdif, vlbi_base as vlbi
+    >>> from baseband import vdif, base as vlbi
 
 .. _new_edv_vdif_headers:
 
@@ -122,7 +122,7 @@ The class must have a private ``_edv`` attribute for it to properly be
 registered in :py:data:`~baseband.vdif.header.VDIF_HEADER_CLASSES`.  It must
 also feature a ``_header_parser`` that reads these words to return header
 properties.  For this, we use
-:class:`baseband.vlbi_base.header.HeaderParser`.  To initialize a header parser,
+:class:`baseband.base.header.HeaderParser`.  To initialize a header parser,
 we pass it a tuple of header properties, where each entry follows the
 syntax:
 
@@ -138,7 +138,7 @@ where
 - ``default``: (optional) default value to use in initialization.
 
 For further details, see the documentation of
-:class:`~baseband.vlbi_base.header.HeaderParser`.
+:class:`~baseband.base.header.HeaderParser`.
 
 Once defined, we can use our new header like any other::
 

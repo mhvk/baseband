@@ -28,7 +28,7 @@ class RawOffsets:
     --------
     The usage is best seen through an example::
 
-      >>> from baseband.vlbi_base.offsets import RawOffsets
+      >>> from baseband.base.offsets import RawOffsets
       >>> offsets = RawOffsets([6], [5])
       >>> offsets[3]  # Implicitly 0 before first entry
       0

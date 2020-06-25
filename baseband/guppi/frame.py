@@ -1,5 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..vlbi_base.frame import VLBIFrameBase
+from ..base.frame import FrameBase
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
 
@@ -7,7 +7,7 @@ from .payload import GUPPIPayload
 __all__ = ['GUPPIFrame']
 
 
-class GUPPIFrame(VLBIFrameBase):
+class GUPPIFrame(FrameBase):
     """Representation of a GUPPI file, consisting of a header and payload.
 
     Parameters

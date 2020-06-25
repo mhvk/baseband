@@ -5,9 +5,9 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (
-    VLBIFileBase, VLBIFileReaderBase,
-    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+from ..base.base import (
+    FileBase,
+    StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
 from .header import GUPPIHeader
 from .payload import GUPPIPayload
@@ -79,7 +79,7 @@ class GUPPIFileNameSequencer(sf.FileNameSequencer):
         self.items['FILE_NR'] = self.items.pop('file_nr')
 
 
-class GUPPIFileReader(VLBIFileReaderBase):
+class GUPPIFileReader(FileBase):
     """Simple reader for GUPPI files.
 
     Wraps a binary filehandle, providing methods to help interpret the data,
@@ -140,12 +140,11 @@ class GUPPIFileReader(VLBIFileReaderBase):
                 / (header.samples_per_frame - header.overlap)).to(u.Hz)
 
 
-class GUPPIFileWriter(VLBIFileBase):
+class GUPPIFileWriter(FileBase):
     """Simple writer/mapper for GUPPI files.
 
-    Adds `write_frame` and `memmap_frame` methods to the VLBI binary file
-    wrapper.  The latter allows one to encode data in pieces, writing to disk
-    as needed.
+    Adds `write_frame` and `memmap_frame` methods to the binary file wrapper.
+    The latter allows one to encode data in pieces, writing to disk as needed.
     """
 
     def write_frame(self, data, header=None, **kwargs):
@@ -194,8 +193,8 @@ class GUPPIFileWriter(VLBIFileBase):
         return GUPPIFrame(header, payload)
 
 
-class GUPPIStreamBase(VLBIStreamBase):
-    """Base for GUPPI streams."""
+class GUPPIStreamBase:
+    """Provides samples_per_frame and fast index getting/setting."""
 
     _sample_shape_maker = GUPPIPayload._sample_shape_maker
 
@@ -226,7 +225,7 @@ class GUPPIStreamBase(VLBIStreamBase):
                       + index * self._packets_per_frame)
 
 
-class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
+class GUPPIStreamReader(GUPPIStreamBase, StreamReaderBase):
     """GUPPI format reader.
 
     Allows access to GUPPI files as a continuous series of samples.
@@ -252,23 +251,12 @@ class GUPPIStreamReader(GUPPIStreamBase, VLBIStreamReaderBase):
 
     def __init__(self, fh_raw, squeeze=True, subset=(), verify=True):
         fh_raw = GUPPIFileReader(fh_raw)
-        header0 = GUPPIHeader.fromfile(fh_raw)
+        header0 = fh_raw.read_header()
         super().__init__(fh_raw, header0, squeeze=squeeze,
                          subset=subset, verify=verify)
 
-    @lazyproperty
-    def _last_header(self):
-        """Header of the last file for this stream."""
-        # Seek forward rather than backward, as last frame often has missing
-        # bytes.
-        with self.fh_raw.temporary_offset() as fh_raw:
-            file_size = fh_raw.seek(0, 2)
-            nframes, fframe = divmod(file_size, self.header0.frame_nbytes)
-            fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
-            return fh_raw.read_header()
 
-
-class GUPPIStreamWriter(GUPPIStreamBase, VLBIStreamWriterBase):
+class GUPPIStreamWriter(GUPPIStreamBase, StreamWriterBase):
     """GUPPI format writer.
 
     Encodes and writes sequences of samples to file.

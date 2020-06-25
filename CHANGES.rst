@@ -23,6 +23,11 @@ API Changes
   in (as was already the case for DADA and GUPPI). Creation of a ``header0``
   from keyword arguments is now done inside the opener. [#417]
 
+- The ``vlbi_base`` module has been deprecated in favour of ``base``,
+  and ``VLBI`` prefixes of classes have been removed where these were
+  not specific to actual VLBI data, leaving only ``VLBIHeaderBase``,
+  ``VLBIFileReaderBase``, and ``VLBIStreamReaderBase``.  [#425]
+
 Bug Fixes
 ---------
 
@@ -256,7 +261,7 @@ Bug Fixes
   astropy 3.1). [#249]
 
 - Fixed rounding error when encoding 4-bit data using
-  `baseband.vlbi_base.encoding.encode_4bit_base`. [#250]
+  ``baseband.vlbi_base.encoding.encode_4bit_base``. [#250]
 
 - Added GUPPI/PUPPI to the list of file formats used by `baseband.open` and
   `baseband.file_info`.  [#251]

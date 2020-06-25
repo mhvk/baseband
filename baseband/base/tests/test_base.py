@@ -9,10 +9,10 @@ import numpy as np
 import astropy.units as u
 
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
-from ..payload import VLBIPayloadBase
-from ..frame import VLBIFrameBase
-from ..base import (VLBIFileBase, VLBIFileReaderBase, VLBIStreamBase,
-                    VLBIStreamReaderBase, VLBIStreamWriterBase)
+from ..payload import PayloadBase
+from ..frame import FrameBase
+from ..base import (FileBase, VLBIFileReaderBase, StreamBase,
+                    StreamReaderBase, StreamWriterBase)
 
 
 def encode_1bit(values):
@@ -32,7 +32,7 @@ def decode_8bit(values):
     return values.view(np.int8).astype(np.float32)
 
 
-class Payload(VLBIPayloadBase):
+class Payload(PayloadBase):
     _encoders = {1: encode_1bit,
                  8: encode_8bit}
     _decoders = {1: decode_1bit,
@@ -62,7 +62,7 @@ class TestVLBIBase:
                                             dtype=Payload._dtype_word),
                                    sample_shape=(5,), bps=1, complex_data=True)
 
-        class Frame(VLBIFrameBase):
+        class Frame(FrameBase):
             _header_class = Header
             _payload_class = Payload
 
@@ -207,7 +207,7 @@ class TestVLBIBase:
 
     def test_header_with_implicit_invariants(self):
         class SyncHeader(self.Header):
-            _header_parser = self.Header._header_parser + HeaderParser(
+            _header_parser = self.Header._header_parser | HeaderParser(
                 (('sync_pattern', (1, 0, 32, 0x12345678)),))
 
         assert SyncHeader.invariants() == {'sync_pattern'}
@@ -228,6 +228,9 @@ class TestVLBIBase:
             SyncHeader.invariant_pattern({'x0_16_4', 'sync_pattern'})
 
     def test_header_with_explicit_invariants(self):
+        # On purpose, check the old way of "adding" HeaderParser,
+        # instead of following python 3.9 and using "|" for update,
+        # to be sure we support code written against baseband < 4.0.
         class SyncHeader(self.Header):
             _header_parser = self.Header._header_parser + HeaderParser(
                 (('sync_pattern', (1, 0, 32, 0x12345678)),))
@@ -464,27 +467,27 @@ class TestVLBIBase:
         # This is probably too basic to show that the wrapper works.
         filename = str(tmpdir.join('test.dat'))
         with io.open(filename, 'wb') as fw:
-            fh = VLBIFileBase(fw)
+            fh = FileBase(fw)
             assert fh.fh_raw is fw
             assert not fh.readable()
             assert fh.writable()
             assert not fh.closed
             with pytest.raises(AttributeError):
                 fh.bla
-            assert repr(fh).startswith('VLBIFileBase(fh_raw')
+            assert repr(fh).startswith('FileBase(fh_raw')
             fh.write(b'abcd')
             fh.close()
             assert fh.closed
             assert fh.fh_raw.closed
         with io.open(filename, 'rb') as fr:
-            fh = VLBIFileReaderBase(fr)
+            fh = FileBase(fr)
             assert fh.fh_raw is fr
             assert fh.readable()
             assert not fh.writable()
             assert not fh.closed
             with pytest.raises(AttributeError):
                 fh.bla
-            assert repr(fh).startswith('VLBIFileReaderBase(fh_raw')
+            assert repr(fh).startswith('FileBase(fh_raw')
             assert fh.read() == b'abcd'
             fh.close()
             assert fh.closed
@@ -496,7 +499,7 @@ class TestVLBIBase:
             fw.write(b'abcdefghijklmnopqrstuvwxyz')
 
         with io.open(filename, 'rb') as fr:
-            fh = VLBIFileReaderBase(fr)
+            fh = FileBase(fr)
             fh.seek(2)
             assert fh.read(2) == b'cd'
             assert fh.tell() == 4
@@ -544,17 +547,13 @@ class TestVLBIBase:
             with pytest.raises(ValueError):
                 fh4.read()
 
-        with VLBIFileBase(io.open(filename, 'wb')) as fw:
+        with FileBase(io.open(filename, 'wb')) as fw:
             with pytest.raises(TypeError):
                 pickle.dumps(fw)
 
 
 class TestSqueezeAndSubset:
     def setup(self):
-        self.other_args = dict(fh_raw=None, header0=None, bps=1,
-                               complex_data=False, samples_per_frame=1000,
-                               sample_rate=10000*u.Hz, fill_value=0.,
-                               verify=True)
         self.sample_shape_maker = namedtuple('SampleShape',
                                              'n0, n1, n2, n3, n4')
         self.unsliced_shape = (1, 21, 33, 1, 2)
@@ -562,35 +561,48 @@ class TestSqueezeAndSubset:
         self.squeezed_fields = ('n1', 'n2', 'n4')
         self.unsliced_data = np.ones((100,) + self.unsliced_shape, dtype='f4')
         self.squeezed_data = self.unsliced_data.squeeze()
+        self.header_class = namedtuple('Header',
+                                       'sample_rate,samples_per_frame,'
+                                       'sample_shape,bps,complex_data')
+        self.other_args = dict(bps=1, complex_data=False,
+                               samples_per_frame=1000, sample_rate=10000*u.Hz)
+        self.header0 = self.header_class(sample_shape=self.unsliced_shape,
+                                         **self.other_args)
 
     def make_reader_with_shape(self, squeeze=True, subset=None,
                                sample_shape_maker=None, unsliced_shape=None):
 
-        class StreamReaderWithShape(VLBIStreamReaderBase):
+        class StreamReaderWithShape(StreamReaderBase):
             _sample_shape_maker = sample_shape_maker or self.sample_shape_maker
 
+        header0 = self.header_class(
+            sample_shape=unsliced_shape or self.unsliced_shape,
+            **self.other_args)
+
         return StreamReaderWithShape(
-            unsliced_shape=unsliced_shape or self.unsliced_shape,
-            squeeze=squeeze, subset=subset, **self.other_args)
+            None, header0=header0, squeeze=squeeze, subset=subset)
 
     def make_writer_with_shape(self, squeeze=True, sample_shape_maker=None,
                                unsliced_shape=None):
 
-        class StreamWriterWithShape(VLBIStreamWriterBase):
+        class StreamWriterWithShape(StreamWriterBase):
             _sample_shape_maker = sample_shape_maker or self.sample_shape_maker
 
+        header0 = self.header_class(
+            sample_shape=unsliced_shape or self.unsliced_shape,
+            **self.other_args)
+
         return StreamWriterWithShape(
-            unsliced_shape=unsliced_shape or self.unsliced_shape,
-            subset=None, squeeze=squeeze, **self.other_args)
+            None, header0=header0, subset=None, squeeze=squeeze)
 
     def test_sample_shape_and_squeeze(self):
         # Tests stream base's sample and squeezing routines.
         # Try tuple only.
-        sb = VLBIStreamBase(unsliced_shape=self.unsliced_shape,
-                            subset=None, squeeze=False, **self.other_args)
+        sb = StreamBase(fh_raw=None, header0=self.header0,
+                        subset=None, squeeze=False)
         assert sb.sample_shape == self.unsliced_shape
-        sb = VLBIStreamBase(unsliced_shape=self.unsliced_shape,
-                            subset=None, squeeze=True, **self.other_args)
+        sb = StreamBase(fh_raw=None, header0=self.header0,
+                        subset=None, squeeze=True)
         assert sb.sample_shape == self.squeezed_shape
 
         # Try reader with equivalent sample shape.
@@ -606,7 +618,7 @@ class TestSqueezeAndSubset:
         assert (sr._squeeze_and_subset(self.unsliced_data[:1]).shape
                 == (1,) + self.squeezed_shape)
 
-        # With VLBIStreamWriterBase, we can access _unsqueeze.
+        # With StreamWriterBase, we can access _unsqueeze.
         sw = self.make_writer_with_shape(squeeze=False)
         assert sw.sample_shape == self.unsliced_shape
         assert sw.sample_shape._fields == self.sample_shape_maker._fields
@@ -656,6 +668,7 @@ class TestSqueezeAndSubset:
     def test_squeeze_subset(self, squeeze, subset, sliced_shape, sliced_n):
         # Tests subsetting for squeezed samples.
         sb = self.make_reader_with_shape(squeeze=squeeze, subset=subset)
+        assert sb.squeeze == squeeze
         if isinstance(subset, tuple):
             assert sb.subset == subset
         elif subset is None:

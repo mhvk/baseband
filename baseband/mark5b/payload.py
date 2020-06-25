@@ -12,8 +12,8 @@ from collections import namedtuple
 
 import numpy as np
 
-from ..vlbi_base.payload import VLBIPayloadBase
-from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
+from ..base.payload import PayloadBase
+from ..base.encoding import encode_2bit_base, decoder_levels
 
 
 __all__ = ['init_luts', 'decode_1bit', 'decode_2bit',
@@ -108,7 +108,7 @@ def encode_2bit(values):
 encode_2bit.__doc__ = encode_2bit_base.__doc__
 
 
-class Mark5BPayload(VLBIPayloadBase):
+class Mark5BPayload(PayloadBase):
     """Container for decoding and encoding VDIF payloads.
 
     Parameters

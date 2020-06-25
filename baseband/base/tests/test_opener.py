@@ -8,8 +8,8 @@ from astropy import units as u
 from ...helpers import sequentialfile as sf
 from ..header import HeaderParser, VLBIHeaderBase, four_word_struct
 from ..base import (FileOpener,
-                    VLBIFileBase, VLBIFileReaderBase,
-                    VLBIStreamReaderBase, VLBIStreamWriterBase)
+                    FileBase, VLBIFileReaderBase,
+                    StreamReaderBase, StreamWriterBase)
 
 
 class BareHeader(VLBIHeaderBase):
@@ -34,15 +34,15 @@ class BareFileReader(VLBIFileReaderBase):
     pass
 
 
-class BareFileWriter(VLBIFileBase):
+class BareFileWriter(FileBase):
     pass
 
 
-class BareStreamReader(VLBIStreamReaderBase):
+class BareStreamReader(StreamReaderBase):
     pass
 
 
-class BareStreamWriter(VLBIStreamWriterBase):
+class BareStreamWriter(StreamWriterBase):
     def __init__(self, fh_raw, header0, *,
                  squeeze=True, subset=(), fill_value=0., verify=True,
                  parrot='alife', **kwargs):

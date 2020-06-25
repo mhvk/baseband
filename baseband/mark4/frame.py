@@ -12,7 +12,7 @@ import operator
 
 import numpy as np
 
-from ..vlbi_base.frame import VLBIFrameBase
+from ..base.frame import FrameBase
 from .header import Mark4Header
 from .payload import Mark4Payload
 
@@ -20,7 +20,7 @@ from .payload import Mark4Payload
 __all__ = ['Mark4Frame']
 
 
-class Mark4Frame(VLBIFrameBase):
+class Mark4Frame(FrameBase):
     """Representation of a Mark 4 frame, consisting of a header and payload.
 
     Parameters

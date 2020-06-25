@@ -76,11 +76,11 @@ formats feature files composed of a long series of frames.
 
 Baseband file objects are frame-reading wrappers around Python file objects,
 and have the same interface, including
-`~baseband.vlbi_base.base.VLBIStreamReaderBase.seek`
+`~baseband.base.base.VLBIStreamReaderBase.seek`
 for seeking to different parts of the file,
-`~baseband.vlbi_base.base.VLBIStreamReaderBase.tell` for reporting the file
+`~baseband.base.base.VLBIStreamReaderBase.tell` for reporting the file
 pointer's current position, and
-`~baseband.vlbi_base.base.VLBIStreamReaderBase.read` for reading data.  The
+`~baseband.base.base.VLBIStreamReaderBase.read` for reading data.  The
 main difference is that Baseband file objects read and navigate in units of
 samples.
 

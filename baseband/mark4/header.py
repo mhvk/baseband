@@ -16,8 +16,8 @@ import numpy as np
 from astropy.time import Time
 from astropy.utils import sharedmethod
 
-from ..vlbi_base.header import HeaderParser, VLBIHeaderBase, fixedvalue
-from ..vlbi_base.utils import bcd_decode, bcd_encode, CRCStack
+from ..base.header import HeaderParser, VLBIHeaderBase, fixedvalue
+from ..base.utils import bcd_decode, bcd_encode, CRCStack
 
 __all__ = ['CRC12', 'crc12', 'stream2words', 'words2stream',
            'Mark4TrackHeader', 'Mark4Header']
@@ -355,7 +355,7 @@ class Mark4Header(Mark4TrackHeader):
         invariants : set of str, optional
             Set of keys to header parts that are shared between all headers
             of a given type or within a given stream/file.  Default: from
-            `~baseband.vlbi_base.header.VLBIHeaderBase.invariants()`.
+            `~baseband.base.header.VLBIHeaderBase.invariants()`.
         ntrack : int, optional
             Number of tracks.  Required for getting class invariants,
             ignored for instances.

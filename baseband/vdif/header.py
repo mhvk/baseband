@@ -12,8 +12,8 @@ import numpy as np
 import astropy.units as u
 from astropy.time import Time, TimeDelta
 
-from ..vlbi_base.header import (four_word_struct, eight_word_struct,
-                                fixedvalue, HeaderParser, VLBIHeaderBase)
+from ..base.header import (four_word_struct, eight_word_struct,
+                           fixedvalue, HeaderParser, VLBIHeaderBase)
 from ..mark5b.header import Mark5BHeader
 
 

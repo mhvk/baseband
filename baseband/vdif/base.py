@@ -6,9 +6,9 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (
-    VLBIFileBase, VLBIFileReaderBase,
-    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+from ..base.base import (
+    FileBase, VLBIFileReaderBase,
+    VLBIStreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo, HeaderNotFoundError)
 from .header import VDIFHeader
 from .payload import VDIFPayload
@@ -266,7 +266,7 @@ class VDIFFileReader(VLBIFileReaderBase):
 
         Raises
         ------
-        ~baseband.vlbi_base.base.HeaderNotFoundError
+        ~baseband.base.base.HeaderNotFoundError
             If no header could be located.
         AssertionError
             If the header did not pass verification.
@@ -314,7 +314,7 @@ class VDIFFileReader(VLBIFileReaderBase):
         raise HeaderNotFoundError("could not locate a nearby header.")
 
 
-class VDIFFileWriter(VLBIFileBase):
+class VDIFFileWriter(FileBase):
     """Simple writer for VDIF files.
 
     Adds `write_frame` and `write_frameset` methods to the basic VLBI
@@ -363,17 +363,10 @@ class VDIFFileWriter(VLBIFileBase):
         return data.tofile(self.fh_raw)
 
 
-class VDIFStreamBase(VLBIStreamBase):
-    """Base for VDIF streams."""
+class VDIFStreamBase:
+    """Provides sample shape maker and fast time and index getting/setting."""
 
     _sample_shape_maker = namedtuple('SampleShape', 'nthread, nchan')
-
-    def __init__(self, fh_raw, header0, sample_rate=None, nthread=1,
-                 squeeze=True, subset=(), fill_value=0., verify=True):
-        super().__init__(
-            fh_raw=fh_raw, header0=header0, sample_rate=sample_rate,
-            unsliced_shape=(nthread, header0.nchan), squeeze=squeeze,
-            subset=subset, fill_value=fill_value, verify=verify)
 
     def _get_time(self, header):
         """Get time from a header.
@@ -459,8 +452,8 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         nthread = len(thread_ids)
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
-            nthread=nthread, squeeze=squeeze, subset=subset,
-            fill_value=fill_value, verify=verify)
+            unsliced_shape=(nthread, header0.nchan), squeeze=squeeze,
+            subset=subset, fill_value=fill_value, verify=verify)
         self._raw_offsets.frame_nbytes *= nthread
 
         # Check whether we are reading only some threads.  This is somewhat
@@ -750,7 +743,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         return frameset
 
 
-class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
+class VDIFStreamWriter(VDIFStreamBase, StreamWriterBase):
     """VLBI VDIF format writer.
 
     Encodes and writes sequences of samples to file.
@@ -793,7 +786,8 @@ class VDIFStreamWriter(VDIFStreamBase, VLBIStreamWriterBase):
                 'sample_rate on header inconsistent with that passed in.')
 
         super().__init__(fh_raw, header0, sample_rate=sample_rate,
-                         nthread=nthread, squeeze=squeeze)
+                         unsliced_shape=(nthread, header0.nchan),
+                         squeeze=squeeze)
 
         self._frame = VDIFFrameSet.fromdata(
             np.zeros((self.samples_per_frame,) + self._unsliced_shape,

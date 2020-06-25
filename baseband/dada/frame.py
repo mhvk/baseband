@@ -1,5 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..vlbi_base.frame import VLBIFrameBase
+from ..base.frame import FrameBase
 from .header import DADAHeader
 from .payload import DADAPayload
 
@@ -7,7 +7,7 @@ from .payload import DADAPayload
 __all__ = ['DADAFrame']
 
 
-class DADAFrame(VLBIFrameBase):
+class DADAFrame(FrameBase):
     """Representation of a DADA file, consisting of a header and payload.
 
     Parameters

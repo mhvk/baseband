@@ -13,8 +13,8 @@ from collections import namedtuple
 
 import numpy as np
 
-from ..vlbi_base.payload import VLBIPayloadBase
-from ..vlbi_base.encoding import encode_2bit_base, decoder_levels
+from ..base.payload import PayloadBase
+from ..base.encoding import encode_2bit_base, decoder_levels
 from .header import MARK4_DTYPES
 
 
@@ -299,7 +299,7 @@ def encode_8chan_2bit_fanout4(values):
     return reorder64(out).view('<u8')
 
 
-class Mark4Payload(VLBIPayloadBase):
+class Mark4Payload(PayloadBase):
     """Container for decoding and encoding Mark 4 payloads.
 
     Parameters

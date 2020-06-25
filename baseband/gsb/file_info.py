@@ -1,8 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 from astropy import units as u
 
-from ..vlbi_base.file_info import (VLBIFileReaderInfo, VLBIStreamReaderInfo,
-                                   info_item)
+from ..base.file_info import FileReaderInfo, StreamReaderInfo, info_item
 
 
 def file_size(fh):
@@ -13,7 +12,7 @@ def file_size(fh):
         fh.seek(offset)
 
 
-class GSBTimeStampInfo(VLBIFileReaderInfo):
+class GSBTimeStampInfo(FileReaderInfo):
     attr_names = ('format', 'mode', 'number_of_frames', 'frame_rate',
                   'start_time', 'readable', 'missing', 'errors', 'warnings')
     _header0_attrs = ('mode',)
@@ -78,14 +77,14 @@ class GSBTimeStampInfo(VLBIFileReaderInfo):
         return missing
 
 
-class GSBStreamReaderInfo(VLBIStreamReaderInfo):
-    attr_names = list(VLBIStreamReaderInfo.attr_names)
+class GSBStreamReaderInfo(StreamReaderInfo):
+    attr_names = list(StreamReaderInfo.attr_names)
     attr_names.insert(attr_names.index('readable'), 'bandwidth')
     attr_names.insert(attr_names.index('readable'), 'n_raw')
     attr_names.insert(attr_names.index('readable'), 'payload_nbytes')
     attr_names = tuple(attr_names)
 
-    _parent_attrs = VLBIStreamReaderInfo._parent_attrs + ('payload_nbytes',)
+    _parent_attrs = StreamReaderInfo._parent_attrs + ('payload_nbytes',)
 
     @info_item
     def frame0(self):
@@ -93,7 +92,7 @@ class GSBStreamReaderInfo(VLBIStreamReaderInfo):
 
     # Bit of a hack, but the base reader one suffices here with
     # the frame0 override above.
-    decodable = VLBIFileReaderInfo.decodable
+    decodable = FileReaderInfo.decodable
 
     @info_item
     def file_info(self):

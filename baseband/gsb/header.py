@@ -13,7 +13,7 @@ import numpy as np
 from astropy import units as u, _erfa as erfa
 from astropy.time import Time, TimeString
 
-from ..vlbi_base.header import ParsedHeaderBase, ParserDict
+from ..base.header import ParsedHeaderBase, ParserDict
 
 
 __all__ = ['TimeGSB', 'GSBHeader', 'GSBRawdumpHeader', 'GSBPhasedHeader']

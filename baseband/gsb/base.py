@@ -6,9 +6,9 @@ import numpy as np
 import astropy.units as u
 from astropy.utils import lazyproperty
 
-from ..vlbi_base.base import (
-    VLBIFileBase,
-    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+from ..base.base import (
+    FileBase,
+    StreamBase, StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
 from .header import GSBHeader
 from .payload import GSBPayload
@@ -21,7 +21,7 @@ __all__ = ['GSBTimeStampIO', 'GSBFileReader', 'GSBFileWriter',
            'open', 'info']
 
 
-class GSBTimeStampIO(VLBIFileBase):
+class GSBTimeStampIO(FileBase):
     """Simple reader/writer for GSB time stamp files.
 
     Wraps a binary filehandle, providing methods `read_timestamp`,
@@ -76,7 +76,7 @@ class GSBTimeStampIO(VLBIFileBase):
         return (1. / (timestamp1.time - timestamp0.time)).to(u.Hz)
 
 
-class GSBFileReader(VLBIFileBase):
+class GSBFileReader(FileBase):
     """Simple reader for GSB data files.
 
     Wraps a binary filehandle, providing a `read_payload` method to help
@@ -122,10 +122,10 @@ class GSBFileReader(VLBIFileBase):
                                    complex_data=self.complex_data)
 
 
-class GSBFileWriter(VLBIFileBase):
+class GSBFileWriter(FileBase):
     """Simple writer for GSB data files.
 
-    Adds `write_payload` method to the basic VLBI binary file wrapper.
+    Adds `write_payload` method to the basic binary file wrapper.
     """
 
     def write_payload(self, data, bps=4):
@@ -144,7 +144,7 @@ class GSBFileWriter(VLBIFileBase):
         return data.tofile(self.fh_raw)
 
 
-class GSBStreamBase(VLBIStreamBase):
+class GSBStreamBase(StreamBase):
     """Base for GSB streams."""
 
     _sample_shape_maker = GSBPayload._sample_shape_maker
@@ -257,7 +257,7 @@ class GSBStreamBase(VLBIStreamBase):
                     self.subset else '')))
 
 
-class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
+class GSBStreamReader(GSBStreamBase, StreamReaderBase):
     """GSB format reader.
 
     Allows access to GSB files as a continuous series of samples.  Requires
@@ -306,7 +306,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         Whether to do basic checks of frame integrity when reading.  The first
         frame of the stream is always checked.  Default: `True`.
     """
-    # TODO: right we are not really compatible with VLBIStreamReaderBase,
+    # TODO: right we are not really compatible with StreamReaderBase,
     # since we need to access multiple files.  Can this be solved with
     # FileWriter/FileReader classes that handle timestamps and multiple blocks,
     # combining these into a frame?
@@ -366,10 +366,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         """Whether the file can be read and decoded."""
         return self.info.readable
 
-    def _read_frame(self, index):
-        # We simply overwrite the base implementation, since for GSB
-        # standard assumptions, like fh_raw being a single file, do
-        # not hold.
+    def _seek_frame(self, index):
         self.fh_ts.seek(self.header0.seek_offset(index))
         if self.header0.mode == 'rawdump':
             self.fh_raw.seek(index * self._payload_nbytes)
@@ -378,15 +375,12 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
                 for fh in fh_pair:
                     fh.seek(index * self._payload_nbytes)
 
-        frame = GSBFrame.fromfile(self.fh_ts, self.fh_raw,
-                                  payload_nbytes=self._payload_nbytes,
-                                  nchan=self._unsliced_shape.nchan,
-                                  bps=self.bps, complex_data=self.complex_data,
-                                  verify=self.verify)
-        if self.verify and self._get_index(frame) != index:
-            raise ValueError('wrong frame number.')
-
-        return frame
+    def _fh_raw_read_frame(self):
+        return GSBFrame.fromfile(self.fh_ts, self.fh_raw,
+                                 payload_nbytes=self._payload_nbytes,
+                                 nchan=self._unsliced_shape.nchan,
+                                 bps=self.bps, complex_data=self.complex_data,
+                                 verify=self.verify)
 
     def __getstate__(self):
         state = super().__getstate__()
@@ -435,7 +429,7 @@ class GSBStreamReader(GSBStreamBase, VLBIStreamReaderBase):
         super().__setstate__(state)
 
 
-class GSBStreamWriter(GSBStreamBase, VLBIStreamWriterBase):
+class GSBStreamWriter(GSBStreamBase, StreamWriterBase):
     """GSB format writer.
 
     Encodes and writes sequences of samples to file.

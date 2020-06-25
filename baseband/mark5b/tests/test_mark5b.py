@@ -7,8 +7,8 @@ import astropy.units as u
 from astropy.time import Time
 
 from ... import mark5b
-from ...vlbi_base.encoding import OPTIMAL_2BIT_HIGH
-from ...vlbi_base.base import HeaderNotFoundError
+from ...base.encoding import OPTIMAL_2BIT_HIGH
+from ...base.base import HeaderNotFoundError
 from ...data import SAMPLE_MARK5B as SAMPLE_FILE
 
 

@@ -8,11 +8,12 @@ import astropy.units as u
 from astropy.utils import lazyproperty
 
 from ..helpers import sequentialfile as sf
-from ..vlbi_base.base import (
-    VLBIFileBase, VLBIFileReaderBase,
-    VLBIStreamBase, VLBIStreamReaderBase, VLBIStreamWriterBase,
+from ..base.base import (
+    FileBase,
+    StreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
-from ..vlbi_base.utils import lcm
+from ..base.file_info import FileReaderInfo
+from ..base.utils import lcm
 from .header import DADAHeader
 from .payload import DADAPayload
 from .frame import DADAFrame
@@ -95,7 +96,7 @@ class DADAFileNameSequencer(sf.FileNameSequencer):
                                         + file_nr * self._file_size)
 
 
-class DADAFileReader(VLBIFileReaderBase):
+class DADAFileReader(FileBase):
     """Simple reader for DADA files.
 
     Wraps a binary filehandle, providing methods to help interpret the data,
@@ -107,6 +108,7 @@ class DADAFileReader(VLBIFileReaderBase):
     fh_raw : filehandle
         Filehandle of the raw binary data file.
     """
+    info = FileReaderInfo()
 
     def read_header(self):
         """Read a single header from the file.
@@ -154,12 +156,11 @@ class DADAFileReader(VLBIFileReaderBase):
         return (header.sample_rate / header.samples_per_frame).to(u.Hz)
 
 
-class DADAFileWriter(VLBIFileBase):
+class DADAFileWriter(FileBase):
     """Simple writer/mapper for DADA files.
 
-    Adds `write_frame` and `memmap_frame` methods to the VLBI binary file
-    wrapper.  The latter allows one to encode data in pieces, writing to disk
-    as needed.
+    Adds `write_frame` and `memmap_frame` methods to the binary file wrapper.
+    The latter allows one to encode data in pieces, writing to disk as needed.
     """
 
     def write_frame(self, data, header=None, **kwargs):
@@ -207,8 +208,8 @@ class DADAFileWriter(VLBIFileBase):
         return DADAFrame(header, payload)
 
 
-class DADAStreamBase(VLBIStreamBase):
-    """Base for DADA streams."""
+class DADAStreamBase:
+    """Provides sample shape maker and fast index getting/setting."""
 
     _sample_shape_maker = DADAPayload._sample_shape_maker
 
@@ -223,7 +224,7 @@ class DADAStreamBase(VLBIStreamBase):
                       + index * self.header0.payload_nbytes)
 
 
-class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
+class DADAStreamReader(DADAStreamBase, StreamReaderBase):
     """DADA format reader.
 
     Allows access to DADA files as a continuous series of samples.
@@ -249,7 +250,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
 
     def __init__(self, fh_raw, squeeze=True, subset=(), verify=True):
         fh_raw = DADAFileReader(fh_raw)
-        header0 = DADAHeader.fromfile(fh_raw)
+        header0 = fh_raw.read_header()
         super().__init__(fh_raw, header0, squeeze=squeeze, subset=subset,
                          verify=verify)
         # Store number of frames, for finding last header.
@@ -331,7 +332,7 @@ class DADAStreamReader(DADAStreamBase, VLBIStreamReaderBase):
         return DADAFrame(self._last_header, last_payload)
 
 
-class DADAStreamWriter(DADAStreamBase, VLBIStreamWriterBase):
+class DADAStreamWriter(DADAStreamBase, StreamWriterBase):
     """DADA format writer.
 
     Encodes and writes sequences of samples to file.
@@ -444,7 +445,7 @@ string that can be formatted using 'frame_nr', 'obs_offset', and other header
 keywords (by `~baseband.dada.DADAFileNameSequencer`).
 
 For writing, one can mimic what is done at quite a few telescopes by using
-the template '{utc_start}_{obs_offset:016d}.000000.dada'.  Unlike for the VLBI
+the template '{utc_start}_{obs_offset:016d}.000000.dada'.  Unlike for most
 openers, ``file_size`` is set to the size of one frame as given by the header.
 
 For reading, to read series such as the above, use something like

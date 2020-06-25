@@ -12,8 +12,8 @@ from collections import namedtuple
 
 import numpy as np
 
-from ..vlbi_base.payload import VLBIPayloadBase
-from ..vlbi_base.encoding import (
+from ..base.payload import PayloadBase
+from ..base.encoding import (
     encode_1bit_base, encode_2bit_base, encode_4bit_base,
     decoder_levels, decode_8bit, encode_8bit)
 
@@ -41,7 +41,7 @@ def init_luts():
     states that samples are encoded by offset-binary, such that all 0
     bits is lowest and all 1 bits is highest.  I.e., for 2-bit sampling,
     the order is 00, 01, 10, 11.  These are decoded using
-    `~baseband.vlbi_base.encoding.decoder_levels`.
+    `~baseband.base.encoding.decoder_levels`.
 
     For example, the 2-bit sample sequence ``-1, -1, 1, 1`` is encoded
     as ``0b10100101`` (or ``165`` in uint8 form).  To translate this back
@@ -114,7 +114,7 @@ def encode_4bit(values):
     return b[:, 0] | b[:, 1]
 
 
-class VDIFPayload(VLBIPayloadBase):
+class VDIFPayload(PayloadBase):
     """Container for decoding and encoding VDIF payloads.
 
     Parameters

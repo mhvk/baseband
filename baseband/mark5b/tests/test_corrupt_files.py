@@ -6,7 +6,7 @@ from astropy.time import Time
 
 from ... import mark5b
 from ...data import SAMPLE_MARK5B as SAMPLE_FILE
-from ...vlbi_base.base import HeaderNotFoundError
+from ...base.base import HeaderNotFoundError
 
 
 class TestCorruptSampleCopy:
