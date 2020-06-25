@@ -1,11 +1,12 @@
 # Licensed under the GPLv3 - see LICENSE
 """
-Base definitions for VLBI Headers, used for VDIF and Mark 5B.
+Base definitions for baseband Headers, in particular for the VLBI types.
 
-Defines a header class VLBIHeaderBase that can be used to hold the words
-corresponding to a frame header, providing access to the values encoded in
-via a dict-like interface.  Definitions for headers are constructed using
-the HeaderParser class.
+Defines a number of helpers to construct a Header class that hold header
+words corresponding to a frame header, and provides access to the values
+encoded in those words via a dict-like interface.  Definitions for headers
+are constructed using a HeaderParser class (which is targeted specifically
+at the VLBI formats).
 """
 import sys
 import struct

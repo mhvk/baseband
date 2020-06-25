@@ -16,11 +16,10 @@ class FrameBase:
 
     Parameters
     ----------
-    header : `baseband.base.header.VLBIHeaderBase`
-        Wrapper around the encoded header words, providing access to the
-        header information.
-    payload : `~baseband.base.payload.PayloadBase`
-        Wrapper around the payload, provding mechanisms to decode it.
+    header : ``cls._header_class``
+        Wrapper around the header, providing mechanisms to decode it.
+    payload : ``cls._payload_class``
+        Wrapper around the payload, providing mechanisms to decode it.
     valid : bool
         Whether the data are valid.  Default: `True`.
     verify : bool
@@ -111,7 +110,7 @@ class FrameBase:
         ----------
         data : `~numpy.ndarray`
             Array holding data to be encoded.
-        header : `~baseband.base.header.VLBIHeaderBase`
+        header : ``cls._header_class``
             Header for the frame.
         *args, **kwargs :
             Any arguments beyond the filehandle are used to help initialize the

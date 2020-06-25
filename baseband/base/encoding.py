@@ -1,5 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
-"""Encoders and decoders for generic VLBI data formats."""
+"""Encoders and decoders for generic binary data formats."""
 import numpy as np
 
 

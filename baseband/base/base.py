@@ -897,9 +897,9 @@ class StreamReaderBase(StreamBase):
 
 
 class VLBIStreamReaderBase(StreamReaderBase):
-    # This class is different mostly in assuming more specifically
-    # that the underlying file has small subsequent frames, and
-    # that its fh_raw has a find_header method.
+    # This class is different in assuming specifically that the underlying
+    # file has small subsequent frames, and that its fh_raw has a find_header
+    # method. This is used to help identify and skip bad frames.
 
     @lazyproperty
     def _last_header(self):
