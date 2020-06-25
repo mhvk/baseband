@@ -10,7 +10,6 @@ the HeaderParser class.
 import struct
 import warnings
 from copy import copy
-from collections import OrderedDict
 
 import numpy as np
 from astropy.utils import sharedmethod, classproperty
@@ -166,13 +165,12 @@ class ParserDict:
 
     Parameters
     ----------
-    method : str
-        Name of the method on the instance that can be used to create
-        a parser or setter, or get the default, based on a header keyword
-        description.  Typically one of 'make_parser', 'make_setter', or
-        'get_default'.
+    function : callable
+        Function that can be used to create a parser or setter, or get the
+        default, based on a header keyword description.  Typically one of
+        ``make_parser``, ``make_setter``, or ``get_default``.
     name : str, optional
-        If not given, inferred from the method name.  Typically, 'parsers',
+        If not given, inferred from the function name.  Typically, 'parsers',
         'setters', or 'default'.  It *must* match the name the descriptor
         is assigned to.
     doc : str, optional
@@ -180,14 +178,14 @@ class ParserDict:
         ``name``'.
     """
 
-    def __init__(self, method, name=None, doc=None):
-        self.method = method
+    def __init__(self, function, name=None, doc=None):
+        self.function = function
         if name is None:
-            if 'parser' in method:
+            if 'parser' in function.__name__:
                 name = 'parsers'
-            elif 'setter' in method:
+            elif 'setter' in function.__name__:
                 name = 'setters'
-            elif 'default' in method:
+            elif 'default' in function.__name__:
                 name = 'defaults'
             else:
                 raise ValueError('cannot infer name automatically.')
@@ -200,20 +198,19 @@ class ParserDict:
         if instance is None:
             return self
         # Create dict of functions/defaults.
-        getter = getattr(instance, self.method)
-        d = {key: getter(*definition)
+        d = {key: self.function(*definition)
              for key, definition in instance.items()}
         # Override ourselves on the instance.
         setattr(instance, self.name, d)
         return d
 
 
-class HeaderParser(OrderedDict):
+class HeaderParser(dict):
     """Parser & setter for VLBI header keywords.
 
-    An ordered dict of header keywords, with values that describe how they are
-    encoded in a given VLBI header.  Initialisation is as a normal OrderedDict,
-    with a key, value pairs.  The value should be a tuple containing:
+    A dictionary of header keywords, with values that describe how they are
+    encoded in a given VLBI header.  Initialisation is as a normal dict,
+    with (ordered) key, value pairs, with each value a tuple containing:
 
     word_index : int
         Index into the header words for this key.
@@ -230,34 +227,17 @@ class HeaderParser(OrderedDict):
     return the default value (if defined).  To speed up access to those,
     they are precalculated on first access rather than calculated on the fly.
 
-    By default, the parsers and setters are calculated from the header
-    definitions using `~baseband.vlbi_base.header.make_parser` and
-    `~baseband.vlbi_base.header.make_setter`, and the defaults inferred
-    using `~baseband.vlbi_base.header.get_default`.  Those can be overridden
-    by passing other functions in as keyword arguments with the same name.
-
     """
-
-    def __init__(self, *args, **kwargs):
-        self.make_parser = kwargs.pop('make_parser', make_parser)
-        self.make_setter = kwargs.pop('make_setter', make_setter)
-        self.get_default = kwargs.pop('get_default', get_default)
-        super().__init__(*args, **kwargs)
-
-    def copy(self):
-        """Make an independent copy."""
-        return self.__class__(self)
-
     def __add__(self, other):
         if not isinstance(other, HeaderParser):
             return NotImplemented
-        result = self.copy()
+        result = self.__class__(self)
         result.update(other)
         return result
 
-    parsers = ParserDict('make_parser')
-    setters = ParserDict('make_setter')
-    defaults = ParserDict('get_default')
+    parsers = ParserDict(make_parser)
+    setters = ParserDict(make_setter)
+    defaults = ParserDict(get_default)
 
 
 class ParsedHeaderBase:
@@ -267,7 +247,7 @@ class ParsedHeaderBase:
 
     Generally, the actual class should define:
 
-      _header_parser : `HeaderParser` instance corresponding to this class.
+      _header_parser : HeaderParser instance corresponding to this class.
 
       _properties : tuple of properties accessible/usable in initialisation
 
