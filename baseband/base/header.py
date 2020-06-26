@@ -11,6 +11,7 @@ at the VLBI formats).
 import sys
 import struct
 import warnings
+import functools
 from copy import copy
 
 import numpy as np
@@ -19,7 +20,8 @@ from astropy.utils import sharedmethod, classproperty
 
 __all__ = ['fixedvalue', 'four_word_struct', 'eight_word_struct',
            'make_parser', 'make_setter', 'get_default',
-           'ParserDict', 'HeaderParser', 'ParsedHeaderBase', 'VLBIHeaderBase']
+           'ParserDict', 'HeaderParserBase', 'HeaderParser',
+           'ParsedHeaderBase', 'VLBIHeaderBase']
 
 
 four_word_struct = struct.Struct('<4I')
@@ -207,7 +209,63 @@ class ParserDict:
         return d
 
 
-class HeaderParser(dict):
+class HeaderParserBase(dict):
+    """Parser & setter for header keywords.
+
+    A dictionary of header keywords, with values that describe how they are
+    encoded in a given header.  Initialisation is as a normal dict,
+    with (ordered) key, value pairs, with each value a tuple containing
+    information that describes how the value is encoded, and any default.
+
+    The actual implementation is done by instances of
+    `~baseband.base.header.ParserDict` called ``parsers``, ``setters``, and
+    ``defaults``, which return functions that get a given keyword from
+    header words, set the corresponding part of the header words to a value,
+    or return the default value (if defined).  To speed up access to those,
+    they are precalculated on first access rather than calculated on the fly.
+
+    """
+    def copy(self):
+        return self.__class__(self)
+
+    def __or__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+
+        if sys.version_info >= (3, 9):
+            return self.__class__(super().__or__(other))
+
+        result = self.__class__(self)
+        result.update(other)
+        return result
+
+    # Backwards compatibility for code written for baseband < 4.0.
+    __add__ = __or__
+
+    def _clear_caches(self):
+        """Clear the caches of the parser dicts. To be done on any change."""
+        for key in set(self.__dict__):
+            if isinstance(self.__class__.__dict__[key], ParserDict):
+                del self.__dict__[key]
+
+
+# Overwrite all dict methods that change the contents to clear the
+# cache of the parsers and setters.
+def make_wrapped_method(method):
+    @functools.wraps(getattr(dict, method))
+    def wrapped(self, *args, **kwargs):
+        result = getattr(super(HeaderParserBase,
+                               self), method)(*args, **kwargs)
+        self._clear_caches()
+        return result
+    return wrapped
+
+
+for method in ('__setitem__', 'update', 'pop', 'popitem', 'clear'):
+    setattr(HeaderParserBase, method, make_wrapped_method(method))
+
+
+class HeaderParser(HeaderParserBase):
     """Parser & setter for VLBI header keywords.
 
     A dictionary of header keywords, with values that describe how they are
@@ -230,20 +288,6 @@ class HeaderParser(dict):
     they are precalculated on first access rather than calculated on the fly.
 
     """
-    def __or__(self, other):
-        if not isinstance(other, type(self)):
-            return NotImplemented
-
-        if sys.version_info >= (3, 9):
-            return self.__class__(super().__or__(other))
-
-        result = self.__class__(self)
-        result.update(other)
-        return result
-
-    # Backwards compatibility for code written for baseband < 4.0.
-    __add__ = __or__
-
     parsers = ParserDict(make_parser)
     setters = ParserDict(make_setter)
     defaults = ParserDict(get_default)
