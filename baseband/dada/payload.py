@@ -54,7 +54,7 @@ class DADAPayload(PayloadBase):
                          bps=bps, complex_data=complex_data)
 
     @classmethod
-    def fromfile(cls, fh, header=None, memmap=False, payload_nbytes=None,
+    def fromfile(cls, fh, header=None, *, memmap=False, payload_nbytes=None,
                  **kwargs):
         """Read or map encoded data in file.
 
@@ -70,30 +70,13 @@ class DADAPayload(PayloadBase):
             If `False` (default), read from file.  Otherwise, map the file in
             memory (see `~numpy.memmap`).
         payload_nbytes : int, optional
-            Number of bytes to read (default: as given in ``header``,
-            ``cls._nbytes``, or, for mapping, to the end of the file).
+            Number of bytes to read or map.
         **kwargs
             Additional arguments are passed on to the class initializer. These
             are only needed if ``header`` is not given.
         """
-        if payload_nbytes is None:
-            payload_nbytes = (cls._nbytes if header is None
-                              else header.payload_nbytes)
+        if header is not None:
+            payload_nbytes = header.payload_nbytes
 
-        if not memmap:
-            return super().fromfile(fh, header=header,
-                                    payload_nbytes=payload_nbytes, **kwargs)
-
-        if hasattr(fh, 'memmap'):
-            words = fh.memmap(dtype=cls._dtype_word,
-                              shape=None if payload_nbytes is None else
-                              (payload_nbytes // cls._dtype_word.itemsize,))
-        else:
-            mode = fh.mode.replace('b', '')
-            offset = fh.tell()
-            words = np.memmap(
-                fh, mode=mode, dtype=cls._dtype_word, offset=offset,
-                shape=(None if payload_nbytes is None
-                       else (payload_nbytes // cls._dtype_word.itemsize,)))
-            fh.seek(offset + words.size * words.dtype.itemsize)
-        return cls(words, header=header, **kwargs)
+        return super().fromfile(fh, payload_nbytes=payload_nbytes,
+                                memmap=memmap, header=header, **kwargs)

@@ -65,7 +65,8 @@ class PayloadBase:
                              .format(self._dtype_word))
 
     @classmethod
-    def fromfile(cls, fh, *args, payload_nbytes=None, **kwargs):
+    def fromfile(cls, fh, *args, payload_nbytes=None, memmap=False,
+                 **kwargs):
         """Read payload from filehandle and decode it into data.
 
         Parameters
@@ -74,6 +75,9 @@ class PayloadBase:
             From which data is read.
         payload_nbytes : int
             Number of bytes to read (default: as given in ``cls._nbytes``).
+        memmap : bool, optional
+            If `False` (default), read from file.  Otherwise, map the file in
+            memory (see `~numpy.memmap`).  Only useful for large payloads.
 
         Any other (keyword) arguments are passed on to the class initialiser.
         """
@@ -82,10 +86,25 @@ class PayloadBase:
             if payload_nbytes is None:
                 raise ValueError("payload_nbytes should be passed in "
                                  "if no default is defined on the class.")
-        s = fh.read(payload_nbytes)
-        if len(s) < payload_nbytes:
-            raise EOFError("could not read full payload.")
-        return cls(np.frombuffer(s, dtype=cls._dtype_word), *args, **kwargs)
+
+        if memmap:
+            shape = (payload_nbytes // cls._dtype_word.itemsize,)
+            if hasattr(fh, 'memmap'):
+                words = fh.memmap(dtype=cls._dtype_word, shape=shape)
+            else:
+                mode = fh.mode.replace('b', '')
+                offset = fh.tell()
+                words = np.memmap(fh, mode=mode, dtype=cls._dtype_word,
+                                  offset=offset, shape=shape)
+                fh.seek(offset + words.size * words.dtype.itemsize)
+            return cls(words, *args, **kwargs)
+
+        else:
+            s = fh.read(payload_nbytes)
+            if len(s) < payload_nbytes:
+                raise EOFError("could not read full payload.")
+            return cls(np.frombuffer(s, dtype=cls._dtype_word),
+                       *args, **kwargs)
 
     def tofile(self, fh):
         """Write payload to filehandle."""
