@@ -40,8 +40,8 @@ class Payload(PayloadBase):
 
 
 class TestVLBIBase:
-    def setup(self):
-        self.header_parser = HeaderParser(
+    def setup_class(cls):
+        cls.header_parser = HeaderParser(
             (('x0_16_4', (0, 16, 4)),
              ('x0_31_1', (0, 31, 1, False)),
              ('x1_0_32', (1, 0, 32)),
@@ -49,33 +49,36 @@ class TestVLBIBase:
 
         class Header(VLBIHeaderBase):
             _struct = four_word_struct
-            _header_parser = self.header_parser
+            _header_parser = cls.header_parser
             payload_nbytes = 8
 
-        self.Header = Header
-        self.header = self.Header([0x12345678, 0xffff0000, 0x0, 0xffffffff])
-        self.Payload = Payload
-        self.payload = Payload(np.array([0x12345678, 0xffff0000],
-                                        dtype=Payload._dtype_word),
-                               sample_shape=(2,), bps=8, complex_data=False)
-        self.payload1bit = Payload(np.array([0x12345678]*5,
-                                            dtype=Payload._dtype_word),
-                                   sample_shape=(5,), bps=1, complex_data=True)
+        cls.Header = Header
+        cls.header = cls.Header([0x12345678, 0xffff0000, 0x0, 0xffffffff])
+        cls.Payload = Payload
+        cls.payload = Payload(np.array([0x12345678, 0xffff0000],
+                                       dtype=Payload._dtype_word),
+                              sample_shape=(2,), bps=8, complex_data=False)
+        cls.payload1bit = Payload(np.array([0x12345678]*5,
+                                           dtype=Payload._dtype_word),
+                                  sample_shape=(5,), bps=1, complex_data=True)
 
         class Frame(FrameBase):
             _header_class = Header
             _payload_class = Payload
 
-        self.Frame = Frame
-        self.frame = Frame(self.header, self.payload)
+        cls.Frame = Frame
+        cls.frame = Frame(cls.header, cls.payload)
 
     def test_header_parser_update(self):
         extra = HeaderParser((('x4_0_32', (4, 0, 32)),))
         new = self.header_parser + extra
         assert len(new.keys()) == 5
+        assert len(self.header_parser.keys()) == 4
         new = self.header_parser.copy()
+        assert isinstance(new, HeaderParser)
         new.update(extra)
         assert len(new.keys()) == 5
+        assert new['x4_0_32'] == (4, 0, 32)
         with pytest.raises(TypeError):
             self.header_parser + {'x4_0_32': (4, 0, 32)}
         with pytest.raises(ValueError):
@@ -164,18 +167,26 @@ class TestVLBIBase:
             header.update(x0_16_4=-1)
 
     def test_header_parser_class(self):
-        header_parser = self.header_parser
+        header_parser = self.header_parser.copy()
         words = self.header.words
         header_parser['0_2_8'] = (0, 2, 8, 5)
         assert '0_2_8' in header_parser
         assert header_parser.defaults['0_2_8'] == 5
         assert header_parser.parsers['0_2_8'](words) == (words[0] >> 2) & 0xff
+        # Check we can change and parsers will be reset.
+        header_parser['0_2_8'] = (0, 1, 8, 3)
+        assert '0_2_8' in header_parser
+        assert header_parser.defaults['0_2_8'] == 3
+        assert header_parser.parsers['0_2_8'](words) == (words[0] >> 1) & 0xff
+        header_parser.update({'0_2_8': (0, 3, 8, 1)})
+        assert '0_2_8' in header_parser
+        assert header_parser.defaults['0_2_8'] == 1
+        assert header_parser.parsers['0_2_8'](words) == (words[0] >> 3) & 0xff
+
         small_parser = HeaderParser((('0_2_8', (0, 2, 8, 4)),))
         header_parser2 = self.header_parser + small_parser
         assert header_parser2.parsers['0_2_8'](words) == (words[0] >> 2) & 0xff
         assert header_parser2.defaults['0_2_8'] == 4
-        with pytest.raises(TypeError):
-            header_parser + {'0_2_8': (0, 2, 8, 4)}
         with pytest.raises(TypeError):
             header_parser + {'0_2_8': (0, 2, 8, 4)}
         with pytest.raises(Exception):

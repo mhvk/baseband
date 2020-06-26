@@ -13,7 +13,7 @@ import numpy as np
 from astropy import units as u, _erfa as erfa
 from astropy.time import Time, TimeString
 
-from ..base.header import ParsedHeaderBase, ParserDict
+from ..base.header import HeaderParserBase, ParsedHeaderBase, ParserDict
 
 
 __all__ = ['TimeGSB', 'GSBHeader', 'GSBRawdumpHeader', 'GSBPhasedHeader']
@@ -98,7 +98,7 @@ def get_default(index, length, forward, backward, default=None):
     return default
 
 
-class GSBHeaderParser(dict):
+class GSBHeaderParser(HeaderParserBase):
     """Parser & setter for GSB timestamp keywords.
 
     A dictionary of header keywords, with values that describe how they are
