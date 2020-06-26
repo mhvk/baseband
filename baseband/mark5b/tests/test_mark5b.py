@@ -176,13 +176,13 @@ class TestMark5B:
             payload.tofile(s)
             s.seek(0)
             payload2 = mark5b.Mark5BPayload.fromfile(
-                s, payload.sample_shape.nchan, payload.bps)
+                s, nchan=payload.sample_shape.nchan, bps=payload.bps)
             assert payload2 == payload
             with pytest.raises(EOFError):
                 # Too few bytes.
                 s.seek(100)
-                mark5b.Mark5BPayload.fromfile(s, payload.sample_shape.nchan,
-                                              payload.bps)
+                mark5b.Mark5BPayload.fromfile(
+                    s, nchan=payload.sample_shape.nchan, bps=payload.bps)
 
         payload3 = mark5b.Mark5BPayload.fromdata(payload.data, bps=payload.bps)
         assert payload3 == payload
