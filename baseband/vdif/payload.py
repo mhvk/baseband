@@ -174,26 +174,6 @@ class VDIFPayload(PayloadBase):
                     .format('complex' if complex_data else 'real', bps))
 
     @classmethod
-    def fromfile(cls, fh, header):
-        """Read payload from filehandle and decode it into data.
-
-        Parameters
-        ----------
-        fh : filehandle
-            To read data from.
-        header : `~baseband.vdif.VDIFHeader`
-            Used to infer the payload size, number of channels, bits per
-            sample, and whether the data are complex.
-        """
-        nbytes = header.payload_nbytes
-        # Could do super().fromfile(fh, header, payload_nbytes=nbytes),
-        # but that is rather more costly.
-        s = fh.read(nbytes)
-        if len(s) < nbytes:
-            raise EOFError("could not read full payload.")
-        return cls(np.frombuffer(s, dtype=cls._dtype_word), header)
-
-    @classmethod
     def fromdata(cls, data, header=None, bps=2, edv=None):
         """Encode data as payload, using header information.
 
@@ -209,7 +189,7 @@ class VDIFPayload(PayloadBase):
             Default: 2.
         edv : int, optional
             Should be given if ``header`` is not given and the payload is
-            encoded as Mark 5 data (i.e., ``edv=0xab``).
+            encoded as Mark 5B data (i.e., ``edv=0xab``).
         """
         nchan = data.shape[-1]
         complex_data = (data.dtype.kind == 'c')
