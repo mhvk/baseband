@@ -77,7 +77,7 @@ class PayloadBase:
 
     @classmethod
     def fromfile(cls, fh, header=None, *, payload_nbytes=None,
-                 memmap=False, **kwargs):
+                 dtype=None, memmap=False, **kwargs):
         """Read payload from filehandle and decode it into data.
 
         Parameters
@@ -90,6 +90,8 @@ class PayloadBase:
             to be passed in.
         payload_nbytes : int
             Number of bytes to read (default: as given in ``cls._nbytes``).
+        dtype : `~numpy.dtype`
+            Type of words to read (default: as given in ``cls._dtype``).
         memmap : bool, optional
             If `False` (default), read from file.  Otherwise, map the file in
             memory (see `~numpy.memmap`).  Only useful for large payloads.
@@ -106,22 +108,25 @@ class PayloadBase:
                     "payload_nbytes or header should be passed in "
                     "if no default payload size is defined on the class.")
 
+        if dtype is None:
+            dtype = cls._dtype_word
+
         if memmap:
-            shape = (payload_nbytes // cls._dtype_word.itemsize,)
+            shape = (payload_nbytes // dtype.itemsize,)
             if hasattr(fh, 'memmap'):
-                words = fh.memmap(dtype=cls._dtype_word, shape=shape)
+                words = fh.memmap(dtype=dtype, shape=shape)
             else:
                 mode = fh.mode.replace('b', '')
                 offset = fh.tell()
-                words = np.memmap(fh, mode=mode, dtype=cls._dtype_word,
+                words = np.memmap(fh, mode=mode, dtype=dtype,
                                   offset=offset, shape=shape)
-                fh.seek(offset + words.size * words.dtype.itemsize)
+                fh.seek(offset + words.nbytes)
 
         else:
             s = fh.read(payload_nbytes)
             if len(s) < payload_nbytes:
                 raise EOFError("could not read full payload.")
-            words = np.frombuffer(s, dtype=cls._dtype_word)
+            words = np.frombuffer(s, dtype=dtype)
 
         return cls(words, **kwargs)
 
