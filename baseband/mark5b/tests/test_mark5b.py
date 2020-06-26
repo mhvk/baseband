@@ -187,7 +187,7 @@ class TestMark5B:
         payload3 = mark5b.Mark5BPayload.fromdata(payload.data, bps=payload.bps)
         assert payload3 == payload
         # Complex data should fail.
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             mark5b.Mark5BPayload(payload3.words, complex_data=True)
         with pytest.raises(ValueError):
             mark5b.Mark5BPayload.fromdata(np.zeros((5000, 8), np.complex64),

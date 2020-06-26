@@ -130,12 +130,8 @@ class Mark5BPayload(PayloadBase):
 
     _sample_shape_maker = namedtuple('SampleShape', 'nchan')
 
-    def __init__(self, words, nchan=1, bps=2, complex_data=False):
-        if complex_data:
-            raise ValueError("Mark5B format does not support complex data.")
-
-        super().__init__(words, sample_shape=(nchan,),
-                         bps=bps, complex_data=False)
+    def __init__(self, words, nchan=1, bps=2):
+        super().__init__(words, sample_shape=(nchan,), bps=bps)
 
     @classmethod
     def fromdata(cls, data, bps=2):
