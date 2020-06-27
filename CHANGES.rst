@@ -30,7 +30,7 @@ affect those that have built their own readers.
 - The ``vlbi_base`` module has been deprecated in favour of ``base``,
   and ``VLBI`` prefixes of classes have been removed where these were
   not specific to actual VLBI data, leaving only ``VLBIHeaderBase``,
-  ``VLBIFileReaderBase``, and ``VLBIStreamReaderBase``.  [#425]
+  ``VLBIFileReaderBase``, and ``VLBIStreamReaderBase``.  [#425, #428]
 
 - Support for memory mapping of payloads has been moved into the base
   ``PayloadBase`` and ``FrameBase`` classes and thus is available for all

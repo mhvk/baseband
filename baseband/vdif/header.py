@@ -114,7 +114,8 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     # that is not a safe bet.
 
     _properties = ('frame_nbytes', 'payload_nbytes', 'bps', 'complex_data',
-                   'nchan', 'samples_per_frame', 'station', 'ref_time', 'time')
+                   'nchan', 'sample_shape', 'samples_per_frame',
+                   'station', 'ref_time', 'time')
     """Properties accessible/usable in initialisation for all VDIF headers."""
 
     _edv = None
@@ -343,6 +344,15 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
             raise ValueError("Multi-channel data requires bits per sample "
                              "that is a power of two.")
         self['lg2_nchan'] = int(lg2_nchan)
+
+    @property
+    def sample_shape(self):
+        """Shape of a sample in the payload (nchan,)."""
+        return (self.nchan,)
+
+    @sample_shape.setter
+    def sample_shape(self, sample_shape):
+        self.nchan, = sample_shape
 
     @property
     def samples_per_frame(self):

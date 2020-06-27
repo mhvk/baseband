@@ -58,6 +58,7 @@ class TestVDIF:
         assert header.sample_rate == 32*u.MHz
         assert header.samples_per_frame == 20000
         assert header.nchan == 1
+        assert header.sample_shape == (1,)
         assert header.bps == 2
         assert not header.complex_data
         assert not header['complex_data']
@@ -212,12 +213,12 @@ class TestVDIF:
             header11.nchan = 2
         header11.bps = 8
         assert header11.bps == 8
-        header11.nchan = 2
+        header11.sample_shape = (2,)
         assert header11.nchan == 2
 
         header12 = header.copy()
         header12.nchan = 2
-        assert header12.nchan == 2
+        assert header12.sample_shape == (2,)
         with pytest.raises(ValueError):
             header12.bps = 5
 
@@ -307,7 +308,7 @@ class TestVDIF:
         assert headerX['thread_id'] == header['thread_id']
         assert headerX.sample_rate == header.sample_rate
         assert headerX.samples_per_frame == header.samples_per_frame
-        assert headerX.nchan == header.nchan
+        assert headerX.sample_shape == header.sample_shape
         assert headerX.bps == header.bps
         assert not headerX.complex_data
         assert headerX.mutable is False
@@ -517,11 +518,12 @@ class TestVDIF:
         assert len(frameset.frames) == 8
         assert len(frameset) == len(frameset.frames[0])
         assert frameset.samples_per_frame == 20000
-        assert frameset.nchan == 1
+        assert frameset.sample_shape == (8, 1)
         assert frameset.shape == (20000, 8, 1)
         assert frameset.size == 160000
         assert frameset.ndim == 3
         assert frameset.nbytes == 8 * frameset.frames[0].nbytes
+        assert frameset.nchan == 1
         assert 'edv' in frameset
         assert 'edv' in frameset.keys()
         assert frameset['edv'] == 3
@@ -1372,6 +1374,7 @@ def test_legacy_vdif(tmpdir):
     assert header['frame_nr'] == 0
     assert header['vdif_version'] == 1
     assert header.nchan == 2
+    assert header.sample_shape == (2,)
     assert header.frame_nbytes == 507 * 8
     assert header.nbytes == 16
     assert header.complex_data is False
@@ -1417,6 +1420,7 @@ class TestVDIFBPS1:
         assert header0.nchan == 16
         assert header0.bps == 1
         assert header0.samples_per_frame == 4000
+        assert header0.sample_shape == (16,)
 
     def test_stream(self):
         with vdif.open(SAMPLE_BPS1, 'rs', sample_rate=8*u.MHz) as fh:
