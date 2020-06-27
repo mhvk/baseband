@@ -310,7 +310,8 @@ class TestMark4:
                 mark4.Mark4Payload.fromfile(s, header)
         payload3 = mark4.Mark4Payload.fromdata(payload.data, header)
         assert payload3 == payload
-        payload4 = mark4.Mark4Payload(payload.words, nchan=8, bps=2, fanout=4)
+        payload4 = mark4.Mark4Payload(payload.words, sample_shape=(8,),
+                                      bps=2, fanout=4)
         assert payload4 == payload
         with pytest.raises(ValueError):
             # Wrong number of channels.
@@ -326,7 +327,8 @@ class TestMark4:
                                         header)
         with pytest.raises(ValueError):
             # Wrong encoded data type for implied number of tracks of 32.
-            mark4.Mark4Payload(payload.words, nchan=4, bps=2, fanout=4)
+            mark4.Mark4Payload(payload.words, sample_shape=(4,),
+                               bps=2, fanout=4)
         with pytest.raises(ValueError):
             # Not little-endian encoded data.
             mark4.Mark4Payload(payload.words.astype('>u8'), header)
