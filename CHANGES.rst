@@ -14,6 +14,10 @@ New Features
 API Changes
 -----------
 
+The internals of baseband have undergone fairly substantial refactoring to
+make the classes more coherent. This should not affect users directly, but may
+affect those that have built their own readers.
+
 - Following python 3.9, ``HeaderParser`` instances (which are subclasses of
   ``dict``), can now be merged together using the ``|`` operator. For
   backward compatibility, using the ``+`` operator will remain supported.
@@ -27,6 +31,10 @@ API Changes
   and ``VLBI`` prefixes of classes have been removed where these were
   not specific to actual VLBI data, leaving only ``VLBIHeaderBase``,
   ``VLBIFileReaderBase``, and ``VLBIStreamReaderBase``.  [#425]
+
+- Support for memory mapping of payloads has been moved into the base
+  ``PayloadBase`` and ``FrameBase`` classes and thus is available for all
+  formats. [#427]
 
 Bug Fixes
 ---------
