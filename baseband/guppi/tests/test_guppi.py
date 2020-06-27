@@ -13,16 +13,16 @@ from ...data import SAMPLE_PUPPI as SAMPLE_FILE
 
 
 class TestGUPPI:
-    def setup(self):
+    def setup_class(cls):
         with open(SAMPLE_FILE, 'rb') as fh:
-            self.header = guppi.GUPPIHeader.fromfile(fh)
-            self.payload = guppi.GUPPIPayload.fromfile(fh, self.header,
-                                                       memmap=False)
+            cls.header = guppi.GUPPIHeader.fromfile(fh)
+            cls.payload = guppi.GUPPIPayload.fromfile(fh, cls.header,
+                                                      memmap=False)
         # Create a header with no overlap for stream writers.
-        self.header_w = self.header.copy()
-        self.header_w.overlap = 0
-        self.header_w.payload_nbytes = self.header.payload_nbytes - (
-            self.header._bpcs * self.header.overlap // 8)
+        cls.header_w = cls.header.copy()
+        cls.header_w.overlap = 0
+        cls.header_w.payload_nbytes = cls.header.payload_nbytes - (
+            cls.header._bpcs * cls.header.overlap // 8)
 
     def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -231,7 +231,7 @@ class TestGUPPI:
             with pytest.raises(EOFError):
                 # Too few bytes.
                 s.seek(100)
-                guppi.GUPPIPayload.fromfile(s, self.header)
+                guppi.GUPPIPayload.fromfile(s, self.header, memmap=False)
 
         payload3 = guppi.GUPPIPayload.fromdata(payload.data, bps=8)
         assert payload3 == payload

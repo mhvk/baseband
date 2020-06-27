@@ -81,22 +81,28 @@ class FrameBase:
         self._valid = bool(valid)
 
     @classmethod
-    def fromfile(cls, fh, *args, valid=None, verify=True, **kwargs):
+    def fromfile(cls, fh, memmap=None, valid=None, verify=True, **kwargs):
         """Read a frame from a filehandle.
 
         Parameters
         ----------
         fh : filehandle
             Handle to read the frame from
-        *args, **kwargs
-            Arguments that help to initialize the payload.
+        memmap : bool, optional
+            If `False`, read payload from file.  If `True`, map the payload
+            in memory (see `~numpy.memmap`).  Only useful for large payloads.
+            Default: as set by payload class.
         valid : bool, optional
-            Whether the data are valid.  Default: assume inferred from data.
+            Whether the data are valid.  Default: inferred from header or
+            payload read from file if possible, otherwise `True`.
         verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
+        **kwargs
+            Extra arguments that help to initialize the payload.
         """
         header = cls._header_class.fromfile(fh, verify=verify)
-        payload = cls._payload_class.fromfile(fh, *args, **kwargs)
+        payload = cls._payload_class.fromfile(fh, header=header,
+                                              memmap=memmap, **kwargs)
         return cls(header, payload, valid=valid, verify=verify)
 
     def tofile(self, fh):
@@ -112,12 +118,15 @@ class FrameBase:
         ----------
         data : `~numpy.ndarray`
             Array holding data to be encoded.
-        header : ``cls._header_class``
+        header : header instance, optional
             Header for the frame.
         valid : bool, optional
-            Whether the data are valid.  Default: assume inferred from header.
+            Whether the data are valid.  Default: inferred from header if
+            possible, otherwise `True`.
         verify : bool, optional
             Whether to verify the header and frame correctness.
+        **kwargs
+            Used to initialize the header, if not given.
         """
         if header is None:
             header = cls._header_class.fromvalues(verify=verify, **kwargs)

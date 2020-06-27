@@ -41,5 +41,5 @@ class DADAPayload(PayloadBase):
         8: decode_8bit}
     _encoders = {
         8: encode_8bit}
-
+    _memmap = True
     _sample_shape_maker = namedtuple('SampleShape', 'npol, nchan')

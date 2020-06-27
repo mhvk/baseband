@@ -37,6 +37,8 @@ class PayloadBase:
     """
     # Possible fixed payload size in bytes.
     _nbytes = None
+    # Default for whether to memmap payload
+    _memmap = False
     # Default type for encoded data.
     _dtype_word = np.dtype('<u4')
     """Default for words: 32-bit unsigned integers, with lsb first."""
@@ -77,24 +79,26 @@ class PayloadBase:
 
     @classmethod
     def fromfile(cls, fh, header=None, *, payload_nbytes=None,
-                 dtype=None, memmap=False, **kwargs):
+                 dtype=None, memmap=None, **kwargs):
         """Read payload from filehandle and decode it into data.
 
         Parameters
         ----------
         fh : filehandle
             From which data is read.
-        header : `~baseband.base.header.HeaderBase`, optional
+        header : header instance, optional
             If given, used to infer ``payload_nbytes``, ``bps``,
             ``sample_shape``, and ``complex_data``.  If not given, those have
             to be passed in.
-        payload_nbytes : int
-            Number of bytes to read (default: as given in ``cls._nbytes``).
-        dtype : `~numpy.dtype`
-            Type of words to read (default: as given in ``cls._dtype``).
+        payload_nbytes : int, optional
+            Number of bytes to read.  Except for fixed-length payloads,
+            required if no ``header`` is given.
+        dtype : `~numpy.dtype`, optional
+            Type of words to read.  Default: taken from class attribute.
         memmap : bool, optional
-            If `False` (default), read from file.  Otherwise, map the file in
-            memory (see `~numpy.memmap`).  Only useful for large payloads.
+            If `False`, read from file.  Otherwise, map the file in memory
+            (see `~numpy.memmap`).  Only useful for large payloads.
+            Default: taken from class attribute.
 
         Any other (keyword) arguments are passed on to the class initialiser.
         """
@@ -107,9 +111,10 @@ class PayloadBase:
                 raise ValueError(
                     "payload_nbytes or header should be passed in "
                     "if no default payload size is defined on the class.")
-
         if dtype is None:
             dtype = cls._dtype_word
+        if memmap is None:
+            memmap = cls._memmap
 
         if memmap:
             shape = (payload_nbytes // dtype.itemsize,)
@@ -141,10 +146,10 @@ class PayloadBase:
         Parameters
         ----------
         data : `~numpy.ndarray`
-            Data to be encoded. The last dimension is taken as the number of
-            channels.
+            Data to be encoded, either complex or real. The trailing
+            dimensions are used to infer ``sample_shape``.
         header : header instance, optional
-            If given, used to infer the bps.
+            If given, used to infer to get ``bps``.
         bps : int, optional
             Bits per elementary sample, i.e., per channel and per real or
             imaginary component, used if header is not given.  Default: 2.

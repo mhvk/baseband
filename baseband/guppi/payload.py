@@ -45,6 +45,7 @@ class GUPPIPayload(PayloadBase):
     _encoders = {
         8: encode_8bit}
     _dtype_word = np.dtype('int8')
+    _memmap = True
 
     _sample_shape_maker = namedtuple('SampleShape', 'npol, nchan')
 

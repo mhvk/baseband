@@ -50,25 +50,3 @@ class GUPPIFrame(FrameBase):
     """
     _header_class = GUPPIHeader
     _payload_class = GUPPIPayload
-
-    @classmethod
-    def fromfile(cls, fh, memmap=True, valid=True, verify=True):
-        """Read a frame from a filehandle, possible mapping the payload.
-
-        Parameters
-        ----------
-        fh : filehandle
-            To read header from.
-        memmap : bool, optional
-            If `True` (default), use `~numpy.memmap` to map the payload.
-            If `False`, just read it from disk.
-        valid : bool, optional
-            Whether the data are valid (default: `True`). Note that this cannot
-            be inferred from the header or payload itself.  If `False`, any
-            data read will be set to ``cls.fill_value``.
-        verify : bool, optional
-            Whether to do basic verification of integrity.  Default: `True`.
-        """
-        header = cls._header_class.fromfile(fh, verify=verify)
-        payload = cls._payload_class.fromfile(fh, header=header, memmap=memmap)
-        return cls(header, payload, valid=valid, verify=verify)
