@@ -45,69 +45,21 @@ class GUPPIPayload(PayloadBase):
     _encoders = {
         8: encode_8bit}
     _dtype_word = np.dtype('int8')
+    _memmap = True
 
     _sample_shape_maker = namedtuple('SampleShape', 'npol, nchan')
 
-    def __init__(self, words, header=None, sample_shape=(), bps=8,
+    def __init__(self, words, *, header=None, sample_shape=(), bps=8,
                  complex_data=False, channels_first=True):
-        if header is not None:
-            bps = header.bps
-            sample_shape = header.sample_shape
-            complex_data = header.complex_data
-            channels_first = header.channels_first
-        super().__init__(words, sample_shape=sample_shape,
+        super().__init__(words, header=header, sample_shape=sample_shape,
                          bps=bps, complex_data=complex_data)
-        self.channels_first = channels_first
+        self.channels_first = (channels_first if header is None
+                               else header.channels_first)
         # If channels first, _item_to_slices must act on per-channel words.  By
         # resetting self._bpfs, we allow _item_to_slices to work unmodified.
         self._true_bpfs = self._bpfs    # Save the true bpfs regardless.
         if self.channels_first:
             self._bpfs //= self.sample_shape.nchan
-
-    @classmethod
-    def fromfile(cls, fh, header=None, memmap=False, payload_nbytes=None,
-                 **kwargs):
-        """Read or map encoded data in file.
-
-        Parameters
-        ----------
-        fh : filehandle
-            Handle to the file which will be read or mapped.
-        header : `~baseband.guppi.GUPPIHeader`, optional
-            If given, used to infer ``payload_nbytes``, ``bps``,
-            ``sample_shape``, ``complex_data`` and ``channels_first``.  If not
-            given, those have to be passed in.
-        memmap : bool, optional
-            If `False` (default), read from file.  Otherwise, map the file in
-            memory (see `~numpy.memmap`).
-        payload_nbytes : int, optional
-            Number of bytes to read (default: as given in ``header``,
-            ``cls._nbytes``, or, for mapping, to the end of the file).
-        **kwargs
-            Additional arguments are passed on to the class initializer. These
-            are only needed if ``header`` is not given.
-        """
-        if payload_nbytes is None:
-            payload_nbytes = (cls._nbytes if header is None
-                              else header.payload_nbytes)
-
-        if not memmap:
-            return super().fromfile(fh, header=header,
-                                    payload_nbytes=payload_nbytes, **kwargs)
-
-        words_shape = (payload_nbytes // cls._dtype_word.itemsize,)
-        if hasattr(fh, 'memmap'):
-            words = fh.memmap(dtype=cls._dtype_word,
-                              shape=(None if payload_nbytes is None else
-                                     words_shape))
-        else:
-            mode = fh.mode.replace('b', '')
-            offset = fh.tell()
-            words = np.memmap(
-                fh, mode=mode, dtype=cls._dtype_word, offset=offset,
-                shape=(None if payload_nbytes is None else words_shape))
-            fh.seek(offset + words.size * words.dtype.itemsize)
-        return cls(words, header=header, **kwargs)
 
     @classmethod
     def fromdata(cls, data, header=None, bps=8, channels_first=True):

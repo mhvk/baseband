@@ -28,9 +28,9 @@ class VDIFFrame(FrameBase):
         header information.
     payload : `~baseband.vdif.VDIFPayload`
         Wrapper around the payload, provding mechanisms to decode it.
-    valid : bool or None
-        Whether the data are valid.  If `None` (default), is inferred from
-        header.  Note that ``header`` is changed in-place if `True` or `False`.
+    valid : bool, optional
+        Whether the data are valid.  Default: inferred from header.
+        Note that ``header`` is changed in-place if `True` or `False`.
     verify : bool
         Whether or not to do basic assertions that check the integrity
         (e.g., that channel information and whether or not data are complex
@@ -65,14 +65,6 @@ class VDIFFrame(FrameBase):
     _header_class = VDIFHeader
     _payload_class = VDIFPayload
 
-    def __init__(self, header, payload, valid=None, verify=True):
-        self.header = header
-        self.payload = payload
-        if valid is not None:
-            self.valid = valid
-        if verify:
-            self.verify()
-
     def verify(self):
         """Verify integrity.
 
@@ -80,7 +72,7 @@ class VDIFFrame(FrameBase):
         data shape and type.
         """
         super().verify()
-        assert self.header['complex_data'] == (self.payload.dtype.kind == 'c')
+        assert self.header.complex_data == (self.payload.dtype.kind == 'c')
         assert self.payload.shape == (self.header.samples_per_frame,
                                       self.header.nchan)
 
@@ -118,30 +110,6 @@ class VDIFFrame(FrameBase):
         # Since header was (optionally) verified, and payload was initialized
         # using header, frame verification is unnecessary.
         return cls(header, payload, verify=False)
-
-    @classmethod
-    def fromdata(cls, data, header=None, verify=True, **kwargs):
-        """Construct frame from data and header.
-
-        Parameters
-        ----------
-        data : `~numpy.ndarray`
-            Array holding complex or real data to be encoded.
-        header : `~baseband.vdif.VDIFHeader` or None
-            If not given, will attempt to generate one using the keywords.
-        verify : bool, optional
-            Whether or not to do basic assertions that check the integrity
-            (e.g., that channel information and whether or not data are complex
-            are consistent between header and data). Default: `True`.
-        **kwargs
-            If ``header`` is not given, these are used to initialize one.
-        """
-        if header is None:
-            header = cls._header_class.fromvalues(verify=verify, **kwargs)
-
-        payload = cls._payload_class.fromdata(data, header=header)
-
-        return cls(header, payload, verify=True)
 
     @classmethod
     def from_mark5b_frame(cls, mark5b_frame, verify=True, **kwargs):
@@ -311,7 +279,7 @@ class VDIFFrameSet:
                 header['thread_id'] = thread_id
                 headers.append(header)
 
-        frames = [VDIFFrame.fromdata(d, h, verify)
+        frames = [VDIFFrame.fromdata(d, h, verify=verify)
                   for d, h in zip(data.transpose(1, 0, 2), headers)]
         return cls(frames)
 

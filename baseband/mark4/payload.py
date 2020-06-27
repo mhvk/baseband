@@ -365,16 +365,20 @@ class Mark4Payload(PayloadBase):
                                else magnitude_bit), fanout)
 
     @classmethod
-    def fromfile(cls, fh, header):
+    def fromfile(cls, fh, header=None, **kwargs):
         """Read payload from filehandle and decode it into data.
 
-        The payload_nbytes, number of channels, bits per sample, and fanout
-        ratio are all taken from the header.
+        Parameters
+        ----------
+        fh : filehandle
+            From which data is read.
+        header : `~baseband.mark4.Mark4Header`
+            Used to infer ``payload_nbytes``, ``bps``, ``sample_shape``, and
+            ``dtype``.  If not given, those have to be passed in.
         """
-        s = fh.read(header.payload_nbytes)
-        if len(s) < header.payload_nbytes:
-            raise EOFError("could not read full payload.")
-        return cls(np.frombuffer(s, dtype=header.stream_dtype), header)
+        if header is not None:
+            kwargs.setdefault('dtype', header.stream_dtype)
+        return super().fromfile(fh, header=header, **kwargs)
 
     @classmethod
     def fromdata(cls, data, header):

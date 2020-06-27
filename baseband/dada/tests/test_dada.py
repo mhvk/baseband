@@ -14,10 +14,11 @@ from ...data import SAMPLE_DADA as SAMPLE_FILE
 
 
 class TestDADA:
-    def setup(self):
+    def setup_class(cls):
         with open(SAMPLE_FILE, 'rb') as fh:
-            self.header = dada.DADAHeader.fromfile(fh)
-            self.payload = dada.DADAPayload.fromfile(fh, self.header)
+            cls.header = dada.DADAHeader.fromfile(fh)
+            cls.payload = dada.DADAPayload.fromfile(fh, cls.header,
+                                                    memmap=False)
 
     def test_header(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -189,7 +190,7 @@ class TestDADA:
             with pytest.raises(EOFError):
                 # Too few bytes.
                 s.seek(100)
-                dada.DADAPayload.fromfile(s, self.header)
+                dada.DADAPayload.fromfile(s, self.header, memmap=False)
         payload3 = dada.DADAPayload.fromdata(payload.data, bps=8)
         assert payload3 == payload
         with open(SAMPLE_FILE, 'rb') as fh:

@@ -39,7 +39,7 @@ class Payload(PayloadBase):
                  8: decode_8bit}
 
 
-class TestVLBIBase:
+class TestBase:
     def setup_class(cls):
         cls.header_parser = HeaderParser(
             (('x0_16_4', (0, 16, 4)),
@@ -51,6 +51,9 @@ class TestVLBIBase:
             _struct = four_word_struct
             _header_parser = cls.header_parser
             payload_nbytes = 8
+            bps = 8
+            sample_shape = (2,)
+            complex_data = False
 
         cls.Header = Header
         cls.header = cls.Header([0x12345678, 0xffff0000, 0x0, 0xffffffff])

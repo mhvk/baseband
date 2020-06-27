@@ -37,6 +37,8 @@ class PayloadBase:
     """
     # Possible fixed payload size in bytes.
     _nbytes = None
+    # Default for whether to memmap payload
+    _memmap = False
     # Default type for encoded data.
     _dtype_word = np.dtype('<u4')
     """Default for words: 32-bit unsigned integers, with lsb first."""
@@ -46,7 +48,18 @@ class PayloadBase:
     # Placeholder for sample shape named tuple.
     _sample_shape_maker = None
 
-    def __init__(self, words, sample_shape=(), bps=2, complex_data=False):
+    def __init__(self, words, *, header=None,
+                 sample_shape=(), bps=2, complex_data=False):
+        if header is not None:
+            sample_shape = header.sample_shape
+            bps = header.bps
+            complex_data = header.complex_data
+            if self._nbytes is None:
+                self._nbytes = header.payload_nbytes
+            elif self._nbytes != header.payload_nbytes:
+                raise ValueError("header payload size should be {0}"
+                                 .format(self._nbytes))
+
         self.words = words
         if self._sample_shape_maker is not None:
             self.sample_shape = self._sample_shape_maker(*sample_shape)
@@ -65,27 +78,62 @@ class PayloadBase:
                              .format(self._dtype_word))
 
     @classmethod
-    def fromfile(cls, fh, *args, payload_nbytes=None, **kwargs):
+    def fromfile(cls, fh, header=None, *, payload_nbytes=None,
+                 dtype=None, memmap=None, **kwargs):
         """Read payload from filehandle and decode it into data.
 
         Parameters
         ----------
         fh : filehandle
             From which data is read.
-        payload_nbytes : int
-            Number of bytes to read (default: as given in ``cls._nbytes``).
+        header : header instance, optional
+            If given, used to infer ``payload_nbytes``, ``bps``,
+            ``sample_shape``, and ``complex_data``.  If not given, those have
+            to be passed in.
+        payload_nbytes : int, optional
+            Number of bytes to read.  Except for fixed-length payloads,
+            required if no ``header`` is given.
+        dtype : `~numpy.dtype`, optional
+            Type of words to read.  Default: taken from class attribute.
+        memmap : bool, optional
+            If `False`, read from file.  Otherwise, map the file in memory
+            (see `~numpy.memmap`).  Only useful for large payloads.
+            Default: taken from class attribute.
 
         Any other (keyword) arguments are passed on to the class initialiser.
         """
-        if payload_nbytes is None:
+        if header is not None:
+            payload_nbytes = header.payload_nbytes
+            kwargs['header'] = header
+        elif payload_nbytes is None:
             payload_nbytes = cls._nbytes
             if payload_nbytes is None:
-                raise ValueError("payload_nbytes should be passed in "
-                                 "if no default is defined on the class.")
-        s = fh.read(payload_nbytes)
-        if len(s) < payload_nbytes:
-            raise EOFError("could not read full payload.")
-        return cls(np.frombuffer(s, dtype=cls._dtype_word), *args, **kwargs)
+                raise ValueError(
+                    "payload_nbytes or header should be passed in "
+                    "if no default payload size is defined on the class.")
+        if dtype is None:
+            dtype = cls._dtype_word
+        if memmap is None:
+            memmap = cls._memmap
+
+        if memmap:
+            shape = (payload_nbytes // dtype.itemsize,)
+            if hasattr(fh, 'memmap'):
+                words = fh.memmap(dtype=dtype, shape=shape)
+            else:
+                mode = fh.mode.replace('b', '')
+                offset = fh.tell()
+                words = np.memmap(fh, mode=mode, dtype=dtype,
+                                  offset=offset, shape=shape)
+                fh.seek(offset + words.nbytes)
+
+        else:
+            s = fh.read(payload_nbytes)
+            if len(s) < payload_nbytes:
+                raise EOFError("could not read full payload.")
+            words = np.frombuffer(s, dtype=dtype)
+
+        return cls(words, **kwargs)
 
     def tofile(self, fh):
         """Write payload to filehandle."""
@@ -98,10 +146,10 @@ class PayloadBase:
         Parameters
         ----------
         data : `~numpy.ndarray`
-            Data to be encoded. The last dimension is taken as the number of
-            channels.
+            Data to be encoded, either complex or real. The trailing
+            dimensions are used to infer ``sample_shape``.
         header : header instance, optional
-            If given, used to infer the bps.
+            If given, used to infer to get ``bps``.
         bps : int, optional
             Bits per elementary sample, i.e., per channel and per real or
             imaginary component, used if header is not given.  Default: 2.
