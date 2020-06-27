@@ -332,9 +332,9 @@ class TestGSB:
         idata = idata.reshape(2, 8, 512).transpose(1, 0, 2)
         assert np.all(phased.data == idata)
         # Raises error for incorrect bps * nchan.
-        with pytest.raises(TypeError):
+        with pytest.raises(AssertionError):
             gsb.GSBPayload.fromfile(fh, payload_nbytes=self.payload_nbytes,
-                                    sample_shape=(2, 1), bps=4)
+                                    sample_shape=(12, 1), bps=4)
         # Close file handles.
         for pol in fh:
             for thread in pol:
