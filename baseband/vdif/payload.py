@@ -125,8 +125,8 @@ class VDIFPayload(PayloadBase):
     header : `~baseband.vdif.VDIFHeader`
         If given, used to infer the number of channels, bps, and whether
         the data are complex.
-    nchan : int, optional
-        Number of channels, used if ``header`` is not given.  Default: 1.
+    sample_shape : tuple
+        Shape of the samples (e.g., (nchan,)).  Default: (1,).
     bps : int, optional
         Bits per elementary sample, used if ``header`` is not given.
         Default: 2.
@@ -146,23 +146,18 @@ class VDIFPayload(PayloadBase):
 
     _sample_shape_maker = namedtuple('SampleShape', 'nchan')
 
-    def __init__(self, words, header=None, nchan=1, bps=2, complex_data=False):
-        if header is not None:
-            nchan = header.nchan
-            bps = header.bps
-            complex_data = header['complex_data']
-            self._nbytes = header.payload_nbytes
-            if header.edv == 0xab:  # Mark5B payload
-                from ..mark5b import Mark5BPayload
-                self._decoders = Mark5BPayload._decoders
-                self._encoders = Mark5BPayload._encoders
-                if complex_data:
-                    raise ValueError("VDIF/Mark5B payload cannot be complex.")
-        super().__init__(words, sample_shape=(nchan,),
+    def __init__(self, words, header=None, sample_shape=(1,), bps=2,
+                 complex_data=False):
+        if header is not None and header.edv == 0xab:  # Mark5B payload
+            from ..mark5b import Mark5BPayload
+            self._decoders = Mark5BPayload._decoders
+            self._encoders = Mark5BPayload._encoders
+
+        super().__init__(words, header=header, sample_shape=sample_shape,
                          bps=bps, complex_data=complex_data)
         # Recalculate bpfs: samples do not cross word boundaries.
-        if (bps & (bps - 1)) != 0:
-            if nchan != 1:
+        if (self.bps & (self.bps - 1)) != 0:
+            if self.sample_shape != (1,):
                 raise ValueError("Multi-channel VDIF data requires "
                                  "bits per sample that is a power of two.")
             spw = 32 // self._bpfs
@@ -171,7 +166,7 @@ class VDIFPayload(PayloadBase):
             else:
                 raise ValueError(
                     "cannot yet sensibly handle {} data with bps={}"
-                    .format('complex' if complex_data else 'real', bps))
+                    .format('complex' if self.complex_data else 'real', bps))
 
     @classmethod
     def fromdata(cls, data, header=None, bps=2, edv=None):
@@ -191,28 +186,13 @@ class VDIFPayload(PayloadBase):
             Should be given if ``header`` is not given and the payload is
             encoded as Mark 5B data (i.e., ``edv=0xab``).
         """
-        nchan = data.shape[-1]
-        complex_data = (data.dtype.kind == 'c')
-        if header is not None:
-            if header.nchan != nchan:
-                raise ValueError("header is for {0} channels but data has {1}"
-                                 .format(header.nchan, data.shape[-1]))
-            if header['complex_data'] != complex_data:
-                raise ValueError("header is for {0} data but data are {1}"
-                                 .format(*(('complex' if c else 'real') for c
-                                           in (header['complex_data'],
-                                               complex_data))))
-            bps = header.bps
-            edv = header.edv
-
-        if edv == 0xab:  # Mark5B payload
+        if (edv if header is None else header.edv) == 0xab:
+            # Mark5B payload
             from ..mark5b import Mark5BPayload
-            encoder = Mark5BPayload._encoders[bps]
-        else:
-            encoder = cls._encoders[bps]
+            bps = bps if header is None else header.bps
+            m5pl = Mark5BPayload.fromdata(data, bps=bps)
+            return cls(m5pl.words, header, sample_shape=data.shape[1:],
+                       bps=bps, complex_data=False)
 
-        if complex_data:
-            data = data.view((data.real.dtype, (2,)))
-        words = encoder(data).ravel().view(cls._dtype_word)
-        return cls(words, header, nchan=nchan, bps=bps,
-                   complex_data=complex_data)
+        else:
+            return super().fromdata(data, header=header, bps=bps)

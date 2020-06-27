@@ -22,7 +22,7 @@ class TestVDIFMark5B:
             # Start time kiloday is needed for Mark 5B to calculate time.
             m5h1 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
             # For the payload, pass in how data is encoded.
-            m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
+            m5pl = mark5b.Mark5BPayload.fromfile(fh, sample_shape=(8,), bps=2)
             # A not-at-the-start header for checking times.
             m5h2 = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
         # Create VDIF headers based on both the Mark 5B header and payload.
@@ -80,7 +80,7 @@ class TestVDIFMark5B:
         # Get Mark 5B header, payload, and construct VDIF header, as above.
         with open(SAMPLE_M5B, 'rb') as fh:
             m5h = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
-            m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
+            m5pl = mark5b.Mark5BPayload.fromfile(fh, sample_shape=(8,), bps=2)
         header = vdif.VDIFHeader.from_mark5b_header(
             m5h, nchan=m5pl.sample_shape.nchan, bps=m5pl.bps)
         # Create VDIF payload from the Mark 5B encoded payload.
@@ -96,9 +96,14 @@ class TestVDIFMark5B:
         assert np.all(payload2.data == m5pl.data)
         # Mark 5B data cannot complex. Check that this raises an exception.
         header2 = header.copy()
-        header2['complex_data'] = True
         with pytest.raises(ValueError):
-            vdif.VDIFPayload(m5pl.words, header2)
+            header2.complex_data = True
+
+        with pytest.raises(ValueError):
+            header2['complex_data'] = True
+
+        with pytest.raises(ValueError):
+            vdif.VDIFPayload.fromdata(m5pl.data.view(complex), bps=2, edv=0xab)
 
     def test_frame(self):
         """Check a whole Mark 5B frame can be translated to VDIF."""
@@ -149,11 +154,11 @@ class TestMark5BToVDIF3:
     def test_header(self):
         with open(SAMPLE_M5B, 'rb') as fh:
             m5h = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
-            m5pl = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
+            m5pl = mark5b.Mark5BPayload.fromfile(fh, sample_shape=(8,), bps=2)
         # check that we have enough information to create VDIF EDV 3 header.
         header = vdif.VDIFHeader.fromvalues(
-            edv=3, bps=m5pl.bps, nchan=1, station='WB', time=m5h.time,
-            sample_rate=32.*u.MHz, complex_data=False)
+            edv=3, bps=m5pl.bps, sample_shape=(1,), station='WB',
+            time=m5h.time, sample_rate=32.*u.MHz, complex_data=False)
         assert header.time == m5h.time
 
     def test_stream(self, tmpdir):

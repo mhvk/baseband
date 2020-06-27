@@ -72,8 +72,8 @@ class Mark5BFrame(FrameBase):
         super().__init__(header, payload, valid, verify)
 
     @classmethod
-    def fromfile(cls, fh, kday=None, ref_time=None, nchan=1, bps=2, valid=None,
-                 verify=True):
+    def fromfile(cls, fh, *, kday=None, ref_time=None,
+                 sample_shape=(1,), bps=2, valid=None, verify=True):
         """Read a frame from a filehandle.
 
         Parameters
@@ -86,8 +86,8 @@ class Mark5BFrame(FrameBase):
         ref_time : `~astropy.time.Time` or None
             Reference time within 500 days of the observation time, used to
             infer the full MJD.  Used only if ``kday`` is not given.
-        nchan : int, optional
-            Number of channels.   Default: 1.
+        sample_shape : tuple of int, optional
+            Can have only one entry, the number of channels.   Default: (1,).
         bps : int, optional
             Bits per elementary sample.  Default: 2.
         verify : bool
@@ -95,7 +95,8 @@ class Mark5BFrame(FrameBase):
         """
         header = cls._header_class.fromfile(fh, kday=kday, ref_time=ref_time,
                                             verify=verify)
-        payload = cls._payload_class.fromfile(fh, nchan=nchan, bps=bps)
+        payload = cls._payload_class.fromfile(fh, sample_shape=sample_shape,
+                                              bps=bps)
         return cls(header, payload, valid, verify)
 
     @classmethod

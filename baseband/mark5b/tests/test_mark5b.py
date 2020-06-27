@@ -158,7 +158,8 @@ class TestMark5B:
     def test_payload(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(16)  # Skip header.
-            payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
+            payload = mark5b.Mark5BPayload.fromfile(
+                fh, sample_shape=(8,), bps=2)
         assert payload._nbytes == 10000
         assert payload.nbytes == 10000
         assert payload.shape == (5000, 8)
@@ -176,18 +177,18 @@ class TestMark5B:
             payload.tofile(s)
             s.seek(0)
             payload2 = mark5b.Mark5BPayload.fromfile(
-                s, nchan=payload.sample_shape.nchan, bps=payload.bps)
+                s, sample_shape=payload.sample_shape, bps=payload.bps)
             assert payload2 == payload
             with pytest.raises(EOFError):
                 # Too few bytes.
                 s.seek(100)
                 mark5b.Mark5BPayload.fromfile(
-                    s, nchan=payload.sample_shape.nchan, bps=payload.bps)
+                    s, sample_shape=payload.sample_shape, bps=payload.bps)
 
         payload3 = mark5b.Mark5BPayload.fromdata(payload.data, bps=payload.bps)
         assert payload3 == payload
         # Complex data should fail.
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             mark5b.Mark5BPayload(payload3.words, complex_data=True)
         with pytest.raises(ValueError):
             mark5b.Mark5BPayload.fromdata(np.zeros((5000, 8), np.complex64),
@@ -200,10 +201,12 @@ class TestMark5B:
     def test_payload_getitem_setitem(self, item):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(16)  # Skip header.
-            payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
+            payload = mark5b.Mark5BPayload.fromfile(fh, sample_shape=(8,),
+                                                    bps=2)
         sel_data = payload.data[item]
         assert np.all(payload[item] == sel_data)
-        payload2 = mark5b.Mark5BPayload(payload.words.copy(), nchan=8, bps=2)
+        payload2 = mark5b.Mark5BPayload(payload.words.copy(),
+                                        sample_shape=(8,), bps=2)
         assert payload2 == payload
         payload2[item] = -sel_data
         check = payload.data
@@ -331,7 +334,8 @@ class TestMark5B:
     def test_frame(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:
             header = mark5b.Mark5BHeader.fromfile(fh, kday=56000)
-            payload = mark5b.Mark5BPayload.fromfile(fh, nchan=8, bps=2)
+            payload = mark5b.Mark5BPayload.fromfile(fh, sample_shape=(8,),
+                                                    bps=2)
             fh.seek(0)
             frame = fh.read_frame()
 
@@ -348,9 +352,9 @@ class TestMark5B:
         with open(str(tmpdir.join('test.m5b')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
-            frame2 = mark5b.Mark5BFrame.fromfile(s, kday=56000,
-                                                 nchan=frame.shape[1],
-                                                 bps=frame.payload.bps)
+            frame2 = mark5b.Mark5BFrame.fromfile(
+                s, kday=56000, sample_shape=frame.sample_shape,
+                bps=frame.payload.bps)
         assert frame2 == frame
 
         # Check passing in reference time.
@@ -381,9 +385,10 @@ class TestMark5B:
         with open(str(tmpdir.join('test8.m5b')), 'w+b') as s:
             frame8.tofile(s)
             s.seek(0)
-            frame9 = mark5b.Mark5BFrame.fromfile(s, kday=56000,
-                                                 nchan=frame8.shape[1],
-                                                 bps=frame8.payload.bps)
+            frame9 = mark5b.Mark5BFrame.fromfile(
+                s, kday=56000,
+                sample_shape=frame8.sample_shape,
+                bps=frame8.payload.bps)
         assert frame9.valid is False
         assert np.all(frame9.data == 0.)
         assert np.all(frame9.payload.words == 0x11223344)

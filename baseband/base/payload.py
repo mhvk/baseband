@@ -27,6 +27,9 @@ class PayloadBase:
     words : `~numpy.ndarray`
         Array containg LSB unsigned words (with the right size) that
         encode the payload.
+    header : header instance
+        If given, used to infer the sample shape, bps, and whether
+        the data are complex.
     sample_shape : tuple
         Shape of the samples (e.g., (nchan,)).  Default: ().
     bps : int
@@ -158,6 +161,14 @@ class PayloadBase:
         complex_data = data.dtype.kind == 'c'
         if header:
             bps = header.bps
+            if header.sample_shape != sample_shape:
+                raise ValueError(f"header is for sample_shape={sample_shape} "
+                                 f"but data has {data.shape[1:]}")
+            if header.complex_data != complex_data:
+                raise ValueError("header is for {0} data but data are {1}"
+                                 .format(*(('complex' if c else 'real') for c
+                                           in (header['complex_data'],
+                                               complex_data))))
         try:
             encoder = cls._encoders[bps]
         except KeyError:

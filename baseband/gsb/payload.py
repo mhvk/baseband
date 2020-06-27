@@ -86,7 +86,7 @@ class GSBPayload(PayloadBase):
             return cls._sample_shape_maker_nthread(*args)
 
     @classmethod
-    def fromfile(cls, fh, payload_nbytes=None, nchan=1, bps=4,
+    def fromfile(cls, fh, *, payload_nbytes=1 << 22, sample_shape=(1,), bps=4,
                  complex_data=False):
         """Read payloads from several threads.
 
@@ -97,10 +97,11 @@ class GSBPayload(PayloadBase):
             tuple holds distinct threads, while the inner ones holds parts of
             those threads.  Typically, these are the two polarisations and the
             two parts of each in which phased baseband data are stored.
-        payload_nbytes : int
-            Number of bytes to read from each part.
-        nchan : int, optional
-            Number of channels.  Default: 1.
+        payload_nbytes : int, optional
+            Number of bytes to read from each part.  Default: 2**22 (4 MB)
+        sample_shape : tuple
+            Shape of the samples (e.g., (nchan,) or (nthread, nchan)).
+            Default: (1,).
         bps : int, optional
             Bits per elementary sample.  Default: 4.
         complex_data : bool, optional
@@ -108,33 +109,25 @@ class GSBPayload(PayloadBase):
         """
         if hasattr(fh, 'read'):
             return super().fromfile(fh, payload_nbytes=payload_nbytes,
-                                    sample_shape=(nchan,), bps=bps,
+                                    sample_shape=sample_shape, bps=bps,
                                     complex_data=complex_data)
 
-        nthread = len(fh)
-        # Seem to need explicit super inside list comprehension.
         payloads = [[super(GSBPayload,
                            cls).fromfile(fh1, payload_nbytes=payload_nbytes,
-                                         sample_shape=(nchan,), bps=bps,
-                                         complex_data=complex_data)
+                                         sample_shape=sample_shape[1:],
+                                         bps=bps, complex_data=complex_data)
                      for fh1 in fh_set] for fh_set in fh]
-        if nthread == 1:
-            words = np.hstack([payload.words for payload in payloads[0]])
-        else:
-            bpfs = payloads[0][0]._bpfs
-            if bpfs % 8:
-                raise TypeError('cannot create phased payload: complete sample'
-                                ' does not fit in integer number of bytes.')
-            words = np.empty((len(payloads[0]),
-                              payloads[0][0].words.size * 8 // bpfs,
-                              nthread,
-                              bpfs // 8), dtype=cls._dtype_word)
-            for payload_set, thread in zip(payloads,
-                                           words.transpose(2, 0, 1, 3)):
-                for payload, part in zip(payload_set, thread):
-                    part[:] = payload.words.reshape(-1, bpfs // 8)
+        sample_nbytes, extra = divmod(payloads[0][0]._bpfs, 8)
+        assert extra == 0, 'Full samples do not fit in integer number of bytes'
+        words = np.empty((len(payloads[0]),
+                          payloads[0][0].words.size // sample_nbytes,
+                          sample_shape[0],
+                          sample_nbytes), dtype=cls._dtype_word)
+        for payload_set, thread in zip(payloads, words.transpose(2, 0, 1, 3)):
+            for payload, part in zip(payload_set, thread):
+                part[:] = payload.words.reshape(-1, sample_nbytes)
 
-        return cls(words.ravel(), bps=bps, sample_shape=(nthread, nchan),
+        return cls(words.ravel(), sample_shape=sample_shape, bps=bps,
                    complex_data=complex_data)
 
     def tofile(self, fh):

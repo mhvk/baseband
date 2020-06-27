@@ -57,8 +57,9 @@ class GSBFrame(FrameBase):
     _payload_class = GSBPayload
 
     @classmethod
-    def fromfile(cls, fh_ts, fh_raw, payload_nbytes=1 << 24, nchan=1, bps=4,
-                 complex_data=False, valid=True, verify=True):
+    def fromfile(cls, fh_ts, fh_raw, payload_nbytes=1 << 22,
+                 sample_shape=(1,), bps=4, complex_data=False,
+                 valid=True, verify=True):
         """Read a frame from timestamp and raw data filehandles.
 
         Any arguments beyond the filehandle are used to help initialize the
@@ -74,10 +75,10 @@ class GSBFrame(FrameBase):
             containing tuples with pairs of handles for a phased one.  E.g.,
             ``((L1, L2), (R1, R2))`` for left and right polarisations.
         payload_nbytes : int, optional
-            Size of the individual payloads in bytes.  Default: ``2**24``
-            (16 MB).
-        nchan : int, optional
-            Number of channels.  Default: 1.
+            Size of the individual payloads in bytes.  Default: ``2**22``
+            (4 MB).
+        sample_shape : tuple, optional
+            Shape of the samples (e.g., (nchan,)).  Default: (1,).
         bps : int, optional
             Bits per elementary sample.  Default: 4.
         complex_data : bool, optional
@@ -90,10 +91,9 @@ class GSBFrame(FrameBase):
             Whether to verify consistency of the frame parts.  Default: `True`.
         """
         header = cls._header_class.fromfile(fh_ts, verify=verify)
-        payload = cls._payload_class.fromfile(fh_raw,
-                                              payload_nbytes=payload_nbytes,
-                                              nchan=nchan, bps=bps,
-                                              complex_data=complex_data)
+        payload = cls._payload_class.fromfile(
+            fh_raw, payload_nbytes=payload_nbytes,
+            sample_shape=sample_shape, bps=bps, complex_data=complex_data)
         return cls(header, payload, valid=valid, verify=verify)
 
     def tofile(self, fh_ts, fh_raw):
