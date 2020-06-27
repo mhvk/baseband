@@ -315,7 +315,7 @@ class TestGSB:
         fh = [[open(thread, 'rb') for thread in pol]
               for pol in SAMPLE_PHASED]
         phased = gsb.GSBPayload.fromfile(
-            fh, payload_nbytes=self.payload_nbytes, nchan=512,
+            fh, payload_nbytes=self.payload_nbytes, sample_shape=(2, 512),
             bps=8, complex_data=True)
         assert phased.shape == (8, 2, 512)
         assert phased.sample_shape == (2, 512)
@@ -334,7 +334,7 @@ class TestGSB:
         # Raises error for incorrect bps * nchan.
         with pytest.raises(TypeError):
             gsb.GSBPayload.fromfile(fh, payload_nbytes=self.payload_nbytes,
-                                    nchan=1, bps=4)
+                                    sample_shape=(2, 1), bps=4)
         # Close file handles.
         for pol in fh:
             for thread in pol:
@@ -385,16 +385,17 @@ class TestGSB:
         fraw = [[open(thread, 'rb') for thread in pol]
                 for pol in SAMPLE_PHASED]
         with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
-            frame1 = gsb.GSBFrame.fromfile(ft, fraw, nchan=512, bps=8,
+            frame1 = gsb.GSBFrame.fromfile(ft, fraw,
                                            payload_nbytes=self.payload_nbytes,
+                                           sample_shape=(2, 512), bps=8,
                                            complex_data=True)
         self.seek_phased_rawfiles(fraw, 0)
         # Open sections individually.
         with open(SAMPLE_PHASED_HEADER, 'rt') as fh:
             header1 = gsb.GSBHeader.fromfile(fh, verify=True)
         payload1 = gsb.GSBPayload.fromfile(
-            fraw, payload_nbytes=self.payload_nbytes, nchan=512, bps=8,
-            complex_data=True)
+            fraw, payload_nbytes=self.payload_nbytes,
+            sample_shape=(2, 512), bps=8, complex_data=True)
         # Compare the two.
         assert frame1.dtype.kind == 'c'
         assert header1 == frame1.header
@@ -415,12 +416,12 @@ class TestGSB:
         fraw = [[open(thread, 'rb') for thread in SAMPLE_PHASED[1]]]
         with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
             frame2 = gsb.GSBFrame.fromfile(
-                ft, fraw, payload_nbytes=self.payload_nbytes, nchan=512, bps=8,
-                complex_data=True)
+                ft, fraw, payload_nbytes=self.payload_nbytes,
+                sample_shape=(1, 512), bps=8, complex_data=True)
         self.seek_phased_rawfiles(fraw, 0)
         payload2 = gsb.GSBPayload.fromfile(
-            fraw, payload_nbytes=self.payload_nbytes, nchan=512, bps=8,
-            complex_data=True)
+            fraw, payload_nbytes=self.payload_nbytes,
+            sample_shape=(1, 512), bps=8, complex_data=True)
         assert frame2.shape == payload2.shape
         assert np.all(frame2.payload.data == payload2.data)
         self.close_phased_rawfiles(fraw)
@@ -440,9 +441,10 @@ class TestGSB:
                 s.seek(0)
             sh.flush()
             sh.seek(0)
-            frame4 = gsb.GSBFrame.fromfile(sh, ((sp0, sp1), (sp2, sp3)),
-                                           payload_nbytes=self.payload_nbytes,
-                                           nchan=512, bps=8, complex_data=True)
+            frame4 = gsb.GSBFrame.fromfile(
+                sh, ((sp0, sp1), (sp2, sp3)),
+                payload_nbytes=self.payload_nbytes,
+                sample_shape=(2, 512), bps=8, complex_data=True)
         assert frame4 == frame1
 
     @pytest.mark.parametrize('sample', (SAMPLE_RAWDUMP_HEADER,
@@ -710,6 +712,7 @@ class TestGSB:
     def test_phased_stream(self, tmpdir):
         bps = 8
         nchan = 512
+        sample_shape = (2, 512)
         sample_rate = (self.frame_rate * self.payload_nbytes
                        * (8 // bps) / nchan)
         # Open here with payloadsize given, below with samples_per_frame.
@@ -721,11 +724,11 @@ class TestGSB:
                     for pol in SAMPLE_PHASED]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
                 frame1 = gsb.GSBFrame.fromfile(
-                    ft, fraw, payload_nbytes=self.payload_nbytes, nchan=nchan,
-                    bps=bps, complex_data=True)
+                    ft, fraw, payload_nbytes=self.payload_nbytes,
+                    sample_shape=sample_shape, bps=bps, complex_data=True)
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
-            assert fh_r.sample_shape == (2, 512)
+            assert fh_r.sample_shape == sample_shape
             assert fh_r.shape == ((10 * fh_r.samples_per_frame,)
                                   + fh_r.sample_shape)
             assert fh_r.size == np.prod(fh_r.shape)
@@ -737,8 +740,8 @@ class TestGSB:
                 ft.seek(frame1.header.seek_offset(9))
                 self.seek_phased_rawfiles(fraw, 9 * fh_r.payload_nbytes)
                 frame10 = gsb.GSBFrame.fromfile(
-                    ft, fraw, payload_nbytes=self.payload_nbytes, nchan=nchan,
-                    bps=bps, complex_data=True)
+                    ft, fraw, payload_nbytes=self.payload_nbytes,
+                    sample_shape=sample_shape, bps=bps, complex_data=True)
             assert fh_r._last_header == frame10.header
             fh_r.seek(-8, 2)
             assert np.all(fh_r.read(8) == frame10.data)
@@ -779,8 +782,8 @@ class TestGSB:
             fraw = [[open(thread, 'rb') for thread in SAMPLE_PHASED[1]]]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
                 frame1 = gsb.GSBFrame.fromfile(
-                    ft, fraw, payload_nbytes=self.payload_nbytes, nchan=nchan,
-                    bps=bps, complex_data=True)
+                    ft, fraw, payload_nbytes=self.payload_nbytes,
+                    sample_shape=(1, nchan), bps=bps, complex_data=True)
             assert fh_r.header0.time == fh_r.start_time
             assert fh_r.header0 == frame1.header
             assert np.all(fh_r.read(fh_r.samples_per_frame) == frame1.data)
@@ -809,7 +812,8 @@ class TestGSB:
             fraw = [[open(thread, 'rb') for thread in SAMPLE_PHASED[1]]]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
                 frame1 = gsb.GSBFrame.fromfile(
-                    ft, fraw, payload_nbytes=self.payload_nbytes, nchan=nchan,
+                    ft, fraw, payload_nbytes=self.payload_nbytes,
+                    sample_shape=(1, nchan),
                     bps=bps, complex_data=True)
             assert np.all(fh_r.read(fh_r.samples_per_frame)
                           == frame1.data[:, 0, :256])

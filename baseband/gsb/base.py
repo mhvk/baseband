@@ -118,7 +118,7 @@ class GSBFileReader(FileBase):
         """
         return GSBPayload.fromfile(self.fh_raw,
                                    payload_nbytes=self.payload_nbytes,
-                                   nchan=self.nchan, bps=self.bps,
+                                   sample_shape=(self.nchan,), bps=self.bps,
                                    complex_data=self.complex_data)
 
 
@@ -378,7 +378,7 @@ class GSBStreamReader(GSBStreamBase, StreamReaderBase):
     def _fh_raw_read_frame(self):
         return GSBFrame.fromfile(self.fh_ts, self.fh_raw,
                                  payload_nbytes=self._payload_nbytes,
-                                 nchan=self._unsliced_shape.nchan,
+                                 sample_shape=self._unsliced_shape,
                                  bps=self.bps, complex_data=self.complex_data,
                                  verify=self.verify)
 

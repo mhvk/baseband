@@ -86,7 +86,7 @@ class GSBPayload(PayloadBase):
             return cls._sample_shape_maker_nthread(*args)
 
     @classmethod
-    def fromfile(cls, fh, payload_nbytes=None, nchan=1, bps=4,
+    def fromfile(cls, fh, *, payload_nbytes=1 << 22, sample_shape=(1,), bps=4,
                  complex_data=False):
         """Read payloads from several threads.
 
@@ -97,10 +97,11 @@ class GSBPayload(PayloadBase):
             tuple holds distinct threads, while the inner ones holds parts of
             those threads.  Typically, these are the two polarisations and the
             two parts of each in which phased baseband data are stored.
-        payload_nbytes : int
-            Number of bytes to read from each part.
-        nchan : int, optional
-            Number of channels.  Default: 1.
+        payload_nbytes : int, optional
+            Number of bytes to read from each part.  Default: 2**22 (4 MB)
+        sample_shape : tuple
+            Shape of the samples (e.g., (nchan,) or (nthread, nchan)).
+            Default: (1,).
         bps : int, optional
             Bits per elementary sample.  Default: 4.
         complex_data : bool, optional
@@ -108,15 +109,18 @@ class GSBPayload(PayloadBase):
         """
         if hasattr(fh, 'read'):
             return super().fromfile(fh, payload_nbytes=payload_nbytes,
-                                    sample_shape=(nchan,), bps=bps,
+                                    sample_shape=sample_shape, bps=bps,
                                     complex_data=complex_data)
 
         nthread = len(fh)
+        if nthread != sample_shape[0]:
+            raise ValueError(f"fh_raw has {nthread} parts but sample shape "
+                             f"starts with {sample_shape[0]}.")
         # Seem to need explicit super inside list comprehension.
         payloads = [[super(GSBPayload,
                            cls).fromfile(fh1, payload_nbytes=payload_nbytes,
-                                         sample_shape=(nchan,), bps=bps,
-                                         complex_data=complex_data)
+                                         sample_shape=sample_shape[1:],
+                                         bps=bps, complex_data=complex_data)
                      for fh1 in fh_set] for fh_set in fh]
         if nthread == 1:
             words = np.hstack([payload.words for payload in payloads[0]])
@@ -134,7 +138,7 @@ class GSBPayload(PayloadBase):
                 for payload, part in zip(payload_set, thread):
                     part[:] = payload.words.reshape(-1, bpfs // 8)
 
-        return cls(words.ravel(), bps=bps, sample_shape=(nthread, nchan),
+        return cls(words.ravel(), sample_shape=sample_shape, bps=bps,
                    complex_data=complex_data)
 
     def tofile(self, fh):
