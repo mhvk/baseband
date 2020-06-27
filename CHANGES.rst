@@ -30,7 +30,7 @@ affect those that have built their own readers.
 - The ``vlbi_base`` module has been deprecated in favour of ``base``,
   and ``VLBI`` prefixes of classes have been removed where these were
   not specific to actual VLBI data, leaving only ``VLBIHeaderBase``,
-  ``VLBIFileReaderBase``, and ``VLBIStreamReaderBase``.  [#425, #428]
+  ``VLBIFileReaderBase``, and ``VLBIStreamReaderBase``.  [#425]
 
 - Support for memory mapping of payloads has been moved into the base
   ``PayloadBase`` and ``FrameBase`` classes and thus is available for all
@@ -51,7 +51,7 @@ Other Changes and Additions
 - The headers for VDIF and Mark 4 now expose standard ``complex_data``
   and ``sample_shape`` properties, to match what is done for the other
   headers. Mark 5B headers expose only ``complex_data``, as the sample
-  shape cannot be inferred from the header. [#414]
+  shape cannot be inferred from the header. [#414, #428]
 
 - General classes to help writing ``open`` and ``info`` functions are now
   provided in ``baseband.vlbi_base.FileOpener`` and ``FileInfo``. [#418]
