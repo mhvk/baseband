@@ -36,6 +36,9 @@ affect those that have built their own readers.
   ``PayloadBase`` and ``FrameBase`` classes and thus is available for all
   formats. [#427]
 
+- Payloads and frames now all take ``sample_shape`` as an argument, instead
+  of some taking ``nchan``. [#429]
+
 Bug Fixes
 ---------
 
