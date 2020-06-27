@@ -14,6 +14,7 @@ import numpy as np
 
 from ..base.payload import PayloadBase
 from ..base.encoding import encode_2bit_base, decoder_levels
+from ..base.header import fixedvalue
 
 
 __all__ = ['init_luts', 'decode_1bit', 'decode_2bit',
@@ -130,10 +131,9 @@ class Mark5BPayload(PayloadBase):
 
     _sample_shape_maker = namedtuple('SampleShape', 'nchan')
 
-    def __init__(self, words, sample_shape=(1,), bps=2, complex_data=False):
-        if complex_data:
-            raise ValueError("Mark5B format does not support complex data.")
-        super().__init__(words, sample_shape=sample_shape, bps=bps)
+    @fixedvalue
+    def complex_data(self):
+        return False
 
     @classmethod
     def fromdata(cls, data, *, bps=2):

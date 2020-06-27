@@ -15,6 +15,7 @@ import numpy as np
 
 from ..base.payload import PayloadBase
 from ..base.encoding import encode_2bit_base, decoder_levels
+from ..base.header import fixedvalue
 from .header import MARK4_DTYPES
 
 
@@ -344,9 +345,6 @@ class Mark4Payload(PayloadBase):
 
     def __init__(self, words, header=None, *, sample_shape=(1,), bps=2,
                  fanout=1, magnitude_bit=None, complex_data=False):
-        if complex_data:
-            raise ValueError("Mark4 format does not support complex data.")
-
         if header is not None:
             magnitude_bit = header['magnitude_bit']
             bps = 2 if magnitude_bit.any() else 1
@@ -368,10 +366,14 @@ class Mark4Payload(PayloadBase):
         self._dtype_word = MARK4_DTYPES[ntrack]
         self.fanout = fanout
         super().__init__(words, sample_shape=sample_shape,
-                         bps=bps, complex_data=False)
+                         bps=bps, complex_data=complex_data)
         self._coder = (self.sample_shape.nchan,
                        (self.bps if magnitude_bit is None else magnitude_bit),
                        self.fanout)
+
+    @fixedvalue
+    def complex_data(self):
+        return False
 
     @classmethod
     def fromfile(cls, fh, header=None, **kwargs):
