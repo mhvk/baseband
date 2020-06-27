@@ -20,9 +20,9 @@ class FrameBase:
         Wrapper around the header, providing mechanisms to decode it.
     payload : ``cls._payload_class``
         Wrapper around the payload, providing mechanisms to decode it.
-    valid : bool
-        Whether the data are valid.  Default: `True`.
-    verify : bool
+    valid : bool, optional
+        Whether the data are valid.  Default: class default, `True`.
+    verify : bool, optional
         Whether to do basic verification of integrity.  Default: `True`.
 
     Notes
@@ -53,11 +53,13 @@ class FrameBase:
     _header_class = None
     _payload_class = None
     _fill_value = 0.
+    _valid = True
 
-    def __init__(self, header, payload, valid=True, verify=True):
+    def __init__(self, header, payload, valid=None, verify=True):
         self.header = header
         self.payload = payload
-        self.valid = valid
+        if valid is not None:
+            self.valid = valid
         if verify:
             self.verify()
 
@@ -79,7 +81,7 @@ class FrameBase:
         self._valid = bool(valid)
 
     @classmethod
-    def fromfile(cls, fh, *args, valid=True, verify=True, **kwargs):
+    def fromfile(cls, fh, *args, valid=None, verify=True, **kwargs):
         """Read a frame from a filehandle.
 
         Parameters
@@ -88,9 +90,9 @@ class FrameBase:
             Handle to read the frame from
         *args, **kwargs
             Arguments that help to initialize the payload.
-        valid : bool
-            Whether the data are valid.  Default: `True`.
-        verify : bool
+        valid : bool, optional
+            Whether the data are valid.  Default: assume inferred from data.
+        verify : bool, optional
             Whether to do basic verification of integrity.  Default: `True`.
         """
         header = cls._header_class.fromfile(fh, verify=verify)
@@ -103,7 +105,7 @@ class FrameBase:
         self.payload.tofile(fh)
 
     @classmethod
-    def fromdata(cls, data, header, *args, valid=True, verify=True, **kwargs):
+    def fromdata(cls, data, header=None, *, valid=None, verify=True, **kwargs):
         """Construct frame from data and header.
 
         Parameters
@@ -112,16 +114,14 @@ class FrameBase:
             Array holding data to be encoded.
         header : ``cls._header_class``
             Header for the frame.
-        *args, **kwargs :
-            Any arguments beyond the filehandle are used to help initialize the
-            payload, except for ``valid`` and ``verify``, which are passed on
-            to the header and class initializers.
         valid : bool, optional
-            Whether this payload contains valid data.
+            Whether the data are valid.  Default: assume inferred from header.
         verify : bool, optional
             Whether to verify the header and frame correctness.
         """
-        payload = cls._payload_class.fromdata(data, *args, **kwargs)
+        if header is None:
+            header = cls._header_class.fromvalues(verify=verify, **kwargs)
+        payload = cls._payload_class.fromdata(data, header=header)
         return cls(header, payload, valid=valid, verify=verify)
 
     @property

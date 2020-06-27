@@ -72,31 +72,3 @@ class GUPPIFrame(FrameBase):
         header = cls._header_class.fromfile(fh, verify=verify)
         payload = cls._payload_class.fromfile(fh, header=header, memmap=memmap)
         return cls(header, payload, valid=valid, verify=verify)
-
-    @classmethod
-    def fromdata(cls, data, header=None, valid=True, verify=True, **kwargs):
-        """Construct frame from data and header.
-
-        Note that since GUPPI files are generally very large, one would
-        normally map the file, and then set pieces of it by assigning to slices
-        of the frame.  See `~baseband.guppi.base.GUPPIFileWriter.memmap_frame`.
-
-        Parameters
-        ----------
-        data : `~numpy.ndarray`
-            Array holding complex or real data to be encoded.
-        header : `~baseband.guppi.GUPPIHeader` or None, optional
-            If not given, will attempt to generate one using the keywords.
-        valid : bool, optional
-            Whether the data are valid (default: `True`). Note that this
-            information cannot be written to disk.
-        verify : bool, optional
-            Whether or not to do basic assertions that check the integrity.
-            Default: `True`.
-        **kwargs
-            If ``header`` is not given, these are used to initialize one.
-        """
-        if header is None:
-            header = cls._header_class.fromvalues(verify=verify, **kwargs)
-        payload = cls._payload_class.fromdata(data, header=header)
-        return cls(header, payload, valid=valid, verify=verify)

@@ -51,6 +51,7 @@ class TestVLBIBase:
             _struct = four_word_struct
             _header_parser = self.header_parser
             payload_nbytes = 8
+            bps = 8
 
         self.Header = Header
         self.header = self.Header([0x12345678, 0xffff0000, 0x0, 0xffffffff])

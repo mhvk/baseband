@@ -111,6 +111,31 @@ class GSBFrame(FrameBase):
         self.header.tofile(fh_ts)
         self.payload.tofile(fh_raw)
 
+    @classmethod
+    def fromdata(cls, data, header=None, *,
+                 bps=4, valid=True, verify=True, **kwargs):
+        """Construct frame from data and header.
+
+        Parameters
+        ----------
+        data : `~numpy.ndarray`
+            Array holding data to be encoded.
+        header : ``cls._header_class``
+            Header for the frame.
+        bps : int, optional
+            Bits per elementary sample.  Default: 4.
+        valid : bool, optional
+            Whether this payload contains valid data.
+        verify : bool, optional
+            Whether to verify the header and frame correctness.
+        **kwargs :
+            Used to intialize the header, if not given.
+        """
+        if header is None:
+            header = cls._header_class.fromvalues(verify=verify, **kwargs)
+        payload = cls._payload_class.fromdata(data, bps=bps)
+        return cls(header, payload, valid=valid, verify=verify)
+
     @property
     def nbytes(self):
         """Size of the encoded frame in the raw data file in bytes."""
