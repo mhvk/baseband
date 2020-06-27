@@ -806,6 +806,7 @@ class VDIFMark5BHeader(VDIFBaseHeader, VDIFNoSampleRateHeader, Mark5BHeader):
         super().verify()
         assert self['frame_length'] == 1254  # payload+header=10000+32 bytes/8
         assert self['frame_nr'] == self['mark5b_frame_nr']
+        assert not self['complex_data']
         # Check consistency of time down to the second (since some Mark 5B
         # headers do not store 'bcd_fraction').
         day, seconds = divmod(self['seconds'], 86400)
@@ -821,10 +822,18 @@ class VDIFMark5BHeader(VDIFBaseHeader, VDIFNoSampleRateHeader, Mark5BHeader):
     def frame_nbytes(cls):
         return cls.nbytes + cls.payload_nbytes
 
+    @fixedvalue
+    def complex_data(cls):
+        return False
+
     def __setitem__(self, item, value):
-        super().__setitem__(item, value)
-        if item == 'frame_nr':
-            super().__setitem__('mark5b_frame_nr', value)
+        if item == 'complex_data':
+            # Pass by fixed-value setter - can only set to False.
+            self.complex_data = value
+        else:
+            super().__setitem__(item, value)
+            if item == 'frame_nr':
+                super().__setitem__('mark5b_frame_nr', value)
 
     def get_time(self, frame_rate=None):
         """

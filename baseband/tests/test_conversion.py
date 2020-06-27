@@ -96,9 +96,14 @@ class TestVDIFMark5B:
         assert np.all(payload2.data == m5pl.data)
         # Mark 5B data cannot complex. Check that this raises an exception.
         header2 = header.copy()
-        header2['complex_data'] = True
         with pytest.raises(ValueError):
-            vdif.VDIFPayload(m5pl.words, header2)
+            header2.complex_data = True
+
+        with pytest.raises(ValueError):
+            header2['complex_data'] = True
+
+        with pytest.raises(ValueError):
+            vdif.VDIFPayload.fromdata(m5pl.data.view(complex), bps=2, edv=0xab)
 
     def test_frame(self):
         """Check a whole Mark 5B frame can be translated to VDIF."""
