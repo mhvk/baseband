@@ -130,17 +130,16 @@ class Mark5BPayload(PayloadBase):
 
     _sample_shape_maker = namedtuple('SampleShape', 'nchan')
 
-    def __init__(self, words, nchan=1, bps=2):
-        super().__init__(words, sample_shape=(nchan,), bps=bps)
+    def __init__(self, words, sample_shape=(1,), bps=2, complex_data=False):
+        if complex_data:
+            raise ValueError("Mark5B format does not support complex data.")
+        super().__init__(words, sample_shape=sample_shape, bps=bps)
 
     @classmethod
-    def fromdata(cls, data, bps=2):
+    def fromdata(cls, data, *, bps=2):
         """Encode data as payload, using a given number of bits per sample.
 
         It is assumed that the last dimension is the number of channels.
         """
-        if data.dtype.kind == 'c':
-            raise ValueError("Mark5B format does not support complex data.")
-        encoder = cls._encoders[bps]
-        words = encoder(data).view(cls._dtype_word)
-        return cls(words, nchan=data.shape[-1], bps=bps)
+        # Override just to remove option of passing in header.
+        return super().fromdata(data, bps=bps)

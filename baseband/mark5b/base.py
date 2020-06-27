@@ -80,7 +80,8 @@ class Mark5BFileReader(VLBIFileReaderBase):
             raise TypeError("In order to read frames, the file handle should "
                             "be initialized with nchan set.")
         return Mark5BFrame.fromfile(self.fh_raw, kday=self.kday,
-                                    ref_time=self.ref_time, nchan=self.nchan,
+                                    ref_time=self.ref_time,
+                                    sample_shape=(self.nchan,),
                                     bps=self.bps, verify=verify)
 
     def get_frame_rate(self):
