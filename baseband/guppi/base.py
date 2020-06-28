@@ -255,6 +255,28 @@ class GUPPIStreamReader(GUPPIStreamBase, StreamReaderBase):
         super().__init__(fh_raw, header0, squeeze=squeeze,
                          subset=subset, verify=verify)
 
+    @lazyproperty
+    def stop_time(self):
+        """Time at the end of the file, just after the last sample.
+
+        This includes any overlap in the last frame.
+
+        See also `start_time` for the start time of the file, and `time` for
+        the time of the sample pointer's current offset.
+        """
+        return (self._get_time(self._last_header)
+                + (self._last_header.samples_per_frame / self.sample_rate))
+
+    def _get_frame(self, offset):
+        normal_end = self._nsample-self._last_header.overlap
+        if normal_end <= offset < self._nsample:
+            # In overlap of last frame.
+            frame, sample_offset = super()._get_frame(normal_end-1)
+            return frame, sample_offset + 1 + offset - normal_end
+
+        else:
+            return super()._get_frame(offset)
+
 
 class GUPPIStreamWriter(GUPPIStreamBase, StreamWriterBase):
     """GUPPI format writer.

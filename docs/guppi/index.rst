@@ -37,7 +37,8 @@ formats).  In either case, for each channel polarization samples from the same
 point in time are stored adjacent to one another.  At the end of each channel's
 data is a section of **overlap samples** identical to the first samples in
 the next payload.  Baseband retains these redundant samples when reading
-individual GUPPI frames, but removes them when reading files as a stream.
+individual GUPPI frames, but skips them when reading files as a stream, keeping
+only the overlap of the last frame.
 
 .. _guppi_usage:
 
@@ -85,7 +86,7 @@ writing is in units of samples, and provides access to header information::
         start_time=2018-01-14T14:11:33.000>
     >>> d = fh.read()
     >>> d.shape
-    (3840, 2, 4)
+    (3904, 2, 4)
     >>> d[:3, 0, 1]    # doctest: +FLOAT_CMP
     array([-32.-10.j, -15.-14.j,   9.-13.j], dtype=complex64)
     >>> fh.close()
@@ -94,11 +95,13 @@ Note that ``fh.samples_per_frame`` represents the number of samples per frame
 **excluding overlap samples**, since the stream reader works on a linearly
 increasing sequence of samples.  Frames themselves have access to the overlap,
 and ``fh.header0.samples_per_frame`` returns the number of samples per frame
-including overlap.
+including overlap. Furthermore, the overlap in the last frame is used for the
+stream, which is the reason that the shape above is not an integer multiple of
+``fh.samples_per_frame``, but rather ``960*4+64=3904``.
 
 To set up a file for writing as a stream is possible as well.  Overlap must be
 zero when writing (so we set ``samples_per_frame`` to its stream reader value
-from above)::
+from above and ignore the extra 64 samples we got from the reader)::
 
     >>> from astropy.time import Time
     >>> fw = guppi.open('puppi_test.{file_nr:04d}.raw', 'ws',
@@ -106,11 +109,11 @@ from above)::
     ...                 samples_per_frame=960, pktsize=1024,
     ...                 time=Time(58132.59135416667, format='mjd'),
     ...                 npol=2, nchan=4)
-    >>> fw.write(d)
+    >>> fw.write(d[:-64])
     >>> fw.close()
     >>> fr = guppi.open('puppi_test.{file_nr:04d}.raw', 'rs')
     >>> d2 = fr.read()
-    >>> (d == d2).all()
+    >>> (d2 == d[:-64]).all()
     True
     >>> fr.close()
 

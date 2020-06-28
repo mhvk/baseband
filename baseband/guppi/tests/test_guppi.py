@@ -421,10 +421,11 @@ class TestGUPPI:
 
     def test_filestreamer(self, tmpdir):
         start_time = self.header.time
+        nsample = 4*1024 - 3*64
         with guppi.open(SAMPLE_FILE, 'rs') as fh:
             assert fh.header0 == self.header
             assert fh.sample_shape == (2, 4)
-            assert fh.shape == (3840,) + fh.sample_shape
+            assert fh.shape == (nsample,) + fh.sample_shape
             assert fh.size == np.prod(fh.shape)
             assert fh.ndim == len(fh.shape)
             assert fh.start_time == start_time
@@ -445,7 +446,7 @@ class TestGUPPI:
             fh.seek(fh.start_time + 100 / (250 * u.Hz))
             assert fh.tell() == 100
             assert (np.abs(fh.stop_time
-                           - (start_time + 3840 / (250 * u.Hz))) < 1. * u.ns)
+                           - (start_time + nsample / (250 * u.Hz))) < 1.*u.ns)
             fh.seek(1, 'end')
             with pytest.raises(EOFError):
                 fh.read()
@@ -547,6 +548,19 @@ class TestGUPPI:
             data_onepol = fh.read()
         assert np.all(data_onepol.squeeze() == self.payload[:spf, 0, :2])
 
+    def test_stream_overlap(self):
+        # See gh-264
+        with guppi.open(SAMPLE_FILE, 'rs') as fh:
+            overlap = fh.header0.overlap
+            # Check "normal" end.
+            fh.seek(4*fh.samples_per_frame)
+            data = fh.read()
+            assert len(data) == overlap
+            fh.seek(-1, 2)
+            assert fh.tell() == 4*fh.samples_per_frame + overlap - 1
+            data = fh.read()
+            assert len(data) == 1
+
     def test_incomplete_stream(self, tmpdir):
         """Test that writing an incomplete stream is possible, and that frame
         set is valid but invalid samples use the fill value.
@@ -587,7 +601,7 @@ class TestGUPPI:
     def test_multiple_files_stream(self, tmpdir):
         start_time = self.header_w.time
         with guppi.open(SAMPLE_FILE, 'rs') as fh:
-            data = fh.read()
+            data = fh.read(3840)  # omit overlap for test
         filenames = (str(tmpdir.join('guppi_1.raw')),
                      str(tmpdir.join('guppi_2.raw')))
         with guppi.open(filenames, 'ws', header0=self.header_w,
@@ -652,18 +666,19 @@ class TestGUPPI:
         # Try reading a file with an incomplete payload.
         with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'wb') as fw:
             fw.write(puppi_raw[:len(puppi_raw) - 6091])
+        nsample = 3*1024 - 2*64  # 3 frames minus 2 overlaps
         with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'rs') as fn:
-            assert fn.shape == (2880, 2, 4)
+            assert fn.shape == (nsample, 2, 4)
             assert np.abs(fn.stop_time
-                          - fn.start_time - 2880 / (250 * u.Hz)) < 1. * u.ns
+                          - fn.start_time - nsample / (250 * u.Hz)) < 1. * u.ns
 
         # Try reading a file with an incomplete header.
         with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'wb') as fw:
             fw.write(puppi_raw[:len(puppi_raw) - 17605])
         with guppi.open(str(tmpdir.join('puppi_partframe.raw')), 'rs') as fn:
-            assert fn.shape == (2880, 2, 4)
+            assert fn.shape == (nsample, 2, 4)
             assert np.abs(fn.stop_time
-                          - fn.start_time - 2880 / (250 * u.Hz)) < 1. * u.ns
+                          - fn.start_time - nsample / (250 * u.Hz)) < 1. * u.ns
 
     def test_chan_ordered_stream(self, tmpdir):
         """Test encoding and decoding frames and streams that use
@@ -672,7 +687,7 @@ class TestGUPPI:
         filename = str(tmpdir.join('testguppi.raw'))
 
         with guppi.open(SAMPLE_FILE) as fh:
-            data = fh.read()
+            data = fh.read(3840)  # omit overlap for test
 
         header = self.header.copy()
         header.channels_first = False
@@ -688,7 +703,7 @@ class TestGUPPI:
     def test_template_stream(self, tmpdir):
         start_time = self.header_w.time
         with guppi.open(SAMPLE_FILE, 'rs') as fh:
-            data = fh.read()
+            data = fh.read(3840)  # omit overlap for test
 
         # Simple template with file number counter.
         template = str(tmpdir.join('guppi_{file_nr:02d}.raw'))
