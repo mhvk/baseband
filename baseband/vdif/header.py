@@ -13,7 +13,8 @@ import astropy.units as u
 from astropy.time import Time, TimeDelta
 
 from ..base.header import (four_word_struct, eight_word_struct,
-                           fixedvalue, HeaderParser, VLBIHeaderBase)
+                           HeaderParser, VLBIHeaderBase)
+from ..base.utils import fixedvalue
 from ..mark5b.header import Mark5BHeader
 
 

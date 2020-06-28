@@ -15,10 +15,12 @@ import functools
 from copy import copy
 
 import numpy as np
-from astropy.utils import sharedmethod, classproperty
+from astropy.utils import sharedmethod
+
+from .utils import fixedvalue
 
 
-__all__ = ['fixedvalue', 'four_word_struct', 'eight_word_struct',
+__all__ = ['four_word_struct', 'eight_word_struct',
            'make_parser', 'make_setter', 'get_default',
            'ParserDict', 'HeaderParserBase', 'HeaderParser',
            'ParsedHeaderBase', 'VLBIHeaderBase']
@@ -28,20 +30,6 @@ four_word_struct = struct.Struct('<4I')
 """Struct instance that packs/unpacks 4 unsigned 32-bit integers."""
 eight_word_struct = struct.Struct('<8I')
 """Struct instance that packs/unpacks 8 unsigned 32-bit integers."""
-
-
-class fixedvalue(classproperty):
-    """Property that is fixed for all instances of a class.
-
-    Based on `astropy.utils.decorators.classproperty`, but with
-    a setter that passes if the value is identical to the fixed
-    value, and otherwise raises a `ValueError`.
-    """
-    def __set__(self, instance, value):
-        fixed_value = self.__get__(instance, type(instance))
-        if value != fixed_value:
-            raise ValueError(
-                f"'{self.fget.__name__}' can only be set to {fixed_value}.")
 
 
 def make_parser(word_index, bit_index, bit_length, default=None):
@@ -305,7 +293,7 @@ class ParsedHeaderBase:
       _properties : tuple of properties accessible/usable in initialisation
 
     It also should define properties that tell the size (getters *and*
-    setters, or use a `baseband.base.header.fixedvalue` if the
+    setters, or use a `baseband.base.utils.fixedvalue` if the
     value is the same for all instances):
 
       payload_nbytes : number of bytes used by payload
@@ -536,7 +524,7 @@ class VLBIHeaderBase(ParsedHeaderBase):
       _stream_invarants : set of keys of invariant header parts for a stream.
 
     It also should define properties that tell the size (getters *and*
-    setters, or use a `baseband.base.header.fixedvalue` if the
+    setters, or use a `baseband.base.utils.fixedvalue` if the
     value is the same for all instances):
 
       payload_nbytes : number of bytes used by payload
