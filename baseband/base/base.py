@@ -474,6 +474,33 @@ class StreamBase:
         self._set_time(header,
                        time=self.start_time + index / self._frame_rate)
 
+    def _get_frame(self, offset):
+        """Get a frame that includes given offset.
+
+        Finds the index corresponding to the needed frame, assuming frames
+        are all the same length.  If not already cached, it retrieves a
+        frame by calling ``self._new_frame(index)``.  The reader and writer
+        subclasses provide implementations for this.
+
+        Parameters
+        ----------
+        offset : int
+            Offset in the stream for which a frame should be found.
+
+        Returns
+        -------
+        frame : `~baseband.base.frame.FrameBase`
+            Frame holding the sample at ``offset``.
+        sample_offset : int
+            Offset within the frame corresponding to ``offset``.
+        """
+        frame_index, sample_offset = divmod(offset, self.samples_per_frame)
+        if frame_index != self._frame_index:
+            self._frame = self._new_frame(frame_index)
+            self._frame_index = frame_index
+
+        return self._frame, sample_offset
+
     @lazyproperty
     def start_time(self):
         """Start time of the file.
@@ -717,7 +744,7 @@ class StreamReaderBase(StreamBase):
         the time of the sample pointer's current offset.
         """
         return (self._get_time(self._last_header)
-                + (self.samples_per_frame / self.sample_rate).to(u.s))
+                + (self.samples_per_frame / self.sample_rate))
 
     @lazyproperty
     def _nsample(self):
@@ -838,25 +865,24 @@ class StreamReaderBase(StreamBase):
         sample = 0
         while sample < count:
             # For current position, get frame plus offset in that frame.
-            frame_index, sample_offset = divmod(self.offset,
-                                                self.samples_per_frame)
-            if frame_index != self._frame_index:
-                self._frame = self._read_frame(frame_index)
-                self._frame.fill_value = self.fill_value
-                self._frame_index = frame_index
-
-            frame = self._frame
-
+            frame, sample_offset = self._get_frame(self.offset)
             nsample = min(count - sample, len(frame) - sample_offset)
             data = frame[sample_offset:sample_offset + nsample]
             data = self._squeeze_and_subset(data)
             # Copy to relevant part of output.
             out[sample:sample + nsample] = data
             sample += nsample
-            # Explicitly set offset (just in case read_frame adjusts it too).
+            # Explicitly set offset (leaving get_frame free to adjust it).
             self.offset = offset0 + sample
 
         return out
+
+    def _new_frame(self, index):
+        # Called from _get_frame if a frame was not already cached.
+        # Could be just _read_frame except we need to set the fill value.
+        frame = self._read_frame(index)
+        frame.fill_value = self.fill_value
+        return frame
 
     _next_index = None
 
@@ -1084,23 +1110,22 @@ class StreamWriterBase(StreamBase):
         offset0 = self.offset
         sample = 0
         while sample < count:
-            frame_index, sample_offset = divmod(self.offset,
-                                                self.samples_per_frame)
-            if frame_index != self._frame_index:
-                self._frame = self._make_frame(frame_index)
-                self._frame_index = frame_index
-
-            nsample = min(count - sample, len(self._frame) - sample_offset)
+            frame, sample_offset = self._get_frame(self.offset)
+            nsample = min(count - sample, len(frame) - sample_offset)
             sample_end = sample_offset + nsample
-            self._frame[sample_offset:sample_end] = data[sample:
-                                                         sample + nsample]
-            self._frame.valid &= valid
+            frame[sample_offset:sample_end] = data[sample:sample+nsample]
+            frame.valid &= valid
             if sample_end == self.samples_per_frame:
-                self._fh_raw_write_frame(self._frame)
+                self._fh_raw_write_frame(frame)
 
             sample += nsample
-            # Explicitly set offset (just in case write_frame adjusts it too).
+            # Explicitly set offset (leaving get_frame free to adjust it).
             self.offset = offset0 + sample
+
+    def _new_frame(self, index):
+        # Called from _get_frame if a frame was not already cached.
+        # Could be just _make_frame except for backwards compatibility.
+        return self._make_frame(index)
 
     def _make_frame(self, index):
         # Default implementation assumes that an initial _frame was
