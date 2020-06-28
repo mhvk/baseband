@@ -884,8 +884,6 @@ class StreamReaderBase(StreamBase):
         frame.fill_value = self.fill_value
         return frame
 
-    _next_index = None
-
     def _read_frame(self, index):
         """Base implementation of reading a frame.
 
@@ -910,10 +908,11 @@ class StreamReaderBase(StreamBase):
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        # Remove any cached frames and associated indices, since these
+        # Remove cached frame and associate index, since these
         # are almost certainly not needed and can be regenerated.
-        for item in ('_frame', '_frame_index', '_next_frame', '_next_index',
-                     'sample_shape'):
+        # Sample_shape can also be regenerated, yet not easily pickled,
+        # if the namedtuple is defined on the class, so we remove it too.
+        for item in ('_frame', '_frame_index', 'sample_shape'):
             state.pop(item, None)
 
         return state
@@ -926,6 +925,7 @@ class VLBIStreamReaderBase(StreamReaderBase):
     # This class is different in assuming specifically that the underlying
     # file has small subsequent frames, and that its fh_raw has a find_header
     # method. This is used to help identify and skip bad frames.
+    _next_index = None
 
     @lazyproperty
     def _last_header(self):
@@ -1077,6 +1077,14 @@ class VLBIStreamReaderBase(StreamReaderBase):
 
         warnings.warn(msg)
         return frame
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        # Remove additional cached frames and indices.
+        for item in ('_next_frame', '_next_index'):
+            state.pop(item, None)
+
+        return state
 
 
 class StreamWriterBase(StreamBase):
