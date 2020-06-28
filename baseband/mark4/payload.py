@@ -15,7 +15,7 @@ import numpy as np
 
 from ..base.payload import PayloadBase
 from ..base.encoding import encode_2bit_base, decoder_levels
-from ..base.header import fixedvalue
+from ..base.utils import fixedvalue
 from .header import MARK4_DTYPES
 
 

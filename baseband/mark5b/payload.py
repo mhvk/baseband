@@ -14,7 +14,7 @@ import numpy as np
 
 from ..base.payload import PayloadBase
 from ..base.encoding import encode_2bit_base, decoder_levels
-from ..base.header import fixedvalue
+from ..base.utils import fixedvalue
 
 
 __all__ = ['init_luts', 'decode_1bit', 'decode_2bit',

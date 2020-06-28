@@ -12,9 +12,8 @@ import numpy as np
 import astropy.units as u
 from astropy.time import Time
 
-from ..base.header import (HeaderParser, VLBIHeaderBase,
-                           four_word_struct, fixedvalue)
-from ..base.utils import bcd_decode, bcd_encode, CRC
+from ..base.header import HeaderParser, VLBIHeaderBase, four_word_struct
+from ..base.utils import bcd_decode, bcd_encode, fixedvalue, CRC
 
 
 __all__ = ['CRC16', 'crc16', 'Mark5BHeader']

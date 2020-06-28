@@ -16,8 +16,8 @@ import numpy as np
 from astropy.time import Time
 from astropy.utils import sharedmethod
 
-from ..base.header import HeaderParser, VLBIHeaderBase, fixedvalue
-from ..base.utils import bcd_decode, bcd_encode, CRCStack
+from ..base.header import HeaderParser, VLBIHeaderBase
+from ..base.utils import bcd_decode, bcd_encode, fixedvalue, CRCStack
 
 __all__ = ['CRC12', 'crc12', 'stream2words', 'words2stream',
            'Mark4TrackHeader', 'Mark4Header']
