@@ -3,7 +3,7 @@ from ..base.base import (  # noqa
     FileBase as _FileBase,
     VLBIFileReaderBase,
     StreamBase as _StreamBase,
-    VLBIStreamReaderBase,
+    VLBIStreamReaderBase as _VLBIStreamReaderBase,
     StreamWriterBase as _StreamWriterBase,
     FileOpener as _FileOpener)
 
@@ -12,11 +12,22 @@ class VLBIFileBase(_FileBase):
     pass
 
 
-class VLBIStreamBase(_StreamBase):
+class _UnslicedShape:
+    def __init__(self, *args, **kwargs):
+        if 'unsliced_shape' in kwargs:
+            kwargs['sample_shape'] = kwargs.pop('unsliced_shape', None)
+        super().__init__(*args, **kwargs)
+
+
+class VLBIStreamBase(_UnslicedShape, _StreamBase):
     pass
 
 
-class VLBIStreamWriterBase(_StreamWriterBase):
+class VLBIStreamReaderBase(_UnslicedShape, _VLBIStreamReaderBase):
+    pass
+
+
+class VLBIStreamWriterBase(_UnslicedShape, _StreamWriterBase):
     pass
 
 

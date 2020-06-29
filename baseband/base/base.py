@@ -410,20 +410,18 @@ class StreamBase:
         # Arguments with defaults.
         self._squeeze = bool(squeeze)
         # Arguments that can override or complement information from header.
-        for header_attr, getter in [
+        for attr, getter in [
                 ('bps', operator.index),
                 ('complex_data', bool),
                 ('samples_per_frame', operator.index),
                 ('sample_shape', tuple),
                 ('sample_rate', None)]:
-            attr = (header_attr if header_attr != 'sample_shape'
-                    else 'unsliced_shape')
             value = kwargs.pop(attr, None)
             if value is None:
-                value = getattr(header0, header_attr, None)
+                value = getattr(header0, attr, None)
             if getter is not None and value is not None:
                 value = getter(value)
-            setattr(self, '_'+header_attr, value)
+            setattr(self, '_'+attr, value)
 
         if kwargs:
             raise TypeError('got unexpected keyword(s): {}'

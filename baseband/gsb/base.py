@@ -192,11 +192,11 @@ class GSBStreamBase(StreamBase):
         if sample_rate is None:
             sample_rate = samples_per_frame * default_frame_rate
 
-        unsliced_shape = (nchan,) if rawdump else (len(fh_raw), nchan)
+        sample_shape = (nchan,) if rawdump else (len(fh_raw), nchan)
 
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
-            samples_per_frame=samples_per_frame, unsliced_shape=unsliced_shape,
+            samples_per_frame=samples_per_frame, sample_shape=sample_shape,
             bps=bps, complex_data=complex_data, **kwargs)
 
         self._payload_nbytes = payload_nbytes
