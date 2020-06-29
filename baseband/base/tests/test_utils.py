@@ -40,7 +40,7 @@ class TestCRC12:
         n = len(string) * 4
         scalar = int(string, base=16)
         return np.array([((scalar & (1 << bit)) != 0)
-                         for bit in range(n-1, -1, -1)], np.bool)
+                         for bit in range(n-1, -1, -1)], bool)
 
     @staticmethod
     def stream_to_scalar(stream):
