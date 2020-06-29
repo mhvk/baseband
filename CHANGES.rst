@@ -45,6 +45,9 @@ Bug Fixes
 - Extraneous arguments to stream writers are no longer ignored, but give
   rise to a ``TypeError``. [#417]
 
+- The GUPPI stream reader now will include any overlap samples from the
+  last frame. [#431]
+
 Other Changes and Additions
 ---------------------------
 
