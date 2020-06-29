@@ -554,10 +554,10 @@ class TestVLBIBase:
 
 class TestSqueezeAndSubset:
     def setup(self):
-        self.other_args = dict(fh_raw=None, header0=None, bps=1,
+        header0 = namedtuple('Header', 'frame_nbytes')(8)
+        self.other_args = dict(fh_raw=None, header0=header0, bps=1,
                                complex_data=False, samples_per_frame=1000,
-                               sample_rate=10000*u.Hz, fill_value=0.,
-                               verify=True)
+                               sample_rate=10000*u.Hz)
         self.sample_shape_maker = namedtuple('SampleShape',
                                              'n0, n1, n2, n3, n4')
         self.unsliced_shape = (1, 21, 33, 1, 2)
@@ -584,16 +584,16 @@ class TestSqueezeAndSubset:
 
         return StreamWriterWithShape(
             unsliced_shape=unsliced_shape or self.unsliced_shape,
-            subset=None, squeeze=squeeze, **self.other_args)
+            squeeze=squeeze, **self.other_args)
 
     def test_sample_shape_and_squeeze(self):
         # Tests stream base's sample and squeezing routines.
         # Try tuple only.
         sb = VLBIStreamBase(unsliced_shape=self.unsliced_shape,
-                            subset=None, squeeze=False, **self.other_args)
+                            squeeze=False, **self.other_args)
         assert sb.sample_shape == self.unsliced_shape
         sb = VLBIStreamBase(unsliced_shape=self.unsliced_shape,
-                            subset=None, squeeze=True, **self.other_args)
+                            squeeze=True, **self.other_args)
         assert sb.sample_shape == self.squeezed_shape
 
         # Try reader with equivalent sample shape.

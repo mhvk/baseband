@@ -606,17 +606,14 @@ class TestSqueezeAndSubset:
             sample_shape=unsliced_shape or self.unsliced_shape,
             **self.other_args)
 
-        return StreamWriterWithShape(
-            None, header0=header0, subset=None, squeeze=squeeze)
+        return StreamWriterWithShape(None, header0=header0, squeeze=squeeze)
 
     def test_sample_shape_and_squeeze(self):
         # Tests stream base's sample and squeezing routines.
         # Try tuple only.
-        sb = StreamBase(fh_raw=None, header0=self.header0,
-                        subset=None, squeeze=False)
+        sb = StreamBase(fh_raw=None, header0=self.header0, squeeze=False)
         assert sb.sample_shape == self.unsliced_shape
-        sb = StreamBase(fh_raw=None, header0=self.header0,
-                        subset=None, squeeze=True)
+        sb = StreamBase(fh_raw=None, header0=self.header0, squeeze=True)
         assert sb.sample_shape == self.squeezed_shape
 
         # Try reader with equivalent sample shape.

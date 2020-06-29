@@ -44,13 +44,10 @@ class BareStreamReader(StreamReaderBase):
 
 class BareStreamWriter(StreamWriterBase):
     def __init__(self, fh_raw, header0, *,
-                 squeeze=True, subset=(), fill_value=0., verify=True,
-                 parrot='alife', **kwargs):
+                 squeeze=True, parrot='alife', **kwargs):
         if parrot == 'dead':
             raise ValueError('parrot is dead')
-        super().__init__(fh_raw, header0, squeeze=squeeze,
-                         subset=subset, fill_value=fill_value,
-                         verify=verify, **kwargs)
+        super().__init__(fh_raw, header0, squeeze=squeeze, **kwargs)
 
 
 class TestFileOpener:

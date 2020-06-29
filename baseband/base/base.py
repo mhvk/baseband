@@ -1,4 +1,23 @@
 # Licensed under the GPLv3 - see LICENSE
+"""Common classes for accessing baseband data as binary files and streams.
+
+For access as binary files, the main `~baseband.base.base.FileBase` class
+provides a base to which simple methods such as ``read_frame`` and
+``write_frame`` can be added. Unlike normal binary file readers, the base can
+be pickled: it stores the name and re-opens the file if unpickled.  The
+`~baseband.base.base.VLBIFileReaderBase` adds additional methods useful for
+streams with small frames, to locate frames and determine the frame rate.
+
+For access as streams, the `~baseband.base.base.StreamReaderBase` and
+`~baseband.base.base.StreamWriterBase` classes allow one to process data in
+terms of frames, and access them as streams of samples via the ``read`` and
+``write`` methods, providing a number of private methods which can be
+overridden as needed for specific data formats.
+
+The `~baseband.base.base.FileOpener` and `~baseband.base.base.FileInfo`
+classes are to help create the ``open`` and ``info`` functions that are
+expected to exist for each format.
+"""
 import io
 import functools
 import inspect
@@ -41,6 +60,15 @@ class FileBase:
     ----------
     fh_raw : filehandle
         Filehandle of the raw binary data file.
+
+    Notes
+    -----
+    A subclass for reading should define ``read_header``, ``read_frame``, and
+    ``get_frame_rate`` methods, and also set an ``info`` property. Often the
+    standard one will suffice, i.e., ``info = FileReaderInfo()``.
+
+    A subclass for writing should define a ``write_frame`` method.
+
     """
     fh_raw = None
 
@@ -125,22 +153,26 @@ class FileBase:
 class VLBIFileReaderBase(FileBase):
     """VLBI wrapped file reader base class.
 
-    Typically, a subclass will define ``read_header`` and ``read_frame``
-    methods.  This baseclass includes base ``locate_frames`` method that
-    can search the file for a header patter. It can be overridden by
-    a version that just passes in the relevant pattern.
-
-    Also defined is a basic ``get_frame_rate`` methods which scans the file
-    for headers determines the maximum frame number that occurs before the
-    jump down for the next second. This method requires the subclass to
-    define a ``read_header`` method and assumes headers have a 'frame_nr'
-    item, and define a ``payload_nbytes`` property (as do all standard VLBI
-    formats).
-
     Parameters
     ----------
     fh_raw : filehandle
         Filehandle of the raw binary data file.
+
+    Notes
+    -----
+    A subclass should define ``read_header`` and ``read_frame`` methods.
+
+    This baseclass includes a base ``locate_frames`` method that can search
+    the file for a header patter. It can be overridden by a version that just
+    passes in the relevant pattern.
+
+    Also defined is are a ``find_header`` method which combines the above with
+    ``read_header``, and a basic ``get_frame_rate`` methods which scans the
+    file for headers and determines the maximum frame number that occurs
+    before the jump down (which is taken to be for the next second, as in all
+    standard VLBI formats). This method assumes headers have a 'frame_nr'
+    item, and define a ``payload_nbytes`` property.
+
     """
 
     info = FileReaderInfo()
@@ -360,25 +392,23 @@ class VLBIFileReaderBase(FileBase):
 
 
 class StreamBase:
-    """Baseband file wrapper, allowing access as a stream of data."""
+    """Baseband file wrapper, allowing access as a stream of data.
+
+    Common methods between stream readers and writers, mostly just
+    dealing with getting the arguments on initialization and providing
+    access to them via properties.
+    """
     # Apart from verify, instances are meant to be immutable.
 
     _sample_shape_maker = None
     _frame_index = None
 
-    def __init__(self, fh_raw, header0, *,
-                 squeeze=True, subset=(), fill_value=0., verify=True,
-                 **kwargs):
+    def __init__(self, fh_raw, header0, *, squeeze=True, **kwargs):
         # Required arguments.
         self.fh_raw = fh_raw
         self._header0 = header0
         # Arguments with defaults.
         self._squeeze = bool(squeeze)
-        self._subset = (() if subset is None
-                        else subset if isinstance(subset, tuple)
-                        else (subset,))
-        self._fill_value = float(fill_value)
-        self.verify = verify
         # Arguments that can override or complement information from header.
         for header_attr, getter in [
                 ('bps', operator.index),
@@ -413,15 +443,6 @@ class StreamBase:
         passed in for writing has them inserted.
         """
         return self._squeeze
-
-    @property
-    def subset(self):
-        """Specific components of the complete sample to decode.
-
-        The order of dimensions is the same as for `sample_shape`.  Set by
-        the class initializer.
-        """
-        return self._subset
 
     @property
     def _unsliced_shape(self):
@@ -474,33 +495,6 @@ class StreamBase:
         self._set_time(header,
                        time=self.start_time + index / self._frame_rate)
 
-    def _get_frame(self, offset):
-        """Get a frame that includes given offset.
-
-        Finds the index corresponding to the needed frame, assuming frames
-        are all the same length.  If not already cached, it retrieves a
-        frame by calling ``self._new_frame(index)``.  The reader and writer
-        subclasses provide implementations for this.
-
-        Parameters
-        ----------
-        offset : int
-            Offset in the stream for which a frame should be found.
-
-        Returns
-        -------
-        frame : `~baseband.base.frame.FrameBase`
-            Frame holding the sample at ``offset``.
-        sample_offset : int
-            Offset within the frame corresponding to ``offset``.
-        """
-        frame_index, sample_offset = divmod(offset, self.samples_per_frame)
-        if frame_index != self._frame_index:
-            self._frame = self._new_frame(frame_index)
-            self._frame_index = frame_index
-
-        return self._frame, sample_offset
-
     @lazyproperty
     def start_time(self):
         """Start time of the file.
@@ -541,15 +535,6 @@ class StreamBase:
     def sample_rate(self):
         """Number of complete samples per second."""
         return self._sample_rate
-
-    @property
-    def verify(self):
-        """Whether to do consistency checks on frames being read."""
-        return self._verify
-
-    @verify.setter
-    def verify(self, verify):
-        self._verify = bool(verify) if verify != 'fix' else verify
 
     def tell(self, unit=None):
         """Current offset in the file.
@@ -602,20 +587,72 @@ class StreamBase:
 
 
 class StreamReaderBase(StreamBase):
+    """Base for all stream readers, providing standard reading methods.
+
+    Parameters
+    ----------
+    fh_raw : filehandle
+        Should be opened in binary mode for reading, and usually wrapped
+        in a given format;s ``FileReader``.
+    header0 : header instance
+        First header of the file, with information like the start time, etc.
+    squeeze : bool, optional
+        If `True` (default), remove any dimensions of length unity from
+        decoded data.
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode (after possible
+        squeezing).
+    fill_value : float or complex, optional
+        Value to use for invalid or missing data. Default: 0.
+    verify : bool, optional
+        Whether to do basic checks of frame integrity when reading.  The first
+        frameset of the stream is always checked.  Default: `True`.
+    **kwargs
+        Information that supplements that of the header. In particular, any
+        format should define ``bps``, ``complex_data``, ``samples_per_frame``,
+        and ``sample_shape`` (pre-squeeze and subset). Furthermore,
+        ``sample_rate`` should be provided if the raw file reader cannot
+        determine it.
+
+    Notes
+    -----
+    Accessing frames happens via a number of private methods, which can be
+    overridden by subclasses to deal with their peculiarities.
+
+    The process starts in `~baseband.base.base.StreamReaderBase.read` with
+    ``_get_frame(offset)``, which determines the ``index`` of the frame a
+    given offset falls in, and then either uses ``_read_frame(index)`` to
+    read it or returns a possibly cached frame, together with the
+    ``sample_offset`` at which ``offset`` falls within the frame. Then, data
+    is retrieved as needed until the frame is exhausted, at which point the
+    process repeats.
+
+    The ``_read_frame(index)`` method in turn takes a number of steps.
+    First, the binary file reader is moved to the correct position using
+    ``_seek_frame(index)``, then for the base reader, the actual reading is
+    done using ``_fh_raw_read_frame()`` and a check is made that the right
+    frame was read.
+
+    Various formats override various steps. For instance, DADA overrides
+    ``_fh_raw_read_frame()`` to take care of last frames, which are often
+    longer than the fixed lengths recorded in the header. For GUPPI,
+    ``_get_frame`` is overridden to take into account overlap between
+    frames, which should not be skipped for the last frame.  For GSB,
+    ``_seek_frame`` and ``_fh_raw_read_frame`` are both overridden to take
+    into account that header and data are read from different files.
+    """
 
     info = StreamReaderInfo()
 
     def __init__(self, fh_raw, header0, *,
                  squeeze=True, subset=(), fill_value=0., verify=True,
                  **kwargs):
-
-        super().__init__(fh_raw, header0,
-                         squeeze=squeeze, subset=subset,
-                         fill_value=fill_value, verify=verify,
-                         **kwargs)
-
-        if hasattr(header0, 'frame_nbytes'):
-            self._raw_offsets = RawOffsets(frame_nbytes=header0.frame_nbytes)
+        self._subset = (() if subset is None
+                        else subset if isinstance(subset, tuple)
+                        else (subset,))
+        self._fill_value = float(fill_value)
+        self.verify = verify
+        super().__init__(fh_raw, header0, squeeze=squeeze, **kwargs)
 
     @lazyproperty
     def sample_rate(self):
@@ -634,6 +671,24 @@ class StreamReaderBase(StreamBase):
                 raise
 
         return sample_rate
+
+    @property
+    def verify(self):
+        """Whether to do consistency checks on frames being read."""
+        return self._verify
+
+    @verify.setter
+    def verify(self, verify):
+        self._verify = bool(verify) if verify != 'fix' else verify
+
+    @property
+    def subset(self):
+        """Specific components of the complete sample to decode.
+
+        The order of dimensions is the same as for `sample_shape`.  Set by
+        the class initializer.
+        """
+        return self._subset
 
     def _squeeze_and_subset(self, data):
         """Possibly remove unit dimensions and subset the given data.
@@ -877,12 +932,33 @@ class StreamReaderBase(StreamBase):
 
         return out
 
-    def _new_frame(self, index):
-        # Called from _get_frame if a frame was not already cached.
-        # Could be just _read_frame except we need to set the fill value.
-        frame = self._read_frame(index)
-        frame.fill_value = self.fill_value
-        return frame
+    def _get_frame(self, offset):
+        """Get a frame that includes given offset.
+
+        Finds the index corresponding to the needed frame, assuming frames
+        are all the same length.  If not already cached, it retrieves a
+        frame by calling ``self._new_frame(index)``.  The reader and writer
+        subclasses provide implementations for this.
+
+        Parameters
+        ----------
+        offset : int
+            Offset in the stream for which a frame should be found.
+
+        Returns
+        -------
+        frame : `~baseband.base.frame.FrameBase`
+            Frame holding the sample at ``offset``.
+        sample_offset : int
+            Offset within the frame corresponding to ``offset``.
+        """
+        frame_index, sample_offset = divmod(offset, self.samples_per_frame)
+        if frame_index != self._frame_index:
+            self._frame = self._read_frame(frame_index)
+            self._frame.fill_value = self.fill_value
+            self._frame_index = frame_index
+
+        return self._frame, sample_offset
 
     def _read_frame(self, index):
         """Base implementation of reading a frame.
@@ -900,7 +976,7 @@ class StreamReaderBase(StreamBase):
 
     def _seek_frame(self, index):
         """Move the underlying file pointer to the frame of the given index."""
-        return self.fh_raw.seek(self._raw_offsets[index])
+        return self.fh_raw.seek(index * self.header0.frame_nbytes)
 
     def _fh_raw_read_frame(self):
         """Read a frame at the current position of the underlying file."""
@@ -922,10 +998,35 @@ class StreamReaderBase(StreamBase):
 
 
 class VLBIStreamReaderBase(StreamReaderBase):
-    # This class is different in assuming specifically that the underlying
-    # file has small subsequent frames, and that its fh_raw has a find_header
-    # method. This is used to help identify and skip bad frames.
+    """Base for VLBI stream readers.
+
+    This extends the base class specifically for the case that the underlying
+    file has small subsequent frames, which may have gaps, and adds methods
+    that allow fixing these.
+
+    Arguments are as for `~baseband.base.base.StreamReaderBase`.
+
+    Notes
+    -----
+    The code assumes that the raw file reader has a ``find_header`` method,
+    which can be used to find next or previous frames from any position, and
+    thus help identify and skip bad frames. It is used in ``_last_header``
+    to be sure to find a full last frame.
+
+    The class also overrides the ``_read_frame`` method which one that checks
+    that the frame after the one requested is the right one, and attemps
+    recovery if anything fails, using ``_bad_frame(index, frame, exc)``.
+
+    Subclasses can overrides parts of the class. For instance, VDIF overrides
+    ``_fh_raw_read_frame`` and ``_bad_frame`` to take care of the fact that
+    data comes in sets of frames from multiple threads, not individual ones.
+    """
+
     _next_index = None
+
+    def __init__(self, fh_raw, header0, **kwargs):
+        super().__init__(fh_raw, header0, **kwargs)
+        self._raw_offsets = RawOffsets(frame_nbytes=self.header0.frame_nbytes)
 
     @lazyproperty
     def _last_header(self):
@@ -939,6 +1040,10 @@ class VLBIStreamReaderBase(StreamReaderBase):
                 exc.args += ("corrupt VLBI frame? No frame in last {0} bytes."
                              .format(2 * self.header0.frame_nbytes),)
                 raise
+
+    def _seek_frame(self, index):
+        """Move the underlying file pointer to the frame of the given index."""
+        return self.fh_raw.seek(self._raw_offsets[index])
 
     def _read_frame(self, index):
         """Base implementation of reading a VLBI frame.
@@ -1088,6 +1193,43 @@ class VLBIStreamReaderBase(StreamReaderBase):
 
 
 class StreamWriterBase(StreamBase):
+    """Base for all stream writers, providing a standard write method.
+
+    Parameters
+    ----------
+    fh_raw : filehandle
+        Should be opened in binary mode for writer, and usually wrapped
+        in a given format's ``FileWriter``.
+    header0 : header instance
+        Header for the first frame, holding time information, etc.  Can instead
+        give keyword arguments to construct a header (see ``**kwargs``).
+    squeeze : bool, optional
+        If `True` (default), writer accepts squeezed arrays as input, and adds
+        any dimensions of length unity.
+    **kwargs
+        Information that supplements that of the header. In particular, any
+        format should define ``bps``, ``complex_data``, ``samples_per_frame``,
+        ``sample_shape`` (on file), and ``sample_rate``.
+
+    Notes
+    -----
+    Accessing frames happens via a number of private methods, which can be
+    overridden by subclasses to deal with their  peculiarities.
+
+    The process starts in `~baseband.base.base.StreamWriterBase.write` with
+    ``_get_frame(offset)``, which determines the ``index`` of the frame a
+    given offset falls in, and then either uses ``_make_frame(index)`` to
+    create it, or returns a possibly cached frame, together with the
+    ``sample_offset`` at which ``offset`` falls within the frame. Then, data
+    is inserted as needed until the frame is exhausted, at which point the
+    frame is written to disk using ``_fh_raw_write_frame`` and the process
+    repeats.
+
+    Various formats override various steps. For instance, for DADA and GUPPI,
+    ``_make_frame()`` and ``_fh_raw_write_frame()`` are overridden to work
+    with memory mapped files. For GSB, ``_fh_raw_write_frame()`` is overridden
+    to take into account that header and data are read from different files.
+    """
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)
@@ -1123,17 +1265,24 @@ class StreamWriterBase(StreamBase):
             sample_end = sample_offset + nsample
             frame[sample_offset:sample_end] = data[sample:sample+nsample]
             frame.valid &= valid
-            if sample_end == self.samples_per_frame:
+            if sample_end == len(frame):
                 self._fh_raw_write_frame(frame)
 
             sample += nsample
             # Explicitly set offset (leaving get_frame free to adjust it).
             self.offset = offset0 + sample
 
-    def _new_frame(self, index):
-        # Called from _get_frame if a frame was not already cached.
-        # Could be just _make_frame except for backwards compatibility.
-        return self._make_frame(index)
+    def _get_frame(self, offset):
+        # Nearly identical to StreamReaderBase version, but not
+        # quite worth separating it out.
+        frame_index, sample_offset = divmod(offset, self.samples_per_frame)
+        if frame_index != self._frame_index:
+            self._frame = self._make_frame(frame_index)
+            self._frame_index = frame_index
+
+        return self._frame, sample_offset
+
+    _get_frame.__doc__ = StreamReaderBase._get_frame.__doc__
 
     def _make_frame(self, index):
         # Default implementation assumes that an initial _frame was

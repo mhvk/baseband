@@ -1,10 +1,10 @@
 .. _base:
 
-*********
-VLBI Base
-*********
+****
+Base
+****
 
-Routines on which the readers and writers for specific VLBI formats
+Routines on which the readers and writers for specific baseband formats
 are based.
 
 Reference/API
@@ -15,6 +15,7 @@ Reference/API
 .. automodapi:: baseband.base.payload
 .. automodapi:: baseband.base.frame
 .. automodapi:: baseband.base.base
+.. automodapi:: baseband.base.offsets
 .. automodapi:: baseband.base.file_info
 .. automodapi:: baseband.base.encoding
    :include-all-objects:
