@@ -554,7 +554,8 @@ class TestVLBIBase:
 
 class TestSqueezeAndSubset:
     def setup(self):
-        self.other_args = dict(fh_raw=None, header0=None, bps=1,
+        header0 = namedtuple('Header', 'frame_nbytes')(8)
+        self.other_args = dict(fh_raw=None, header0=header0, bps=1,
                                complex_data=False, samples_per_frame=1000,
                                sample_rate=10000*u.Hz)
         self.sample_shape_maker = namedtuple('SampleShape',

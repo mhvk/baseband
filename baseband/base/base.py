@@ -630,9 +630,6 @@ class StreamReaderBase(StreamBase):
         self.verify = verify
         super().__init__(fh_raw, header0, squeeze=squeeze, **kwargs)
 
-        if hasattr(header0, 'frame_nbytes'):
-            self._raw_offsets = RawOffsets(frame_nbytes=header0.frame_nbytes)
-
     @lazyproperty
     def sample_rate(self):
         sample_rate = super().sample_rate
@@ -955,7 +952,7 @@ class StreamReaderBase(StreamBase):
 
     def _seek_frame(self, index):
         """Move the underlying file pointer to the frame of the given index."""
-        return self.fh_raw.seek(self._raw_offsets[index])
+        return self.fh_raw.seek(index * self.header0.frame_nbytes)
 
     def _fh_raw_read_frame(self):
         """Read a frame at the current position of the underlying file."""
@@ -1001,6 +998,10 @@ class VLBIStreamReaderBase(StreamReaderBase):
     """
     _next_index = None
 
+    def __init__(self, fh_raw, header0, **kwargs):
+        super().__init__(fh_raw, header0, **kwargs)
+        self._raw_offsets = RawOffsets(frame_nbytes=self.header0.frame_nbytes)
+
     @lazyproperty
     def _last_header(self):
         """Last header of the file."""
@@ -1013,6 +1014,10 @@ class VLBIStreamReaderBase(StreamReaderBase):
                 exc.args += ("corrupt VLBI frame? No frame in last {0} bytes."
                              .format(2 * self.header0.frame_nbytes),)
                 raise
+
+    def _seek_frame(self, index):
+        """Move the underlying file pointer to the frame of the given index."""
+        return self.fh_raw.seek(self._raw_offsets[index])
 
     def _read_frame(self, index):
         """Base implementation of reading a VLBI frame.
