@@ -32,6 +32,12 @@ affect those that have built their own readers.
   not specific to actual VLBI data, leaving only ``VLBIHeaderBase``,
   ``VLBIFileReaderBase``, and ``VLBIStreamReaderBase``.  [#425]
 
+- The stream base classes will now try to get information that is not
+  passed in explicitly from ``header0``. Given this change, the keyword
+  argument ``unsliced_shape`` become somewhat illogical, so was changed
+  to ``sample_shape`` (still referring to the pre-squeeze and subset
+  shape) [#415, #433]
+
 - Support for memory mapping of payloads has been moved into the base
   ``PayloadBase`` and ``FrameBase`` classes and thus is available for all
   formats. [#427]

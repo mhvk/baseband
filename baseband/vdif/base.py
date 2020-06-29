@@ -452,7 +452,7 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
         nthread = len(thread_ids)
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
-            unsliced_shape=(nthread, header0.nchan), squeeze=squeeze,
+            sample_shape=(nthread, header0.nchan), squeeze=squeeze,
             subset=subset, fill_value=fill_value, verify=verify)
         self._raw_offsets.frame_nbytes *= nthread
 
@@ -786,11 +786,11 @@ class VDIFStreamWriter(VDIFStreamBase, StreamWriterBase):
                 'sample_rate on header inconsistent with that passed in.')
 
         super().__init__(fh_raw, header0, sample_rate=sample_rate,
-                         unsliced_shape=(nthread, header0.nchan),
+                         sample_shape=(nthread, header0.nchan),
                          squeeze=squeeze)
 
         self._frame = VDIFFrameSet.fromdata(
-            np.zeros((self.samples_per_frame,) + self._unsliced_shape,
+            np.zeros((self.samples_per_frame, nthread, header0.nchan),
                      dtype=np.complex64 if self.complex_data else np.float32),
             self.header0)
 

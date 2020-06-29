@@ -332,13 +332,13 @@ class Mark4StreamWriter(StreamWriterBase):
 
     _sample_shape_maker = Mark4Payload._sample_shape_maker
 
-    def __init__(self, fh_raw, header0=None, sample_rate=None, squeeze=True):
+    def __init__(self, fh_raw, header0, sample_rate=None, squeeze=True):
         fh_raw = Mark4FileWriter(fh_raw)
         super().__init__(fh_raw=fh_raw, header0=header0,
                          sample_rate=sample_rate, squeeze=squeeze)
         # Initial frame, reused for every other one.
         self._frame = Mark4Frame.fromdata(
-            np.zeros((self.samples_per_frame,) + self._unsliced_shape),
+            np.zeros((self.samples_per_frame,) + header0.sample_shape),
             header0.copy())
 
 

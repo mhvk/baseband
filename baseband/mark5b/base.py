@@ -257,7 +257,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
-            unsliced_shape=(nchan,), bps=bps,
+            sample_shape=(nchan,), bps=bps,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
         # Use ref_time in preference to kday so we can handle files that
@@ -304,10 +304,10 @@ class Mark5BStreamWriter(Mark5BStreamBase, StreamWriterBase):
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=header0.payload_nbytes * 8 // bps // nchan,
-            unsliced_shape=(nchan,), bps=bps, squeeze=squeeze)
+            sample_shape=(nchan,), bps=bps, squeeze=squeeze)
         # Initial frame, reused for every other one.
         self._frame = Mark5BFrame.fromdata(
-            np.zeros((self.samples_per_frame,) + self._unsliced_shape),
+            np.zeros((self.samples_per_frame, nchan)),
             header0.copy(), bps=bps)
 
 
