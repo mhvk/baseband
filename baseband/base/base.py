@@ -1,4 +1,23 @@
 # Licensed under the GPLv3 - see LICENSE
+"""Common classes for accessing baseband data as binary files and streams.
+
+For access as binary files, the main `~baseband.base.base.FileBase` class
+provides a base to which simple methods such as ``read_frame`` and
+``write_frame`` can be added. Unlike normal binary file readers, the base can
+be pickled: it stores the name and re-opens the file if unpickled.  The
+`~baseband.base.base.VLBIFileReaderBase` adds additional methods useful for
+streams with small frames, to locate frames and determine the frame rate.
+
+For access as streams, the `~baseband.base.base.StreamReaderBase` and
+`~baseband.base.base.StreamWriterBase` classes allow one to process data in
+terms of frames, and access them as streams of samples via the ``read`` and
+``write`` methods, providing a number of private methods which can be
+overridden as needed for specific data formats.
+
+The `~baseband.base.base.FileOpener` and `~baseband.base.base.FileInfo`
+classes are to help create the ``open`` and ``info`` functions that are
+expected to exist for each format.
+"""
 import io
 import functools
 import inspect
@@ -41,6 +60,15 @@ class FileBase:
     ----------
     fh_raw : filehandle
         Filehandle of the raw binary data file.
+
+    Notes
+    -----
+    A subclass for reading should define ``read_header``, ``read_frame``, and
+    ``get_frame_rate`` methods, and also set an ``info`` property. Often the
+    standard one will suffice, i.e., ``info = FileReaderInfo()``.
+
+    A subclass for writing should define a ``write_frame`` method.
+
     """
     fh_raw = None
 
@@ -125,22 +153,26 @@ class FileBase:
 class VLBIFileReaderBase(FileBase):
     """VLBI wrapped file reader base class.
 
-    Typically, a subclass will define ``read_header`` and ``read_frame``
-    methods.  This baseclass includes base ``locate_frames`` method that
-    can search the file for a header patter. It can be overridden by
-    a version that just passes in the relevant pattern.
-
-    Also defined is a basic ``get_frame_rate`` methods which scans the file
-    for headers determines the maximum frame number that occurs before the
-    jump down for the next second. This method requires the subclass to
-    define a ``read_header`` method and assumes headers have a 'frame_nr'
-    item, and define a ``payload_nbytes`` property (as do all standard VLBI
-    formats).
-
     Parameters
     ----------
     fh_raw : filehandle
         Filehandle of the raw binary data file.
+
+    Notes
+    -----
+    A subclass should define ``read_header`` and ``read_frame`` methods.
+
+    This baseclass includes a base ``locate_frames`` method that can search
+    the file for a header patter. It can be overridden by a version that just
+    passes in the relevant pattern.
+
+    Also defined is are a ``find_header`` method which combines the above with
+    ``read_header``, and a basic ``get_frame_rate`` methods which scans the
+    file for headers and determines the maximum frame number that occurs
+    before the jump down (which is taken to be for the next second, as in all
+    standard VLBI formats). This method assumes headers have a 'frame_nr'
+    item, and define a ``payload_nbytes`` property.
+
     """
 
     info = FileReaderInfo()
@@ -360,7 +392,12 @@ class VLBIFileReaderBase(FileBase):
 
 
 class StreamBase:
-    """Baseband file wrapper, allowing access as a stream of data."""
+    """Baseband file wrapper, allowing access as a stream of data.
+
+    Common methods between stream readers and writers, mostly just
+    dealing with getting the arguments on initialization and providing
+    access to them via properties.
+    """
     # Apart from verify, instances are meant to be immutable.
 
     _sample_shape_maker = None
@@ -575,6 +612,36 @@ class StreamBase:
 
 
 class StreamReaderBase(StreamBase):
+    """Base for all stream readers, providing standard reading methods.
+
+    Notes
+    -----
+    Accessing frames happens via a number of private methods, which can be
+    overridden by subclasses to deal with their peculiarities.
+
+    The process starts in `~baseband.base.base.StreamReaderBase.read` with
+    ``_get_frame(offset)``, which determines the ``index`` of the frame a
+    given offset falls in, and then either uses ``_read_frame(index)`` to
+    read it or returns a possibly cached frame, together with the
+    ``sample_offset`` at which ``offset`` falls within the frame. Then, data
+    is retrieved as needed until the frame is exhausted, at which point the
+    process repeats.
+
+    The ``_read_frame(index)`` method in turn takes a number of steps.
+    First, the binary file reader is moved to the correct position using
+    ``_seek_frame(index)``, then for the base reader, the actual reading is
+    done using ``_fh_raw_read_frame()`` and a check is made that the right
+    frame was read.
+
+    Various formats override various steps. For instance, DADA overrides
+    ``_fh_raw_read_frame()`` to take care of last frames, which are often
+    longer than the fixed lengths recorded in the header. For GUPPI,
+    ``_get_frame`` is overridden to take into account overlap between
+    frames, which should not be skipped for the last frame.  For GSB,
+    ``_seek_frame`` and ``_fh_raw_read_frame`` are both overridden to take
+    into account that header and data are read from different files.
+
+    """
 
     info = StreamReaderInfo()
 
@@ -916,9 +983,28 @@ class StreamReaderBase(StreamBase):
 
 
 class VLBIStreamReaderBase(StreamReaderBase):
-    # This class is different in assuming specifically that the underlying
-    # file has small subsequent frames, and that its fh_raw has a find_header
-    # method. This is used to help identify and skip bad frames.
+    """Base for VLBI stream readers.
+
+    This extends the base class specifically for the case that the underlying
+    file has small subsequent frames, which may have gaps, and adds methods
+    that allow fixing these.
+
+    Notes
+    -----
+    The code assumes that the raw file reader has a ``find_header`` method,
+    which can be used to find next or previous frames from any position, and
+    thus help identify and skip bad frames. It is used in ``_last_header``
+    to be sure to find a full last frame.
+
+    The class also overrides the ``_read_frame`` method which one that checks
+    that the frame after the one requested is the right one, and attemps
+    recovery if anything fails, using ``_bad_frame(index, frame, exc)``.
+
+    Subclasses can overrides parts of the class. For instance, VDIF overrides
+    ``_fh_raw_read_frame`` and ``_bad_frame`` to take care of the fact that
+    data comes in sets of frames from multiple threads, not individual ones.
+
+    """
     _next_index = None
 
     @lazyproperty
@@ -1082,6 +1168,28 @@ class VLBIStreamReaderBase(StreamReaderBase):
 
 
 class StreamWriterBase(StreamBase):
+    """Base for all stream writers, providing a standard write method.
+
+    Notes
+    -----
+    Accessing frames happens via a number of private methods, which can be
+    overridden by subclasses to deal with their  peculiarities.
+
+    The process starts in `~baseband.base.base.StreamWriterBase.write` with
+    ``_get_frame(offset)``, which determines the ``index`` of the frame a
+    given offset falls in, and then either uses ``_make_frame(index)`` to
+    create it, or returns a possibly cached frame, together with the
+    ``sample_offset`` at which ``offset`` falls within the frame. Then, data
+    is inserted as needed until the frame is exhausted, at which point the
+    frame is written to disk using ``_fh_raw_write_frame`` and the process
+    repeats.
+
+    Various formats override various steps. For instance, for DADA and GUPPI,
+    ``_make_frame()`` and ``_fh_raw_write_frame()`` are overridden to work
+    with memory mapped files. For GSB, ``_fh_raw_write_frame()`` is overridden
+    to take into account that header and data are read from different files.
+
+    """
 
     def _unsqueeze(self, data):
         new_shape = list(data.shape)
@@ -1117,7 +1225,7 @@ class StreamWriterBase(StreamBase):
             sample_end = sample_offset + nsample
             frame[sample_offset:sample_end] = data[sample:sample+nsample]
             frame.valid &= valid
-            if sample_end == self.samples_per_frame:
+            if sample_end == len(frame):
                 self._fh_raw_write_frame(frame)
 
             sample += nsample
