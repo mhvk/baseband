@@ -474,33 +474,6 @@ class StreamBase:
         self._set_time(header,
                        time=self.start_time + index / self._frame_rate)
 
-    def _get_frame(self, offset):
-        """Get a frame that includes given offset.
-
-        Finds the index corresponding to the needed frame, assuming frames
-        are all the same length.  If not already cached, it retrieves a
-        frame by calling ``self._new_frame(index)``.  The reader and writer
-        subclasses provide implementations for this.
-
-        Parameters
-        ----------
-        offset : int
-            Offset in the stream for which a frame should be found.
-
-        Returns
-        -------
-        frame : `~baseband.base.frame.FrameBase`
-            Frame holding the sample at ``offset``.
-        sample_offset : int
-            Offset within the frame corresponding to ``offset``.
-        """
-        frame_index, sample_offset = divmod(offset, self.samples_per_frame)
-        if frame_index != self._frame_index:
-            self._frame = self._new_frame(frame_index)
-            self._frame_index = frame_index
-
-        return self._frame, sample_offset
-
     @lazyproperty
     def start_time(self):
         """Start time of the file.
@@ -877,12 +850,33 @@ class StreamReaderBase(StreamBase):
 
         return out
 
-    def _new_frame(self, index):
-        # Called from _get_frame if a frame was not already cached.
-        # Could be just _read_frame except we need to set the fill value.
-        frame = self._read_frame(index)
-        frame.fill_value = self.fill_value
-        return frame
+    def _get_frame(self, offset):
+        """Get a frame that includes given offset.
+
+        Finds the index corresponding to the needed frame, assuming frames
+        are all the same length.  If not already cached, it retrieves a
+        frame by calling ``self._new_frame(index)``.  The reader and writer
+        subclasses provide implementations for this.
+
+        Parameters
+        ----------
+        offset : int
+            Offset in the stream for which a frame should be found.
+
+        Returns
+        -------
+        frame : `~baseband.base.frame.FrameBase`
+            Frame holding the sample at ``offset``.
+        sample_offset : int
+            Offset within the frame corresponding to ``offset``.
+        """
+        frame_index, sample_offset = divmod(offset, self.samples_per_frame)
+        if frame_index != self._frame_index:
+            self._frame = self._read_frame(frame_index)
+            self._frame.fill_value = self.fill_value
+            self._frame_index = frame_index
+
+        return self._frame, sample_offset
 
     def _read_frame(self, index):
         """Base implementation of reading a frame.
@@ -1130,10 +1124,17 @@ class StreamWriterBase(StreamBase):
             # Explicitly set offset (leaving get_frame free to adjust it).
             self.offset = offset0 + sample
 
-    def _new_frame(self, index):
-        # Called from _get_frame if a frame was not already cached.
-        # Could be just _make_frame except for backwards compatibility.
-        return self._make_frame(index)
+    def _get_frame(self, offset):
+        # Nearly identical to StreamReaderBase version, but not
+        # quite worth separating it out.
+        frame_index, sample_offset = divmod(offset, self.samples_per_frame)
+        if frame_index != self._frame_index:
+            self._frame = self._make_frame(frame_index)
+            self._frame_index = frame_index
+
+        return self._frame, sample_offset
+
+    _get_frame.__doc__ = StreamReaderBase._get_frame.__doc__
 
     def _make_frame(self, index):
         # Default implementation assumes that an initial _frame was
