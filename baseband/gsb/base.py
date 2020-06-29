@@ -151,8 +151,7 @@ class GSBStreamBase(StreamBase):
 
     def __init__(self, fh_ts, fh_raw, header0, sample_rate=None,
                  samples_per_frame=None, payload_nbytes=None, nchan=None,
-                 bps=None, complex_data=None, squeeze=True, subset=(),
-                 verify=True):
+                 bps=None, complex_data=None, **kwargs):
 
         self.fh_ts = fh_ts
         rawdump = header0.mode == 'rawdump'
@@ -198,8 +197,7 @@ class GSBStreamBase(StreamBase):
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
             samples_per_frame=samples_per_frame, unsliced_shape=unsliced_shape,
-            bps=bps, complex_data=complex_data, squeeze=squeeze, subset=subset,
-            fill_value=0., verify=verify)
+            bps=bps, complex_data=complex_data, **kwargs)
 
         self._payload_nbytes = payload_nbytes
 

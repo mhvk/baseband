@@ -403,19 +403,12 @@ class StreamBase:
     _sample_shape_maker = None
     _frame_index = None
 
-    def __init__(self, fh_raw, header0, *,
-                 squeeze=True, subset=(), fill_value=0., verify=True,
-                 **kwargs):
+    def __init__(self, fh_raw, header0, *, squeeze=True, **kwargs):
         # Required arguments.
         self.fh_raw = fh_raw
         self._header0 = header0
         # Arguments with defaults.
         self._squeeze = bool(squeeze)
-        self._subset = (() if subset is None
-                        else subset if isinstance(subset, tuple)
-                        else (subset,))
-        self._fill_value = float(fill_value)
-        self.verify = verify
         # Arguments that can override or complement information from header.
         for header_attr, getter in [
                 ('bps', operator.index),
@@ -450,15 +443,6 @@ class StreamBase:
         passed in for writing has them inserted.
         """
         return self._squeeze
-
-    @property
-    def subset(self):
-        """Specific components of the complete sample to decode.
-
-        The order of dimensions is the same as for `sample_shape`.  Set by
-        the class initializer.
-        """
-        return self._subset
 
     @property
     def _unsliced_shape(self):
@@ -552,15 +536,6 @@ class StreamBase:
         """Number of complete samples per second."""
         return self._sample_rate
 
-    @property
-    def verify(self):
-        """Whether to do consistency checks on frames being read."""
-        return self._verify
-
-    @verify.setter
-    def verify(self, verify):
-        self._verify = bool(verify) if verify != 'fix' else verify
-
     def tell(self, unit=None):
         """Current offset in the file.
 
@@ -648,11 +623,12 @@ class StreamReaderBase(StreamBase):
     def __init__(self, fh_raw, header0, *,
                  squeeze=True, subset=(), fill_value=0., verify=True,
                  **kwargs):
-
-        super().__init__(fh_raw, header0,
-                         squeeze=squeeze, subset=subset,
-                         fill_value=fill_value, verify=verify,
-                         **kwargs)
+        self._subset = (() if subset is None
+                        else subset if isinstance(subset, tuple)
+                        else (subset,))
+        self._fill_value = float(fill_value)
+        self.verify = verify
+        super().__init__(fh_raw, header0, squeeze=squeeze, **kwargs)
 
         if hasattr(header0, 'frame_nbytes'):
             self._raw_offsets = RawOffsets(frame_nbytes=header0.frame_nbytes)
@@ -674,6 +650,24 @@ class StreamReaderBase(StreamBase):
                 raise
 
         return sample_rate
+
+    @property
+    def verify(self):
+        """Whether to do consistency checks on frames being read."""
+        return self._verify
+
+    @verify.setter
+    def verify(self, verify):
+        self._verify = bool(verify) if verify != 'fix' else verify
+
+    @property
+    def subset(self):
+        """Specific components of the complete sample to decode.
+
+        The order of dimensions is the same as for `sample_shape`.  Set by
+        the class initializer.
+        """
+        return self._subset
 
     def _squeeze_and_subset(self, data):
         """Possibly remove unit dimensions and subset the given data.
