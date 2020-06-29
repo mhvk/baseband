@@ -589,6 +589,31 @@ class StreamBase:
 class StreamReaderBase(StreamBase):
     """Base for all stream readers, providing standard reading methods.
 
+    Parameters
+    ----------
+    fh_raw : filehandle
+        Should be opened in binary mode for reading, and usually wrapped
+        in a given format;s ``FileReader``.
+    header0 : header instance
+        First header of the file, with information like the start time, etc.
+    squeeze : bool, optional
+        If `True` (default), remove any dimensions of length unity from
+        decoded data.
+    subset : indexing object or tuple of objects, optional
+        Specific components of the complete sample to decode (after possible
+        squeezing).
+    fill_value : float or complex, optional
+        Value to use for invalid or missing data. Default: 0.
+    verify : bool, optional
+        Whether to do basic checks of frame integrity when reading.  The first
+        frameset of the stream is always checked.  Default: `True`.
+    **kwargs
+        Information that supplements that of the header. In particular, any
+        format should define ``bps``, ``complex_data``, ``samples_per_frame``,
+        and ``sample_shape`` (pre-squeeze and subset). Furthermore,
+        ``sample_rate`` should be provided if the raw file reader cannot
+        determine it.
+
     Notes
     -----
     Accessing frames happens via a number of private methods, which can be
@@ -615,7 +640,6 @@ class StreamReaderBase(StreamBase):
     frames, which should not be skipped for the last frame.  For GSB,
     ``_seek_frame`` and ``_fh_raw_read_frame`` are both overridden to take
     into account that header and data are read from different files.
-
     """
 
     info = StreamReaderInfo()
@@ -980,6 +1004,8 @@ class VLBIStreamReaderBase(StreamReaderBase):
     file has small subsequent frames, which may have gaps, and adds methods
     that allow fixing these.
 
+    Arguments are as for `~baseband.base.base.StreamReaderBase`.
+
     Notes
     -----
     The code assumes that the raw file reader has a ``find_header`` method,
@@ -994,8 +1020,8 @@ class VLBIStreamReaderBase(StreamReaderBase):
     Subclasses can overrides parts of the class. For instance, VDIF overrides
     ``_fh_raw_read_frame`` and ``_bad_frame`` to take care of the fact that
     data comes in sets of frames from multiple threads, not individual ones.
-
     """
+
     _next_index = None
 
     def __init__(self, fh_raw, header0, **kwargs):
@@ -1169,6 +1195,22 @@ class VLBIStreamReaderBase(StreamReaderBase):
 class StreamWriterBase(StreamBase):
     """Base for all stream writers, providing a standard write method.
 
+    Parameters
+    ----------
+    fh_raw : filehandle
+        Should be opened in binary mode for writer, and usually wrapped
+        in a given format's ``FileWriter``.
+    header0 : header instance
+        Header for the first frame, holding time information, etc.  Can instead
+        give keyword arguments to construct a header (see ``**kwargs``).
+    squeeze : bool, optional
+        If `True` (default), writer accepts squeezed arrays as input, and adds
+        any dimensions of length unity.
+    **kwargs
+        Information that supplements that of the header. In particular, any
+        format should define ``bps``, ``complex_data``, ``samples_per_frame``,
+        ``sample_shape`` (on file), and ``sample_rate``.
+
     Notes
     -----
     Accessing frames happens via a number of private methods, which can be
@@ -1187,7 +1229,6 @@ class StreamWriterBase(StreamBase):
     ``_make_frame()`` and ``_fh_raw_write_frame()`` are overridden to work
     with memory mapped files. For GSB, ``_fh_raw_write_frame()`` is overridden
     to take into account that header and data are read from different files.
-
     """
 
     def _unsqueeze(self, data):
