@@ -83,43 +83,31 @@ class ASPFileHeader(VLBIHeaderBase):
     def fromfile(cls, fh, *args, **kwargs):
         nbytes_read = cls._dtype.itemsize
         buf = fh.read(nbytes_read)
-        if(len(buf) < nbytes_read):
+        if len(buf) < nbytes_read:
             raise EOFError('reached EOF while reading ASPFileHeader')
-        words = np.frombuffer(buf, dtype=cls._dtype, count=1)
+        words = np.ndarray(buffer=buf, shape=(), dtype=cls._dtype)
         return cls(words, *args, **kwargs)
 
     @property
-    def size(self):
-        return self._dtype.itemsize
-
-    @property
     def nbytes(self):
-        return self.size
-
-    @property
-    def framesize(self):
-        return self['totalsize']
-
-    @property
-    def payloadsize(self):
-        return self.framesize - self.size
+        return self._dtype.itemsize
 
     @property
     def time(self):
         # Is scale UTC?
-        return Time(self['iMJD'], self['fMJD'], format='mjd', scale='utc')
+        return Time(self['imjd'], self['fmjd'], format='mjd', scale='utc')
 
 
 # block heaer class promoted to general "header" label
 class ASPHeader(VLBIHeaderBase):
     _dtype = np.dtype([
         ('totalsize', '<i4'),
-        ('NPtsSend', '<i4'),
-        ('iMJD', '<f8'),
-        ('fMJD', '<f8'),
+        ('nptssend', '<i4'),
+        ('imjd', '<f8'),
+        ('fmjd', '<f8'),
         ('ipts1', '<i8'),
         ('ipts2', '<i8'),
-        ('FreqChanNo', '<i4')])
+        ('freqchanno', '<i4')])
 
     _header_parser = HeaderParser(make_parser_from_dtype(_dtype))
 
@@ -143,12 +131,6 @@ class ASPHeader(VLBIHeaderBase):
     def has_file_header(self):
         return self._file_header is not None
 
-    @property
-    def nbytes(self):
-        """Size of the header in bytes."""
-        # overrides the parent _struct approach
-        return self._dtype.itemsize
-
     def verify(self):
         assert self._words.dtype == self._dtype
         # Add some more useful verification?
@@ -162,28 +144,33 @@ class ASPHeader(VLBIHeaderBase):
                 return self._file_header._words[item]
             else:
                 raise ValueError("no field of name " + str(item))
-        # return self._words[item]
 
     @classmethod
     def fromfile(cls, fh, *args, **kwargs):
         nbytes_read = cls._dtype.itemsize
         buf = fh.read(nbytes_read)
-        if(len(buf) < nbytes_read):
+        if len(buf) < nbytes_read:
             raise EOFError('reached EOF while reading ASPHeader')
-        words = np.frombuffer(buf, dtype=cls._dtype, count=1)
+        words = np.ndarray(buffer=buf, dtype=cls._dtype, shape=())
         return cls(words, *args, **kwargs)
 
     @property
-    def size(self):
+    def nbytes(self):
+        """Size of the header in bytes."""
+        # overrides the parent _struct approach
         return self._dtype.itemsize
 
     @property
-    def framesize(self):
+    def payload_nbytes(self):
         return self['totalsize']
 
     @property
-    def payloadsize(self):
-        return self.framesize - self.size
+    def frame_nbytes(self):
+        return self.payload_nbytes + self.nbytes
+
+    @property
+    def samples_per_frame(self):
+        return self['nptssend']
 
     @property
     def time(self):

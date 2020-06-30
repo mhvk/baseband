@@ -13,13 +13,11 @@ class ASPStreamReaderBase(StreamReaderBase):
     def __init__(self, fh_raw, header0):
         self._fh_raw = fh_raw
         self._header0 = header0
-        sample_rate = header0['ch_bw'][0] * u.MHz
-        samples_per_frame = header0['NPtsSend'][0]
+        sample_rate = header0['ch_bw'] * u.MHz
         super().__init__(
             fh_raw, header0, sample_rate=sample_rate,
-            samples_per_frame=samples_per_frame,
-            sample_shape=None, bps=8, complex_data=True,
-            squeeze=False, subset=None, fill_value=0.0, verify=False)
+            sample_shape=(), bps=8, complex_data=True,
+            verify=False)
 
     def read_frame(self):
         frame = ASPFrame.fromfile(self._fh_raw)
@@ -30,6 +28,7 @@ class ASPStreamReaderBase(StreamReaderBase):
 
 
 class ASPStreamReader(ASPStreamReaderBase):
+
     def __init__(self, fh_raw):
         pos = fh_raw.tell()
         fh_raw.seek(0)

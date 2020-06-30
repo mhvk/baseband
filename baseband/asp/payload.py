@@ -40,7 +40,7 @@ class ASPPayload(PayloadBase):
         # the header field is actually a block header
         assert(header is not None)
 
-        npts = header['NPtsSend'][0]
+        npts = header['nptssend']
         payload_count = NPOL * NDIM * npts
         nbytes_read = payload_count * cls._dtype_word.itemsize
 

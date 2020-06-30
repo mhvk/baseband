@@ -15,8 +15,7 @@ class TestASP:
             assert fh.tell() == (
                 self.header.nbytes
                 + self.header.file_header.nbytes
-                + self.payload.nbytes), (
-                    "TestASP::setup: file position not expected")
+                + self.payload.nbytes), 'not at end of payload'
 
     def test_header(self, tmpdir=None):
         """For now this is a very modest test of read integrity for the asp format
@@ -26,5 +25,5 @@ class TestASP:
         header = self.header
         assert header.nbytes == 44
         assert header['totalsize'] == 512
-        assert header['NPtsSend'] == 128
-        assert header['FreqChanNo'] == 10
+        assert header['nptssend'] == 128
+        assert header['freqchanno'] == 10
