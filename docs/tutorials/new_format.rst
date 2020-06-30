@@ -93,10 +93,17 @@ Instead, this may be most easily captured by a structured
 
 In principle, like :class:`~baseband.dada.DADAHeader` is based on a
 `dict`, we could base ourselves on a :class:`numpy.ndarray` or
-:class:`numpy.void` with such a dtype, but then we inherit all their
+``numpy.void`` with such a dtype, but then we inherit all their
 methods, so instead it may be better to still think in terms of a
-:class:`~baseband.base.header.ParsedHeader`, but override the getting
+:class:`~baseband.base.header.ParsedHeaderBase`, but override the getting
 and setting of keywords using the built-in numpy methods.  Hence, we
-first define a :class:`~baseband.asp.header.DTypeHeaderBase` and then use
+first define a :class:`~baseband.asp.header.ASPHeaderBase` and then use
 this for :class:`~baseband.asp.header.ASPFileHeader` and
-:class:`~baseband.asp.header.ASPBlockHeader`.
+:class:`~baseband.asp.header.ASPHeader`.
+
+Inspecting the two headers, one sees that information comes from both.
+For instance, the file header has information about the sample rate
+while the block header has accurate time and the total number of
+samples.  In order to deal with this, we allow the block header to
+contain a link to the file header, and use its information if it is
+present.
