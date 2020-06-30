@@ -1,6 +1,6 @@
 import numpy as np
 from astropy.time import Time
-from ..vlbi_base.header import VLBIHeaderBase, HeaderParser
+from ..base.header import VLBIHeaderBase, HeaderParser
 
 
 __all__ = ['ASPFileHeader', 'ASPHeader']

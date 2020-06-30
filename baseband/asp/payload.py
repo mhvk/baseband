@@ -1,5 +1,5 @@
 import numpy as np
-from ..vlbi_base.payload import VLBIPayloadBase
+from ..base.payload import PayloadBase
 from collections import namedtuple
 
 
@@ -18,7 +18,7 @@ NPOL = 2
 NDIM = 2
 
 
-class ASPPayload(VLBIPayloadBase):
+class ASPPayload(PayloadBase):
     _encoders = {8: encode_8bit}
     _decoders = {8: decode_8bit}
     _dtype_word = np.dtype('int8')

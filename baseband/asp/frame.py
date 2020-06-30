@@ -1,12 +1,12 @@
-from .header import ASPFileHeader, ASPHeader
+from .header import ASPHeader
 from .payload import ASPPayload
-from ..vlbi_base.frame import VLBIFrameBase
+from ..base.frame import FrameBase
 
 
 __all__ = ['ASPFrame', ]
 
 
-class ASPFrame(VLBIFrameBase):
+class ASPFrame(FrameBase):
 
     _header_class = ASPHeader
     _payload_class = ASPPayload

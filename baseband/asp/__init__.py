@@ -1,4 +1,4 @@
-from .base import ASPStreamReader
-from .header import ASPFileHeader, ASPHeader
-from .payload import ASPPayload
-from .frame import ASPFrame
+from .base import ASPStreamReader  # noqa
+from .header import ASPFileHeader, ASPHeader  # noqa
+from .payload import ASPPayload  # noqa
+from .frame import ASPFrame  # noqa
