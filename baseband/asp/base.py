@@ -1,7 +1,6 @@
-from ..base.base import StreamReaderBase
+from ..base.base import StreamReaderBase, FileOpener
 from .frame import ASPFrame
-from .header import ASPFileHeader, ASPHeader
-import astropy.units as u
+from .header import ASPHeader
 
 
 __all__ = ['ASPStreamReaderBase', 'ASPStreamReader']
@@ -11,12 +10,8 @@ class ASPStreamReaderBase(StreamReaderBase):
 
     # unfinished
     def __init__(self, fh_raw, header0):
-        self._fh_raw = fh_raw
-        self._header0 = header0
-        sample_rate = header0['ch_bw'] * u.MHz
         super().__init__(
-            fh_raw, header0, sample_rate=sample_rate,
-            sample_shape=(), bps=8, complex_data=True,
+            fh_raw, header0, sample_shape=(), bps=8, complex_data=True,
             verify=False)
 
     def read_frame(self):
@@ -30,16 +25,9 @@ class ASPStreamReaderBase(StreamReaderBase):
 class ASPStreamReader(ASPStreamReaderBase):
 
     def __init__(self, fh_raw):
-        pos = fh_raw.tell()
-        fh_raw.seek(0)
-        fileheader0 = ASPFileHeader.fromfile(fh_raw)
-        pos2 = fh_raw.tell()
         header0 = ASPHeader.fromfile(fh_raw)
-        header0.file_header = fileheader0
-
-        if pos == 0:
-            pos = pos2
-
-        fh_raw.seek(pos)
-
         super().__init__(fh_raw, header0)
+
+
+open = FileOpener('ASP', header_class=ASPHeader, classes={
+    'rs': ASPStreamReader}).wrapped(module=__name__, doc="")
