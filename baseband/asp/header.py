@@ -231,4 +231,5 @@ class ASPHeader(ASPHeaderBase):
 
         return start_time + ipts1 / (self.samples_per_frame * frame_rate)
 
-    time = property(get_time)
+    def __eq__(self, other):
+        return super().__eq__(other) and self.file_header == other.file_header
