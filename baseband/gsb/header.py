@@ -10,8 +10,9 @@ http://gmrt.ncra.tifr.res.in/gmrt_hpage/sub_system/gmrt_gsb/GSB_rawdump_data_for
 import os
 
 import numpy as np
-from astropy import units as u, _erfa as erfa
+from astropy import units as u
 from astropy.time import Time, TimeString
+from astropy.time.formats import erfa  # astropy-version independent.
 
 from ..base.header import HeaderParserBase, ParsedHeaderBase, ParserDict
 
