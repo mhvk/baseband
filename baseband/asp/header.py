@@ -30,12 +30,35 @@ class ASPHeaderBase(ParsedHeaderBase):
         assert self.words.dtype == self._dtype
         # Add some more useful verification?
 
+    @property
+    def mutable(self):
+        """Whether the header can be modified."""
+        return self.words.flags['WRITEABLE']
+
+    @mutable.setter
+    def mutable(self, mutable):
+        self.words.flags['WRITEABLE'] = mutable
+
     def __getitem__(self, item):
         try:
             return self.words[item]
         except ValueError:
             raise KeyError(f"{self.__class__.__name__} header does not "
                            f"contain {item}") from None
+
+    def __setitem__(self, item, value):
+        try:
+            self.words[item] = value
+        except ValueError:
+            if not self.mutable:
+                raise TypeError("header is immutable. Set '.mutable` attribute"
+                                " or make a copy.")
+            elif item not in self.words.dtype.names:
+                raise KeyError(f"{self.__class__.__name__} header does not "
+                               f"contain {item}") from None
+
+            else:
+                raise
 
     @classmethod
     def fromfile(cls, fh, verify=True, **kwargs):
@@ -48,7 +71,9 @@ class ASPHeaderBase(ParsedHeaderBase):
         if len(s) < cls._dtype.itemsize:
             raise EOFError('reached EOF while reading ASPFileHeader')
         words = np.ndarray(buffer=s, shape=(), dtype=cls._dtype)
-        return cls(words, verify=verify, **kwargs)
+        self = cls(words, verify=verify, **kwargs)
+        self.mutable = False
+        return self
 
     @property
     def nbytes(self):
@@ -179,6 +204,13 @@ class ASPHeader(ASPHeaderBase):
             return getattr(self.file_header, attr)
 
         return self.__getattribute__(attr)
+
+    def invariant_pattern(self):
+        mask = self.__class__(None)
+        for key in {'totalsize', 'nptssend', 'freqchanno'}:
+            mask[key] = -1
+        return (np.atleast_1d(self.words).view('<u4'),
+                np.atleast_1d(mask.words).view('<u4'))
 
     @property
     def payload_nbytes(self):

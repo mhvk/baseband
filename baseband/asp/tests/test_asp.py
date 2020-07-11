@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.testing import assert_array_equal
 import pytest
 
 from ... import asp
@@ -33,6 +34,22 @@ class TestASP:
         assert header['freqchanno'] == 10
         with pytest.raises(KeyError):
             header['n_chan']
+
+        assert header.mutable is False
+        with pytest.raises(TypeError):
+            header['totalsize'] = 256
+
+        header2 = header.copy()
+        header2['totalsize'] = 256
+        assert header2['totalsize'] == 256
+        assert header2 != header
+        header2['totalsize'] = 512
+        assert header2 == header
+
+        pattern, mask = header.invariant_pattern()
+        assert_array_equal(pattern, np.atleast_1d(header.words).view('u4'))
+        assert_array_equal(mask, np.array([-1, -1] + [0]*8 + [-1],
+                                          dtype='i4').view('u4'))
 
     def test_file_header(self):
         header = self.file_header
@@ -86,6 +103,35 @@ class TestASP:
         assert frame.header == self.header
         assert frame.payload == self.payload
 
+    def test_locate_frames(self):
+        with asp.open(SAMPLE_FILE, 'rb') as fh:
+            # Maximum only needed because sample file has frame size smaller
+            # than file_header size.
+            locs0 = fh.locate_frames(self.header, maximum=5000)
+            assert locs0 == [self.file_header.nbytes,
+                             self.file_header.nbytes+self.frame.nbytes]
+            # Also go a frame before first one, with normal search.
+            fh.seek(self.file_header.nbytes - self.frame.nbytes)
+            locs0a = fh.locate_frames(self.header)
+            assert locs0a == [self.file_header.nbytes]
+            file_nbytes = fh.seek(0, 2)
+            locs1 = fh.locate_frames(self.header, forward=False)
+            assert locs1 == [file_nbytes - self.frame.nbytes]
+
+    def test_find_header(self):
+        with asp.open(SAMPLE_FILE, 'rb') as fh:
+            # Maximum only needed because sample file has frame size smaller
+            # than file_header size.
+            header0 = fh.find_header(self.header, maximum=5000)
+            assert header0 == self.block_header
+            assert fh.tell() == self.file_header.nbytes
+            file_nbytes = fh.seek(0, 2)
+            header1 = fh.find_header(self.header, forward=False)
+            assert fh.tell() == file_nbytes - self.frame.nbytes
+            assert header1 != header0
+            for key in 'totalsize', 'nptssend', 'imjd', 'fmjd', 'freqchanno':
+                assert header1[key] == header0[key]
+
     def test_file_streamer(self):
         with asp.open(SAMPLE_FILE, 'rs') as fh:
             header0 = fh.header0
@@ -95,4 +141,5 @@ class TestASP:
         assert header0 == self.header
         assert data.shape == fh.shape
         assert data.dtype == fh.dtype
+        assert_array_equal(data[:len(self.frame)], self.frame.data)
         # TODO: add check of actual content of data!

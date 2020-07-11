@@ -1,5 +1,4 @@
 from astropy import units as u
-from astropy.utils import lazyproperty
 
 from ..base.base import VLBIFileReaderBase, VLBIStreamReaderBase, FileOpener
 from ..base.file_info import FileReaderInfo
@@ -99,17 +98,6 @@ class ASPStreamReader(VLBIStreamReaderBase):
             fh_raw, header0, bps=8, complex_data=True)
         # TODO: this would fail with SequentialFile!!
         self._raw_offsets[0] = file_header.nbytes
-
-    @lazyproperty
-    def _last_header(self):
-        """Header of the last file for this stream."""
-        file_header = self.header0.file_header
-        with self.fh_raw.temporary_offset() as fh_raw:
-            file_size = fh_raw.seek(0, 2) - file_header.nbytes
-            nframes, fframe = divmod(file_size, self.header0.frame_nbytes)
-            fh_raw.seek(file_header.nbytes
-                        + (nframes - 1) * self.header0.frame_nbytes)
-            return fh_raw.read_header(file_header=file_header)
 
 
 open = FileOpener('ASP', header_class=ASPHeader, classes={
