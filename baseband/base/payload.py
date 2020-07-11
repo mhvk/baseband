@@ -167,7 +167,7 @@ class PayloadBase:
             if header.complex_data != complex_data:
                 raise ValueError("header is for {0} data but data are {1}"
                                  .format(*(('complex' if c else 'real') for c
-                                           in (header['complex_data'],
+                                           in (header.complex_data,
                                                complex_data))))
         try:
             encoder = cls._encoders[bps]
