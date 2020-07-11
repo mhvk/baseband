@@ -89,5 +89,10 @@ class TestASP:
     def test_file_streamer(self):
         with asp.open(SAMPLE_FILE, 'rs') as fh:
             header0 = fh.header0
+            assert fh.start_time == fh.header0.time
+            data = fh.read()
 
         assert header0 == self.header
+        assert data.shape == fh.shape
+        assert data.dtype == fh.dtype
+        # TODO: add check of actual content of data!

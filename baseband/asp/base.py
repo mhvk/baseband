@@ -1,6 +1,7 @@
 from astropy import units as u
+from astropy.utils import lazyproperty
 
-from ..base.base import FileBase, StreamReaderBase, FileOpener
+from ..base.base import VLBIFileReaderBase, VLBIStreamReaderBase, FileOpener
 from ..base.file_info import FileReaderInfo
 from .frame import ASPFrame
 from .header import ASPHeader, ASPFileHeader
@@ -9,7 +10,7 @@ from .header import ASPHeader, ASPFileHeader
 __all__ = ['ASPFileReader', 'ASPStreamReader']
 
 
-class ASPFileReader(FileBase):
+class ASPFileReader(VLBIFileReaderBase):
     """Simple reader for GUPPI files.
 
     Wraps a binary filehandle, providing methods to help interpret the data,
@@ -88,13 +89,27 @@ class ASPFileReader(FileBase):
                 / (header.samples_per_frame - header.overlap)).to(u.Hz)
 
 
-class ASPStreamReader(StreamReaderBase):
+class ASPStreamReader(VLBIStreamReaderBase):
 
     def __init__(self, fh_raw):
-        file_header = ASPFileHeader.fromfile(fh_raw)
-        header0 = ASPHeader.fromfile(fh_raw, file_header=file_header)
+        fh_raw = ASPFileReader(fh_raw)
+        file_header = fh_raw.read_file_header()
+        header0 = fh_raw.read_header(file_header=file_header)
         super().__init__(
             fh_raw, header0, bps=8, complex_data=True)
+        # TODO: this would fail with SequentialFile!!
+        self._raw_offsets[0] = file_header.nbytes
+
+    @lazyproperty
+    def _last_header(self):
+        """Header of the last file for this stream."""
+        file_header = self.header0.file_header
+        with self.fh_raw.temporary_offset() as fh_raw:
+            file_size = fh_raw.seek(0, 2) - file_header.nbytes
+            nframes, fframe = divmod(file_size, self.header0.frame_nbytes)
+            fh_raw.seek(file_header.nbytes
+                        + (nframes - 1) * self.header0.frame_nbytes)
+            return fh_raw.read_header(file_header=file_header)
 
 
 open = FileOpener('ASP', header_class=ASPHeader, classes={
