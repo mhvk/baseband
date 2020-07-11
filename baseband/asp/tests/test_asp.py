@@ -103,11 +103,17 @@ class TestASP:
         assert frame.header == self.header
         assert frame.payload == self.payload
 
-    def test_reproduce_frame(self, tmpdir):
+    @pytest.mark.parametrize('file_writer', (False, True))
+    def test_reproduce_frame(self, file_writer, tmpdir):
         check = str(tmpdir.join('check.asp'))
-        with open(check, 'wb') as fw:
-            self.file_header.tofile(fw)
-            self.frame.tofile(fw)
+        if file_writer:
+            with asp.open(check, 'wb') as fw:
+                fw.write_file_header(self.file_header)
+                fw.write_frame(self.frame)
+        else:
+            with open(check, 'wb') as fw:
+                self.file_header.tofile(fw)
+                self.frame.tofile(fw)
 
         with open(SAMPLE_FILE, 'rb') as fh:
             expected = fh.read(self.file_header.nbytes + self.frame.nbytes)
