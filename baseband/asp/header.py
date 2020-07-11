@@ -30,6 +30,9 @@ class ASPHeaderBase(ParsedHeaderBase):
         assert self.words.dtype == self._dtype
         # Add some more useful verification?
 
+    def keys(self):
+        return self._dtype.names
+
     @property
     def mutable(self):
         """Whether the header can be modified."""
@@ -83,8 +86,8 @@ class ASPHeaderBase(ParsedHeaderBase):
     def nbytes(self):
         return self._dtype.itemsize
 
-    @property
-    def sample_shape(self):
+    @fixedvalue
+    def sample_shape(cls):
         npol = 2  # fixed value for all payloads??
         return npol,
 
@@ -92,6 +95,11 @@ class ASPHeaderBase(ParsedHeaderBase):
     def time(self):
         """Start time."""
         return Time(self['imjd'], self['fmjd'], format='mjd')
+
+    @time.setter
+    def time(self, time):
+        self['imjd'] = (time.jd1 - 2400000).astype('i4')
+        self['fmjd'] = time.jd2 + 0.5
 
     def __eq__(self, other):
         return (type(other) is type(self)
@@ -170,8 +178,9 @@ class ASPFileHeader(ASPHeaderBase):
 
 class ASPHeader(ASPHeaderBase):
 
-    _properties = ('payload_nbytes', 'frame_nbytes', 'bps', 'complex_data',
-                   'samples_per_frame') + ASPHeaderBase._properties
+    _properties = (('payload_nbytes', 'frame_nbytes', 'bps', 'complex_data',
+                    'samples_per_frame', 'start_time')
+                   + ASPHeaderBase._properties)
 
     _dtype = np.dtype([
         ('totalsize', '<i4'),
@@ -238,11 +247,15 @@ class ASPHeader(ASPHeaderBase):
     def samples_per_frame(self):
         return self['nptssend']
 
-    start_time = property(ASPHeaderBase.time.fget, doc=(
-        """Start time of the observation."""))
+    start_time = property(ASPHeaderBase.time.fget,
+                          ASPHeaderBase.time.fset,
+                          doc="""Start time of the observation.""")
 
     def get_time(self, frame_rate=None):
         """Time for the current block.
+
+        If set, assumes that ``start_time`` and ``samples_per_frame`` are
+        already set, and updates the ``ipts1`` and ``ipts2`` values.
 
         Parameters
         ----------
@@ -266,6 +279,22 @@ class ASPHeader(ASPHeaderBase):
             frame_rate = self.file_header.sample_rate / self.samples_per_frame
 
         return start_time + ipts1 / (self.samples_per_frame * frame_rate)
+
+    def set_time(self, time, frame_rate=None):
+        if frame_rate is None:
+            if self.file_header is None:
+                raise ValueError('when no file header is attached, need a '
+                                 'frame rate to calculate the time '
+                                 'for a nonzero offset.')
+            frame_rate = self.file_header.sample_rate / self.samples_per_frame
+
+        ipts1 = ((time - self.start_time) * frame_rate
+                 * self.samples_per_frame).to_value(u.one).round().astype(int)
+        self['ipts1'] = ipts1
+        # TODO: check this is consistent with actual ASP files!!
+        self['ipts2'] = ipts1 + self.samples_per_frame - 1
+
+    time = property(get_time, set_time)
 
     def __eq__(self, other):
         return super().__eq__(other) and self.file_header == other.file_header

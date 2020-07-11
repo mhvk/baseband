@@ -1,7 +1,10 @@
+import numpy as np
 from astropy import units as u
+from astropy.utils import lazyproperty
 
 from ..base.base import (FileBase, VLBIFileReaderBase,
-                         VLBIStreamReaderBase, FileOpener)
+                         VLBIStreamReaderBase, StreamWriterBase,
+                         FileOpener)
 from ..base.file_info import FileReaderInfo
 from .frame import ASPFrame
 from .header import ASPHeader, ASPFileHeader
@@ -136,19 +139,53 @@ class ASPFileWriter(FileBase):
         return data.tofile(self.fh_raw)
 
 
-class ASPStreamReader(VLBIStreamReaderBase):
+class ASPStreamBase:
+    """Provides fast index getting/setting and time overrides."""
 
-    def __init__(self, fh_raw):
+    def _get_index(self, header):
+        # Override to avoid calculating index from time.
+        return int(round((header['ipts1'] - self.header0['ipts1'])
+                         / self.samples_per_frame))
+
+    def _set_index(self, header, index):
+        header.update(ipts1=self.header0['ipts1']
+                      + index * self.samples_per_frame)
+
+    def _get_time(self, header):
+        return header.get_time(frame_rate=self._frame_rate)
+
+    def _set_time(self, header, time):
+        header.set_time(frame_rate=self._frame_rate)
+
+
+class ASPStreamReader(ASPStreamBase, VLBIStreamReaderBase):
+
+    def __init__(self, fh_raw, verify=True):
         fh_raw = ASPFileReader(fh_raw)
         file_header = fh_raw.read_file_header()
         header0 = fh_raw.read_header(file_header=file_header)
         super().__init__(
-            fh_raw, header0, bps=8, complex_data=True)
+            fh_raw, header0, bps=8, complex_data=True, verify=verify)
         # TODO: this would fail with SequentialFile!!
         self._raw_offsets[0] = file_header.nbytes
 
+    @lazyproperty
+    def _last_header(self):
+        last_header = super()._last_header
+        last_header.file_header = self.header0.file_header
+        return last_header
 
-open = FileOpener('ASP', header_class=ASPHeader, classes={
-    'rb': ASPFileReader,
-    'wb': ASPFileWriter,
-    'rs': ASPStreamReader}).wrapped(module=__name__, doc="")
+
+class ASPStreamWriter(ASPStreamBase, StreamWriterBase):
+    def __init__(self, fh_raw, header0, squeeze=True):
+        fh_raw = ASPFileWriter(fh_raw)
+        super().__init__(fh_raw, header0, squeeze=squeeze)
+        # TODO: this only works with a single file!
+        self.fh_raw.write_file_header(self.header0.file_header)
+        self._frame = ASPFrame.fromdata(
+            np.zeros((self.samples_per_frame,)+self.header0.sample_shape,
+                     dtype='c8' if self.header0.complex_data else 'f4'),
+            self.header0.copy())
+
+
+open = FileOpener.create(globals(), doc="")
