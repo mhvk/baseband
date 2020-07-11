@@ -410,6 +410,8 @@ class TestBase:
         payload3 = self.Payload.fromdata(self.payload.data,
                                          header=header)
         assert payload3 == self.payload
+        with pytest.raises(ValueError, match='data are complex'):
+            self.Payload.fromdata(self.payload.data.astype(complex), header)
         payload4 = self.Payload.fromdata(data.ravel(), bps=8)
         assert payload4.sample_shape == ()
         assert payload4.shape == (16,)
