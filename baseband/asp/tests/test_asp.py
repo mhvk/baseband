@@ -103,6 +103,20 @@ class TestASP:
         assert frame.header == self.header
         assert frame.payload == self.payload
 
+    def test_reproduce_frame(self, tmpdir):
+        check = str(tmpdir.join('check.asp'))
+        with open(check, 'wb') as fw:
+            self.file_header.tofile(fw)
+            self.frame.tofile(fw)
+
+        with open(SAMPLE_FILE, 'rb') as fh:
+            expected = fh.read(self.file_header.nbytes + self.frame.nbytes)
+
+        with open(check, 'rb') as fh:
+            data = fh.read()
+
+        assert data == expected
+
     def test_locate_frames(self):
         with asp.open(SAMPLE_FILE, 'rb') as fh:
             # Maximum only needed because sample file has frame size smaller

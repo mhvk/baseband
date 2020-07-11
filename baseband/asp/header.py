@@ -75,6 +75,10 @@ class ASPHeaderBase(ParsedHeaderBase):
         self.mutable = False
         return self
 
+    def tofile(self, fh):
+        """Write ASP header to filehandle."""
+        return fh.write(self.words.tobytes())
+
     @property
     def nbytes(self):
         return self._dtype.itemsize
