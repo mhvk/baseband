@@ -47,9 +47,9 @@ class TestASP:
         assert header2 == header
 
         pattern, mask = header.invariant_pattern()
-        assert_array_equal(pattern, np.atleast_1d(header.words).view('u4'))
+        assert_array_equal(pattern, np.atleast_1d(header.words).view('<u4'))
         assert_array_equal(mask, np.array([-1, -1] + [0]*8 + [-1],
-                                          dtype='i4').view('u4'))
+                                          dtype='<i4').view('<u4'))
 
     def test_file_header(self):
         header = self.file_header
