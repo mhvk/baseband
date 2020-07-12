@@ -10,7 +10,9 @@ from .frame import ASPFrame
 from .header import ASPHeader, ASPFileHeader
 
 
-__all__ = ['ASPFileReader', 'ASPStreamReader']
+__all__ = ['ASPFileReader', 'ASPFileWriter',
+           'ASPStreamBase', 'ASPStreamReader', 'ASPStreamWriter',
+           'open']
 
 
 class ASPFileReader(VLBIFileReaderBase):

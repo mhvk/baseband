@@ -6,7 +6,7 @@ from ..base.header import ParsedHeaderBase
 from ..base.utils import fixedvalue
 
 
-__all__ = ['ASPFileHeader', 'ASPHeader']
+__all__ = ['ASPHeaderBase', 'ASPFileHeader', 'ASPHeader']
 
 
 class ASPHeaderBase(ParsedHeaderBase):
