@@ -479,7 +479,7 @@ class StreamReaderInfo(InfoBase):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        if parent is not None and getattr(self.file_info, 'errors'):
+        if parent is not None and hasattr(self.file_info, 'errors'):
             # Remove errors from file_info if we actually got the item.
             # (e.g., start_time if frame_rate couldn't be calculated.)
             for key in self.errors:
