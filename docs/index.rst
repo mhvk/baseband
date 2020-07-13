@@ -74,8 +74,9 @@ used for testing).
 Developer Documentation
 =======================
 
-The developer documentation feature tutorials for supporting new formats or
-format extensions such as VDIF EDV.  It also contains instructions for
+The developer documentation features tutorials for supporting format
+extensions such as VDIF EDV or a completely new format, possibly making it
+available as a `baseband.io` plugin.  It also contains instructions for
 publishing new code releases.
 
 .. toctree::
@@ -120,3 +121,5 @@ Project Details
 Reference/API
 =============
 .. automodapi:: baseband
+.. automodapi:: baseband.io
+   :include-all-objects:
