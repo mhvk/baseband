@@ -65,7 +65,6 @@ exclude_patterns.append('_templates')
 # be used globally.
 rst_epilog += """
 .. |minimum_python_version| replace:: {0.__minimum_python_version__}
-.. |minimum_numpy_version| replace:: {0.__minimum_numpy_version__}
 .. |minimum_astropy_version| replace:: {0.__minimum_astropy_version__}
 """.format(baseband)
 
