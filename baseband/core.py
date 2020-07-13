@@ -1,10 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 """Routines to obtain information on baseband files."""
-import warnings
-
-from .helpers import sequentialfile as sf
-from . import io as baseband_io
-
+# We do not import baseband.io on top to keep import time as fast as possible,
+# and to ensure that entry points are only generated when needed.
 
 __all__ = ['file_info', 'open']
 
@@ -35,10 +32,11 @@ def file_info(name, format=None, **kwargs):
     Returns
     -------
     info
-        The information on the file, an instance of either
-        `~baseband.base.file_info.FileReaderInfo` or
-        `~baseband.base.file_info.StreamReaderInfo`.
-        Can be turned info a `dict` by calling it (i.e., ``info()``).
+        The information on the file.  Depending on how much information could
+        be gathered, this will be an instance of either
+        `~baseband.base.file_info.StreamReaderInfo`,
+        `~baseband.base.file_info.FileReaderInfo`, or
+        `~baseband.base.file_info.NoInfo`.
 
     Notes
     -----
@@ -50,10 +48,9 @@ def file_info(name, format=None, **kwargs):
       - ``inconsistent_kwargs``: not needed to open the file, and inconsistent.
       - ``irrelevant_kwargs``: provide information irrelevant for opening.
     """
+    from . import io as baseband_io
+    from .base.file_info import NoInfo
 
-    # Handle lists and tuples of files, which may be passed from open.
-    if isinstance(name, (tuple, list, sf.FileNameSequencer)):
-        return file_info(name[0], format, **kwargs)
     # If we're looking at one file but multiple formats, cycle through formats.
     if format is None:
         format = tuple(baseband_io.FORMATS)
@@ -65,14 +62,12 @@ def file_info(name, format=None, **kwargs):
             if info:
                 return info
 
-            if info is None:
+            if isinstance(info, NoInfo):
                 no_info.add(format_)
 
-        tried = set(format) - no_info
-        warnings.warn(f"{name} does not seem formatted as any of {tried}"
-                      + (f" ({no_info} did not provide info)."
+        return NoInfo(f"{name} does not seem formatted as any of {set(format)}"
+                      + (f" ({no_info} had no 'info' and opening failed)."
                          if no_info else "."))
-        return
 
     module = getattr(baseband_io, format)
     # A well-behaved module should define info, but we allow for more
@@ -85,8 +80,9 @@ def file_info(name, format=None, **kwargs):
     try:
         with module.open(name, 'rs', **kwargs) as fh:
             return fh.info
-    except Exception:
-        return None
+    except Exception as exc:
+        return NoInfo(f"baseband.io.{format} has no 'info' and opening "
+                      f"raised {exc!r}.")
 
 
 def open(name, mode='rs', format=None, **kwargs):
@@ -117,6 +113,8 @@ def open(name, mode='rs', format=None, **kwargs):
         arguments are passed in that are inconsistent with the file, or are
         irrelevant for opening the file.
     """
+    from . import io as baseband_io
+
     if format is None or isinstance(format, tuple):
         if 'w' in mode:
             raise ValueError("cannot specify multiple formats for writing.")

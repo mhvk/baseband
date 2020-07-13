@@ -14,7 +14,7 @@ from astropy.time import Time
 
 
 __all__ = ['info_item', 'InfoMeta', 'InfoBase',
-           'FileReaderInfo', 'StreamReaderInfo']
+           'FileReaderInfo', 'StreamReaderInfo', 'NoInfo']
 
 
 class info_item:
@@ -214,11 +214,8 @@ class InfoBase(metaclass=InfoMeta):
         if self._parent is None:
             return super().__repr__()
 
-        if not self:
-            if self._parent.closed:
-                return 'File closed. Not parsable.'
-            else:
-                return 'Not parsable. Wrong format?'
+        if any('closed' in str(error) for error in self.errors.values()):
+            return 'File closed. Not parsable.'
 
         result = ''
         for attr in self.attr_names:
@@ -244,6 +241,9 @@ class InfoBase(metaclass=InfoMeta):
                 elif attr == 'sample_rate':
                     value = value.to(u.MHz)
                 result += '{} = {}\n'.format(attr, value)
+
+        if not self:
+            result += '\nNot parsable. Wrong format?\n'
 
         return result
 
@@ -588,3 +588,24 @@ class StreamReaderInfo(InfoBase):
                 file_info.attr_names = raw_attrs
 
         return result
+
+
+class NoInfo:
+    """Info class for cases where no useful information was returned.
+
+    Any instance evaluates as `False`, to indicate a file for which
+    the information is given is not readable.
+
+    Parameters
+    ----------
+    info : str
+        Information that will be displayed using ``repr``.
+    """
+    def __init__(self, info=None):
+        self.info = info
+
+    def __bool__(self):
+        return False
+
+    def __repr__(self):
+        return f"No Info: {self.info}"
