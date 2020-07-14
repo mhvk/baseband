@@ -84,6 +84,13 @@ writing is in units of samples, and provides access to header information::
         sample_rate=250.0 Hz, samples_per_frame=960,
         sample_shape=SampleShape(npol=2, nchan=4), bps=8,
         start_time=2018-01-14T14:11:33.000>
+    >>> fh.header0
+    <GUPPIHeader SRC_NAME= 'J1810+1744'
+                 OBSERVER= 'NikhilMahajan'
+                 RA_STR  = '18:10:37.2800'
+                 DEC_STR = '+17:44:37.3801'
+                 TELESCOP= 'Arecibo '
+    ...
     >>> d = fh.read()
     >>> d.shape
     (3904, 2, 4)
