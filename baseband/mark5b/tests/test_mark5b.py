@@ -157,7 +157,7 @@ class TestMark5B:
 
     def test_payload(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
-            fh.seek(16)  # Skip header
+            fh.seek(16)  # Skip header.
             payload = mark5b.Mark5BPayload.fromfile(
                 fh, sample_shape=(8,), bps=2)
         assert payload._nbytes == 10000
@@ -448,11 +448,23 @@ class TestMark5B:
                         frame_rate=frame_rate)
         assert abs(header.get_time(frame_rate)
                    - start_time - 25599. / frame_rate) < 1. * u.ns
-        # Check rounding to the nearest second when less than 2 ns away.
-        header.set_time(time=(start_time + 0.9 * u.ns), frame_rate=frame_rate)
+        # Check rounding to the nearest second when less than 2 ns away,
+        # without frame_rate
+        header.set_time(time=(start_time + 0.9 * u.ns))
         assert header.seconds == header0.seconds
-        header.set_time(time=(start_time - 0.9 * u.ns), frame_rate=frame_rate)
+        header.set_time(time=(start_time - 0.9 * u.ns))
         assert header.seconds == header0.seconds
+        # And also proper rounding for larger time differences if a
+        # frame rate is passed in.
+        header.set_time(start_time + 0.4/frame_rate, frame_rate=frame_rate)
+        assert header.seconds == header0.seconds
+        assert header['frame_nr'] == 0
+        header.set_time(start_time - 0.4/frame_rate, frame_rate=frame_rate)
+        assert header.seconds == header0.seconds
+        assert header['frame_nr'] == 0
+
+        with pytest.raises(ValueError, match='cannot calculate frame rate'):
+            header.set_time(time=start_time+1./frame_rate)
 
     def test_locate_frames(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000) as fh:
@@ -776,6 +788,21 @@ class TestMark5B:
             # Might as well test some other properties
             assert abs(fh.start_time - test_time) < 1.*u.ns
             assert fh.header0['frame_nr'] == 198
+
+        # Check that we can fail sample rate determination if we have only
+        # a single frame.  In the process, might as well check both versions
+        # of write_frame...
+        with mark5b.open(m5_test_samplerate, 'wb') as fw:
+            fw.write_frame(frame)
+            fw.write_frame(frame.data, frame.header, bps=2)
+
+        with mark5b.open(m5_test_samplerate, 'rb', nchan=8) as fr:
+            data1 = fr.read_frame()
+            data2 = fr.read_frame()
+            assert np.all(data1 == data2)
+
+            with pytest.raises(EOFError, match='can also not'):
+                fr.get_frame_rate()
 
     def test_filestreamer_readable(self):
         with mark5b.open(SAMPLE_FILE, 'rs', sample_rate=32*u.MHz,
