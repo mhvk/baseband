@@ -142,8 +142,8 @@ class Mark4FileReader(VLBIFileReaderBase):
             in order of proximity to the starting position.
         """
         # Use initializer value (determines ntrack if not already given).
+        ntrack = self.ntrack
         if frame_nbytes is None:
-            ntrack = self.ntrack
             if ntrack is None:
                 with self.temporary_offset(0):
                     ntrack = self.determine_ntrack(maximum=maximum)
@@ -157,7 +157,7 @@ class Mark4FileReader(VLBIFileReaderBase):
                                  '2500 bytes for Mark 4 data.')
 
         if pattern is None:
-            pattern, mask = Mark4Header.invariant_pattern(ntrack=self.ntrack)
+            pattern, mask = Mark4Header.invariant_pattern(ntrack=ntrack)
         return super().locate_frames(
             pattern, mask=mask, frame_nbytes=frame_nbytes, offset=offset,
             forward=forward, maximum=maximum, check=check)
