@@ -669,6 +669,19 @@ class TestGSB:
             assert fh_r.samples_per_frame == 2**23
             assert fh_r.payload_nbytes == 2**22
 
+        # Test that missing header line will lead to failure.
+        filename_missinghead = str(tmpdir.join('missing.timestamp'))
+        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh_r:
+            timestamps = fh_r.readlines()
+            del timestamps[3]
+        with open(filename_missinghead, 'wt') as fh_w:
+            fh_w.writelines(timestamps)
+        with gsb.open(filename_missinghead, 'rs', raw=SAMPLE_RAWDUMP,
+                      sample_rate=sample_rate,
+                      payload_nbytes=self.payload_nbytes) as fr:
+            with pytest.raises(ValueError, match='wrong frame'):
+                fr.read()
+
     @pytest.mark.parametrize('bad', [False, True])
     def test_bad_last_timestamp(self, bad, tmpdir):
         # Test that an incomplete or bad last header leads to the
@@ -704,6 +717,14 @@ class TestGSB:
                 fh_r._last_header
             assert fh_r.shape[0] == fh_r.samples_per_frame
             assert fh_r._last_header == fh_r.header0
+
+        # Test not passing a sample rate and samples per frame to reader
+        # (can't test reading, since the sample file is tiny).
+        with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP) as fh_r:
+            assert u.isclose(fh_r.sample_rate, (100. / 3.) * u.MHz,
+                             rtol=2**-52)
+            assert fh_r.samples_per_frame == 2**23
+            assert fh_r.payload_nbytes == 2**22
 
     @pytest.mark.parametrize('sample_header,sample_data', [
         (SAMPLE_RAWDUMP_HEADER, SAMPLE_RAWDUMP),

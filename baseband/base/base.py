@@ -1129,7 +1129,7 @@ class VLBIStreamReaderBase(StreamReaderBase):
         # Don't yet know how to deal with excess data.
         header_index = self._get_index(header)
         if header_index < index:
-            exc.args += (msg + ' There appears to be excess data.')
+            exc.args += (msg + ' There appears to be excess data.',)
             raise exc
 
         # Go backward until we find previous frame, storing offsets
@@ -1577,7 +1577,7 @@ class FileInfo:
             if key.endswith('StreamReader'):
                 fmt = key.replace('StreamReader', '')
                 break
-        else:  # noqa
+        else:  # pragma: no cover
             fmt = None
 
         opener = ns['open']

@@ -130,3 +130,8 @@ def test_byte_array(pattern, expected):
     result = byte_array(pattern)
     expected = np.array(expected, 'u1')
     assert_array_equal(result, expected)
+
+
+def test_byte_array_errors():
+    with pytest.raises(ValueError, match='values have to fit'):
+        byte_array([-1, -1])

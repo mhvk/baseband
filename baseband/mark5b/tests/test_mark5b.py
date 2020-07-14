@@ -157,7 +157,7 @@ class TestMark5B:
 
     def test_payload(self, tmpdir):
         with open(SAMPLE_FILE, 'rb') as fh:
-            fh.seek(16)  # Skip header.
+            fh.seek(16)  # Skip header
             payload = mark5b.Mark5BPayload.fromfile(
                 fh, sample_shape=(8,), bps=2)
         assert payload._nbytes == 10000
@@ -191,7 +191,9 @@ class TestMark5B:
         with pytest.raises(ValueError):
             mark5b.Mark5BPayload(payload3.words, sample_shape=(1,),
                                  complex_data=True)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='encoded data should have len'):
+            mark5b.Mark5BPayload(payload3.words[:-2], sample_shape=(1,))
+        with pytest.raises(ValueError, match='complex'):
             mark5b.Mark5BPayload.fromdata(np.zeros((5000, 8), np.complex64),
                                           bps=2)
 

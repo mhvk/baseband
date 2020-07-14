@@ -72,21 +72,6 @@ class TestBase:
         cls.Frame = Frame
         cls.frame = Frame(cls.header, cls.payload)
 
-    def test_header_parser_update(self):
-        extra = HeaderParser((('x4_0_32', (4, 0, 32)),))
-        new = self.header_parser + extra
-        assert len(new.keys()) == 5
-        assert len(self.header_parser.keys()) == 4
-        new = self.header_parser.copy()
-        assert isinstance(new, HeaderParser)
-        new.update(extra)
-        assert len(new.keys()) == 5
-        assert new['x4_0_32'] == (4, 0, 32)
-        with pytest.raises(TypeError):
-            self.header_parser + {'x4_0_32': (4, 0, 32)}
-        with pytest.raises(ValueError):
-            self.header_parser.copy().update(('x4_0_32', (4, 0, 32)))
-
     def test_header_basics(self):
         header = self.Header(None)
         assert header.words == [0] * 4
@@ -168,34 +153,6 @@ class TestBase:
             header.update(bla=10)
         with pytest.raises(ValueError, match='cannot be represented'):
             header.update(x0_16_4=-1)
-
-    def test_header_parser_class(self):
-        header_parser = self.header_parser.copy()
-        words = self.header.words
-        header_parser['0_2_8'] = (0, 2, 8, 5)
-        assert '0_2_8' in header_parser
-        assert header_parser.defaults['0_2_8'] == 5
-        assert header_parser.parsers['0_2_8'](words) == (words[0] >> 2) & 0xff
-        # Check we can change and parsers will be reset.
-        header_parser['0_2_8'] = (0, 1, 8, 3)
-        assert '0_2_8' in header_parser
-        assert header_parser.defaults['0_2_8'] == 3
-        assert header_parser.parsers['0_2_8'](words) == (words[0] >> 1) & 0xff
-        header_parser.update({'0_2_8': (0, 3, 8, 1)})
-        assert '0_2_8' in header_parser
-        assert header_parser.defaults['0_2_8'] == 1
-        assert header_parser.parsers['0_2_8'](words) == (words[0] >> 3) & 0xff
-
-        small_parser = HeaderParser((('0_2_8', (0, 2, 8, 4)),))
-        header_parser2 = self.header_parser + small_parser
-        assert header_parser2.parsers['0_2_8'](words) == (words[0] >> 2) & 0xff
-        assert header_parser2.defaults['0_2_8'] == 4
-        with pytest.raises(TypeError):
-            header_parser + {'0_2_8': (0, 2, 8, 4)}
-        with pytest.raises(Exception):
-            self.HeaderParser((('0_2_32', (0, 2, 32, 4)),))
-        with pytest.raises(Exception):
-            self.HeaderParser((('0_2_64', (0, 2, 64, 4)),))
 
     def test_header_without_invariants(self):
         # More elaborate tests implicitly done in locate_frames.
@@ -379,6 +336,19 @@ class TestBase:
 
         with pytest.raises(ValueError):
             payload[1:3, :1] = np.ones((1, 2))
+
+    def test_payload_fixed_size(self):
+        class FixedSizePayload(self.Payload):
+            _nbytes = self.Header.payload_nbytes
+
+        fsp = FixedSizePayload(self.payload.words, header=self.header)
+        assert fsp.nbytes == 8
+
+        FixedSizePayload._nbytes = 6
+        with pytest.raises(ValueError, match='header payload size should'):
+            FixedSizePayload(self.payload.words, header=self.header)
+        with pytest.raises(ValueError, match='encoded data should'):
+            FixedSizePayload(self.payload.words)
 
     def test_payload_fromfile(self, tmpdir):
         with open(str(tmpdir.join('test.dat')), 'w+b') as s:
