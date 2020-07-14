@@ -140,19 +140,32 @@ def test_unsupported_file(tmpdir):
     with open(name, 'wb') as fw:
         fw.write(b'abcdefghijklmnopqrstuvwxyz')
 
-    with pytest.warns(UserWarning, match='not.*formatted as any of'):
-        info = file_info(name)
+    info = file_info(name)
+    assert not info
+    assert 'does not seem formatted as any of' in str(info)
 
-    assert info is None
+    info = file_info(name, format='vdif')
+    assert 'errors' in str(info)
+    assert 'Not parsable' in str(info)
 
 
 def test_format_with_no_info(monkeypatch):
+    # If a format does not provide info, we still try to open
+    # with the stream opener, so the format should still get
+    # recognized.  But we do note that the format checking was
+    # haphazard.
     monkeypatch.delattr('baseband.vdif.info')
     info = file_info(SAMPLE_VDIF)
     assert info
     assert info.format == 'vdif'
     assert not hasattr(info, 'used_kwargs')
 
-    with pytest.warns(UserWarning, match=(
-            r"as any of {'mark5b'} \({'vdif'} did not")):
-        info = file_info(SAMPLE_M4, format=('vdif', 'mark5b'))
+    info = file_info(SAMPLE_M4, format='vdif')
+    assert not info
+    assert "Error" in str(info)
+    assert "no 'info'" in str(info)
+
+    info = file_info(SAMPLE_M4, format=('vdif', 'mark5b'))
+    assert not info
+    assert "does not seem formatted as any of" in str(info)
+    assert "({'vdif'} had no 'info'" in str(info)

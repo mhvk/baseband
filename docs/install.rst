@@ -12,8 +12,8 @@ Requirements
 Baseband requires:
 
 - `Python <https://www.python.org/>`_ |minimum_python_version| or later
-- `Numpy <https://www.numpy.org/>`_ |minimum_numpy_version| or later
 - `Astropy`_ |minimum_astropy_version| or later
+- `entrypoints <https://entrypoints.readthedocs.io/en/latest/>`_
 
 .. _install_baseband:
 
@@ -25,11 +25,8 @@ run::
 
     pip3 install baseband
 
-.. note::
-
-    To run without pip potentially updating Numpy and Astropy, run, include the
-    ``--no-deps`` flag.  Another useful flag is ``--user`` if you are
-    installing for yourself outside of a virtual environment.
+Here, include a ``--user`` flag if you are installing for yourself
+outside of a virtual environment.
 
 Obtaining Source Code
 ---------------------
@@ -62,6 +59,10 @@ the path::
     sys.path.append(BASEBAND_PATH)
 
 where ``BASEBAND_PATH`` is the directory you downloaded or cloned Baseband into.
+However, for its plugin modules to be discoverable, you may still want to run::
+
+    python3 setup.py egg_info
+
 
 .. _install_sourcebuildtest:
 

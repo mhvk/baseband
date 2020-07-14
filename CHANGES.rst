@@ -4,6 +4,8 @@
 - This future version will likely only support python 3.7, numpy 1.17 and
   astropy 4.0.
 
+- Baseband now requires the (very small) ``entrypoints`` package.
+
 New Features
 ------------
 

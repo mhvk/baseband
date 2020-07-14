@@ -14,7 +14,7 @@ from astropy.time import Time
 
 
 __all__ = ['info_item', 'InfoMeta', 'InfoBase',
-           'FileReaderInfo', 'StreamReaderInfo']
+           'FileReaderInfo', 'StreamReaderInfo', 'NoInfo']
 
 
 class info_item:
@@ -214,38 +214,39 @@ class InfoBase(metaclass=InfoMeta):
         if self._parent is None:
             return super().__repr__()
 
-        if not self:
-            if self._parent.closed:
-                return 'File closed. Not parsable.'
-            else:
-                return 'Not parsable. Wrong format?'
+        if any('closed' in str(error) for error in self.errors.values()):
+            return "File closed. Not parsable."
 
-        result = ''
+        result = []
         for attr in self.attr_names:
             value = getattr(self, attr)
             if isinstance(value, dict):
-                prefix = '\n{}: '.format(attr)
+                result.append('')
+                prefix = f"{attr}: "
                 if attr == 'missing':
                     for msg in sorted(set(self.missing.values())):
                         keys = sorted(set(key for key in self.missing
                                           if self.missing[key] == msg))
-                        result += "{} {}: {}\n".format(prefix,
-                                                       ', '.join(keys), msg)
-                        prefix = ' ' * (len(attr) + 2)
+                        result.append(f"{prefix} {', '.join(keys)}: {msg}")
+                        prefix = ' ' * len(prefix)
                 else:
                     for key, val in value.items():
                         str_val = str(val) or repr(val)
-                        result += "{} {}: {}\n".format(prefix, key, str_val)
-                        prefix = ' ' * (len(attr) + 2)
+                        result.append(f"{prefix} {key}: {str_val}")
+                        prefix = ' ' * len(prefix)
 
             elif value is not None:
                 if isinstance(value, Time):
                     value = Time(value, format='isot', precision=9)
                 elif attr == 'sample_rate':
                     value = value.to(u.MHz)
-                result += '{} = {}\n'.format(attr, value)
+                result.append(f"{attr} = {value}")
 
-        return result
+        if not self:
+            result.append('\nNot parsable. Wrong format?')
+
+        result.append('')
+        return '\n'.join(result)
 
 
 class FileReaderInfo(InfoBase):
@@ -395,8 +396,8 @@ class FileReaderInfo(InfoBase):
             return int(number_of_frames)
         else:
             self.warnings['number_of_frames'] = (
-                'file contains non-integer number ({}) of frames'
-                .format(number_of_frames))
+                f"file contains non-integer number "
+                f"({number_of_frames}) of frames")
             return None
 
     @info_item(needs='header0')
@@ -532,7 +533,7 @@ class StreamReaderInfo(InfoBase):
                         # If we know this is the right one, raise,
                         # otherwise start bisection.
                         if frame == good + 1:
-                            msg = 'While reading at {}: '.format(fh.tell())
+                            msg = f"While reading at {fh.tell()}: "
                             if isinstance(exc, UserWarning):
                                 self.warnings['continuous'] = msg + str(exc)
                                 return 'fixable gaps'
@@ -588,3 +589,24 @@ class StreamReaderInfo(InfoBase):
                 file_info.attr_names = raw_attrs
 
         return result
+
+
+class NoInfo:
+    """Info class for cases where no useful information was returned.
+
+    Any instance evaluates as `False`, to indicate a file for which
+    the information is given is not readable.
+
+    Parameters
+    ----------
+    info : str
+        Information that will be displayed using ``repr``.
+    """
+    def __init__(self, info=None):
+        self.info = info
+
+    def __bool__(self):
+        return False
+
+    def __repr__(self):
+        return f"No Info: {self.info}"
