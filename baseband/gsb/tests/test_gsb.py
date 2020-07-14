@@ -35,6 +35,7 @@ class TestGSB:
         assert header2 == header
         header3 = gsb.GSBHeader.fromvalues(mode='rawdump', **header2)
         assert header3 == header2
+        assert header3.nbytes == header2.nbytes
         with pytest.raises(TypeError):
             gsb.GSBHeader.fromvalues(**header)
         with pytest.raises(TypeError):
@@ -426,9 +427,12 @@ class TestGSB:
         assert np.all(frame2.payload.data == payload2.data)
         self.close_phased_rawfiles(fraw)
 
-        frame3 = gsb.GSBFrame.fromdata(payload1.data, header1, bps=8)
-        assert frame3.shape == frame1.shape
-        assert np.all(frame3.data == frame1.data)
+        frame3a = gsb.GSBFrame.fromdata(payload1.data, header1, bps=8)
+        assert frame3a.shape == frame1.shape
+        assert np.all(frame3a.data == frame1.data)
+        frame3b = gsb.GSBFrame.fromdata(payload1.data, bps=8, **header1)
+        assert frame3b.shape == frame1.shape
+        assert np.all(frame3b.data == frame1.data)
         # Test writing phased data to multiple files.
         with open(str(tmpdir.join('test.timestamp')), 'w+t') as sh, \
                 open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
@@ -465,9 +469,12 @@ class TestGSB:
         testfile = str(tmpdir.join('test.timestamp'))
         with gsb.open(testfile, 'wt') as fw:
             fw.write_timestamp(header=header1)
+            fw.write_timestamp(mode=header1.mode, **header1)
         with gsb.open(testfile, 'rt') as fh:
             header2 = fh.read_timestamp()
             assert header2 == header1
+            header3 = fh.read_timestamp()
+            assert header3 == header1
 
         # Check that extra arguments raise TypeError.
         with pytest.raises(TypeError):
@@ -494,10 +501,16 @@ class TestGSB:
                 fh, payload_nbytes=self.payload_nbytes)
         testfile = str(tmpdir.join('test.dat'))
         with gsb.open(testfile, 'wb') as fw:
+            assert fw.writable()
             fw.write_payload(payload1, bps=4)
+            fw.write_payload(payload1.data, bps=4)
         with gsb.open(testfile, 'rb', payload_nbytes=2**12) as fh:
+            assert fh.readable()
+            assert not fh.writable()
             payload2 = fh.read_payload()
             assert payload2 == payload1
+            payload3 = fh.read_payload()
+            assert payload3 == payload1
 
     def test_pickle_filereader(self):
         """Tests GSBFileReader in base.py."""
@@ -528,6 +541,14 @@ class TestGSB:
                       sample_rate=sample_rate,
                       payload_nbytes=self.payload_nbytes,
                       squeeze=False) as fh_r:
+            assert fh_r.readable()
+            # Get some attributes from fh_raw but not all.
+            assert fh_r.seekable()
+            assert not fh_r.writable()
+            assert not hasattr(fh_r, 'read_payload')
+            # Also checks repr works at all...
+            assert 'rawdump' in repr(fh_r)
+
             with open(SAMPLE_RAWDUMP_HEADER, 'rt') as ft, \
                     open(SAMPLE_RAWDUMP, 'rb') as fraw:
                 frame1 = gsb.GSBFrame.fromfile(
@@ -640,32 +661,6 @@ class TestGSB:
             assert not sh.closed
             assert not sp.closed
 
-        # Test that an incomplete last header leads to the second-to-last
-        # header being used, and raises a warning.
-        filename_incompletehead = str(
-            tmpdir.join('test_incomplete_header.timestamp'))
-        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
-                open(filename_incompletehead, 'wt') as fw:
-            fw.write(fh.read()[:-4])
-        with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_RAWDUMP,
-                      sample_rate=sample_rate,
-                      payload_nbytes=self.payload_nbytes,
-                      squeeze=False) as fh_r:
-            with pytest.warns(UserWarning, match='second-to-last entry'):
-                fh_r._last_header
-            assert fh_r.shape[0] == 9 * fh_r.samples_per_frame
-        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
-                open(filename_incompletehead, 'wt') as fw:
-            fw.write(fh.read()[:45])
-        with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_RAWDUMP,
-                      sample_rate=sample_rate,
-                      payload_nbytes=self.payload_nbytes,
-                      squeeze=False) as fh_r:
-            with pytest.warns(UserWarning, match='second-to-last entry'):
-                fh_r._last_header
-            assert fh_r.shape[0] == fh_r.samples_per_frame
-            assert fh_r._last_header == fh_r.header0
-
         # Test not passing a sample rate and samples per frame to reader
         # (can't test reading, since the sample file is tiny).
         with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP) as fh_r:
@@ -673,6 +668,42 @@ class TestGSB:
                              rtol=2**-52)
             assert fh_r.samples_per_frame == 2**23
             assert fh_r.payload_nbytes == 2**22
+
+    @pytest.mark.parametrize('bad', [False, True])
+    def test_bad_last_timestamp(self, bad, tmpdir):
+        # Test that an incomplete or bad last header leads to the
+        # second-to-last header being used, and raises a warning.
+        filename_incompletehead = str(
+            tmpdir.join('test_incomplete_header.timestamp'))
+        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
+                open(filename_incompletehead, 'wt') as fw:
+            fw.write(fh.read()[:-4])
+            if bad:
+                fw.write('xxxx')
+
+        with gsb.open(filename_incompletehead, 'rt') as fh_t:
+            assert 'number_of_frames' in fh_t.info.warnings
+            warn_exp = 'failed to read' if bad else 'incomplete'
+            assert warn_exp in fh_t.info.warnings['number_of_frames']
+
+        with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_RAWDUMP,
+                      payload_nbytes=self.payload_nbytes,
+                      squeeze=False) as fh_r:
+            with pytest.warns(UserWarning, match='second-to-last entry'):
+                fh_r._last_header
+            assert fh_r.shape[0] == 9 * fh_r.samples_per_frame
+            assert warn_exp in fh_r.info.warnings['number_of_frames']
+
+        with open(SAMPLE_RAWDUMP_HEADER, 'rt') as fh, \
+                open(filename_incompletehead, 'wt') as fw:
+            fw.write(fh.read()[:45])
+        with gsb.open(filename_incompletehead, 'rs', raw=SAMPLE_RAWDUMP,
+                      payload_nbytes=self.payload_nbytes,
+                      squeeze=False) as fh_r:
+            with pytest.warns(UserWarning, match='second-to-last entry'):
+                fh_r._last_header
+            assert fh_r.shape[0] == fh_r.samples_per_frame
+            assert fh_r._last_header == fh_r.header0
 
     @pytest.mark.parametrize('sample_header,sample_data', [
         (SAMPLE_RAWDUMP_HEADER, SAMPLE_RAWDUMP),
@@ -720,6 +751,14 @@ class TestGSB:
                       sample_rate=sample_rate,
                       payload_nbytes=self.payload_nbytes,
                       squeeze=False) as fh_r:
+            assert fh_r.readable()
+            # Get some attributes from fh_raw but not all.
+            assert fh_r.seekable()
+            assert not fh_r.writable()
+            assert not hasattr(fh_r, 'read_payload')
+            # Also checks repr works at all...
+            assert 'phased' in repr(fh_r)
+
             fraw = [[open(thread, 'rb') for thread in pol]
                     for pol in SAMPLE_PHASED]
             with open(SAMPLE_PHASED_HEADER, 'rt') as ft:
@@ -958,6 +997,9 @@ class TestGSB:
                              rtol=2**-52)
 
     def test_stream_invalid(self, tmpdir):
+        with pytest.raises(Exception):
+            gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_PHASED,
+                     payload_nbytes=self.payload_nbytes)
         with pytest.raises(ValueError):
             # no r or w in mode
             gsb.open('ts.dat', 's')
@@ -965,9 +1007,20 @@ class TestGSB:
             # non-existing file
             gsb.open(str(tmpdir.join('ts.bla')),
                      raw=str(tmpdir.join('raw.bla')))
+        with pytest.raises(TypeError, match="required argument 'raw'"):
+            gsb.open(SAMPLE_PHASED_HEADER, 'rs')
         with pytest.raises(ValueError, match='inconsistent'):
             gsb.open(SAMPLE_PHASED_HEADER, 'rs', raw=SAMPLE_PHASED,
                      payload_nbytes=32, samples_per_frame=400)
+        with pytest.raises(ValueError, match='inconsistent'):
+            gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP,
+                     payload_nbytes=32, samples_per_frame=400)
+
+    def test_stream_wrong_payload_warning(self):
+        with gsb.open(SAMPLE_RAWDUMP_HEADER, 'rs', raw=SAMPLE_RAWDUMP,
+                      payload_nbytes=self.payload_nbytes-1) as fh:
+            assert 'consistent' in fh.info.warnings
+            assert 'non-integer' in fh.info.warnings['consistent']
 
     @pytest.mark.parametrize('ts,raw,mode', [
         (SAMPLE_RAWDUMP_HEADER, SAMPLE_RAWDUMP, 'rawdump'),
