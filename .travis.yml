@@ -49,7 +49,7 @@ env:
         # Also allow tests without tox, getting our packages using apt;
         # Here, we need to include python3-attr, since the version on bionic
         # is too old.
-        - APT_DEPENDENCIES='python3-astropy python3-setuptools python3-attr'
+        - APT_DEPENDENCIES='python3-astropy python3-setuptools python3-entrypoints python3-attr'
 
         # If there are matplotlib or other GUI tests, uncomment the following
         # line to use the X virtual framebuffer.
