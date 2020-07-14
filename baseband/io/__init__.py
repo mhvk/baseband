@@ -36,11 +36,10 @@ def __getattr__(fmt):
 
     try:
         module = entry_point.load()
-    except Exception as exc:
-        exc.args += (f"{entry_point} was not loadable. Now removed",)
+    except Exception:
         FORMATS.pop(fmt)
         BAD_FORMATS.add(fmt)
-        raise
+        raise AttributeError(f"{entry_point} was not loadable. Now removed")
 
     # Update so we do not have to go through __getattr__ again.
     globals()[fmt] = module
