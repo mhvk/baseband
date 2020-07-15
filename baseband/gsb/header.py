@@ -173,10 +173,9 @@ class GSBHeader(ParsedHeaderBase):
                  verify=True):
         if words is None:
             words = [''] * self._number_of_words
-        if nbytes is not None:
-            self._nbytes = nbytes
         if mode is not None:
             self._mode = mode
+        self._nbytes = nbytes
         self.utc_offset = utc_offset
         super().__init__(words, verify=verify)
 
@@ -220,28 +219,22 @@ class GSBHeader(ParsedHeaderBase):
 
     @classmethod
     def fromvalues(cls, mode=None, nbytes=None, *args, **kwargs):
-        if mode is None:
-            if cls._mode is not None:
-                mode = cls._mode
+        if mode is None and cls._mode is None:
+            if set(kwargs.keys()) & {'pc', 'pc_time',
+                                     'seq_nr', 'mem_block'}:
+                mode = 'phased'
             else:
-                if set(kwargs.keys()) & {'pc', 'pc_time',
-                                         'seq_nr', 'mem_block'}:
-                    mode = 'phased'
-                else:
-                    raise TypeError("cannot construct a GSB header from "
-                                    "values without knowing the mode.")
+                raise TypeError("cannot construct a GSB header from "
+                                "values without knowing the mode.")
         return super().fromvalues(mode, nbytes, *args, **kwargs)
 
     @classmethod
     def fromkeys(cls, mode=None, nbytes=None, *args, **kwargs):
-        if mode is None:
-            if cls._mode is not None:
-                mode = cls._mode
+        if mode is None and cls._mode is None:
+            if set(kwargs.keys()) & {'pc', 'seq_nr', 'mem_block'}:
+                mode = 'phased'
             else:
-                if set(kwargs.keys()) & {'pc', 'seq_nr', 'mem_block'}:
-                    mode = 'phased'
-                else:
-                    mode = 'rawdump'
+                mode = 'rawdump'
         return super().fromkeys(mode, nbytes, *args, **kwargs)
 
     def seek_offset(self, n, nbytes=None):

@@ -266,6 +266,32 @@ class TestCorruptFile:
         expected[missing_data] = 0.
         assert np.all(data.astype(int) == expected)
 
+    def test_duplicate_data(self, tmpdir):
+        fake_file = self.fake_file(tmpdir)
+        corrupt_file = self.corrupt_copy(fake_file, slice(320, 240))
+        with vdif.open(corrupt_file, 'rs') as fv:
+            with pytest.raises(Exception, match='excess data'):
+                fv.read()
+
+    def test_bad_thread_ids(self, tmpdir):
+        filename = str(tmpdir.join('fake.vdif'))
+        header = self.header0.copy()
+        with vdif.open(filename, 'wb') as fw:
+            for i in range(4):
+                for j in range(i+1):
+                    header['frame_nr'] = i
+                    header['thread_id'] = j
+                    fw.write_frame(self.data[:, 0], header)
+
+        with vdif.open(filename, 'rb') as fr:
+            assert len(fr.read_frameset().frames) == 1
+            assert len(fr.read_frameset().frames) == 2
+            assert len(fr.read_frameset().frames) == 3
+            assert len(fr.read_frameset().frames) == 4
+
+        with pytest.raises(EOFError):
+            vdif.open(filename, 'rs')
+
 
 class TestInvalidFrameHeaders:
     # CHIME VDIF files from ARO can have invalid frames included in

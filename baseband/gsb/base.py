@@ -1,5 +1,4 @@
 # Licensed under the GPLv3 - see LICENSE
-import io
 import warnings
 
 import numpy as np
@@ -155,13 +154,13 @@ class GSBStreamBase(StreamBase):
 
         self.fh_ts = fh_ts
         rawdump = header0.mode == 'rawdump'
-        if not rawdump:
-            if isinstance(fh_raw, (tuple, list)):
-                for pair in fh_raw:
-                    assert isinstance(pair, (tuple, list))
-                    assert len(pair) == len(fh_raw[0])
-            else:
-                fh_raw = ((fh_raw,),)
+        if isinstance(fh_raw, (tuple, list)):
+            assert not rawdump
+            for pair in fh_raw:
+                assert isinstance(pair, (tuple, list))
+                assert len(pair) == len(fh_raw[0])
+        elif not rawdump:
+            fh_raw = ((fh_raw,),)
 
         complex_data = (complex_data if complex_data is not None else
                         (False if rawdump else True))
@@ -213,7 +212,7 @@ class GSBStreamBase(StreamBase):
                       else self.fh_raw[0][0])
             try:
                 return getattr(fh_raw, attr)
-            except AttributeError:
+            except AttributeError:  # pragma: no cover
                 pass
         #  __getattribute__ to raise appropriate error.
         return self.__getattribute__(attr)
@@ -231,9 +230,9 @@ class GSBStreamBase(StreamBase):
 
     def close(self):
         self.fh_ts.close()
-        try:
+        if self.header0.mode == 'rawdump':
             self.fh_raw.close()
-        except AttributeError:
+        else:
             for fh_pair in self.fh_raw:
                 for fh in fh_pair:
                     fh.close()
@@ -319,6 +318,15 @@ class GSBStreamReader(GSBStreamBase, StreamReaderBase):
             nchan=nchan, bps=bps, complex_data=complex_data,
             squeeze=squeeze, subset=subset, verify=verify)
         self.fh_ts.seek(0)
+        # Replace fh_raw with GSBFileReader instances.
+        fr_kwargs = dict(payload_nbytes=self._payload_nbytes,
+                         nchan=self._unsliced_shape.nchan,
+                         bps=self.bps, complex_data=self.complex_data)
+        if header0.mode == 'rawdump':
+            self.fh_raw = GSBFileReader(self.fh_raw, **fr_kwargs)
+        else:
+            self.fh_raw = [[GSBFileReader(fh, **fr_kwargs)
+                            for fh in fh_pair] for fh_pair in self.fh_raw]
 
     info = GSBStreamReaderInfo()
 
@@ -326,15 +334,11 @@ class GSBStreamReader(GSBStreamBase, StreamReaderBase):
     def _last_header(self):
         """Last header of the timestamp file."""
         with self.fh_ts.temporary_offset() as fh:
-            fh_size = fh.seek(0, 2)
-            if fh_size == self.header0.nbytes:
-                # Only one line in file
-                return self.header0
-
             # Guess based on a fixed header size.  In reality, this
             # may be an overestimate as the headers can grow in size,
             # or an underestimate as the last header may be partial.
             # So, search around to be sure.
+            fh_size = fh.seek(0, 2)
             guess = max(fh_size // self.header0.nbytes, 1)
             while self.header0.seek_offset(guess) > fh_size:
                 guess -= 1
@@ -351,6 +355,8 @@ class GSBStreamReader(GSBStreamBase, StreamReaderBase):
                         < len(" ".join(self.header0.words))):
                     raise EOFError
                 last_header = self.header0.__class__(last_line_tuple)
+                # Check header time can be parsed.
+                last_header.time
             except Exception:
                 warnings.warn("The last header entry, '{0}', has an incorect "
                               "length. Using the second-to-last entry instead."
@@ -379,52 +385,6 @@ class GSBStreamReader(GSBStreamBase, StreamReaderBase):
                                  sample_shape=self._unsliced_shape,
                                  bps=self.bps, complex_data=self.complex_data,
                                  verify=self.verify)
-
-    def __getstate__(self):
-        state = super().__getstate__()
-        fh_raw = state.pop('fh_raw')
-        if self.header0.mode == 'rawdump':
-            fh_raw = [[fh_raw]]
-
-        fh_info = []
-        for fh_pair in fh_raw:
-            pair_info = []
-            for fh in fh_pair:
-                if isinstance(fh, io.IOBase):
-                    pair_info.append({
-                        'offset': 'closed' if fh.closed else fh.tell(),
-                        'filename': fh.name,
-                        'mode': fh.mode})
-                else:
-                    pair_info.append(fh)
-            fh_info.append(pair_info)
-
-        state['fh_info'] = fh_info
-        return state
-
-    def __setstate__(self, state):
-        fh_info = state.pop('fh_info', None)
-        if fh_info is not None:
-            fh_raw = []
-            for pair_info in fh_info:
-                fh_pair = []
-                for info in pair_info:
-                    if isinstance(info, dict):
-                        fh = io.open(info['filename'], info['mode'])
-                        if info['offset'] != 'closed':
-                            fh.seek(info['offset'])
-                        else:
-                            fh.close()
-                        fh_pair.append(fh)
-                    else:
-                        fh_pair.append(info)
-                fh_raw.append(fh_pair)
-            if state['_header0'].mode == 'rawdump':
-                fh_raw = fh_raw[0][0]
-
-            state['fh_raw'] = fh_raw
-
-        super().__setstate__(state)
 
 
 class GSBStreamWriter(GSBStreamBase, StreamWriterBase):
@@ -662,10 +622,6 @@ class GSBFileInfo(FileInfo):
         return info
 
     def get_stream_info(self, name, file_info, **kwargs):
-        frame_rate = file_info.frame_rate
-        if frame_rate is None:
-            return file_info
-
         used_kwargs = file_info.used_kwargs
         for key in ('sample_rate', 'payload_nbytes', 'samples_per_frame'):
             if key in kwargs:

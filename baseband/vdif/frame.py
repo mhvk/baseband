@@ -380,7 +380,7 @@ class VDIFFrameSet:
 
         single_sample = not isinstance(item[0], slice)
         if len(item) == 1:
-            return self.frames, False, item[0], single_sample, False
+            return self.frames, item[0], single_sample, False, False
 
         single_channel = (len(item) > 2
                           and np.empty(self.shape[2:])[item[2:]].ndim == 0)
@@ -423,8 +423,8 @@ class VDIFFrameSet:
             swapped = data.swapaxes(0, 1)
 
         swapped[0] = data0
-        for frame, frame_data in zip(frames[1:], swapped[1:]):
-            frame_data[...] = frame[frame_item]
+        for i, frame in enumerate(frames[1:]):
+            swapped[i+1] = frame[frame_item]
         return data
 
     def __setitem__(self, item, data):
@@ -453,7 +453,7 @@ class VDIFFrameSet:
 
         data = np.asanyarray(data)
         if single_channel:
-            if single_sample or data.ndim <= 1:
+            if single_sample and data.ndim <= 1:
                 swapped = np.broadcast_to(data, (len(frames),))
             else:
                 new_shape = (data.shape[0], len(frames))
@@ -485,7 +485,7 @@ class VDIFFrameSet:
         if attr in self.header0._properties:
             if attr in VDIFBaseHeader._properties:
                 return getattr(self.header0, attr)
-            values = np.array([getattr(f.header, attr) for f in self.frames])
+            values = np.hstack([getattr(f.header, attr) for f in self.frames])
             return values[0] if len(np.unique(values)) == 1 else values
         else:
             return self.__getattribute__(attr)

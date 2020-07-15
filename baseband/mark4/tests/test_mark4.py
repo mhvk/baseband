@@ -128,6 +128,22 @@ class TestMark4:
         with pytest.raises(ValueError, match='can only be set to False'):
             mark4.Mark4Header.fromvalues(
                 ntrack=64, bps=2, complex_data=True, time=header.time)
+        # That fanout has to be 1, 2, or 4
+        with pytest.raises(ValueError, match='fanout=1, 2, or 4'):
+            mark4.Mark4Header.fromvalues(
+                ntrack=64, bps=2, time=header.time, fanout=8)
+        # That nsb should be 1 or 2.
+        with pytest.raises(ValueError, match='can only be 1 or 2'):
+            mark4.Mark4Header.fromvalues(
+                ntrack=64, bps=2, time=header.time, nsb=3)
+        # That we do not have track assignments for ntrack=8
+        with pytest.raises(ValueError, match='track assignments only'):
+            mark4.Mark4Header.fromvalues(ntrack=8, bps=2, fanout=1)
+        # And that bps=1, fanout=1 is not supported for nsb=2,
+        # since it needs track assignments.
+        # TODO: is this necessary??
+        with pytest.raises(ValueError, match='does not support bps=1'):
+            mark4.Mark4Header.fromvalues(ntrack=64, bps=1, fanout=1, nsb=2)
         # Check that passing approximate ref_time is equivalent to passing a
         # decade.
         with open(SAMPLE_FILE, 'rb') as fh:
@@ -235,6 +251,9 @@ class TestMark4:
 
         assert np.all((h0w ^ p) & m == 0)
         assert np.all((h1w ^ p) & m == 0)
+
+        with pytest.raises(ValueError, match='need to pass in'):
+            mark4.Mark4Header.invariant_pattern()
 
     @pytest.mark.parametrize(('unit_year', 'ref_time', 'decade'),
                              [(5, Time('2014:1:12:00:00'), 2010),
@@ -425,8 +444,17 @@ class TestMark4:
         with open(str(tmpdir.join('test.m4')), 'w+b') as s:
             frame.tofile(s)
             s.seek(0)
-            frame2 = mark4.Mark4Frame.fromfile(s, ntrack=64, decade=2010)
-        assert frame2 == frame
+            frame2a = mark4.Mark4Frame.fromfile(s, ntrack=64, decade=2010)
+        assert frame2a == frame
+        test_file2b = str(tmpdir.join('test2.m4'))
+        with mark4.open(test_file2b, 'wb') as fw:
+            fw.write_frame(frame)
+            fw.write_frame(frame.data, ntrack=64, decade=2010, **frame.header)
+        with mark4.open(test_file2b, 'rb', ntrack=64, decade=2010) as fr:
+            frame2b = fr.read_frame()
+            frame2c = fr.read_frame()
+        assert frame2b == frame
+        assert frame2c == frame
         # Need frame.data here, since payload.data does not contain pieces
         # overwritten by header.
         frame3 = mark4.Mark4Frame.fromdata(frame.data, header)
@@ -482,7 +510,12 @@ class TestMark4:
         # Check scalar, including whether the shape is correct.
         assert frame[935].shape == data[935].shape
         assert np.all(frame[639] == data[639])
-        assert np.all(frame[640] == data[640])
+        assert np.all(frame[640, 3:] == data[640, 3:])
+        assert np.all(frame[-4, -1] == data[-4, -1])
+        with pytest.raises(IndexError, match='out of range'):
+            frame[100000000000]
+        with pytest.raises(TypeError, match='only be indexed or sliced'):
+            frame[[1, 2, 3]]
         # Check __setitem__.
         # Default frame read from a file is not mutable.
         with pytest.raises(ValueError):
@@ -951,8 +984,16 @@ class TestMark4:
 class Test32TrackFanout4():
     def test_locate_frames(self):
         with mark4.open(SAMPLE_32TRACK, 'rb') as fh:
-            assert fh.locate_frames() == [9656, 9656+32*2500]
+            # Simple first: let frame_nbytes stand in for ntrack:
+            expected = [9656, 9656+32*2500]
+            assert fh.locate_frames(frame_nbytes=32*2500) == expected
+            assert fh.ntrack is None
+            # But if we pass in nothing, it autodeterminess
+            assert fh.locate_frames() == expected
             assert fh.ntrack == 32
+            # And frame_nbytes has to make sense
+            with pytest.raises(ValueError, match='multiple of 2500 bytes'):
+                fh.locate_frames(frame_nbytes=500)
 
     def test_header(self):
         with open(SAMPLE_32TRACK, 'rb') as fh:

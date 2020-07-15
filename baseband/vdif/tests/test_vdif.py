@@ -94,11 +94,11 @@ class TestVDIF:
             sideband=header['sideband'], major_rev=header['major_rev'],
             minor_rev=header['minor_rev'], personality=header['personality'],
             _7_28_4=header['_7_28_4'])
-        # The same header, but created by passing time and sample rate.
+        # The same header, but created by passing time and frame rate.
         header4_usetime = vdif.VDIFHeader.fromvalues(
             edv=header.edv, time=header.time,
             samples_per_frame=header.samples_per_frame,
-            station=header.station, sample_rate=header.sample_rate,
+            station=header.station, frame_rate=header.frame_rate,
             bps=header.bps, complex_data=header['complex_data'],
             thread_id=header['thread_id'],
             loif_tuning=header['loif_tuning'], dbe_unit=header['dbe_unit'],
@@ -420,6 +420,13 @@ class TestVDIF:
         payload9 = vdif.VDIFPayload(payload.words, bps=11, complex_data=True)
         assert payload9.shape == (1250 * 1, 1)
 
+    def test_invalid_payload(self):
+        with pytest.raises(ValueError, match='multi-channel'):
+            vdif.VDIFPayload(np.zeros(10, '<u4'), sample_shape=(10,), bps=5)
+        # TODO: fix this limitation and replace with actual test!
+        with pytest.raises(ValueError, match='cannot yet'):
+            vdif.VDIFPayload(np.zeros(10, '<u4'), bps=5)
+
     @pytest.mark.parametrize('item', (2, (), -1, slice(1, 3),
                                       slice(2, 4), slice(-3, None)))
     def test_payload_getitem_setitem(self, item):
@@ -519,9 +526,12 @@ class TestVDIF:
         assert frameset.ndim == 3
         assert frameset.nbytes == 8 * frameset.frames[0].nbytes
         assert frameset.nchan == 1
+        assert frameset.fill_value == 0.
         assert 'edv' in frameset
         assert 'edv' in frameset.keys()
         assert frameset['edv'] == 3
+        assert bool(frameset['invalid_data']) is False
+        assert frameset.sample_rate == 32. << u.MHz
         # Properties from headers are passed on if they are settable.
         assert frameset.time == frameset.header0.time
         with pytest.raises(AttributeError):
@@ -563,6 +573,15 @@ class TestVDIF:
                                                **frameset4.header0)
         assert frameset6 == frameset4
 
+        frameset6.frames[4].valid = False
+        frameset6.frames[6].sample_rate = frameset6.sample_rate / 2.
+        assert np.all(frameset6.valid == np.array([
+            True, True, True, True, False, True, True, True]))
+        assert np.all(frameset6['invalid_data'] == np.array([
+            False, False, False, False, True, False, False, False]))
+        assert np.all(frameset6.sample_rate == (32. << u.MHz)
+                      * np.array([1., 1., 1., 1., 1., 1., 0.5, 1.]))
+
         with vdif.open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0)
             # try reading just a few threads
@@ -589,6 +608,7 @@ class TestVDIF:
         assert np.all(frameset[:] == data)
         # Select just samples.
         assert np.all(frameset[15] == data[15])
+        assert np.all(frameset[(16,)] == data[16])
         assert np.all(frameset[10:20] == data[10:20])
         # Select just frames.
         assert np.all(frameset[:, 3] == data[:, 3])
@@ -596,6 +616,10 @@ class TestVDIF:
         # Select just channels (there is only one).
         assert np.all(frameset[:, :, 0] == data[:, :, 0])
         assert np.all(frameset[:, :, :1] == data[:, :, :1])
+        assert np.all(frameset[10, :, 0] == data[10, :, 0])
+        assert np.all(frameset[10, :, :1] == data[10, :, :1])
+        assert np.all(frameset[10, 3, 0] == data[10, 3, 0])
+        assert np.all(frameset[10, 3, :1] == data[10, 3, :1])
         # Check direct access to frames with known results.
         assert np.all(frameset[:12, 0, 0].astype(int)
                       == np.array([-1, -1, 3, -1, 1, -1, 3, -1, 1, 3, -1, 1]))
@@ -611,6 +635,8 @@ class TestVDIF:
         # Select just samples.
         frameset2[15] = -data[15]
         assert np.all(frameset2[15] == -data[15])
+        frameset2[(15,)] = data[15]
+        assert np.all(frameset2[15] == data[15])
         frameset2[10:20] = -1.
         assert np.all(frameset2[10:20] == -1.)
         frameset2[10:20:2] = data[10:20:2]
@@ -627,6 +653,13 @@ class TestVDIF:
         # Select just channels (there is only one).
         frameset2[:, :, 0] = -data[:, :, 0]
         assert np.all(frameset2[:, :, 0] == -data[:, :, 0])
+        frameset2[1, :, 0] = data[1, :, 0]
+        assert np.all(frameset2[1, :, 0] == data[1, :, 0])
+        frameset2[1, 0, 0] = -data[1, 0, 0]
+        assert np.all(frameset2[1, 0, 0] == -data[1, 0, 0])
+        assert np.all(frameset2[1, 1:, 0] == data[1, 1:, 0])
+        assert np.all(frameset2[0, :, 0] == -data[0, :, 0])
+        assert np.all(frameset2[2:, :, 0] == -data[2:, :, 0])
         frameset2[:, :, :1] = 1.
         assert np.all(frameset2[:, :, :1] == 1.)
         # Test header getting/setting.
@@ -1174,10 +1207,13 @@ class TestVDIF:
         with vdif.open(SAMPLE_FILE, 'rb') as fh, \
                 open(corrupt_file, 'w+b') as s:
             frameset = fh.read_frameset()
-            header0 = frameset.frames[0].header
+            header0 = frameset.frames[0].header.copy()
             frameset.tofile(s)
-            frameset = fh.read_frameset()
-            frameset.tofile(s)
+            for frame in frameset.frames:
+                frame.header.mutable = True
+            for i in range(5):
+                frameset['frame_nr'] += 1
+                frameset.tofile(s)
             # Now add lots of the final frame, i.e., with the wrong thread_id.
             fh.seek(-5032, 2)
             frame2 = fh.read_frame()

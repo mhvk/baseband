@@ -141,3 +141,10 @@ class TestCorruptFile:
         expected = np.stack([self.data] * 8)
         expected[missing_frames] = 0.
         assert np.all(data.astype(int) == expected)
+
+    def test_duplicate_data(self, tmpdir):
+        fake_file = self.fake_file(tmpdir)
+        corrupt_file = self.corrupt_copy(fake_file, slice(100000, 40000))
+        with mark4.open(corrupt_file, 'rs', verify='fix', **self.kwargs) as fv:
+            with pytest.raises(Exception, match='excess data'):
+                fv.read()

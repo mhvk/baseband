@@ -182,6 +182,7 @@ class ParserDict:
             else:
                 raise ValueError('cannot infer name automatically.')
         self.name = name
+        self.doc = doc
         if doc is None:
             doc = 'Lazily evaluated dict of {}'.format(name)
         self.__doc__ = doc
@@ -195,6 +196,11 @@ class ParserDict:
         # Override ourselves on the instance.
         setattr(instance, self.name, d)
         return d
+
+    def __repr__(self):
+        return (f"{self.__class__.__name__}({self.function}, "
+                f"name='{self.name}'" + (")" if self.doc is None
+                                         else f", doc='{self.doc}')"))
 
 
 class HeaderParserBase(dict):
@@ -220,7 +226,7 @@ class HeaderParserBase(dict):
         if not isinstance(other, type(self)):
             return NotImplemented
 
-        if sys.version_info >= (3, 9):
+        if sys.version_info >= (3, 9):  # pragma: no cover
             return self.__class__(super().__or__(other))
 
         result = self.__class__(self)
@@ -325,7 +331,7 @@ class ParsedHeaderBase:
 
         Only here for subclasses to be able to do super().
         """
-        pass
+        pass  # pragma: no cover
 
     def copy(self, **kwargs):
         """Create a mutable and independent copy of the header.

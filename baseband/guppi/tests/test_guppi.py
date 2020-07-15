@@ -272,6 +272,9 @@ class TestGUPPI:
         item = (slice(547, 829, 2), slice(None), np.array([2, 1]))
         assert np.all(payload_tfirst[item] == payload[item])
 
+        with pytest.raises(ValueError, match='cannot encode'):
+            guppi.GUPPIPayload.fromdata(payload.data, bps=4)
+
     def test_file_reader(self):
         with guppi.open(SAMPLE_FILE, 'rb') as fh:
             header = fh.read_header()
