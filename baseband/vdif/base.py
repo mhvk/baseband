@@ -208,7 +208,7 @@ class VDIFFileReader(VLBIFileReaderBase):
                         n_check -= 1
             except EOFError:
                 # Hack: let through very short files (like our samples).
-                if self.seek(0, 2) > ((check+2) * len(thread_ids)
+                if self.seek(0, 2) > (check * len(thread_ids)
                                       * header0.frame_nbytes):
                     raise
 
@@ -503,7 +503,10 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
                 fh_raw.seek(location)
                 try:
                     header = fh_raw.read_header(edv=self.header0.edv)
-                except Exception:
+                except Exception:  # pragma: no cover
+                    # If reading fails, just try the next one -- we would
+                    # use loose a bit of the end of the file.  Would require
+                    # an EDV verify stricter than what locate_frames uses.
                     continue
 
                 if header['thread_id'] == self.header0['thread_id']:

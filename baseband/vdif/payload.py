@@ -158,7 +158,7 @@ class VDIFPayload(PayloadBase):
         # Recalculate bpfs: samples do not cross word boundaries.
         if (self.bps & (self.bps - 1)) != 0:
             if self.sample_shape != (1,):
-                raise ValueError("Multi-channel VDIF data requires "
+                raise ValueError("multi-channel VDIF data requires "
                                  "bits per sample that is a power of two.")
             spw = 32 // self._bpfs
             if (spw & (spw - 1)) == 0:
