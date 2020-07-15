@@ -15,7 +15,7 @@ class VDIFFileReaderInfo(FileReaderInfo):
                   + FileReaderInfo.attr_names[2:])
     """Attributes that the container provides."""
 
-    _header0_attrs = ('edv', 'bps', 'samples_per_frame')
+    _header0_attrs = ('edv', 'bps', 'complex_data', 'samples_per_frame')
 
     @info_item
     def thread_ids(self):
@@ -52,7 +52,3 @@ class VDIFFileReaderInfo(FileReaderInfo):
                 'file contains non-integer number ({}) of '
                 'framesets'.format(number_of_framesets))
             return None
-
-    @info_item(needs='header0')
-    def complex_data(self):
-        return self.header0['complex_data']

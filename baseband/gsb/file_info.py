@@ -70,11 +70,8 @@ class GSBTimeStampInfo(FileReaderInfo):
     # Cannot know whether it is readable without the raw data files.
     readable = None
 
-    @info_item
-    def missing(self):
-        missing = super().missing
-        missing['raw'] = 'need raw binary files for the stream reader'
-        return missing
+    missing = info_item(default={
+        'raw': 'need raw binary files for the stream reader'}, copy=True)
 
 
 class GSBStreamReaderInfo(StreamReaderInfo):

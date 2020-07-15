@@ -13,8 +13,8 @@ class Mark5BFileReaderInfo(FileReaderInfo):
     _header0_attrs = ('complex_data',)
     _parent_attrs = ('nchan', 'bps', 'ref_time', 'kday')
 
-    bps = info_item('bps', needs='_parent', missing='needed to decode data')
-    nchan = info_item('nchan', needs='_parent', missing=(
+    bps = info_item(needs='_parent', missing='needed to decode data')
+    nchan = info_item(needs='_parent', missing=(
         "needed to determine sample shape, frame rate, decode data."))
 
     @info_item
