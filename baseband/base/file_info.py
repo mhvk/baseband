@@ -6,7 +6,6 @@ Loosely based on `~astropy.utils.data_info.DataInfo`.
 import copy
 import operator
 import warnings
-from collections import OrderedDict
 
 from astropy import units as u
 from astropy.time import Time
@@ -30,11 +29,12 @@ class info_item:
     Parameters
     ----------
     attr : str or callable, optional
-        If a string, assumes we will get that attribute from ``needs``,
-        otherwise the attr will be called to calculate the value.  In
-        this case, the name of the attribute will be taken from the
-        callable's name.  If this argument is not given, it is assumed
-        the class is used as a decorator, and a wrapper is returned.
+        If a string, assumes we will get that attribute from ``needs``.
+        If a callable, it will be called with the instance as its
+        argument to calculate the value (i.e., it will behave like a
+        property). If ``attr`` is not given, its is set after the fact
+        by applying the instance to a function (i.e., using it as a
+        decorator), or by defining it as an attribute of a class.
     needs : str or tuple of str
         The attributes that need to be present to get or calculate
         ``attr``.  If ``attr`` is a string, this should be where the
@@ -56,53 +56,70 @@ class info_item:
         useful, e.g., if the value is expected to be a `dict` and an
         independent copy should be made.
     """
-    def __new__(cls, attr=None, needs=(), default=None, doc=None,
-                missing=None, copy=False):
-        if attr is None:
-            def wrapper(func):
-                return cls(func, needs=needs, default=default, doc=doc,
-                           missing=missing, copy=copy)
+    _fget = None
 
-            return wrapper
-
-        return super().__new__(cls)
-
-    def __init__(self, attr, needs=(), default=None, doc=None,
+    def __init__(self, attr=None, *, needs=(), default=None, doc=None,
                  missing=None, copy=False):
         needs = tuple(needs) if isinstance(needs, (tuple, list)) else (needs,)
-        if callable(attr):
-            self.fget = attr
-            self.attr = attr.__name__
-            if doc is None:
-                doc = attr.__doc__
-        else:
-            self.attr = attr
-            full_attr = '.'.join(needs+(attr,))
-            self.fget = operator.attrgetter(full_attr) if needs else None
-            if doc is None:
-                doc = "Link to " + full_attr.replace('_parent', 'parent')
-
-        self.needs = needs if '_parent' in needs else ('_parent',) + needs
+        self.needs = needs
         self.default = default
         self.missing = missing
         self.copy = copy
-        self.__doc__ = self.doc = doc
+        # attr will be a callable here if item_info is used as a decorator
+        # without any arguments. For backwards compatibility, it can also
+        # be the name of the attribute although that will more typically
+        # pass through __set_name__.  It can still be used to let the
+        # name of the info_item be different from the attribute that is
+        # gotten (though really that will hopefully never be done!).
+        self._init_wrapup(attr, doc)
+
+    def _init_wrapup(self, attr, doc=None):
+        # Finish initialization, or update from __set_name__ or __call__
+        if callable(attr):
+            self._fget = attr
+            self.name = attr.__name__
+            doc = attr.__doc__
+        elif attr is not None:
+            self.name = attr
+            if self._fget is None and self.needs:
+                full_attr = '.'.join(self.needs+(attr,))
+                self._fget = operator.attrgetter(full_attr)
+                doc = "Link to " + full_attr.replace('_parent', 'parent')
+        if doc and self.__doc__ is self.__class__.__doc__:
+            self.__doc__ = doc
+
+    def __set_name__(self, owner, name):
+        # This call-back is entered during class definition time,
+        # when the instance has been assigned to a class attribute.
+        # This will define the name under which the result gets stored.
+        # Will normally be the wrapped function or attribute name.
+        self._init_wrapup(name)
+
+    def __call__(self, func):
+        """For use as a decorator when not yet fully initialized."""
+        # We get here if info_item is used as a decorator but with other
+        # arguments defined, e.g., as in @info_item(needs='header0')
+        if hasattr(self, 'name'):
+            raise TypeError(f"assigned {self.__class__.__name__!r}"
+                            f"is not callable")
+        self._init_wrapup(func)
+        return self
 
     def __get__(self, instance, cls=None):
         if instance is None:
             return self
 
-        if self.fget and all(getattr(instance, need, None) is not None
-                             for need in self.needs):
+        if self._fget and all(getattr(instance, need, None) is not None
+                              for need in self.needs):
             try:
-                value = self.fget(instance)
+                value = self._fget(instance)
             except Exception as exc:
-                instance.errors[self.attr] = exc
+                instance.errors[self.name] = exc
                 value = self.default
             else:
                 if value is None:
                     if self.missing:
-                        instance.missing[self.attr] = self.missing
+                        instance.missing[self.name] = self.missing
                     value = self.default
 
         else:
@@ -111,29 +128,35 @@ class info_item:
         if self.copy:
             value = copy.copy(value)
 
-        setattr(instance, self.attr, value)
+        setattr(instance, self.name, value)
         return value
 
     def __str__(self):
-        return f"{self.attr}: " + ', '.join(
-            [f"{a}={getattr(self, a)}"
-             for a in ('needs', 'default', 'doc', 'missing', 'copy')
-             if getattr(self, a) is not None])
+        short_doc = self.__doc__.split('\n')[0]
+        return f"{self.name}: {short_doc}"
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({str(self).replace(':', ',')})"
+        result = f"<{self.__class__.__name__} {self}>"
+        d = {a: getattr(self, a) for a in
+             ('needs', 'default', 'missing', 'copy')}
+        d = ', '.join([f"{a}={v}" for a, v in d.items()
+                       if v or a == 'default' and v is not None])
+        if d == '' or (d == "needs=('_parent',)"
+                       and 'Link to parent' in result):
+            return result
+        else:
+            return f"{result[:-1]}\n{' '*len(result.split()[0])} {d}>"
 
 
 class InfoMeta(type):
-    # Set any default attributes according to where they are mentioned
+    # Set any default attributes according to where they are mentioned.
     # (if not explicitly defined already).
-    def __init__(cls, name, bases, dct):
-        super().__init__(name, bases, dct)
-        defs = set(dct.keys())
-        for attr in set(dct.get('_header0_attrs', ())) - defs:
-            setattr(cls, attr, info_item(attr, needs='header0'))
-        for attr in set(dct.get('_parent_attrs', ())) - defs:
-            setattr(cls, attr, info_item(attr, needs='_parent'))
+    def __new__(metacls, name, bases, dct):
+        for attr in dct.get('_header0_attrs', ()):
+            dct.setdefault(attr, info_item(needs='header0'))
+        for attr in dct.get('_parent_attrs', ()):
+            dct.setdefault(attr, info_item(needs='_parent'))
+        return super().__new__(metacls, name, bases, dct)
 
 
 class InfoBase(metaclass=InfoMeta):
@@ -351,10 +374,14 @@ class FileReaderInfo(InfoBase):
     _header0_attrs = ('bps', 'complex_data', 'samples_per_frame',
                       'sample_shape')
 
-    missing = info_item('missing', default=OrderedDict(), copy=True)
-    checks = info_item('checks', default=OrderedDict(), copy=True)
-    errors = info_item('errors', default=OrderedDict(), copy=True)
-    warnings = info_item('warnings', default=OrderedDict(), copy=True)
+    missing = info_item(default={}, copy=True,
+                        doc='dict of missing attributes')
+    checks = info_item(default={}, copy=True,
+                       doc='dict of checks done')
+    errors = info_item(default={}, copy=True,
+                       doc='dict of attributes that raised errors')
+    warnings = info_item(default={}, copy=True,
+                         doc='dict of attributes that gave warnings')
 
     @info_item
     def header0(self):
@@ -480,12 +507,12 @@ class StreamReaderInfo(InfoBase):
     # Note that we cannot have missing information in streams;
     # they cannot be opened without it.
 
-    checks = info_item('checks', needs='file_info', copy=True,
-                       default=OrderedDict())
-    errors = info_item('errors', needs='file_info', copy=True,
-                       default=OrderedDict())
-    warnings = info_item('warnings', needs='file_info', copy=True,
-                         default=OrderedDict())
+    checks = info_item(needs='file_info', copy=True, default={},
+                       doc='dict of checks done')
+    errors = info_item(needs='file_info', copy=True, default={},
+                       doc='dict of attributes that raised errors')
+    warnings = info_item(needs='file_info', copy=True, default={},
+                         doc='dict of attributes that gave warnings')
 
     @info_item
     def file_info(self):
