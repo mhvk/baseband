@@ -270,18 +270,24 @@ class TestMark5B:
             for key in ('sample_rate', 'samples_per_frame', 'sample_shape',
                         'start_time'):
                 assert getattr(info, key) is None
+            # Only with a change in parent properties should a new info be
+            # generated (really a bit of an implementation detail).
+            info2 = fh.info
+            assert info is info2
             fh.nchan = 8
-            info = fh.info
-            assert set(info.missing.keys()) == {'ref_time', 'kday'}
+            info3 = fh.info
+            assert info3 is not info
+            assert set(info3.missing.keys()) == {'ref_time', 'kday'}
             for key in ('format', 'frame_rate', 'bps', 'complex_data',
                         'sample_rate', 'samples_per_frame', 'sample_shape'):
-                assert getattr(info, key) == expected[key]
-            assert info.start_time is None
+                assert getattr(info3, key) == expected[key]
+            assert info3.start_time is None
             fh.kday = 56000
-            info = fh.info
-            assert info.missing == {}
+            info4 = fh.info
+            assert info4 is not info3
+            assert info4.missing == {}
             for key, value in expected.items():
-                assert getattr(info, key) == value
+                assert getattr(info4, key) == value
 
             # Also check we cannot set, but can delete info
             with pytest.raises(AttributeError):
@@ -290,8 +296,15 @@ class TestMark5B:
             assert 'info' in fh.__dict__
             del fh.info
             assert 'info' not in fh.__dict__
+            info5 = fh.info
+            assert info5 is not info4
+            assert info5.missing == {}
+            for key, value in expected.items():
+                assert getattr(info5, key) == value
 
-        assert 'closed' in repr(fh.info)
+        info6 = fh.info
+        assert info6 is not info5
+        assert 'closed' in repr(info6)
 
         # Finally, also do a brief check of the stream reader info.
         # Note that the readers properties themselves are tested further below.

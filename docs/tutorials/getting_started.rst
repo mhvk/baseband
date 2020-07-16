@@ -135,7 +135,7 @@ For an overview of the file, we can either print ``fh_vdif`` itself, or use the
         bps=2, complex_data=False, edv=3, station=65532,
         start_time=2014-06-16T05:56:07.000000000>
     >>> fh_vdif.info
-    Stream information:
+    VDIFStream information:
     start_time = 2014-06-16T05:56:07.000000000
     stop_time = 2014-06-16T05:56:07.001250000
     sample_rate = 32.0 MHz
@@ -149,7 +149,7 @@ For an overview of the file, we can either print ``fh_vdif`` itself, or use the
     checks:  decodable: True
              continuous: no obvious gaps
     <BLANKLINE>
-    File information:
+    VDIFFile information:
     edv = 3
     number_of_frames = 16
     thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]

@@ -6,13 +6,12 @@ Loosely based on `~astropy.utils.data_info.DataInfo`.
 import copy
 import operator
 import warnings
-from collections import OrderedDict
 
 from astropy import units as u
 from astropy.time import Time
 
 
-__all__ = ['info_item', 'InfoMeta', 'InfoBase',
+__all__ = ['info_item', 'InfoBase',
            'FileReaderInfo', 'StreamReaderInfo', 'NoInfo']
 
 
@@ -30,11 +29,12 @@ class info_item:
     Parameters
     ----------
     attr : str or callable, optional
-        If a string, assumes we will get that attribute from ``needs``,
-        otherwise the attr will be called to calculate the value.  In
-        this case, the name of the attribute will be taken from the
-        callable's name.  If this argument is not given, it is assumed
-        the class is used as a decorator, and a wrapper is returned.
+        If a string, assumes we will get that attribute from ``needs``.
+        If a callable, it will be called with the instance as its
+        argument to calculate the value (i.e., it will behave like a
+        property). If ``attr`` is not given, its is set after the fact
+        by applying the instance to a function (i.e., using it as a
+        decorator), or by defining it as an attribute of a class.
     needs : str or tuple of str
         The attributes that need to be present to get or calculate
         ``attr``.  If ``attr`` is a string, this should be where the
@@ -56,53 +56,70 @@ class info_item:
         useful, e.g., if the value is expected to be a `dict` and an
         independent copy should be made.
     """
-    def __new__(cls, attr=None, needs=(), default=None, doc=None,
-                missing=None, copy=False):
-        if attr is None:
-            def wrapper(func):
-                return cls(func, needs=needs, default=default, doc=doc,
-                           missing=missing, copy=copy)
+    _fget = None
 
-            return wrapper
-
-        return super().__new__(cls)
-
-    def __init__(self, attr, needs=(), default=None, doc=None,
+    def __init__(self, attr=None, *, needs=(), default=None, doc=None,
                  missing=None, copy=False):
         needs = tuple(needs) if isinstance(needs, (tuple, list)) else (needs,)
-        if callable(attr):
-            self.fget = attr
-            self.attr = attr.__name__
-            if doc is None:
-                doc = attr.__doc__
-        else:
-            self.attr = attr
-            full_attr = '.'.join(needs+(attr,))
-            self.fget = operator.attrgetter(full_attr) if needs else None
-            if doc is None:
-                doc = "Link to " + full_attr.replace('_parent', 'parent')
-
-        self.needs = needs if '_parent' in needs else ('_parent',) + needs
+        self.needs = needs
         self.default = default
         self.missing = missing
         self.copy = copy
-        self.__doc__ = self.doc = doc
+        # attr will be a callable here if item_info is used as a decorator
+        # without any arguments. For backwards compatibility, it can also
+        # be the name of the attribute although that will more typically
+        # pass through __set_name__.  It can still be used to let the name
+        # of the info_item be different from the attribute that is gotten;
+        # e.g., start_time = info_item('time', needs='header0').
+        self._init_wrapup(attr, doc)
+
+    def _init_wrapup(self, attr, doc=None):
+        # Finish initialization, or update from __set_name__ or __call__
+        if callable(attr):
+            self._fget = attr
+            self.name = attr.__name__
+            doc = attr.__doc__
+        elif attr is not None:
+            self.name = attr
+            if self._fget is None and self.needs:
+                full_attr = '.'.join(self.needs+(attr,))
+                self._fget = operator.attrgetter(full_attr)
+                doc = "Link to " + full_attr.replace('_parent', 'parent')
+        if doc and self.__doc__ is self.__class__.__doc__:
+            self.__doc__ = doc
+
+    def __set_name__(self, owner, name):
+        # This call-back is entered during class definition time,
+        # when the instance has been assigned to a class attribute.
+        # This will define the name under which the result gets stored.
+        # Will normally be the wrapped function or attribute name.
+        self._init_wrapup(name)
+
+    def __call__(self, func):
+        """For use as a decorator when not yet fully initialized."""
+        # We get here if info_item is used as a decorator but with other
+        # arguments defined, e.g., as in @info_item(needs='header0')
+        if hasattr(self, 'name'):
+            raise TypeError(f"assigned {self.__class__.__name__!r}"
+                            f"is not callable")
+        self._init_wrapup(func)
+        return self
 
     def __get__(self, instance, cls=None):
         if instance is None:
             return self
 
-        if self.fget and all(getattr(instance, need, None) is not None
-                             for need in self.needs):
+        if self._fget and all(getattr(instance, need, None) is not None
+                              for need in self.needs):
             try:
-                value = self.fget(instance)
+                value = self._fget(instance)
             except Exception as exc:
-                instance.errors[self.attr] = exc
+                instance.errors[self.name] = exc
                 value = self.default
             else:
                 if value is None:
                     if self.missing:
-                        instance.missing[self.attr] = self.missing
+                        instance.missing[self.name] = self.missing
                     value = self.default
 
         else:
@@ -111,32 +128,25 @@ class info_item:
         if self.copy:
             value = copy.copy(value)
 
-        setattr(instance, self.attr, value)
+        setattr(instance, self.name, value)
         return value
 
     def __str__(self):
-        return f"{self.attr}: " + ', '.join(
-            [f"{a}={getattr(self, a)}"
-             for a in ('needs', 'default', 'doc', 'missing', 'copy')
-             if getattr(self, a) is not None])
+        short_doc = self.__doc__.split('\n')[0]
+        return f"{self.name}: {short_doc}"
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({str(self).replace(':', ',')})"
+        name = self.__class__.__name__
+        extra = {a: getattr(self, a) for a in
+                 ('needs', 'default', 'missing', 'copy')}
+        extra = ', '.join([f"{a}={v}" for a, v in extra.items()
+                           if v or a == 'default' and v is not None])
+        if extra:
+            extra = f"\n{' '*len(name)}  {extra}"
+        return f"<{name} {str(self)}{extra}>"
 
 
-class InfoMeta(type):
-    # Set any default attributes according to where they are mentioned
-    # (if not explicitly defined already).
-    def __init__(cls, name, bases, dct):
-        super().__init__(name, bases, dct)
-        defs = set(dct.keys())
-        for attr in set(dct.get('_header0_attrs', ())) - defs:
-            setattr(cls, attr, info_item(attr, needs='header0'))
-        for attr in set(dct.get('_parent_attrs', ())) - defs:
-            setattr(cls, attr, info_item(attr, needs='_parent'))
-
-
-class InfoBase(metaclass=InfoMeta):
+class InfoBase:
     """Container providing a standardized interface to file information.
 
     In order to ensure that information is always returned, all access
@@ -160,17 +170,26 @@ class InfoBase(metaclass=InfoMeta):
     attr_names = ()
     """Attributes that the container provides."""
 
-    _parent_attrs = ()
     _parent = None
+    closed = info_item(needs='_parent', doc='Whether parent is closed')
 
     def __init__(self, parent=None):
         if parent is not None:
             self._parent = parent
-            for attr in self.attr_names:
-                getattr(self, attr)
+            if not self.closed:
+                for attr in self.attr_names:
+                    getattr(self, attr)
 
     def _up_to_date(self):
         """Determine whether the information we have stored is up to date."""
+        if not hasattr(self, '_parent_attrs'):
+            # Set it on the class since it cannot change.
+            cls = self.__class__
+            cls._parent_attrs = tuple(
+                attr for attr in dir(cls)
+                if not attr.startswith('_')
+                and getattr(getattr(cls, attr), 'needs', ()) == ('_parent',))
+
         return all(getattr(self, attr) == getattr(self._parent, attr, None)
                    for attr in self._parent_attrs)
 
@@ -225,26 +244,27 @@ class InfoBase(metaclass=InfoMeta):
                 + [f"  {getattr(self.__class__, attr)}"
                    for attr in self.attr_names])
 
-        if any('closed' in str(error) for error in self.errors.values()):
+        if self.closed:
             return "File closed. Not parsable."
 
-        result = []
+        result = [self._parent.__class__.__name__.replace('Reader', '')
+                  + ' information:']
         for attr in self.attr_names:
             value = getattr(self, attr)
             if isinstance(value, dict):
-                result.append('')
-                prefix = f"{attr}: "
+                prefix = f"\n{attr}: "
+                spaces = ' ' * (len(attr)+2)
                 if attr == 'missing':
                     for msg in sorted(set(self.missing.values())):
                         keys = sorted(set(key for key in self.missing
                                           if self.missing[key] == msg))
                         result.append(f"{prefix} {', '.join(keys)}: {msg}")
-                        prefix = ' ' * len(prefix)
+                        prefix = spaces
                 else:
                     for key, val in value.items():
                         str_val = str(val) or repr(val)
                         result.append(f"{prefix} {key}: {str_val}")
-                        prefix = ' ' * len(prefix)
+                        prefix = spaces
 
             elif value is not None:
                 if isinstance(value, Time):
@@ -256,7 +276,6 @@ class InfoBase(metaclass=InfoMeta):
         if not self:
             result.append('\nNot parsable. Wrong format?')
 
-        result.append('')
         return '\n'.join(result)
 
 
@@ -268,42 +287,6 @@ class FileReaderInfo(InfoBase):
     (``info.header0``) and from possibly scanning the file to determine the
     duration of frames.
 
-    Attributes
-    ----------
-    format : str or `None`
-        File format, or `None` if the underlying file cannot be parsed.
-    number_of_frames : int
-        Number of frames in the file.
-    frame_rate : `~astropy.units.Quantity`
-        Number of data frames per unit of time.
-    sample_rate : `~astropy.units.Quantity`
-        Complete samples per unit of time.
-    samples_per_frame : int
-        Number of complete samples in each frame.
-    sample_shape : tuple
-        Dimensions of each complete sample (e.g., ``(nchan,)``).
-    bps : int
-        Number of bits used to encode each elementary sample.
-    complex_data : bool
-        Whether the data are complex.
-    start_time : `~astropy.time.Time`
-        Time of the first complete sample.
-    readable : bool
-        Whether the first sample could be read and decoded.
-    missing : dict
-        Entries are keyed by names of arguments that should be passed to
-        the file reader to obtain full information. The associated entries
-        explain why these arguments are needed.
-    checks : dict
-        Checks that were done to determine whether the file was readable
-        (normally the only entry is 'decodable').
-    errors : dict
-        Any exceptions raised while trying to determine attributes or doing
-        checks.  Keyed by the attributes/checks.
-    warnings : dict
-        Any warnings about the attributes or about the checks.
-        Keyed by the attributes/checks.
-
     Examples
     --------
     The most common use is simply to print information::
@@ -312,7 +295,7 @@ class FileReaderInfo(InfoBase):
         >>> from baseband import mark5b
         >>> fh = mark5b.open(SAMPLE_MARK5B, 'rb')
         >>> fh.info
-        File information:
+        Mark5BFile information:
         format = mark5b
         number_of_frames = 4
         frame_rate = 6400.0 Hz
@@ -327,7 +310,7 @@ class FileReaderInfo(InfoBase):
 
         >>> fh = mark5b.open(SAMPLE_MARK5B, 'rb', kday=56000, nchan=8)
         >>> fh.info
-        File information:
+        Mark5BFile information:
         format = mark5b
         number_of_frames = 4
         frame_rate = 6400.0 Hz
@@ -348,13 +331,25 @@ class FileReaderInfo(InfoBase):
                   'missing', 'checks', 'errors', 'warnings')
     """Attributes that the container provides."""
 
-    _header0_attrs = ('bps', 'complex_data', 'samples_per_frame',
-                      'sample_shape')
+    samples_per_frame = info_item(needs='header0', doc=(
+        'Number of complete samples in each frame.'))
+    sample_shape = info_item(needs='header0', doc=(
+        'Shape of each complete sample (e.g., ``(nchan,)``).'))
+    bps = info_item(needs='header0', doc=(
+        'Number of bits used to encode each elementary sample.'))
+    complex_data = info_item(needs='header0', doc=(
+        'Whether the data are complex.'))
+    start_time = info_item('time', needs='header0', doc=(
+        "Time of the first sample."))
 
-    missing = info_item('missing', default=OrderedDict(), copy=True)
-    checks = info_item('checks', default=OrderedDict(), copy=True)
-    errors = info_item('errors', default=OrderedDict(), copy=True)
-    warnings = info_item('warnings', default=OrderedDict(), copy=True)
+    missing = info_item(default={}, copy=True,
+                        doc='dict of missing attributes.')
+    checks = info_item(default={}, copy=True,
+                       doc='dict of checks for readability.')
+    errors = info_item(default={}, copy=True,
+                       doc='dict of attributes that raised errors.')
+    warnings = info_item(default={}, copy=True,
+                         doc='dict of attributes that gave warnings.')
 
     @info_item
     def header0(self):
@@ -407,11 +402,6 @@ class FileReaderInfo(InfoBase):
                 f"({number_of_frames}) of frames")
             return None
 
-    @info_item(needs='header0')
-    def start_time(self):
-        """Time of the first sample."""
-        return self.header0.time
-
     @info_item(needs='frame0', default=False)
     def readable(self):
         """Whether the file is readable and decodable."""
@@ -423,13 +413,6 @@ class FileReaderInfo(InfoBase):
         """Rate of complete samples per unit time."""
         return self.frame_rate * self.samples_per_frame
 
-    def __repr__(self):
-        result = super().__repr__()
-        if self._parent is None:
-            return result
-
-        return 'File information:\n' + result
-
 
 class StreamReaderInfo(InfoBase):
     """Standardized information on stream readers.
@@ -439,53 +422,36 @@ class StreamReaderInfo(InfoBase):
     readability of the stream. More detailed information on the underlying
     file is stored in its info, accessible via ``info.file_info`` (and shown
     by ``__repr__``).
-
-    Attributes
-    ----------
-    start_time : `~astropy.time.Time`
-        Time of the first complete sample.
-    stop_time : `~astropy.time.Time`
-        Time of the complete sample just beyond the end of the file.
-    sample_rate : `~astropy.units.Quantity`
-        Complete samples per unit of time.
-    shape : tuple
-        Equivalent shape of the whole file, i.e., combining the number of
-        complete samples and the shape of those samples.
-    bps : int
-        Number of bits used to encode each elementary sample.
-    complex_data : bool
-        Whether the data are complex.
-    verify : bool or str
-        The type of verification done by the stream reader.
-    readable : bool
-        Whether the first and last samples could be read and decoded.
-    checks : dict
-        Checks that were done to determine whether the file was readable
-        (normally 'continuous' and 'decodable').
-    errors : dict
-        Any exceptions raised while trying to determine attributes or doing
-        checks.  Keyed by the attributes/checks.
-    warnings : dict
-        Any warnings about the attributes or about the checks.
-        Keyed by the attributes/checks.
     """
     attr_names = ('start_time', 'stop_time', 'sample_rate', 'shape',
                   'format', 'bps', 'complex_data', 'verify', 'readable',
                   'checks', 'errors', 'warnings')
     """Attributes that the container provides."""
 
-    _parent_attrs = ('start_time', 'stop_time', 'sample_rate', 'shape',
-                     'bps', 'complex_data', 'verify')
+    start_time = info_item(needs='_parent', doc=(
+        'Time of the first complete sample.'))
+    stop_time = info_item(needs='_parent', doc=(
+        'Time of the sample just beyond the end of the file.'))
+    sample_rate = info_item(needs='_parent', doc=(
+        'Complete samples per unit of time.'))
+    shape = info_item(needs='_parent', doc=(
+        'Equivalent shape of the whole file.'))
+    bps = info_item(needs='_parent', doc=(
+        'Number of bits used to encode each elementary sample.'))
+    complex_data = info_item(needs='_parent', doc=(
+        'Whether the data are complex.'))
+    verify = info_item(needs='_parent', doc=(
+        'The type of verification done by the stream reader.'))
 
     # Note that we cannot have missing information in streams;
     # they cannot be opened without it.
 
-    checks = info_item('checks', needs='file_info', copy=True,
-                       default=OrderedDict())
-    errors = info_item('errors', needs='file_info', copy=True,
-                       default=OrderedDict())
-    warnings = info_item('warnings', needs='file_info', copy=True,
-                         default=OrderedDict())
+    checks = info_item(needs='file_info', copy=True, default={},
+                       doc='dict of checks for readability.')
+    errors = info_item(needs='file_info', copy=True, default={},
+                       doc='dict of attributes that raised errors')
+    warnings = info_item(needs='file_info', copy=True, default={},
+                         doc='dict of attributes that gave warnings')
 
     @info_item
     def file_info(self):
@@ -562,8 +528,9 @@ class StreamReaderInfo(InfoBase):
         return all(bool(v) for v in self.checks.values())
 
     def _up_to_date(self):
-        # Stream readers can only change in how they verify.
-        return self.verify == self._parent.verify
+        # Beyond open/close, stream readers can only change in how they verify.
+        return (self.verify == self._parent.verify
+                and self.closed == self._parent.closed)
 
     def __call__(self):
         """Create a dict with information about the stream and the raw file."""
@@ -577,7 +544,6 @@ class StreamReaderInfo(InfoBase):
         if self._parent is None:
             return result
 
-        result = 'Stream information:\n' + result
         file_info = getattr(self, 'file_info', None)
         if file_info is not None:
             # Add information from the raw file, but skip atttributes and
@@ -586,7 +552,7 @@ class StreamReaderInfo(InfoBase):
             try:
                 file_info.attr_names = [attr for attr in raw_attrs
                                         if attr not in self.attr_names]
-                result += '\n' + repr(file_info)
+                result += '\n\n' + repr(file_info)
             finally:
                 file_info.attr_names = raw_attrs
 

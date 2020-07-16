@@ -10,12 +10,16 @@ __all__ = ['Mark5BFileReaderInfo']
 
 
 class Mark5BFileReaderInfo(FileReaderInfo):
-    _header0_attrs = ('complex_data',)
-    _parent_attrs = ('nchan', 'bps', 'ref_time', 'kday')
-
-    bps = info_item('bps', needs='_parent', missing='needed to decode data')
-    nchan = info_item('nchan', needs='_parent', missing=(
+    ref_time = info_item(needs='_parent', doc=(
+        'Reference time within 500 days of the observation time'))
+    kday = info_item(needs='_parent', doc=(
+        'Explicit thousands of MJD of the observation time'))
+    bps = info_item(needs='_parent', missing='needed to decode data', doc=(
+        'Number of bits used to encode each elementary sample.'))
+    nchan = info_item(needs='_parent', doc='Number of channels.', missing=(
         "needed to determine sample shape, frame rate, decode data."))
+    complex_data = info_item(needs='header0', doc=(
+        'Whether the data are complex.'))
 
     @info_item
     def time_info(self):

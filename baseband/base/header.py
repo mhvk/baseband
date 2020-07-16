@@ -150,8 +150,8 @@ def get_default(word_index, bit_index, bit_length, default=None):
 class ParserDict:
     """Create a lazily evaluated dictionary of parsers, setters, or defaults.
 
-    Implemented as a non-data descriptor.  When first called on an
-    instance, it will create a dict under its own name in the instance's
+    Implemented as a non-data descriptor.  When first called on an instance,
+    it will create a dict under the name of itself in the instance's
     ``__dict__``, which means that any further attribute access will return
     that dict instead of this descriptor.
 
@@ -161,31 +161,15 @@ class ParserDict:
         Function that can be used to create a parser or setter, or get the
         default, based on a header keyword description.  Typically one of
         ``make_parser``, ``make_setter``, or ``get_default``.
-    name : str, optional
-        If not given, inferred from the function name.  Typically, 'parsers',
-        'setters', or 'default'.  It *must* match the name the descriptor
-        is assigned to.
-    doc : str, optional
-        Docstring for the instance.  Defaults to 'Lazily evaluated dict of
-        ``name``'.
+
     """
 
-    def __init__(self, function, name=None, doc=None):
+    def __init__(self, function):
         self.function = function
-        if name is None:
-            if 'parser' in function.__name__:
-                name = 'parsers'
-            elif 'setter' in function.__name__:
-                name = 'setters'
-            elif 'default' in function.__name__:
-                name = 'defaults'
-            else:
-                raise ValueError('cannot infer name automatically.')
+
+    def __set_name__(self, owner, name):
         self.name = name
-        self.doc = doc
-        if doc is None:
-            doc = 'Lazily evaluated dict of {}'.format(name)
-        self.__doc__ = doc
+        self.__doc__ = f"Lazily evaluated dict of {name}"
 
     def __get__(self, instance, cls=None):
         if instance is None:
@@ -198,9 +182,7 @@ class ParserDict:
         return d
 
     def __repr__(self):
-        return (f"{self.__class__.__name__}({self.function}, "
-                f"name='{self.name}'" + (")" if self.doc is None
-                                         else f", doc='{self.doc}')"))
+        return f"{self.__class__.__name__}({self.function}"
 
 
 class HeaderParserBase(dict):

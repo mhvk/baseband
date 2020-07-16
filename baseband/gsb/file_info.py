@@ -1,7 +1,8 @@
 # Licensed under the GPLv3 - see LICENSE
 from astropy import units as u
 
-from ..base.file_info import FileReaderInfo, StreamReaderInfo, info_item
+from ..base.file_info import (info_item, InfoBase,
+                              FileReaderInfo, StreamReaderInfo)
 
 
 def file_size(fh):
@@ -12,10 +13,30 @@ def file_size(fh):
         fh.seek(offset)
 
 
-class GSBTimeStampInfo(FileReaderInfo):
+class GSBTimeStampInfo(InfoBase):
+    """Standardized information on a timestamp file reader.
+
+    The ``info`` descriptor has a number of standard attributes, which are
+    determined from arguments passed in opening the file, from the first header
+    (``info.header0``) and from possibly scanning the file to determine the
+    duration of frames.
+    """
     attr_names = ('format', 'mode', 'number_of_frames', 'frame_rate',
                   'start_time', 'readable', 'missing', 'errors', 'warnings')
-    _header0_attrs = ('mode',)
+    mode = info_item(needs='header0', doc=(
+        "Mode in which data was taken: 'phased' or 'rawdump'."))
+    # We do not subclass FileReaderInfo, since the logic is a bit different.
+    # Still, these ones can be used directly.
+    start_time = FileReaderInfo.start_time
+    frame_rate = FileReaderInfo.frame_rate
+    checks = FileReaderInfo.checks
+    errors = FileReaderInfo.errors
+    warnings = FileReaderInfo.warnings
+
+    # We cannot know whether the stream is readable without the raw files.
+    readable = None
+    missing = info_item(default={
+        'raw': 'need raw binary files for the stream reader'}, copy=True)
 
     @info_item
     def header0(self):
@@ -67,15 +88,6 @@ class GSBTimeStampInfo(FileReaderInfo):
 
         return guess
 
-    # Cannot know whether it is readable without the raw data files.
-    readable = None
-
-    @info_item
-    def missing(self):
-        missing = super().missing
-        missing['raw'] = 'need raw binary files for the stream reader'
-        return missing
-
 
 class GSBStreamReaderInfo(StreamReaderInfo):
     attr_names = list(StreamReaderInfo.attr_names)
@@ -84,10 +96,12 @@ class GSBStreamReaderInfo(StreamReaderInfo):
     attr_names.insert(attr_names.index('readable'), 'payload_nbytes')
     attr_names = tuple(attr_names)
 
-    _parent_attrs = StreamReaderInfo._parent_attrs + ('payload_nbytes',)
+    payload_nbytes = info_item(needs='_parent', doc=(
+        'Number of bytes per payload (in each raw file).'))
 
     @info_item
     def frame0(self):
+        """First frame from the file."""
         return self._parent._read_frame(0)
 
     # Bit of a hack, but the base reader one suffices here with
@@ -96,22 +110,26 @@ class GSBStreamReaderInfo(StreamReaderInfo):
 
     @info_item
     def file_info(self):
+        """Information from timestamp file."""
         fh_ts_info = self._parent.fh_ts.info
         fh_ts_info.missing.pop('raw', None)
         return fh_ts_info
 
     @info_item(needs='shape')
     def bandwidth(self):
+        """Bandwidth covered by the stream."""
         return (self.sample_rate * self.shape[-1]
                 / (1 if self.complex_data else 2)).to(u.MHz)
 
     @info_item
     def n_raw(self):
+        """Number of raw streams (per polarization)."""
         fh_raw = self._parent.fh_raw
         return len(fh_raw[0]) if isinstance(fh_raw, (list, tuple)) else 1
 
     @info_item(needs=('file_info', 'payload_nbytes', 'n_raw'), default=False)
     def consistent(self):
+        """Whether timestamp and raw files are consistent in length."""
         pl_nbytes = self.payload_nbytes
         nchan = self._parent._unsliced_shape[-1]
         expected_size = int(((self.stop_time-self.start_time)

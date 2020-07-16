@@ -198,7 +198,7 @@ samples per frame and get very small ``sample_rate``, ``bandwidth``, and
     ...                  raw=SAMPLE_GSB_PHASED,
     ...                  samples_per_frame=phased_samples_per_frame)
     >>> fh_ph.info
-    Stream information:
+    GSBStream information:
     start_time = 2013-07-27T21:23:55.324108800
     stop_time = 2013-07-27T21:23:57.840691200
     sample_rate = 3.178914388020833e-05 MHz
@@ -215,7 +215,7 @@ samples per frame and get very small ``sample_rate``, ``bandwidth``, and
     checks:  decodable: True
              consistent: True
     <BLANKLINE>
-    File information:
+    GSBTimeStampIO information:
     mode = phased
     number_of_frames = 10
     frame_rate = 3.9736429849163546 Hz

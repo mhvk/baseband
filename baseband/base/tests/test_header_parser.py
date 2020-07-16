@@ -20,19 +20,6 @@ class ParserDictSetup:
         return index
 
 
-class TestParserDict(ParserDictSetup):
-    # Rather minimal tests, since tested so much in practice.
-    def test_init(self):
-        pd = ParserDict(self.create_parser)
-        assert pd.name == 'parsers'
-        assert 'Lazily evaluated' in pd.__doc__
-        sd = ParserDict(self.random_name, name='setters', doc='random')
-        assert sd.name == 'setters'
-        assert sd.__doc__ == 'random'
-        with pytest.raises(ValueError, match='cannot infer name'):
-            ParserDict(self.random_name)
-
-
 class TestHeaderParserBase(ParserDictSetup):
     def setup_class(cls):
         cls.hp = {'0': (0, 'default0'),
@@ -40,14 +27,16 @@ class TestHeaderParserBase(ParserDictSetup):
 
         class H(HeaderParserBase):
             parsers = ParserDict(cls.create_parser)
-            indices = ParserDict(cls.random_name, name='indices')
+            indices = ParserDict(cls.random_name)
             defaults = ParserDict(cls.get_default)
 
         cls.H = H
 
-    def test_setup(self):
+    def test_parserdict(self):
+        assert self.H.parsers.name == 'parsers'
+        assert self.H.indices.name == 'indices'
         assert repr(self.H.parsers).startswith('ParserDict')
-        assert "'defaults'" in repr(self.H.defaults)
+        assert 'Lazily evaluated' in self.H.defaults.__doc__
 
     def test_init(self):
         h = self.H(self.hp)

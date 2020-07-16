@@ -3,7 +3,7 @@
 
 Overrides what can be gotten from the first header.
 """
-from ..base.file_info import FileReaderInfo
+from ..base.file_info import FileReaderInfo, info_item
 
 
 __all__ = ['GUPPIFileReaderInfo']
@@ -17,5 +17,7 @@ class GUPPIFileReaderInfo(FileReaderInfo):
     attr_names = tuple(attr_names)
     """Attributes that the container provides."""
 
-    _header0_attrs = (FileReaderInfo._header0_attrs
-                      + ('overlap', 'sample_rate',))
+    overlap = info_item(needs='header0', doc=(
+        'Number of complete samples that overlap between frames.'))
+    sample_rate = info_item(needs='header0', doc=(
+        'Number of complete samples per second.'))
