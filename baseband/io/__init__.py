@@ -3,50 +3,77 @@
 
 This will contain the baseband modules as well as any other plugins
 discovered via entry point 'baseband.io'.
+
+Attributes
+----------
+FORMATS : list
+    Available baseband formats.
+
 """
+import sys
+
 import entrypoints
 
 
-__all__ = ['FORMATS', 'BAD_FORMATS']
+__all__ = []
 
 
-# Perhaps a bit silly, but it is nice to be able to use a pure source
-# checkout even though the baseband entry points are then missing.
-# These will normally be overwritten immediately below.
-FORMATS = {fmt: entrypoints.EntryPoint(fmt, 'baseband.'+fmt, '')
-           for fmt in ('dada', 'guppi', 'mark4', 'mark5b', 'vdif', 'gsb')}
-"""Entrypoints to the various formats, keyed by their name."""
+__self__ = sys.modules[__name__]
+"""Link to our own module, for convenience below."""
 
-BAD_FORMATS = set()
-"""Formats for which the entry point failed to load."""
-
-FORMATS.update(entrypoints.get_group_named('baseband.io'))
+# We only load entries on demand, to keep import time minimal.
+_entries = {}
+"""Entry points found."""
+_bad_entries = set()
+"""Any entry points that failed to load. These will not be retried."""
 
 
-def __getattr__(fmt):
-    entry_point = FORMATS.get(fmt, None)
-    if entry_point is None:
-        if fmt not in BAD_FORMATS:
-            # Try getting entry points again, just in case.
-            FORMATS.update(entrypoints.get_group_named('baseband.io'))
-            entry_point = FORMATS.get(fmt, None)
+def __getattr__(attr):
+    """Get a missing attribute from a possible entry point.
 
-        if entry_point is None:
-            raise AttributeError(f"baseband.io has no format {fmt!r}")
+    Looks for the attribute among the (possibly updated) entry points,
+    and, if found, tries loading the entry.  If that fails, the entry
+    is added to _bad_entries to ensure it does not recur.
+    """
+    if attr.startswith('_') or attr in _bad_entries:
+        raise AttributeError(f"module {__name__!r} has no attribute {attr!r}")
+
+    FORMATS = globals().setdefault('FORMATS', [])
+    if attr not in _entries:
+        if not _entries:
+            # On initial update, we add our own formats as explicit entries,
+            # in part to set some order, but also so things work even in a
+            # pure source checkout, where entry points are missing.
+            _entries.update({
+                fmt: entrypoints.EntryPoint(fmt, 'baseband.'+fmt, '')
+                for fmt in ('dada', 'guppi', 'mark4', 'mark5b', 'vdif', 'gsb')
+            })
+
+        _entries.update(entrypoints.get_group_named('baseband.io'))
+        FORMATS.extend([name for name, entry in _entries.items()
+                        if not (entry.object_name or name in FORMATS)])
+        if attr == 'FORMATS':
+            return FORMATS
+
+    entry = _entries.get(attr, None)
+    if entry is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {attr!r}")
 
     try:
-        module = entry_point.load()
+        value = entry.load()
     except Exception:
-        FORMATS.pop(fmt)
-        BAD_FORMATS.add(fmt)
-        raise AttributeError(f"{entry_point} was not loadable. Now removed")
+        _entries.pop(attr)
+        _bad_entries.add(attr)
+        if attr in FORMATS:
+            FORMATS.remove(attr)
+        raise AttributeError(f"{entry} was not loadable. Now removed")
 
     # Update so we do not have to go through __getattr__ again.
-    globals()[fmt] = module
-    return module
+    globals()[attr] = value
+    return value
 
 
 def __dir__():
-    result = list(globals())
-    result.extend(fmt for fmt in FORMATS if fmt not in globals())
-    return result
+    # Force update of entries, creates 'FORMATS' if it doesn't exist.
+    hasattr(__self__, 'absolutely_no_way_this_exists')
+    return sorted(set(globals()).union(_entries).difference(_bad_entries))

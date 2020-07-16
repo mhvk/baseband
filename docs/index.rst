@@ -122,4 +122,3 @@ Reference/API
 =============
 .. automodapi:: baseband
 .. automodapi:: baseband.io
-   :include-all-objects:
