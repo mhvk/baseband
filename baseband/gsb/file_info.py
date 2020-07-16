@@ -1,7 +1,8 @@
 # Licensed under the GPLv3 - see LICENSE
 from astropy import units as u
 
-from ..base.file_info import FileReaderInfo, StreamReaderInfo, info_item
+from ..base.file_info import (info_item, InfoBase,
+                              FileReaderInfo, StreamReaderInfo)
 
 
 def file_size(fh):
@@ -12,11 +13,30 @@ def file_size(fh):
         fh.seek(offset)
 
 
-class GSBTimeStampInfo(FileReaderInfo):
+class GSBTimeStampInfo(InfoBase):
+    """Standardized information on a timestamp file reader.
+
+    The ``info`` descriptor has a number of standard attributes, which are
+    determined from arguments passed in opening the file, from the first header
+    (``info.header0``) and from possibly scanning the file to determine the
+    duration of frames.
+    """
     attr_names = ('format', 'mode', 'number_of_frames', 'frame_rate',
                   'start_time', 'readable', 'missing', 'errors', 'warnings')
     mode = info_item(needs='header0', doc=(
         "Mode in which data was taken: 'phased' or 'rawdump'."))
+    # We do not subclass FileReaderInfo, since the logic is a bit different.
+    # Still, these ones can be used directly.
+    start_time = FileReaderInfo.start_time
+    frame_rate = FileReaderInfo.frame_rate
+    checks = FileReaderInfo.checks
+    errors = FileReaderInfo.errors
+    warnings = FileReaderInfo.warnings
+
+    # We cannot know whether the stream is readable without the raw files.
+    readable = None
+    missing = info_item(default={
+        'raw': 'need raw binary files for the stream reader'}, copy=True)
 
     @info_item
     def header0(self):
@@ -68,11 +88,12 @@ class GSBTimeStampInfo(FileReaderInfo):
 
         return guess
 
-    # Cannot know whether it is readable without the raw data files.
-    readable = None
+    def __repr__(self):
+        result = super().__repr__()
+        if self._parent is None:
+            return result
 
-    missing = info_item(default={
-        'raw': 'need raw binary files for the stream reader'}, copy=True)
+        return 'File information:\n' + result
 
 
 class GSBStreamReaderInfo(StreamReaderInfo):
