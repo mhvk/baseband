@@ -20,40 +20,6 @@ class Mark4FileReaderInfo(FileReaderInfo):
     duration of frames.  This class has two additional attributes specific to
     Mark 4 files (``ntrack`` and ``offset0``, see below).
 
-    Attributes
-    ----------
-    format : str or `None`
-        File format, or `None` if the underlying file cannot be parsed.
-    frame_rate : `~astropy.units.Quantity`
-        Number of data frames per unit of time.
-    sample_rate : `~astropy.units.Quantity`
-        Complete samples per unit of time.
-    samples_per_frame : int
-        Number of complete samples in each frame.
-    sample_shape : tuple
-        Dimensions of each complete sample (e.g., ``(nchan,)``).
-    bps : int
-        Number of bits used to encode each elementary sample.
-    complex_data : bool
-        Whether the data are complex.
-    start_time : `~astropy.time.Time`
-        Time of the first complete sample.
-    ntrack : int
-        Number of "tape tracks" simulated in the disk file.
-    offset0 : int
-        Offset in bytes from the start of the file to the location of the
-        first header.
-    readable : bool
-        Whether the first sample could be read and decoded.
-    missing : dict
-        Entries are keyed by names of arguments that should be passed to
-        the file reader to obtain full information. The associated entries
-        explain why these arguments are needed. For Mark 4, the possible
-        entries are ``decade`` and ``ref_time``.
-    errors : dict
-        Any exceptions raised while trying to determine attributes.  Keyed
-        by the attributes.
-
     Examples
     --------
     The most common use is simply to print information::
@@ -104,7 +70,12 @@ class Mark4FileReaderInfo(FileReaderInfo):
                   + FileReaderInfo.attr_names[-4:])
     """Attributes that the container provides."""
 
-    _parent_attrs = ('ntrack', 'decade', 'ref_time')
+    ntrack = info_item(needs='_parent', doc=(
+        'Number of "tape tracks" simulated in the disk file.'))
+    decade = info_item(needs='_parent', doc=(
+        'Decade in which the observations were taken'))
+    ref_time = info_item(needs='_parent', doc=(
+        'Reference time within 4 years of the observation time'))
 
     @info_item
     def time_info(self):

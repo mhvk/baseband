@@ -15,7 +15,8 @@ def file_size(fh):
 class GSBTimeStampInfo(FileReaderInfo):
     attr_names = ('format', 'mode', 'number_of_frames', 'frame_rate',
                   'start_time', 'readable', 'missing', 'errors', 'warnings')
-    _header0_attrs = ('mode',)
+    mode = info_item(needs='header0', doc=(
+        "Mode in which data was taken: 'phased' or 'rawdump'."))
 
     @info_item
     def header0(self):
@@ -81,7 +82,8 @@ class GSBStreamReaderInfo(StreamReaderInfo):
     attr_names.insert(attr_names.index('readable'), 'payload_nbytes')
     attr_names = tuple(attr_names)
 
-    _parent_attrs = StreamReaderInfo._parent_attrs + ('payload_nbytes',)
+    payload_nbytes = info_item(needs='_parent', doc=(
+        'Number of bytes per payload (in each raw file).'))
 
     @info_item
     def frame0(self):

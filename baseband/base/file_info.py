@@ -11,7 +11,7 @@ from astropy import units as u
 from astropy.time import Time
 
 
-__all__ = ['info_item', 'InfoMeta', 'InfoBase',
+__all__ = ['info_item', 'InfoBase',
            'FileReaderInfo', 'StreamReaderInfo', 'NoInfo']
 
 
@@ -148,18 +148,7 @@ class info_item:
             return f"{result[:-1]}\n{' '*len(result.split()[0])} {d}>"
 
 
-class InfoMeta(type):
-    # Set any default attributes according to where they are mentioned.
-    # (if not explicitly defined already).
-    def __new__(metacls, name, bases, dct):
-        for attr in dct.get('_header0_attrs', ()):
-            dct.setdefault(attr, info_item(needs='header0'))
-        for attr in dct.get('_parent_attrs', ()):
-            dct.setdefault(attr, info_item(needs='_parent'))
-        return super().__new__(metacls, name, bases, dct)
-
-
-class InfoBase(metaclass=InfoMeta):
+class InfoBase:
     """Container providing a standardized interface to file information.
 
     In order to ensure that information is always returned, all access
@@ -183,7 +172,6 @@ class InfoBase(metaclass=InfoMeta):
     attr_names = ()
     """Attributes that the container provides."""
 
-    _parent_attrs = ()
     _parent = None
 
     def __init__(self, parent=None):
@@ -194,6 +182,12 @@ class InfoBase(metaclass=InfoMeta):
 
     def _up_to_date(self):
         """Determine whether the information we have stored is up to date."""
+        if not hasattr(self, '_parent_attrs'):
+            self._parent_attrs = tuple(
+                attr for attr in dir(self)
+                if getattr(getattr(self.__class__, attr), 'needs', ())
+                == ('_parent',))
+
         return all(getattr(self, attr) == getattr(self._parent, attr, None)
                    for attr in self._parent_attrs)
 
@@ -291,42 +285,6 @@ class FileReaderInfo(InfoBase):
     (``info.header0``) and from possibly scanning the file to determine the
     duration of frames.
 
-    Attributes
-    ----------
-    format : str or `None`
-        File format, or `None` if the underlying file cannot be parsed.
-    number_of_frames : int
-        Number of frames in the file.
-    frame_rate : `~astropy.units.Quantity`
-        Number of data frames per unit of time.
-    sample_rate : `~astropy.units.Quantity`
-        Complete samples per unit of time.
-    samples_per_frame : int
-        Number of complete samples in each frame.
-    sample_shape : tuple
-        Dimensions of each complete sample (e.g., ``(nchan,)``).
-    bps : int
-        Number of bits used to encode each elementary sample.
-    complex_data : bool
-        Whether the data are complex.
-    start_time : `~astropy.time.Time`
-        Time of the first complete sample.
-    readable : bool
-        Whether the first sample could be read and decoded.
-    missing : dict
-        Entries are keyed by names of arguments that should be passed to
-        the file reader to obtain full information. The associated entries
-        explain why these arguments are needed.
-    checks : dict
-        Checks that were done to determine whether the file was readable
-        (normally the only entry is 'decodable').
-    errors : dict
-        Any exceptions raised while trying to determine attributes or doing
-        checks.  Keyed by the attributes/checks.
-    warnings : dict
-        Any warnings about the attributes or about the checks.
-        Keyed by the attributes/checks.
-
     Examples
     --------
     The most common use is simply to print information::
@@ -371,17 +329,23 @@ class FileReaderInfo(InfoBase):
                   'missing', 'checks', 'errors', 'warnings')
     """Attributes that the container provides."""
 
-    _header0_attrs = ('bps', 'complex_data', 'samples_per_frame',
-                      'sample_shape')
+    samples_per_frame = info_item(needs='header0', doc=(
+        'Number of complete samples in each frame.'))
+    sample_shape = info_item(needs='header0', doc=(
+        'Shape of each complete sample (e.g., ``(nchan,)``).'))
+    bps = info_item(needs='header0', doc=(
+        'Number of bits used to encode each elementary sample.'))
+    complex_data = info_item(needs='header0', doc=(
+        'Whether the data are complex.'))
 
     missing = info_item(default={}, copy=True,
-                        doc='dict of missing attributes')
+                        doc='dict of missing attributes.')
     checks = info_item(default={}, copy=True,
-                       doc='dict of checks done')
+                       doc='dict of checks for readability.')
     errors = info_item(default={}, copy=True,
-                       doc='dict of attributes that raised errors')
+                       doc='dict of attributes that raised errors.')
     warnings = info_item(default={}, copy=True,
-                         doc='dict of attributes that gave warnings')
+                         doc='dict of attributes that gave warnings.')
 
     @info_item
     def header0(self):
@@ -466,49 +430,32 @@ class StreamReaderInfo(InfoBase):
     readability of the stream. More detailed information on the underlying
     file is stored in its info, accessible via ``info.file_info`` (and shown
     by ``__repr__``).
-
-    Attributes
-    ----------
-    start_time : `~astropy.time.Time`
-        Time of the first complete sample.
-    stop_time : `~astropy.time.Time`
-        Time of the complete sample just beyond the end of the file.
-    sample_rate : `~astropy.units.Quantity`
-        Complete samples per unit of time.
-    shape : tuple
-        Equivalent shape of the whole file, i.e., combining the number of
-        complete samples and the shape of those samples.
-    bps : int
-        Number of bits used to encode each elementary sample.
-    complex_data : bool
-        Whether the data are complex.
-    verify : bool or str
-        The type of verification done by the stream reader.
-    readable : bool
-        Whether the first and last samples could be read and decoded.
-    checks : dict
-        Checks that were done to determine whether the file was readable
-        (normally 'continuous' and 'decodable').
-    errors : dict
-        Any exceptions raised while trying to determine attributes or doing
-        checks.  Keyed by the attributes/checks.
-    warnings : dict
-        Any warnings about the attributes or about the checks.
-        Keyed by the attributes/checks.
     """
     attr_names = ('start_time', 'stop_time', 'sample_rate', 'shape',
                   'format', 'bps', 'complex_data', 'verify', 'readable',
                   'checks', 'errors', 'warnings')
     """Attributes that the container provides."""
 
-    _parent_attrs = ('start_time', 'stop_time', 'sample_rate', 'shape',
-                     'bps', 'complex_data', 'verify')
+    start_time = info_item(needs='_parent', doc=(
+        'Time of the first complete sample.'))
+    stop_time = info_item(needs='_parent', doc=(
+        'Time of the sample just beyond the end of the file.'))
+    sample_rate = info_item(needs='_parent', doc=(
+        'Complete samples per unit of time.'))
+    shape = info_item(needs='_parent', doc=(
+        'Equivalent shape of the whole file.'))
+    bps = info_item(needs='_parent', doc=(
+        'Number of bits used to encode each elementary sample.'))
+    complex_data = info_item(needs='_parent', doc=(
+        'Whether the data are complex.'))
+    verify = info_item(needs='_parent', doc=(
+        'The type of verification done by the stream reader.'))
 
     # Note that we cannot have missing information in streams;
     # they cannot be opened without it.
 
     checks = info_item(needs='file_info', copy=True, default={},
-                       doc='dict of checks done')
+                       doc='dict of checks for readability.')
     errors = info_item(needs='file_info', copy=True, default={},
                        doc='dict of attributes that raised errors')
     warnings = info_item(needs='file_info', copy=True, default={},
