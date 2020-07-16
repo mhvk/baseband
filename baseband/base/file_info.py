@@ -173,20 +173,24 @@ class InfoBase:
     """Attributes that the container provides."""
 
     _parent = None
+    closed = info_item(needs='_parent', doc='Whether parent is closed')
 
     def __init__(self, parent=None):
         if parent is not None:
             self._parent = parent
-            for attr in self.attr_names:
-                getattr(self, attr)
+            if not self.closed:
+                for attr in self.attr_names:
+                    getattr(self, attr)
 
     def _up_to_date(self):
         """Determine whether the information we have stored is up to date."""
         if not hasattr(self, '_parent_attrs'):
-            self._parent_attrs = tuple(
-                attr for attr in dir(self)
-                if getattr(getattr(self.__class__, attr), 'needs', ())
-                == ('_parent',))
+            # Set it on the class since it cannot change.
+            cls = self.__class__
+            cls._parent_attrs = tuple(
+                attr for attr in dir(cls)
+                if not attr.startswith('_')
+                and getattr(getattr(cls, attr), 'needs', ()) == ('_parent',))
 
         return all(getattr(self, attr) == getattr(self._parent, attr, None)
                    for attr in self._parent_attrs)
@@ -242,7 +246,7 @@ class InfoBase:
                 + [f"  {getattr(self.__class__, attr)}"
                    for attr in self.attr_names])
 
-        if any('closed' in str(error) for error in self.errors.values()):
+        if self.closed:
             return "File closed. Not parsable."
 
         result = []
@@ -533,8 +537,9 @@ class StreamReaderInfo(InfoBase):
         return all(bool(v) for v in self.checks.values())
 
     def _up_to_date(self):
-        # Stream readers can only change in how they verify.
-        return self.verify == self._parent.verify
+        # Beyond open/close, stream readers can only change in how they verify.
+        return (self.verify == self._parent.verify
+                and self.closed == self._parent.closed)
 
     def __call__(self):
         """Create a dict with information about the stream and the raw file."""
