@@ -88,13 +88,6 @@ class GSBTimeStampInfo(InfoBase):
 
         return guess
 
-    def __repr__(self):
-        result = super().__repr__()
-        if self._parent is None:
-            return result
-
-        return 'File information:\n' + result
-
 
 class GSBStreamReaderInfo(StreamReaderInfo):
     attr_names = list(StreamReaderInfo.attr_names)
@@ -108,6 +101,7 @@ class GSBStreamReaderInfo(StreamReaderInfo):
 
     @info_item
     def frame0(self):
+        """First frame from the file."""
         return self._parent._read_frame(0)
 
     # Bit of a hack, but the base reader one suffices here with
@@ -116,22 +110,26 @@ class GSBStreamReaderInfo(StreamReaderInfo):
 
     @info_item
     def file_info(self):
+        """Information from timestamp file."""
         fh_ts_info = self._parent.fh_ts.info
         fh_ts_info.missing.pop('raw', None)
         return fh_ts_info
 
     @info_item(needs='shape')
     def bandwidth(self):
+        """Bandwidth covered by the stream."""
         return (self.sample_rate * self.shape[-1]
                 / (1 if self.complex_data else 2)).to(u.MHz)
 
     @info_item
     def n_raw(self):
+        """Number of raw streams (per polarization)."""
         fh_raw = self._parent.fh_raw
         return len(fh_raw[0]) if isinstance(fh_raw, (list, tuple)) else 1
 
     @info_item(needs=('file_info', 'payload_nbytes', 'n_raw'), default=False)
     def consistent(self):
+        """Whether timestamp and raw files are consistent in length."""
         pl_nbytes = self.payload_nbytes
         nchan = self._parent._unsliced_shape[-1]
         expected_size = int(((self.stop_time-self.start_time)

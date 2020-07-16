@@ -28,7 +28,7 @@ class Mark4FileReaderInfo(FileReaderInfo):
         >>> from baseband import mark4
         >>> fh = mark4.open(SAMPLE_MARK4, 'rb')
         >>> fh.info
-        File information:
+        Mark4File information:
         format = mark4
         number_of_frames = 2
         frame_rate = 400.0 Hz
@@ -48,7 +48,7 @@ class Mark4FileReaderInfo(FileReaderInfo):
 
         >>> fh = mark4.open(SAMPLE_MARK4, 'rb', decade=2010)
         >>> fh.info
-        File information:
+        Mark4File information:
         format = mark4
         number_of_frames = 2
         frame_rate = 400.0 Hz

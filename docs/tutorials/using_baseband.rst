@@ -43,7 +43,7 @@ files can all be found in the `baseband.data` module)::
 
     >>> import baseband.data
     >>> baseband.file_info(baseband.data.SAMPLE_VDIF)
-    Stream information:
+    VDIFStream information:
     start_time = 2014-06-16T05:56:07.000000000
     stop_time = 2014-06-16T05:56:07.001250000
     sample_rate = 32.0 MHz
@@ -57,7 +57,7 @@ files can all be found in the `baseband.data` module)::
     checks:  decodable: True
              continuous: no obvious gaps
     <BLANKLINE>
-    File information:
+    VDIFFile information:
     edv = 3
     number_of_frames = 16
     thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -71,7 +71,7 @@ instance, for Mark 5B files one needs the number of channels used, as well as
 (roughly) when the data were taken::
 
     >>> baseband.file_info(baseband.data.SAMPLE_MARK5B)
-    File information:
+    Mark5BFile information:
     format = mark5b
     number_of_frames = 4
     frame_rate = 6400.0 Hz
@@ -84,7 +84,7 @@ instance, for Mark 5B files one needs the number of channels used, as well as
 
     >>> from astropy.time import Time
     >>> baseband.file_info(baseband.data.SAMPLE_MARK5B, nchan=8, ref_time=Time('2014-01-01'))
-    Stream information:
+    Mark5BStream information:
     start_time = 2014-06-13T05:30:01.000000000
     stop_time = 2014-06-13T05:30:01.000625000
     sample_rate = 32.0 MHz
@@ -98,7 +98,7 @@ instance, for Mark 5B files one needs the number of channels used, as well as
     checks:  decodable: True
              continuous: no obvious gaps
     <BLANKLINE>
-    File information:
+    Mark5BFile information:
     number_of_frames = 4
     frame_rate = 6400.0 Hz
     samples_per_frame = 5000
@@ -221,7 +221,7 @@ Basic information about the file is obtained by either by ``fh.info`` or simply
 ``fh`` itself::
 
     >>> fh.info
-    Stream information:
+    VDIFStream information:
     start_time = 2014-06-16T05:56:07.000000000
     stop_time = 2014-06-16T05:56:07.001250000
     sample_rate = 32.0 MHz
@@ -235,7 +235,7 @@ Basic information about the file is obtained by either by ``fh.info`` or simply
     checks:  decodable: True
              continuous: no obvious gaps
     <BLANKLINE>
-    File information:
+    VDIFFile information:
     edv = 3
     number_of_frames = 16
     thread_ids = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -742,7 +742,7 @@ Now check its `~baseband.vdif.base.VDIFStreamReader.info`::
     >>> fh.info.readable
     False
     >>> fh.info
-    Stream information:
+    VDIFStream information:
     start_time = 2009-12-31T23:58:53.816000000
     stop_time = 2009-12-31T23:58:54.816000000
     sample_rate = 0.016 MHz
@@ -760,7 +760,7 @@ Now check its `~baseband.vdif.base.VDIFStreamReader.info`::
     <BLANKLINE>
     warnings:  number_of_frames: file contains non-integer number (1997.9166666666667) of frames
     <BLANKLINE>
-    File information:
+    VDIFFile information:
     edv = 1
     thread_ids = [0, 1]
     frame_rate = 1000.0 Hz
@@ -778,7 +778,7 @@ missing frames.  Indeed, when one opens the file with the default
 
     >>> fh = baseband.vdif.open('corrupt.vdif', 'rs')
     >>> fh.info
-    Stream information:
+    VDIFStream information:
     start_time = 2009-12-31T23:58:53.816000000
     stop_time = 2009-12-31T23:58:54.816000000
     sample_rate = 0.016 MHz
@@ -795,7 +795,7 @@ missing frames.  Indeed, when one opens the file with the default
     warnings:  number_of_frames: file contains non-integer number (1997.9166666666667) of frames
                continuous: While reading at 7968: problem loading frame set 498. Thread(s) [1] missing; set to invalid.
     <BLANKLINE>
-    File information:
+    VDIFFile information:
     edv = 1
     thread_ids = [0, 1]
     frame_rate = 1000.0 Hz

@@ -136,16 +136,14 @@ class info_item:
         return f"{self.name}: {short_doc}"
 
     def __repr__(self):
-        result = f"<{self.__class__.__name__} {self}>"
-        d = {a: getattr(self, a) for a in
-             ('needs', 'default', 'missing', 'copy')}
-        d = ', '.join([f"{a}={v}" for a, v in d.items()
-                       if v or a == 'default' and v is not None])
-        if d == '' or (d == "needs=('_parent',)"
-                       and 'Link to parent' in result):
-            return result
-        else:
-            return f"{result[:-1]}\n{' '*len(result.split()[0])} {d}>"
+        name = self.__class__.__name__
+        extra = {a: getattr(self, a) for a in
+                 ('needs', 'default', 'missing', 'copy')}
+        extra = ', '.join([f"{a}={v}" for a, v in extra.items()
+                           if v or a == 'default' and v is not None])
+        if extra:
+            extra = f"\n{' '*len(name)}  {extra}"
+        return f"<{name} {str(self)}{extra}>"
 
 
 class InfoBase:
@@ -249,23 +247,24 @@ class InfoBase:
         if self.closed:
             return "File closed. Not parsable."
 
-        result = []
+        result = [self._parent.__class__.__name__.replace('Reader', '')
+                  + ' information:']
         for attr in self.attr_names:
             value = getattr(self, attr)
             if isinstance(value, dict):
-                result.append('')
-                prefix = f"{attr}: "
+                prefix = f"\n{attr}: "
+                spaces = ' ' * (len(attr)+2)
                 if attr == 'missing':
                     for msg in sorted(set(self.missing.values())):
                         keys = sorted(set(key for key in self.missing
                                           if self.missing[key] == msg))
                         result.append(f"{prefix} {', '.join(keys)}: {msg}")
-                        prefix = ' ' * len(prefix)
+                        prefix = spaces
                 else:
                     for key, val in value.items():
                         str_val = str(val) or repr(val)
                         result.append(f"{prefix} {key}: {str_val}")
-                        prefix = ' ' * len(prefix)
+                        prefix = spaces
 
             elif value is not None:
                 if isinstance(value, Time):
@@ -277,7 +276,6 @@ class InfoBase:
         if not self:
             result.append('\nNot parsable. Wrong format?')
 
-        result.append('')
         return '\n'.join(result)
 
 
@@ -297,7 +295,7 @@ class FileReaderInfo(InfoBase):
         >>> from baseband import mark5b
         >>> fh = mark5b.open(SAMPLE_MARK5B, 'rb')
         >>> fh.info
-        File information:
+        Mark5BFile information:
         format = mark5b
         number_of_frames = 4
         frame_rate = 6400.0 Hz
@@ -312,7 +310,7 @@ class FileReaderInfo(InfoBase):
 
         >>> fh = mark5b.open(SAMPLE_MARK5B, 'rb', kday=56000, nchan=8)
         >>> fh.info
-        File information:
+        Mark5BFile information:
         format = mark5b
         number_of_frames = 4
         frame_rate = 6400.0 Hz
@@ -414,13 +412,6 @@ class FileReaderInfo(InfoBase):
     def sample_rate(self):
         """Rate of complete samples per unit time."""
         return self.frame_rate * self.samples_per_frame
-
-    def __repr__(self):
-        result = super().__repr__()
-        if self._parent is None:
-            return result
-
-        return 'File information:\n' + result
 
 
 class StreamReaderInfo(InfoBase):
@@ -553,7 +544,6 @@ class StreamReaderInfo(InfoBase):
         if self._parent is None:
             return result
 
-        result = 'Stream information:\n' + result
         file_info = getattr(self, 'file_info', None)
         if file_info is not None:
             # Add information from the raw file, but skip atttributes and
@@ -562,7 +552,7 @@ class StreamReaderInfo(InfoBase):
             try:
                 file_info.attr_names = [attr for attr in raw_attrs
                                         if attr not in self.attr_names]
-                result += '\n' + repr(file_info)
+                result += '\n\n' + repr(file_info)
             finally:
                 file_info.attr_names = raw_attrs
 
