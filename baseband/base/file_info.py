@@ -68,9 +68,9 @@ class info_item:
         # attr will be a callable here if item_info is used as a decorator
         # without any arguments. For backwards compatibility, it can also
         # be the name of the attribute although that will more typically
-        # pass through __set_name__.  It can still be used to let the
-        # name of the info_item be different from the attribute that is
-        # gotten (though really that will hopefully never be done!).
+        # pass through __set_name__.  It can still be used to let the name
+        # of the info_item be different from the attribute that is gotten;
+        # e.g., start_time = info_item('time', needs='header0').
         self._init_wrapup(attr, doc)
 
     def _init_wrapup(self, attr, doc=None):
@@ -337,6 +337,8 @@ class FileReaderInfo(InfoBase):
         'Number of bits used to encode each elementary sample.'))
     complex_data = info_item(needs='header0', doc=(
         'Whether the data are complex.'))
+    start_time = info_item('time', needs='header0', doc=(
+        "Time of the first sample."))
 
     missing = info_item(default={}, copy=True,
                         doc='dict of missing attributes.')
@@ -397,11 +399,6 @@ class FileReaderInfo(InfoBase):
                 f"file contains non-integer number "
                 f"({number_of_frames}) of frames")
             return None
-
-    @info_item(needs='header0')
-    def start_time(self):
-        """Time of the first sample."""
-        return self.header0.time
 
     @info_item(needs='frame0', default=False)
     def readable(self):
