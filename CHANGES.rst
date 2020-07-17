@@ -70,6 +70,10 @@ Other Changes and Additions
 - General classes to help writing ``open`` and ``info`` functions are now
   provided in ``baseband.vlbi_base.FileOpener`` and ``FileInfo``. [#418]
 
+- The general ``open`` and ``file_open`` functions are now defined in
+  ``baseband.io`` (but still imported at the top level). They are able
+  to use any format defined via the plugin system. [#444]
+
 3.2.1 (2020-06-24)
 ==================
 
