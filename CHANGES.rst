@@ -13,6 +13,11 @@ New Features
   packages to make new readers accessible to baseband by defining an entry
   point in their ``setup.cfg``. [#418]
 
+- Similarly, baseband also provides an ``baseband.tasks`` entry point, which
+  allows other packages to define tasks useful for processing baseband
+  data by defining an entry point in their ``setup.cfg``. This is primarily
+  intended for the future ``baseband-tasks`` package. [#445]
+
 API Changes
 -----------
 
