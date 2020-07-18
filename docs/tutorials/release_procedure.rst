@@ -263,11 +263,7 @@ its own version as well, which should be pointing to its latest patch release.
 --------------------
 
 In the main development branch, add the next major/minor release to
-``CHANGES.rst``.  Also update the ``version`` keyword in ``setup.cfg`` to::
-
-    version = <next major/minor version>.dev
-
-Make a commmit::
+``CHANGES.rst``.  Make a commmit::
 
     git commit -m "Add v<next major/minor version> to the changelog."
 
