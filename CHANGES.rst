@@ -1,8 +1,8 @@
-4.0 (unreleased)
+4.0 (2020-07-18)
 ================
 
-- This future version will likely only support python 3.7, numpy 1.17 and
-  astropy 4.0.
+- The minimum versions required by baseband are now python 3.7, numpy 1.17
+  and astropy 4.0.
 
 - Baseband now requires the (very small) ``entrypoints`` package.
 
