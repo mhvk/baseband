@@ -1,34 +1,13 @@
 Baseband: a Package for Radio Baseband I/O
 ==========================================
 
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214268.svg
+   :target: https://doi.org/10.5281/zenodo.1214268
+   :alt: DOI 10.5281/zenodo.1214268
+
 .. image:: http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
     :target: http://www.astropy.org
-    :alt: Powered by Astropy Badge
-
-.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214268.svg
-   :target: https://doi.org/10.5281/zenodo.1214268
-
-Baseband is a package for reading and writing VLBI and other radio baseband
-files, with the aim of simplifying and streamlining data conversion and
-standardization.  It relies on `NumPy <http://www.numpy.org/>`_ and `Astropy
-<http://www.astropy.org/>`_.
-
-For installation and usage instructions, please see the `online documentation
-<https://baseband.readthedocs.io/>`_.
-
-If you used this package in your research, please cite it via DOI
-`10.5281/zenodo.1214268 <https://doi.org/10.5281/zenodo.1214268>`_.
-
-Project Status
---------------
-
-.. image:: https://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
-    :target: https://www.astropy.org/
-    :alt: Powered by Astropy Badge
-
-.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214268.svg
-   :target: https://doi.org/10.5281/zenodo.1214268
-   :alt: Zenodo link
+    :alt: Powered by Astropy
 
 .. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master
    :target: https://travis-ci.org/mhvk/baseband
@@ -41,6 +20,17 @@ Project Status
 .. image:: https://readthedocs.org/projects/baseband/badge/?version=latest
    :target: https://baseband.readthedocs.io/en/latest/?badge=latest
    :alt: Documentation Status
+
+Baseband is a package for reading and writing VLBI and other radio baseband
+files, with the aim of simplifying and streamlining data conversion and
+standardization.  It relies on `NumPy <http://www.numpy.org/>`_ and `Astropy
+<http://www.astropy.org/>`_.
+
+For installation and usage instructions, please see the `online documentation
+<https://baseband.readthedocs.io/>`_.
+
+If you used this package in your research, please cite it via DOI
+`10.5281/zenodo.1214268 <https://doi.org/10.5281/zenodo.1214268>`_.
 
 Contributing
 ------------
