@@ -91,13 +91,13 @@ publishing new code releases.
 Project Details
 ===============
 
-.. image:: https://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
-    :target: https://www.astropy.org/
-    :alt: Powered by Astropy Badge
-
 .. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1214268.svg
    :target: https://doi.org/10.5281/zenodo.1214268
-   :alt: Zenodo link
+   :alt: DOI 10.5281/zenodo.1214268
+
+.. image:: https://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
+    :target: https://www.astropy.org/
+    :alt: Powered by Astropy
 
 .. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master
    :target: https://travis-ci.org/mhvk/baseband
