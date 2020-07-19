@@ -26,7 +26,10 @@ run::
     pip3 install baseband
 
 Here, include a ``--user`` flag if you are installing for yourself
-outside of a virtual environment.
+outside of a virtual environment.  You can also add a trailing
+``[all]`` to install also the `baseband-tasks`_ package (and all of
+its dependencies), which provides analysis tasks and I/O support for
+`~baseband_tasks.io.hdf5`.
 
 Obtaining Source Code
 ---------------------
