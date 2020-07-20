@@ -6,7 +6,7 @@ Baseband
 
 Welcome to the Baseband documentation!  Baseband is a package
 `affiliated <https://www.astropy.org/affiliated/index.html>`_ with the
-`Astropy project <https://www.astropy.org>`_ for reading and
+Astropy_ project for reading and
 writing VLBI and other radio baseband files, with the aim of simplifying and
 streamlining data conversion and standardization.  It provides:
 
@@ -16,6 +16,10 @@ streamlining data conversion and standardization.  It provides:
   :ref:`specific file formats <specific_file_formats_toc>`.
 - The ability to read from and write to an ordered sequence of files as if it
   was a single file.
+
+It can be extended with the more experimental baseband-tasks_ package,
+which provides tasks to, e.g., `~baseband_tasks.channelize.Channelize`
+or `~baseband_tasks.dispersion.Dedisperse` sample streams.
 
 If you used this package in your research, please cite it via DOI
 `10.5281/zenodo.1214268 <https://doi.org/10.5281/zenodo.1214268>`_.

@@ -2,7 +2,7 @@
 """Analysis tasks.
 
 The tasks are imported via plugins discovered via entry point
-'baseband.tasks', such as are provided by the ``baseband-tasks``
+'baseband.tasks', such as are provided by the baseband-tasks_
 package.  A special rule for the entry points is that if it points
 to ``__all__``, all items from that list will be imported.
 Furthermore, if any name starts with '_', it is not imported.

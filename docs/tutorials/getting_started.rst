@@ -13,8 +13,11 @@ Baseband <using_baseband>`.
 For installation instructions, please see :ref:`Installing Baseband
 <install_baseband>`.
 
-When using Baseband, we typically will also use `numpy`, `astropy.units`, and
-`astropy.time.Time`. Let's import all of these::
+When using Baseband, we typically will also use
+numpy_, the `astropy.units <https://docs.astropy.org/en/stable/units>`_ module,
+and :class:`~astropy.time.Time` from the
+`astropy.time <https://docs.astropy.org/en/stable/time>`_ module.
+Let's import all of these::
 
     >>> import baseband
     >>> import numpy as np
@@ -30,12 +33,14 @@ For this tutorial, we'll use two sample files::
 
     >>> from baseband.data import SAMPLE_VDIF, SAMPLE_MARK5B
 
-The first file is a VDIF one created from `EVN <https://www.evlbi.org/>`_/`VLBA
-<https://public.nrao.edu/telescopes/vlba/>`_ observations of `Black Widow
-pulsar PSR B1957+20 <https://en.wikipedia.org/wiki/Black_Widow_Pulsar>`_,
-while the second is a Mark 5B from EVN/`WSRT
-<https://www.astron.nl/radio-observatory/public/public-0>`_ observations of the
-same pulsar.
+The first file is a VDIF one created from EVN_/VLBA_ observations of
+`Black Widow pulsar PSR B1957+20
+<https://en.wikipedia.org/wiki/Black_Widow_Pulsar>`_, while the second
+is a Mark 5B from EVN_/WSRT_ observations of the same pulsar.
+
+.. _EVN: https://www.evlbi.org/
+.. _VLBA: https://public.nrao.edu/telescopes/vlba/
+.. _WSRT: https://www.astron.nl/radio-observatory/public/public-0
 
 To open the VDIF file::
 

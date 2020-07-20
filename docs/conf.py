@@ -57,6 +57,10 @@ highlight_language = 'python3'
 # major.minor, call `check_sphinx_version("x.y.z")` here.
 # check_sphinx_version("1.2.1")
 
+# add any custom intersphinx mappings
+intersphinx_mapping['baseband_tasks'] = (
+    'https://baseband.readthedocs.io/projects/baseband-tasks/en/stable/', None)
+
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 exclude_patterns.append('_templates')
@@ -64,6 +68,10 @@ exclude_patterns.append('_templates')
 # This is added to the end of RST files - a good place to put substitutions to
 # be used globally.
 rst_epilog += """
+.. _Python: https://www.python.org/
+.. _Astropy: https://www.astropy.org
+.. _NumPy: https://numpy.org
+.. _baseband-tasks: https://baseband.readthedocs.io/projects/baseband-tasks/
 .. |minimum_python_version| replace:: {0.__minimum_python_version__}
 .. |minimum_astropy_version| replace:: {0.__minimum_astropy_version__}
 """.format(baseband)
