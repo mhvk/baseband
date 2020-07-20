@@ -3,7 +3,8 @@
 
 Contains general ``open`` and ``file_info`` functions that can iterate
 over possible formats to determine which is the right one, including
-possible formats discovered via entry point 'baseband.io'.
+possible formats discovered via entry point 'baseband.io', such as
+the `~baseband_tasks.io.hdf5` module from the baseband-tasks_ package.
 
 Any 'baseband.io' entry points are treated as possible formats if they
 point to a module (e.g., 'vdif = baseband.vdif').  Any entries that
