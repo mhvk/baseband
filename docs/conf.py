@@ -68,6 +68,7 @@ exclude_patterns.append('_templates')
 # This is added to the end of RST files - a good place to put substitutions to
 # be used globally.
 rst_epilog += """
+.. _Python: https://www.python.org/
 .. _Astropy: https://www.astropy.org
 .. _NumPy: https://numpy.org
 .. _baseband-tasks: https://baseband.readthedocs.io/projects/baseband-tasks/

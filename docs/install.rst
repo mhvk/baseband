@@ -11,8 +11,8 @@ Requirements
 
 Baseband requires:
 
-- `Python <https://www.python.org/>`_ |minimum_python_version| or later
-- `Astropy`_ |minimum_astropy_version| or later
+- Python_ |minimum_python_version| or later
+- Astropy_ |minimum_astropy_version| or later
 - `entrypoints <https://entrypoints.readthedocs.io/en/latest/>`_
 
 .. _install_baseband:

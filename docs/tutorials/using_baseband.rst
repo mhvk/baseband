@@ -24,8 +24,9 @@ basics of :ref:`inspecting files <using_baseband_inspecting>`, :ref:`reading
 <using_baseband_reading>` from and :ref:`writing <using_baseband_writing>`
 to files, :ref:`converting <using_baseband_converting>` from one format
 to another, and :ref:`diagnosing problems <using_baseband_problems>`.
-We assume that Baseband as well as `NumPy <https://www.numpy.org/>`_ and the
-`Astropy`_ units module have been imported::
+We assume that Baseband as well as numpy_ and the
+`astropy.units <https://docs.astropy.org/en/stable/units>`_ module
+have been imported::
 
     >>> import baseband
     >>> import numpy as np
