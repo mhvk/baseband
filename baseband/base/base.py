@@ -830,8 +830,17 @@ class StreamReaderBase(StreamBase):
         """Value to use for invalid or missing data. Default: 0."""
         return self._fill_value
 
+    @property
+    def dtype(self):
+        # TODO: arguably, this should be inferred from an actual payload.
+        return np.dtype(np.complex64 if self.complex_data else np.float32)
+
+    def readable(self):
+        """Whether the file can be read and decoded."""
+        return self.fh_raw.readable and self.fh_raw.info.readable
+
     def seek(self, offset, whence=0):
-        """Change the stream position.
+        """Change the sample pointer position.
 
         This works like a normal filehandle seek, but the offset is in samples
         (or a relative or absolute time).
@@ -840,7 +849,8 @@ class StreamReaderBase(StreamBase):
         ----------
         offset : int, `~astropy.units.Quantity`, or `~astropy.time.Time`
             Offset to move to.  Can be an (integer) number of samples,
-            an offset in time units, or an absolute time.
+            an offset in time units, or an absolute time.  For the latter
+            two, the pointer will be moved to the nearest integer sample.
         whence : {0, 1, 2, 'start', 'current', or 'end'}, optional
             Like regular seek, the offset is taken to be from the start if
             ``whence=0`` (default), from the current position if 1,
@@ -865,54 +875,48 @@ class StreamReaderBase(StreamBase):
         elif whence == 1 or whence == 'current':
             self.offset += offset
         elif whence == 2 or whence == 'end':
-            self.offset = self._nsample + offset
+            self.offset = self.shape[0] + offset
         else:
             raise ValueError("invalid 'whence'; should be 0 or 'start', 1 or "
                              "'current', or 2 or 'end'.")
 
         return self.offset
 
-    @property
-    def dtype(self):
-        # TODO: arguably, this should be inferred from an actual payload.
-        return np.dtype(np.complex64 if self.complex_data else np.float32)
-
-    def readable(self):
-        """Whether the file can be read and decoded."""
-        return self.fh_raw.readable and self.fh_raw.info.readable
-
     def read(self, count=None, out=None):
-        """Read a number of complete (or subset) samples.
-
-        The range retrieved can span multiple frames.
+        """Read a number of complete samples.
 
         Parameters
         ----------
         count : int or None, optional
-            Number of complete/subset samples to read.  If `None` (default) or
-            negative, the whole file is read.  Ignored if ``out`` is given.
+            Number of complete samples to read. If `None` (default) or
+            negative, the number of samples left. Ignored if ``out`` is given.
         out : None or array, optional
-            Array to store the data in. If given, ``count`` will be inferred
-            from the first dimension; the other dimension should equal
+            Array to store the samples in. If given, ``count`` will be inferred
+            from the first dimension; the remaining dimensions should equal
             `sample_shape`.
 
         Returns
         -------
         out : `~numpy.ndarray` of float or complex
-            The first dimension is sample-time, and the remainder given by
-            `sample_shape`.
+            The first dimension is sample-time, and the remaining ones are
+            as given by `sample_shape`.
         """
+        if self.closed:
+            raise ValueError("I/O operation on closed stream.")
+
+        samples_left = self.shape[0] - self.offset
         if out is None:
             if count is None or count < 0:
-                count = self._nsample - self.offset
-                if count < 0:
-                    raise EOFError("cannot read from beyond end of file.")
+                count = max(0, samples_left)
 
             out = np.empty((count,) + self.sample_shape, dtype=self.dtype)
         else:
             assert out.shape[1:] == self.sample_shape, (
                 "'out' must have trailing shape {}".format(self.sample_shape))
             count = out.shape[0]
+
+        if count > samples_left:
+            raise EOFError("cannot read from beyond end of input.")
 
         offset0 = self.offset
         sample = 0
@@ -935,8 +939,7 @@ class StreamReaderBase(StreamBase):
 
         Finds the index corresponding to the needed frame, assuming frames
         are all the same length.  If not already cached, it retrieves a
-        frame by calling ``self._new_frame(index)``.  The reader and writer
-        subclasses provide implementations for this.
+        frame by calling ``self._read_frame(index)``.
 
         Parameters
         ----------
