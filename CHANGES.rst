@@ -4,6 +4,9 @@
 Bug Fixes
 ---------
 
+- Allow the GUPPI reader to assume channel-first ordering by default, i.e.,
+  no longer insist that PKTFMT is one of '1SFA' or 'SIMPLE'. Instead, ``info``
+  will include a warning for formats not known to work. [#453]
 
 4.0 (2020-07-18)
 ================
