@@ -304,6 +304,22 @@ class TestGUPPI:
             assert info.frame_rate == header.sample_rate / (
                 header.samples_per_frame - header.overlap)
 
+    def test_file_info_unsupported_format(self, tmpdir):
+        filename = str(tmpdir.join('file.uppi'))
+        with guppi.open(SAMPLE_FILE, 'rb') as fh:
+            f = fh.read_frame()
+            f.header = f.header.copy()
+            f['PKTFMT'] = 'unknown'
+            with guppi.open(filename, 'wb') as fw:
+                fw.write_frame(f)
+
+        with guppi.open(filename, 'rb') as fr:
+            info = fr.info
+
+        assert info.pktfmt == 'unknown'
+        assert 'pktfmt' in info.warnings
+        assert 'Unknown pktfmt' in info.warnings['pktfmt']
+
     def test_frame(self, tmpdir):
         with guppi.open(SAMPLE_FILE, 'rb') as fh:
             frame = fh.read_frame(memmap=False)

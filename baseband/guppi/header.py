@@ -67,6 +67,18 @@ class GUPPIHeader(fits.Header):
                  ('NPOL', 1),
                  ('OBSNCHAN', 1)]
 
+    supported_formats = {'1SFA', 'SIMPLE'}
+    """GUPPI formats that are known to work.
+
+    '1SFA' is used for all modes other than FAST4K (which is only used
+    for total intensity).  'SIMPLE' is from DSPSR, and used to support
+    time-first payloads.  See
+    https://safe.nrao.edu/wiki/pub/Main/JoeBrandt/guppi_status_shmem.pdf
+
+    If a format is not in this set, yet is known to work, a PR would be
+    most welcome.
+    """
+
     def __init__(self, *args, verify=True, mutable=True, **kwargs):
         # Comments handled by fits.Header__init__().
         super().__init__(*args, **kwargs)
@@ -77,13 +89,12 @@ class GUPPIHeader(fits.Header):
 
     def verify(self):
         """Basic check of integrity."""
+        # Same check as dspsr's dsp::GUPPIFile::is_valid
         assert all(key in self for key in ('BLOCSIZE',
                                            'PKTIDX'))
-        # '1SFA' is used for all modes other than FAST4K (which is only used
-        # for total intensity).  'SIMPLE' is from DSPSR, and used to support
-        # time-first payloads.  See
-        # https://safe.nrao.edu/wiki/pub/Main/JoeBrandt/guppi_status_shmem.pdf
-        assert self['PKTFMT'] in ('1SFA', 'SIMPLE')
+        # We could check here for self['PKTFMT'] in self.supported_formats
+        # but that would break reading of unsupported but working formats,
+        # so instead this becomes just a warning in file_info.
 
     def copy(self):
         """Create a mutable and independent copy of the header."""
