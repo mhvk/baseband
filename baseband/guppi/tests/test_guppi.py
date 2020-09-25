@@ -10,6 +10,7 @@ from ... import guppi
 from ...helpers import sequentialfile as sf
 from ..base import GUPPIFileNameSequencer
 from ...data import SAMPLE_PUPPI as SAMPLE_FILE
+from ...data import SAMPLE_PUPPI_HEADER as SAMPLE_HEADER
 
 
 class TestGUPPI:
@@ -167,6 +168,24 @@ class TestGUPPI:
         assert np.abs(header9.start_time - header.start_time) < 1 * u.ns
         assert np.abs(header10.offset - offset) < 1 * u.ns
         assert np.abs(header10.start_time - header.start_time) < 1 * u.ns
+
+    def test_fractional_time_header(self, tmpdir):
+        """Check that we can represent fractional time in headers."""
+        with open(SAMPLE_FILE, 'rb') as fh:
+            header = guppi.GUPPIHeader.fromfile(fh)
+        # Check setting attributes.
+        header.mutable = True
+        header.start_time = header.start_time - 0.25 * u.s
+        assert header['STT_IMJD'] == 58132
+        assert header['STT_SMJD'] == 51092
+        assert header['STT_OFFS'] == 0.75
+        assert header.time.isot == '2018-01-14T14:11:32.750'
+        with open(str(tmpdir.join('testguppi.raw')), 'w+b') as s:
+            header.tofile(s)
+            s.seek(0)
+            header2 = guppi.GUPPIHeader.fromfile(s)
+        assert header2 == header
+        assert header2.time.isot == '2018-01-14T14:11:32.750'
 
     def test_header_impossible_samples_per_frame(self):
         with pytest.raises(ValueError):
