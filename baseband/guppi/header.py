@@ -6,10 +6,9 @@ Implements a GUPPIHeader class that reads & writes FITS-like headers from file.
 """
 import operator
 
-import numpy as np
 import astropy.units as u
 from astropy.io import fits
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 
 
 __all__ = ['GUPPIHeader']
@@ -345,8 +344,8 @@ class GUPPIHeader(fits.Header):
     def offset(self):
         """Offset from start of observation in units of time."""
         # PKTIDX only counts valid packets, not overlap ones.
-        return self['STT_OFFS'] + ((self['PKTIDX'] * self['PKTSIZE'] * 8
-                                    // self._bpcs) * self['TBIN'] * u.s)
+        return ((self['PKTIDX'] * self['PKTSIZE'] * 8 // self._bpcs)
+                * self['TBIN']) * u.s
 
     @offset.setter
     def offset(self, offset):
@@ -357,15 +356,21 @@ class GUPPIHeader(fits.Header):
     def start_time(self):
         """Start time of the observation."""
         return (Time(self['STT_IMJD'], scale='utc', format='mjd')
-                + self['STT_SMJD'] * u.s)
+                + TimeDelta(self['STT_SMJD'], self['STT_OFFS'], format='sec'))
 
     @start_time.setter
     def start_time(self, start_time):
-        start_time = Time(start_time, scale='utc', format='isot', precision=9)
-        self['STT_IMJD'] = int(start_time.mjd)
-        self['STT_SMJD'] = int(np.around(
-            (start_time - Time(self['STT_IMJD'], format='mjd',
-                               scale=start_time.scale)).sec))
+        start_time = Time(start_time, scale='utc')
+        imjd = int(start_time.mjd)
+        # Calculate differences from start of day.
+        djd = start_time - Time(imjd, format='mjd', scale='utc')
+        # Correct for possible rounding errors.
+        imjd += int(djd.jd)
+        # Get seconds.  Should now be guaranteed to be between 0 and 86400
+        # (or 86401 if a leap-second day).
+        seconds = (start_time - Time(imjd, format='mjd', scale='utc')).sec
+        self['STT_IMJD'] = imjd
+        self['STT_SMJD'], self['STT_OFFS'] = divmod(seconds, 1)
 
     @property
     def time(self):
