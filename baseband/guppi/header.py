@@ -8,7 +8,7 @@ import operator
 
 import astropy.units as u
 from astropy.io import fits
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 
 
 __all__ = ['GUPPIHeader']
@@ -356,16 +356,21 @@ class GUPPIHeader(fits.Header):
     def start_time(self):
         """Start time of the observation."""
         return (Time(self['STT_IMJD'], scale='utc', format='mjd')
-                + (self['STT_SMJD'] + self['STT_OFFS']) * u.s)
+                + TimeDelta(self['STT_SMJD'], self['STT_OFFS'], format='sec'))
 
     @start_time.setter
     def start_time(self, start_time):
-        start_time = Time(start_time, scale='utc', format='isot', precision=9)
-        self['STT_IMJD'] = int(start_time.mjd)
-        # Yes, this looks odd, but approaching it with astropy time objects
-        # results in timing errors greater than 10ns.
-        self['STT_SMJD'] = int((start_time.mjd - self['STT_IMJD']) * 86400)
-        self['STT_OFFS'] = start_time.mjd * 86400 - int(start_time.mjd * 86400)
+        start_time = Time(start_time, scale='utc')
+        imjd = int(start_time.mjd)
+        # Calculate differences from start of day.
+        djd = start_time - Time(imjd, format='mjd', scale='utc')
+        # Correct for possible rounding errors.
+        imjd += int(djd.jd)
+        # Get seconds.  Should now be guaranteed to be between 0 and 86400
+        # (or 86401 if a leap-second day).
+        seconds = (start_time - Time(imjd, format='mjd', scale='utc')).sec
+        self['STT_IMJD'] = imjd
+        self['STT_SMJD'], self['STT_OFFS'] = divmod(seconds, 1)
 
     @property
     def time(self):
