@@ -11,6 +11,16 @@ Other Changes and Additions
 ---------------------------
 
 
+4.0.2 (2020-09-25)
+==================
+
+Bug Fixes
+---------
+
+- Fix the GUPPIHeader class incorrectly ignoring the STT_OFFS header
+  keyword. [#457]
+
+
 4.0.1 (2020-07-31)
 ==================
 

@@ -4,7 +4,8 @@ import pickle
 
 import pytest
 import numpy as np
-import astropy.units as u
+from astropy import units as u
+from astropy.time import Time
 
 from ... import guppi
 from ...helpers import sequentialfile as sf
@@ -167,6 +168,34 @@ class TestGUPPI:
         assert np.abs(header9.start_time - header.start_time) < 1 * u.ns
         assert np.abs(header10.offset - offset) < 1 * u.ns
         assert np.abs(header10.start_time - header.start_time) < 1 * u.ns
+
+    def test_fractional_time_header(self, tmpdir):
+        """Check that we can represent fractional time in headers."""
+        with open(SAMPLE_FILE, 'rb') as fh:
+            header0 = guppi.GUPPIHeader.fromfile(fh)
+        # Check setting attributes.
+        header1 = header0.copy()
+        header1.start_time = header0.start_time + (1.25+2**-10) * u.day
+        assert header1['STT_IMJD'] == 58132+1
+        assert header1['STT_SMJD'] == 51093+0.25*24*3600+84
+        assert header1['STT_OFFS'] == 2**-10*24*3600-84
+        assert header1.time.isot == '2018-01-15T20:12:57.375'
+        with open(str(tmpdir.join('testguppi.raw')), 'w+b') as s:
+            header1.tofile(s)
+            s.seek(0)
+            header2 = guppi.GUPPIHeader.fromfile(s)
+        assert header2 == header1
+        assert header2.time.isot == header1.time.isot
+
+    @pytest.mark.parametrize('time', [
+        '2012-06-30T23:59:60',
+        '2012-06-30T23:59:60.375',
+        '2012-07-01T00:00:00.125'])
+    def test_leap_seconds(self, time):
+        # Check leap second.
+        time = Time(time)
+        header = guppi.GUPPIHeader.fromvalues(start_time=time)
+        assert abs(header.start_time - time) < 1. * u.ns
 
     def test_header_impossible_samples_per_frame(self):
         with pytest.raises(ValueError):
