@@ -197,7 +197,7 @@ samples per frame and get very small ``sample_rate``, ``bandwidth``, and
     >>> fh_ph = gsb.open(SAMPLE_GSB_PHASED_HEADER, mode='rs',
     ...                  raw=SAMPLE_GSB_PHASED,
     ...                  samples_per_frame=phased_samples_per_frame)
-    >>> fh_ph.info
+    >>> fh_ph.info  # doctest: +FLOAT_CMP
     GSBStream information:
     start_time = 2013-07-27T21:23:55.324108800
     stop_time = 2013-07-27T21:23:57.840691200
