@@ -13,6 +13,7 @@ Baseband requires:
 
 - Python_ |minimum_python_version| or later
 - Astropy_ |minimum_astropy_version| or later
+- Numpy_ |minimum_numpy_version| or later
 - `entrypoints <https://entrypoints.readthedocs.io/en/latest/>`_
 
 .. _install_baseband:

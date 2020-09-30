@@ -74,6 +74,7 @@ rst_epilog += """
 .. _baseband-tasks: https://baseband.readthedocs.io/projects/baseband-tasks/
 .. |minimum_python_version| replace:: {0.__minimum_python_version__}
 .. |minimum_astropy_version| replace:: {0.__minimum_astropy_version__}
+.. |minimum_numpy_version| replace:: {0.__minimum_numpy_version__}
 """.format(baseband)
 
 # -- Project information ------------------------------------------------------
