@@ -651,7 +651,7 @@ frameset of the sample file::
     >>> fsf = vdif.open(filenames[1], mode='rs', sample_rate=fh.sample_rate)
     >>> fh.seek(fh.shape[0] // 2)    # Seek to start of second frameset.
     20000
-    >>> fsf.header0.time == fh.time
+    >>> abs(fsf.header0.time - fh.time) < 1.*u.ns
     True
     >>> np.all(fsf.read() == fh.read())
     True
