@@ -99,20 +99,25 @@ jobs:
         - os: windows
           language: c
           stage: Comprehensive tests
-          name: Python 3.7 on Windows
-          env: PYTHON_VERSION=3.7
-               TOXENV='py37-test'
+          name: Python 3.8 on Windows
+          env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
+               TOXENV='py38-test'
 
 
-install:
-
-    # language: python is only available for Linux, so for other platforms
-    # we need to use ci-helpers to set up Python.
-    - if [[ $TRAVIS_OS_NAME == osx || $TRAVIS_OS_NAME == windows ]]; then
+before_install:
+    # language: python is only available for Linux.
+    # For Windows, we use choco to install Python.
+    - if [[ $TRAVIS_OS_NAME == windows ]]; then
+        choco install --no-progress python --version 3.8;
+        python -m pip install --upgrade pip;
+      fi
+    # For OSX, we use ci-helpers to set up Python.
+    - if [[ $TRAVIS_OS_NAME == osx ]]; then
         git clone git://github.com/astropy/ci-helpers.git;
         source ci-helpers/travis/setup_conda.sh;
       fi
 
+install:
     - if [[ $SETUP_METHOD == 'tox' ]]; then
         pip install tox;
       else
