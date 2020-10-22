@@ -46,9 +46,6 @@ env:
         - TOXARGS='-v'
         - TOXPOSARGS=''
 
-        # Also allow tests without tox, getting our packages using apt.
-        - APT_DEPENDENCIES='python3-astropy python3-setuptools python3-entrypoints'
-
         # If there are matplotlib or other GUI tests, uncomment the following
         # line to use the X virtual framebuffer.
         # - SETUP_XVFB=True
@@ -93,6 +90,12 @@ jobs:
           stage: Comprehensive tests
           arch: s390x
           language: c
+          addons:
+            apt:
+              packages:
+              - python3-astropy
+              - python3-entrypoints
+              - python3-pip
           env: SETUP_METHOD='apt'
 
         # Try on Windows
@@ -120,11 +123,6 @@ before_install:
 install:
     - if [[ $SETUP_METHOD == 'tox' ]]; then
         pip install tox;
-      else
-        curl https://ftp-master.debian.org/keys/archive-key-10.asc | sudo apt-key add -;
-        echo "deb http://ftp.us.debian.org/debian testing main" | sudo tee -a /etc/apt/sources.list;
-        sudo apt-get -qq update;
-        sudo apt-get install -y --no-install-recommends ${APT_DEPENDENCIES};
       fi
 
     - if [[ $TOXENV == *-cov ]]; then
