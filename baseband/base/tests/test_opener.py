@@ -127,6 +127,11 @@ class TestFileOpener:
             assert fr.fh_raw.name == name
             assert fr.read() == b'abcde'
 
+    @pytest.mark.parametrize('mode', ['rb', 'rs'])
+    def test_file_not_found(self, mode):
+        with pytest.raises(FileNotFoundError):
+            self.file_opener('does_not_exist', mode)
+
     def test_binary_fh(self, tmpdir):
         # Also flip mode, and use constructed open
         name = str(tmpdir.join('test.bare'))

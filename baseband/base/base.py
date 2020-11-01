@@ -1335,6 +1335,8 @@ class FileInfo:
             with self.open(name, mode=mode, **kwargs) as fh:
                 return fh.info
         except Exception as exc:
+            if isinstance(exc, FileNotFoundError):
+                raise
             return exc
 
     def is_ok(self, info):
@@ -1361,10 +1363,15 @@ class FileInfo:
             Information on the file.  Will evaluate as `False` if the
             file was not in the right format.
 
+        Raises
+        ------
+        FileNotFoundError
+            If the file does not exist.
+
         Notes
         -----
-        Getting information should never fail. If an `Exception` is
-        raised or returned, it is a bug in the file reader.
+        Getting information for an existing file should never fail. If an
+        `Exception` is raised or returned, it is a bug in the file reader.
         """
         info = self._get_info(name, 'rb')
         # If right format, check if arguments were missing.
