@@ -11,6 +11,16 @@ Other Changes and Additions
 ---------------------------
 
 
+4.0.3 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- Ensure that ``pathlib.Path`` objects are recognized as valid in the various
+  openers. [#467]
+
+
 4.0.2 (2020-10-23)
 ==================
 
