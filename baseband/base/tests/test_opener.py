@@ -1,5 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 import io
+import pathlib
 
 import pytest
 import numpy as np
@@ -109,17 +110,27 @@ class TestFileOpener:
                                        dict(payload_nbytes=2, bla='aha'))
         assert fns[1] == '1_aha.bare'
 
-    def test_binary_name(self, tmpdir):
-        name = str(tmpdir.join('test.bare'))
-        with self.file_opener(name, 'wb') as fw:
+    @pytest.mark.parametrize('path_type', [str, None, pathlib.Path])
+    def test_binary_name(self, path_type, tmpdir):
+        path = tmpdir.join('test.bare')
+        if path_type:
+            path = path_type(path)
+        name = str(path)
+
+        with self.file_opener(path, 'wb') as fw:
             assert isinstance(fw, BareFileWriter)
             assert fw.fh_raw.name == name
             fw.write(b'abcde')
 
-        with self.file_opener(name, 'rb') as fr:
+        with self.file_opener(path, 'rb') as fr:
             assert isinstance(fr, BareFileReader)
             assert fr.fh_raw.name == name
             assert fr.read() == b'abcde'
+
+    @pytest.mark.parametrize('mode', ['rb', 'rs'])
+    def test_file_not_found(self, mode):
+        with pytest.raises(FileNotFoundError):
+            self.file_opener('does_not_exist', mode)
 
     def test_binary_fh(self, tmpdir):
         # Also flip mode, and use constructed open
