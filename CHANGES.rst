@@ -23,6 +23,10 @@ Bug Fixes
 - Raise a proper ``FileNotFoundError`` instead of an obscure ``AttributeError``
   if trying to get ``file_info`` on a non-existing file. [#467]
 
+- Pass on all "irrelevant" arguments not understood by ``file_info`` to the
+  general opener, so they can be used or raise ``TypeError`` in a place where
+  it will be clearer why that happens. [#468]
+
 
 4.0.2 (2020-10-23)
 ==================

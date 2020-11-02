@@ -210,11 +210,11 @@ def open(name, mode='rs', format=None, **kwargs):
             raise ValueError(f"arguments inconsistent with this {format} file "
                              f"were passed in: {info.inconsistent_kwargs}")
 
-        if getattr(info, 'irrelevant_kwargs', False):
-            raise TypeError(f"open() got unexpected keyword arguments "
-                            f"{info.irrelevant_kwargs}")
-
         kwargs = getattr(info, 'used_kwargs', kwargs)
+        # We add any arguments deemed irrelevant for opening the file, since
+        # either they might just give some extra information (say, squeeze)
+        # or they will just lead to a TypeError, in likely a more useful place.
+        kwargs.update(getattr(info, 'irrelevant_kwargs', {}))
 
     module = getattr(__self__, format)
     return module.open(name, mode=mode, **kwargs)
