@@ -1,5 +1,7 @@
 # Licensed under the GPLv3 - see LICENSE
 import importlib
+import pathlib
+
 import pytest
 from astropy import units as u
 from astropy.time import Time
@@ -147,6 +149,13 @@ def test_unsupported_file(tmpdir):
     info = file_info(name, format='vdif')
     assert 'errors' in str(info)
     assert 'Not parsable' in str(info)
+
+
+@pytest.mark.parametrize('path', ['does_not_exst',
+                                  pathlib.Path('does_not_exist')])
+def test_non_existing_file(path):
+    with pytest.raises(FileNotFoundError):
+        file_info(path)
 
 
 def test_format_with_no_info(monkeypatch):

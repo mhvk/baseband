@@ -11,6 +11,19 @@ Other Changes and Additions
 ---------------------------
 
 
+4.0.3 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- Ensure that ``pathlib.Path`` objects are recognized as valid in the various
+  openers. [#467]
+
+- Raise a proper ``FileNotFoundError`` instead of an obscure ``AttributeError``
+  if trying to get ``file_info`` on a non-existing file. [#467]
+
+
 4.0.2 (2020-10-23)
 ==================
 

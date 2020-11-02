@@ -24,13 +24,14 @@ import inspect
 import textwrap
 import warnings
 import operator
+import pathlib
 from collections import namedtuple
 from contextlib import contextmanager
 
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import astropy.units as u
-from astropy.utils import lazyproperty
+from astropy.utils import lazyproperty, isiterable
 
 from ..helpers import sequentialfile as sf
 from .offsets import RawOffsets
@@ -1334,6 +1335,8 @@ class FileInfo:
             with self.open(name, mode=mode, **kwargs) as fh:
                 return fh.info
         except Exception as exc:
+            if isinstance(exc, FileNotFoundError):
+                raise
             return exc
 
     def is_ok(self, info):
@@ -1360,10 +1363,15 @@ class FileInfo:
             Information on the file.  Will evaluate as `False` if the
             file was not in the right format.
 
+        Raises
+        ------
+        FileNotFoundError
+            If the file does not exist.
+
         Notes
         -----
-        Getting information should never fail. If an `Exception` is
-        raised or returned, it is a bug in the file reader.
+        Getting information for an existing file should never fail. If an
+        `Exception` is raised or returned, it is a bug in the file reader.
         """
         info = self._get_info(name, 'rb')
         # If right format, check if arguments were missing.
@@ -1639,19 +1647,18 @@ class FileOpener:
                          f'({self.fmt} supports {set(self.classes)}).')
 
     def _get_type(self, name):
-        if hasattr(name, 'read') or hasattr(name, 'write'):
-            return 'fh'
-
         try:
-            f0 = name[0]
-        except (TypeError, IndexError):
-            raise ValueError("name '{name}' not understood.") from None
+            pathlib.Path(name)
+        except TypeError:
+            if hasattr(name, 'read') or hasattr(name, 'write'):
+                return 'fh'
 
-        if (isinstance(name, (tuple, list, sf.FileNameSequencer))
-                or isinstance(f0, str) and len(f0) > 1):
-            return 'sequence'
+            elif isiterable(name):
+                return 'sequence'
 
-        if '{' in name and '}' in name:
+            raise ValueError("name '{name}' not understood.")
+
+        if isinstance(name, str) and '{' in name and '}' in name:
             return 'template'
         else:
             return 'name'
@@ -1762,7 +1769,8 @@ class FileOpener:
         Parameters
         ----------
         name : str or filehandle, or sequence of str
-            File name, filehandle, sequence of file names, or template.
+            File name, filehandle, sequence of file names, or template
+            (file name(s) can be `~pathlib.Path` but template has to be `str`).
         mode : {'rb', 'wb', 'rs', or 'ws'}, optional
             Whether to open for reading or writing, and as a regular binary
             file or as a stream. Default: 'rs', for reading a stream.
