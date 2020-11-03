@@ -32,6 +32,19 @@ def test_open_missing_args(sample):
     assert "missing required arguments" in str(exc.value)
 
 
+def test_open_squeeze():
+    with baseband_open(SAMPLE_VDIF, 'rs', squeeze=False) as fh:
+        assert fh.sample_shape == (8, 1)
+    with baseband_open(SAMPLE_VDIF, 'rs', squeeze=True) as fh:
+        assert fh.sample_shape == (8,)
+
+
+@pytest.mark.parametrize('verify', [True, False, 'fix'])
+def test_open_verify(verify):
+    with baseband_open(SAMPLE_VDIF, 'rs', verify=verify) as fh:
+        assert fh.verify == verify
+
+
 def test_open_wrong_args():
     # Use extra arguments that allow formats to succeed up to the stream
     # reader, but then fail on an incorrect sample rate.

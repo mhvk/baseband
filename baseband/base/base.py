@@ -1410,7 +1410,9 @@ class FileInfo:
             the opening as a stream failed.
         """
         frame_rate = file_info.frame_rate
-        used_kwargs = file_info.used_kwargs
+        used_kwargs = file_info.used_kwargs.copy()
+
+        # Somewhat inelegant special-cases for sample_rate and verify.
         if frame_rate is None:
             if 'sample_rate' in kwargs:
                 used_kwargs['sample_rate'] = kwargs['sample_rate']
@@ -1418,6 +1420,9 @@ class FileInfo:
                 # frame rate will already be marked as missing in
                 # file_info.
                 return None
+
+        if 'verify' in kwargs:
+            used_kwargs['verify'] = kwargs['verify']
 
         stream_info = self._get_info(name, mode='rs', **used_kwargs)
         if self.is_ok(stream_info):
