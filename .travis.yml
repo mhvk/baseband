@@ -79,10 +79,10 @@ jobs:
           env: TOXENV="py37-test-oldestdeps-cov"
 
         # Regularly try Astropy dev with the latest Python
-        - name: Python 3.8 with developer version of astropy
+        - name: Python 3.9 with developer version of astropy
           stage: Cron tests
-          python: 3.8
-          env: TOXENV=py38-test-devdeps
+          python: 3.9
+          env: TOXENV=py39-test-devdeps
 
         # Also try the big-endian s390x architecture, in the
         # process checking that installing dependencies with apt works.
