@@ -59,8 +59,8 @@ jobs:
 
         - name: Tests that all the basics are covered.
           stage: Initial tests
-          python: 3.9
-          env: TOXENV=py39-test
+          python: 3.8
+          env: TOXENV=py38-test
                TOXPOSARGS="--open-files"
 
         - name: Code style checks
