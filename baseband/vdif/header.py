@@ -734,15 +734,17 @@ class VDIFHeader3(VDIFSampleRateHeader):
 
     def verify(self):
         super().verify()
-        assert self['frame_length'] == 629
+        assert self['frame_length'] in (129, 629)
 
-    @fixedvalue
-    def payload_nbytes(cls):
-        return 5000
+    @property
+    def frame_nbytes(self):
+        """Size of the frame in bytes."""
+        return self['frame_length'] * 8
 
-    @fixedvalue
-    def frame_nbytes(cls):
-        return cls.nbytes + cls.payload_nbytes
+    @frame_nbytes.setter
+    def frame_nbytes(self, nbytes):
+        assert nbytes in (1032, 5032)
+        self['frame_length'] = int(nbytes) // 8
 
 
 class VDIFHeader2(VDIFBaseHeader, VDIFNoSampleRateHeader):

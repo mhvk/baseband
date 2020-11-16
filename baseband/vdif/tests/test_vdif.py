@@ -1541,3 +1541,22 @@ class TestFindHeader:
             header = fc.find_header()
             assert header is not None
             assert header == h1
+
+
+def test_edf3_vdif_payload_size(tmpdir):
+    """Test payload size in VDIF EDF3."""
+    testfile = str(tmpdir.join('test.vdif'))
+    with vdif.open(SAMPLE_FILE, 'rs') as fh:
+        header1 = fh.header0.copy()
+        header1.payload_nbytes = 1000
+        data1 = fh.read()
+        with vdif.open(testfile, 'ws', header0=header1, nthread=8) as fw:
+            fw.write(data1)
+
+    with vdif.open(testfile, 'rs') as fc:
+        header2 = fc.header0
+        data2 = fc.read()
+        assert header2.frame_nbytes == 1032
+        assert header2.payload_nbytes == 1000
+        assert header2.samples_per_frame == 4000
+        assert np.all(data2 == data1)

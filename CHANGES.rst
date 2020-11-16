@@ -4,6 +4,8 @@
 New Features
 ------------
 
+- Support for VDIF EDV3 data with payload size of 1000 bytes. [#456]
+
 API Changes
 -----------
 
