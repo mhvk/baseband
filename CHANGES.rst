@@ -14,6 +14,8 @@ Bug Fixes
   general opener, so they can be used or raise ``TypeError`` in a place where
   it will be clearer why that happens. [#468]
 
+- Support for VDIF EDV3 data with payload size of 1000 bytes. [#456]
+
 
 4.0.2 (2020-10-23)
 ==================
