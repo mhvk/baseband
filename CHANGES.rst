@@ -4,8 +4,6 @@
 New Features
 ------------
 
-- Support for VDIF EDV3 data with payload size of 1000 bytes. [#456]
-
 API Changes
 -----------
 
@@ -13,7 +11,7 @@ Other Changes and Additions
 ---------------------------
 
 
-4.0.3 (unreleased)
+4.0.3 (2020-11-26)
 ==================
 
 Bug Fixes
@@ -28,6 +26,8 @@ Bug Fixes
 - Pass on all "irrelevant" arguments not understood by ``file_info`` to the
   general opener, so they can be used or raise ``TypeError`` in a place where
   it will be clearer why that happens. [#468]
+
+- Support for VDIF EDV3 data with payload size of 1000 bytes. [#456]
 
 
 4.0.2 (2020-10-23)
