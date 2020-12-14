@@ -27,16 +27,22 @@ def _get_entry_points():
     A list of entries where loading raised an exception are store inside
     the result under '_bad_entries'.
     """
-    from entrypoints import get_group_all
     from importlib import import_module
+    import sys
+    if sys.version_info >= (3, 8):
+        from importlib.metadata import entry_points
+    else:
+        from importlib_metadata import entry_points
 
     entries = {'_bad_entries': []}
 
-    for entry_point in get_group_all('baseband.tasks'):
+    for entry_point in entry_points().get('baseband.tasks', []):
+        # Only on python >= 3.9 do .module and .attr exist.
+        ep_module, _, ep_attr = entry_point.value.partition(':')
         try:
             loaded = entry_point.load()
-            if entry_point.object_name == '__all__':
-                module = import_module(entry_point.module_name)
+            if ep_attr == '__all__':
+                module = import_module(ep_module)
                 entries.update({name: getattr(module, name) for name in loaded
                                 if not name.startswith('_')})
                 # Possibly load module too, depending on entry point name.
