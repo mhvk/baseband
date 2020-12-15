@@ -10,6 +10,10 @@ API Changes
 Other Changes and Additions
 ---------------------------
 
+- Entry points are now handled via ``importlib.metadata`` (or the python 3.7
+  backport ``importlib_metadata``), meaning baseband no longer requires the
+  ``entrypoints`` package. [#477]
+
 
 4.0.3 (2020-11-26)
 ==================

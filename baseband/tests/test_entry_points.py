@@ -1,8 +1,13 @@
 # Licensed under the GPLv3 - see LICENSE
+import sys
 from importlib import reload
 
+if sys.version_info >= (3, 8):
+    from importlib.metadata import EntryPoint, entry_points
+else:
+    from importlib_metadata import EntryPoint, entry_points
+
 import pytest
-import entrypoints
 
 from .. import io as bio, tasks, vdif, base
 
@@ -21,7 +26,7 @@ class TestExistingIOFormat:
         assert hasattr(bio, 'vdif')
         assert 'vdif' in bio._entries
         assert 'vdif' in bio.FORMATS
-        assert isinstance(bio._entries['vdif'], entrypoints.EntryPoint)
+        assert isinstance(bio._entries['vdif'], EntryPoint)
         del bio.vdif
         assert 'vdif' not in bio.__dict__
         assert 'vdif' in bio.FORMATS
@@ -33,7 +38,7 @@ class TestExistingIOFormat:
     def test_fake_bad_vdif(self):
         assert bio.vdif is vdif
         del bio.vdif
-        bio._entries['vdif'] = entrypoints.EntryPoint('vdif', 'bad.vdif', '')
+        bio._entries['vdif'] = EntryPoint('vdif', 'bad.vdif', '')
         with pytest.raises(AttributeError, match='not loadable'):
             bio.vdif
         assert 'vdif' not in dir(bio)
@@ -61,7 +66,7 @@ class TestNewIOFormats:
         bio.__dict__.pop(self.added, None)
 
     def test_find_new(self):
-        self.setup_entry(entrypoints.EntryPoint('new', 'baseband.vdif', ''))
+        self.setup_entry(EntryPoint('new', 'baseband.vdif', ''))
         assert 'new' in dir(bio)
         assert 'new' in bio.FORMATS
         assert bio.new is vdif
@@ -73,7 +78,7 @@ class TestNewIOFormats:
         assert bio.new is vdif
 
     def test_cannot_getattr_bad(self):
-        self.setup_entry(entrypoints.EntryPoint('bad', 'really_bad', ''))
+        self.setup_entry(EntryPoint('bad', 'really_bad', ''))
         assert 'bad' in dir(bio)
         assert 'bad' in bio.FORMATS
         with pytest.raises(AttributeError, match='not loadable'):
@@ -85,7 +90,7 @@ class TestNewIOFormats:
             bio.bad
 
     def test_not_hasattr_bad(self):
-        self.setup_entry(entrypoints.EntryPoint('bad', 'really_bad', ''))
+        self.setup_entry(EntryPoint('bad', 'really_bad', ''))
         assert 'bad' in dir(bio)
         assert not hasattr(bio, 'bad')
         assert 'bad' not in dir(bio)
@@ -144,7 +149,7 @@ class TestTasks:
         assert (set(entry.name for entry in tasks._bad_entries)
                 == {'utils', 'does_not_exist'})
 
-    @pytest.mark.xfail(entrypoints.get_group_all('baseband.tasks'),
+    @pytest.mark.xfail(entry_points().get('baseband.tasks', []),
                        reason='cannot test for lack of entry points')
     def test_message_on_empty_tasks(self):
         with pytest.raises(AttributeError, match='No.*entry points found'):

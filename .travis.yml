@@ -94,7 +94,7 @@ jobs:
             apt:
               packages:
               - python3-astropy
-              - python3-entrypoints
+              - python3-importlib-metadata
               - python3-pip
           env: SETUP_METHOD='apt'
 

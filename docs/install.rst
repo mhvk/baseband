@@ -14,7 +14,12 @@ Baseband requires:
 - Python_ |minimum_python_version| or later
 - Astropy_ |minimum_astropy_version| or later
 - Numpy_ |minimum_numpy_version| or later
-- `entrypoints <https://entrypoints.readthedocs.io/en/latest/>`_
+
+On python 3.7, in addition it requires
+`importlib_metadata <https://importlib-metadata.readthedocs.io/en/latest/>`_,
+which is the backport of
+`importlib.metadata <https://docs.python.org/3/library/importlib.metadata.html>`_
+from python 3.8 and later.
 
 .. _install_baseband:
 
