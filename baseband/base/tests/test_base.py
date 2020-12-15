@@ -1,5 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
-from copy import copy
+from copy import copy, deepcopy
 import io
 import pickle
 from collections import namedtuple
@@ -536,6 +536,37 @@ class TestBase:
         with FileBase(io.open(filename, 'wb')) as fw:
             with pytest.raises(TypeError):
                 pickle.dumps(fw)
+
+    def test_deepcopy(self, tmpdir):
+        filename = str(tmpdir.join('test.dat'))
+        with io.open(filename, 'wb') as fw:
+            fw.write(b'abcdefghijklmnopqrstuvwxyz')
+
+        with VLBIFileReaderBase(io.open(filename, 'rb')) as fh:
+            assert fh.read(2) == b'ab'
+            with deepcopy(fh) as fh2:
+                assert fh2.tell() == 2
+                assert fh2.read(2) == b'cd'
+                fh2.seek(-2, 2)
+                assert fh2.read(2) == b'yz'
+
+            # cannot read closed file
+            with pytest.raises(ValueError):
+                fh2.read()
+
+            # Old file was not moved or closed.
+            assert fh.tell() == 2
+            assert fh.read(2) == b'cd'
+
+        with deepcopy(fh) as fh3:
+            assert fh3.closed
+            # cannot read closed file
+            with pytest.raises(ValueError):
+                fh3.read()
+
+        with FileBase(io.open(filename, 'wb')) as fw:
+            with pytest.raises(TypeError):
+                deepcopy(fw)
 
 
 class TestSqueezeAndSubset:

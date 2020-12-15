@@ -1,5 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 import os
+import copy
 import pickle
 
 import pytest
@@ -760,6 +761,36 @@ class TestGSB:
             assert fh4.closed
             with pytest.raises(ValueError):
                 fh4.read(1)
+
+    @pytest.mark.parametrize('sample_header,sample_data', [
+        (SAMPLE_RAWDUMP_HEADER, SAMPLE_RAWDUMP),
+        (SAMPLE_PHASED_HEADER, SAMPLE_PHASED)])
+    def test_copy(self, sample_header, sample_data):
+        if sample_header is SAMPLE_RAWDUMP_HEADER:
+            sample_rate = self.frame_rate * self.payload_nbytes * 2
+        else:
+            sample_rate = self.frame_rate * self.payload_nbytes / 512
+        # Only simple tests here; more complete ones in vdif.
+        with gsb.open(sample_header, 'rs', raw=sample_data,
+                      sample_rate=sample_rate,
+                      payload_nbytes=self.payload_nbytes,
+                      squeeze=False) as fh:
+            fh.seek(6)
+            with copy.deepcopy(fh) as fh2:
+                d1_3 = fh.read(3)
+                assert fh2.tell() == 6
+                d2_10 = fh2.read(10)
+                assert fh.tell() == 9
+                assert fh2.tell() == 16
+
+            assert np.all(d2_10[:3] == d1_3)
+            assert fh2.closed
+            assert not fh.closed
+            d1_7 = fh.read(7)
+            assert np.all(d2_10[3:] == d1_7)
+
+        with copy.copy(fh) as fh3:
+            assert fh3.closed
 
     def test_phased_stream(self, tmpdir):
         bps = 8
