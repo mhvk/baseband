@@ -35,6 +35,7 @@ Overview
    install
    tutorials/getting_started
    tutorials/using_baseband
+   tutorials/performance_tips
    tutorials/glossary
 
 .. _specific_file_formats_toc:
