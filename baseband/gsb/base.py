@@ -468,11 +468,11 @@ class GSBFileOpener(FileOpener):
             return super().__call__(name, mode, **kwargs)
 
         # But for stream mode, we need to open both raw and timestamp.
-        fh = self.get_fh(name, mode[0]+'t')
         raw = kwargs.pop('raw', None)
         if raw is None:
             raise TypeError("stream missing required argument 'raw'.")
 
+        fh = self.get_fh(name, mode[0]+'t')
         stream_mode = kwargs.pop('header_mode',
                                  'phased' if isinstance(raw, (list, tuple))
                                  else 'rawdump')
