@@ -104,9 +104,9 @@ Project Details
     :target: https://www.astropy.org/
     :alt: Powered by Astropy
 
-.. image:: https://travis-ci.org/mhvk/baseband.svg?branch=master
-   :target: https://travis-ci.org/mhvk/baseband
-   :alt: Test Status
+.. image:: https://github.com/mhvk/baseband/workflows/CI/badge.svg
+    :target: https://github.com/mhvk/baseband/actions
+    :alt: Test Status
 
 .. image:: https://codecov.io/gh/mhvk/baseband/branch/master/graph/badge.svg
    :target: https://codecov.io/gh/mhvk/baseband
