@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches:
+    - master
+    tags:
+    - '*'
+  pull_request:
+
+jobs:
+  initial_tests:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+
+          - name: Test basics on 3.9
+            python: 3.9
+            toxenv: py39-test
+            toxposargs: --open-files
+
+          - name: Code style checks
+            python: 3.x
+            toxenv: codestyle
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python }}
+    - name: Install Python dependencies
+      run: python -m pip install --upgrade tox
+    - name: Run tests
+      run: tox ${{ matrix.toxargs }} -e ${{ matrix.toxenv }} -- ${{ matrix.toxposargs }}
+
+  comprehensive_tests:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    needs: initial_tests
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+
+          - name: Documentation build
+            python: 3.8
+            toxenv: build_docs
+            apt_packages: graphviz
+
+          - name: Coverage using oldest supported versions
+            python: 3.7
+            toxenv: py37-test-oldestdeps-cov
+            pip_packages: codecov
+
+          - name: Windows on 3.8
+            os: windows-latest
+            python: 3.8
+            toxenv: py38-test
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: Install system dependencies
+      if: matrix.apt_packages
+      run: sudo apt-get install ${{ matrix.apt_packages }}
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python }}
+    - name: Install Python dependencies
+      run: python -m pip install --upgrade tox ${{ matrix.pip_packages }}
+    - name: Run tests
+      run: tox ${{ matrix.toxargs }} -e ${{ matrix.toxenv }} -- ${{ matrix.toxposargs }}
+    - name: Upload coverage to codecov
+      if: ${{ contains(matrix.toxenv,'-cov') }}
+      uses: codecov/codecov-action@v1
+      with:
+        file: ./coverage.xml
