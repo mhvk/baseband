@@ -292,8 +292,10 @@ are situations such the one above, however, where we'd like to replace
 one header with another.
 
 To get :class:`~baseband.vdif.header.VDIFHeader` to use ``VDIFHeader4Enhanced``
-when ``edv=4``, we can manually insert it in the dictionary::
+when ``edv=4``, we can manually insert it in the dictionary (keeping a
+copy of the original `dict` so we can updo later)::
 
+    >>> original_header_classes = vdif.header.VDIF_HEADER_CLASSES.copy()
     >>> vdif.header.VDIF_HEADER_CLASSES[4] = VDIFHeader4Enhanced
 
 Of course, we should then be sure that its ``_edv`` attribute is correct::
@@ -444,6 +446,7 @@ now read frames::
     >>> np.all(frame0.data == payload0.data)
     True
     >>> fh2.close()
+    >>> vdif.header.VDIF_HEADER_CLASSES = original_header_classes
 
 Reading frames using :meth:`VDIFFileReader.read_frame
 <baseband.vdif.base.VDIFFileReader.read_frame>` will now work as well, but
