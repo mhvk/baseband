@@ -108,15 +108,16 @@ coincidentally, what is given by the reader above suffices::
     True
     >>> fh.close()
 
-Here is a simple example to copy a VDIF file.  We use the ``sort=False`` option
-to ensure the frames are written exactly in the same order, so the files should
-be identical::
+Copying Parts of Files
+======================
+
+Here is a simple example to copy a VDIF file::
 
     >>> with vdif.open(SAMPLE_VDIF, 'rb') as fr, vdif.open('try.vdif', 'wb') as fw:
     ...     while True:
     ...         try:
-    ...             fw.write_frameset(fr.read_frameset(sort=False))
-    ...         except:
+    ...             fw.write_frame(fr.read_frame())
+    ...         except EOFError:
     ...             break
 
 For small files, one could just do::
@@ -128,6 +129,32 @@ For small files, one could just do::
     ...     fw.write(fr.read())
 
 This copies everything to memory, though, and some header information is lost.
+
+Both examples can be adjusted for copying just some channels::
+
+    >>> from baseband.data import SAMPLE_AROCHIME_VDIF as SAMPLE_AROCHIME
+    >>> with vdif.open(SAMPLE_AROCHIME, 'rb') as fr, vdif.open('try.vdif', 'wb') as fw:
+    ...     while True:
+    ...         try:
+    ...             frame = fr.read_frame()
+    ...         except EOFError:
+    ...             break
+    ...         new_header = frame.header.copy()
+    ...         new_header.nchan = 128
+    ...         new_header.samples_per_frame = 1
+    ...         new_data = frame[:, :128]
+    ...         fw.write_frame(new_data, new_header)
+
+    >>> with vdif.open(SAMPLE_AROCHIME, 'rs', sample_rate=800/1024/2*u.MHz,
+    ...                subset=(slice(None), slice(0, 128))) as fr:
+    ...     out_header = fr.header0.copy()
+    ...     out_header.nchan = 128
+    ...     out_header.samples_per_frame = 1
+    ...     with vdif.open('try.vdif', 'ws', sample_rate=fr.sample_rate,
+    ...                    header0=out_header, nthread=2) as fw:
+    ...         fw.write(fr.read())
+
+
 
 .. _vdif_troubleshooting:
 

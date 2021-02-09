@@ -3,6 +3,7 @@ import pickle
 
 import pytest
 import numpy as np
+from numpy.testing import assert_array_equal
 from astropy.time import Time
 import astropy.units as u
 
@@ -1382,6 +1383,99 @@ def test_arochime_vdif():
     with pytest.raises(EOFError):
         with vdif.open(SAMPLE_AROCHIME, 'rs') as fh:
             pass
+
+
+class TestAROCHIMEPartialCopy:
+    def setup_class(self):
+        self.sample_rate = 800*u.MHz / 1024. / 2.
+
+        with vdif.open(SAMPLE_AROCHIME, 'rs',
+                       sample_rate=self.sample_rate) as fh:
+            self.start_time = fh.start_time
+            self.sample_rate = fh.sample_rate
+            self.stop_time = fh.stop_time
+            self.data = fh.read()
+
+    def test_via_frames(self, tmpdir):
+        out_file = str(tmpdir.join('upper128_wb.vdif'))
+        with vdif.open(SAMPLE_AROCHIME, 'rb') as fr, \
+             vdif.open(out_file, 'wb') as fw:
+            while True:
+                try:
+                    frame = fr.read_frame()
+                except EOFError:
+                    break
+
+                new_header = frame.header.copy()
+                new_header.nchan = 128
+                new_header.samples_per_frame = 1
+                new_data = frame[:, :128]
+                fw.write_frame(new_data, new_header)
+
+        with vdif.open(out_file, 'rs', sample_rate=self.sample_rate) as fr:
+            assert fr.start_time == self.start_time
+            assert fr.sample_rate == self.sample_rate
+            assert fr.samples_per_frame == 1
+            assert fr.sample_shape == (2, 128)
+            data = fr.read()
+
+        assert_array_equal(data, self.data[:, :, :128])
+
+    def test_via_frame_sets(self, tmpdir):
+        out_file = str(tmpdir.join('upper128_wb.vdif'))
+        with vdif.open(SAMPLE_AROCHIME, 'rb') as fr, \
+             vdif.open(out_file, 'wb') as fw:
+            while True:
+                try:
+                    frame_set = fr.read_frameset()
+                except EOFError:
+                    break
+
+                new_header = frame_set.header0.copy()
+                new_header.nchan = 128
+                new_header.samples_per_frame = 1
+                new_data = frame_set[:, :, :128]
+                fw.write_frameset(new_data, new_header,
+                                  nthread=new_data.shape[1])
+
+        with vdif.open(out_file, 'rs', sample_rate=self.sample_rate) as fr:
+            assert fr.start_time == self.start_time
+            assert fr.sample_rate == self.sample_rate
+            assert fr.samples_per_frame == 1
+            assert fr.sample_shape == (2, 128)
+            data = fr.read()
+
+        assert_array_equal(data, self.data[:, :, :128])
+
+    def test_via_stream_reader(self, tmpdir):
+        """Check we can easily copy part of the band."""
+        out_file = str(tmpdir.join('upper128_ws.vdif'))
+        with vdif.open(SAMPLE_AROCHIME, 'rs', sample_rate=self.sample_rate,
+                       subset=(slice(None), slice(0, 128))) as fh:
+            data1 = fh.read()
+            assert data1.shape == (5, 2, 128)
+            assert_array_equal(data1, self.data[:, :, :128])
+            out_header = fh.header0.copy()
+            out_header.nchan = 128
+            out_header.samples_per_frame = 1
+            with vdif.open(out_file, 'ws', sample_rate=self.sample_rate,
+                           header0=out_header, nthread=2) as fw:
+                assert fw.start_time == self.start_time
+                assert fw.sample_rate == self.sample_rate
+                assert fw.samples_per_frame == 1
+                assert fw.sample_shape == (2, 128)
+                fw.write(data1)
+                assert fw.tell() == fh.tell()
+                assert fw.time == fh.time
+
+            with vdif.open(out_file, 'rs', sample_rate=self.sample_rate) as fr:
+                assert fr.start_time == self.start_time
+                assert fr.sample_rate == self.sample_rate
+                assert fr.samples_per_frame == 1
+                assert fr.sample_shape == (2, 128)
+                data2 = fr.read()
+
+        assert_array_equal(data2, data1)
 
 
 def test_count_not_changed():
