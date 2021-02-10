@@ -1396,6 +1396,19 @@ class TestAROCHIMEPartialCopy:
             self.stop_time = fh.stop_time
             self.data = fh.read()
 
+        self.nchan = 128
+        self.channels = slice(0, self.nchan)
+
+    def check_file(self, out_file):
+        with vdif.open(out_file, 'rs', sample_rate=self.sample_rate) as fr:
+            assert fr.start_time == self.start_time
+            assert fr.sample_rate == self.sample_rate
+            assert fr.samples_per_frame == 1
+            assert fr.sample_shape == (2, self.nchan)
+            data = fr.read()
+
+        assert_array_equal(data, self.data[:, :, self.channels])
+
     def test_via_frames(self, tmpdir):
         out_file = str(tmpdir.join('upper128_wb.vdif'))
         with vdif.open(SAMPLE_AROCHIME, 'rb') as fr, \
@@ -1407,19 +1420,12 @@ class TestAROCHIMEPartialCopy:
                     break
 
                 new_header = frame.header.copy()
-                new_header.nchan = 128
+                new_header.nchan = self.nchan
                 new_header.samples_per_frame = 1
-                new_data = frame[:, :128]
+                new_data = frame[:, self.channels]
                 fw.write_frame(new_data, new_header)
 
-        with vdif.open(out_file, 'rs', sample_rate=self.sample_rate) as fr:
-            assert fr.start_time == self.start_time
-            assert fr.sample_rate == self.sample_rate
-            assert fr.samples_per_frame == 1
-            assert fr.sample_shape == (2, 128)
-            data = fr.read()
-
-        assert_array_equal(data, self.data[:, :, :128])
+        self.check_file(out_file)
 
     def test_via_frame_sets(self, tmpdir):
         out_file = str(tmpdir.join('upper128_wb.vdif'))
@@ -1432,31 +1438,24 @@ class TestAROCHIMEPartialCopy:
                     break
 
                 new_header = frame_set.header0.copy()
-                new_header.nchan = 128
+                new_header.nchan = self.nchan
                 new_header.samples_per_frame = 1
-                new_data = frame_set[:, :, :128]
+                new_data = frame_set[:, :, self.channels]
                 fw.write_frameset(new_data, new_header,
                                   nthread=new_data.shape[1])
 
-        with vdif.open(out_file, 'rs', sample_rate=self.sample_rate) as fr:
-            assert fr.start_time == self.start_time
-            assert fr.sample_rate == self.sample_rate
-            assert fr.samples_per_frame == 1
-            assert fr.sample_shape == (2, 128)
-            data = fr.read()
-
-        assert_array_equal(data, self.data[:, :, :128])
+        self.check_file(out_file)
 
     def test_via_stream_reader(self, tmpdir):
         """Check we can easily copy part of the band."""
         out_file = str(tmpdir.join('upper128_ws.vdif'))
         with vdif.open(SAMPLE_AROCHIME, 'rs', sample_rate=self.sample_rate,
-                       subset=(slice(None), slice(0, 128))) as fh:
+                       subset=(slice(None), self.channels)) as fh:
             data1 = fh.read()
-            assert data1.shape == (5, 2, 128)
-            assert_array_equal(data1, self.data[:, :, :128])
+            assert data1.shape == (5, 2, self.nchan)
+            assert_array_equal(data1, self.data[:, :, self.channels])
             out_header = fh.header0.copy()
-            out_header.nchan = 128
+            out_header.nchan = self.nchan
             out_header.samples_per_frame = 1
             with vdif.open(out_file, 'ws', sample_rate=self.sample_rate,
                            header0=out_header, nthread=2) as fw:
@@ -1468,14 +1467,24 @@ class TestAROCHIMEPartialCopy:
                 assert fw.tell() == fh.tell()
                 assert fw.time == fh.time
 
-            with vdif.open(out_file, 'rs', sample_rate=self.sample_rate) as fr:
-                assert fr.start_time == self.start_time
-                assert fr.sample_rate == self.sample_rate
-                assert fr.samples_per_frame == 1
-                assert fr.sample_shape == (2, 128)
-                data2 = fr.read()
+        self.check_file(out_file)
 
-        assert_array_equal(data2, data1)
+    def test_via_binary_modification(self, tmpdir):
+        out_file = str(tmpdir.join('upper128_binary_mod.vdif'))
+        # 1024 bytes payload + 32 bytes header = 1056 bytes = 264 words
+        binary = np.fromfile(SAMPLE_AROCHIME, 'u4').reshape(-1, 264)
+        header0 = vdif.VDIFHeader(binary[0, :8])
+        header0.nchan = 128
+        header0.samples_per_frame = 1
+        assert header0.words[2] == (
+            (32+128) // 8  # frame (header+payload) length in 8-byte words
+            + (7 << 24)    # lg2nchan
+            + (1 << 29))   # VDIF version number
+        binary[:, 2] = header0.words[2]
+        # Only save header (8 words) plus first 128 channels = 32 words.
+        binary[:, :40].tofile(out_file)
+
+        self.check_file(out_file)
 
 
 def test_count_not_changed():
