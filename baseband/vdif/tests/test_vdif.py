@@ -1472,7 +1472,7 @@ class TestAROCHIMEPartialCopy:
     def test_via_binary_modification(self, tmpdir):
         out_file = str(tmpdir.join('upper128_binary_mod.vdif'))
         # 1024 bytes payload + 32 bytes header = 1056 bytes = 264 words
-        binary = np.fromfile(SAMPLE_AROCHIME, 'u4').reshape(-1, 264)
+        binary = np.fromfile(SAMPLE_AROCHIME, '<u4').reshape(-1, 264)
         header0 = vdif.VDIFHeader(binary[0, :8])
         header0.nchan = 128
         header0.samples_per_frame = 1
