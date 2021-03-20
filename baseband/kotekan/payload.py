@@ -4,7 +4,7 @@ from collections import namedtuple
 
 import numpy as np
 
-from ..base.payload import PayloadBase
+from baseband.base.payload import PayloadBase
 
 
 __all__ = ['KotekanPayload']
@@ -19,5 +19,6 @@ def decode_4bit(words):
 
 
 class KotekanPayload(PayloadBase):
+    _dtype_word = np.dtype('u1')
     _decoders = {4: decode_4bit}
     _sample_shape_maker = namedtuple('SampleShape', 'npol')

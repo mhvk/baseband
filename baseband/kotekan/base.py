@@ -1,11 +1,11 @@
 # Licensed under the GPLv3 - see LICENSE
 import astropy.units as u
 
-from ..helpers import sequentialfile as sf
-from ..base.base import (
+from baseband.helpers import sequentialfile as sf
+from baseband.base.base import (
     FileBase,
     FileOpener, FileInfo)
-from ..base.file_info import FileReaderInfo
+from baseband.base.file_info import FileReaderInfo
 from .header import KotekanHeader
 from .frame import KotekanFrame
 

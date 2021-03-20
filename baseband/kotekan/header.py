@@ -2,8 +2,8 @@ import numpy as np
 from astropy.time import Time
 from astropy import units as u
 
-from ..base.header import ParsedHeaderBase
-from ..base.utils import fixedvalue
+from baseband.base.header import ParsedHeaderBase
+from baseband.base.utils import fixedvalue
 
 
 __all__ = ['KotekanHeader']
@@ -84,7 +84,7 @@ class KotekanHeader(ParsedHeaderBase):
         """
         s = fh.read(cls._dtype.itemsize)
         if len(s) < cls._dtype.itemsize:
-            raise EOFError('reached EOF while reading ASPFileHeader')
+            raise EOFError('reached EOF while reading frame header')
         words = np.ndarray(buffer=s, shape=(), dtype=cls._dtype)
         self = cls(words, verify=verify, **kwargs)
         self.mutable = False

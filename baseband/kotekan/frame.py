@@ -1,5 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
-from ..base.frame import FrameBase
+from baseband.base.frame import FrameBase
 from .header import KotekanHeader
 from .payload import KotekanPayload
 
