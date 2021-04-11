@@ -7,6 +7,8 @@ New Features
 API Changes
 -----------
 
+- The deprecated ``vlbi_base`` module has been removed. [#484]
+
 Other Changes and Additions
 ---------------------------
 
