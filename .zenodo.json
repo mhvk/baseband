@@ -1,0 +1,45 @@
+{
+    "creators": [
+        {
+            "affiliation": "University of Toronto",
+            "name": "Marten van Kerkwijk",
+            "orcid": "0000-0002-5830-8505"
+        },
+        {
+            "affiliation": "City of Toronto Transportation Services",
+            "name": "Chenchong Charles Zhu"
+        },
+        {
+            "affiliation": "Shanghai Astronomical Observatory",
+            "name": "Shaoguang Guo"
+        },
+        {
+            "affiliation": "University of Toronto",
+            "name": "Rebecca Lin"
+        },
+        {
+            "affiliation": "University of Toronto",
+            "name": "Nikhil Mahajan"
+        },
+        {
+            "affiliation": "Dublin Institute for Advanced Studies",
+            "name": "David McKenna"
+        },
+        {
+            "affiliation": "Max-Plank-Institut f\u00fcr Radioastronomie",
+            "name": "Robert Main"
+        },
+        {
+            "affiliation": "California Institute of Technology",
+            "name": "Dana Simard"
+        },
+        {
+            "affiliation": "UC Berkeley",
+            "name": "George Stein"
+        },
+        {
+            "affiliation": "University of Toronto",
+            "name": "Rik van Lieshout"
+        }
+    ]
+}
