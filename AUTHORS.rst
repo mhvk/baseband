@@ -26,8 +26,10 @@ Other contributors (alphabetical)
 * Rebecca Lin (@00rebe)
 * Nikhil Mahajan (@theXYZT)
 * Robert Main (@ramain)
+* David McKenna (@David-McKenna)
 * Dana Simard (@danasimard)
 * George Stein (@georgestein)
+* Rik van Lieshout (@rikvl)
 
 If you have contributed to Baseband but are not listed above, please send one
 of the authors an e-mail, or `open a pull request for this page
