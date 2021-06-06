@@ -64,8 +64,8 @@ We begin in the main development branch (the local equivalent to
   Since ``CHANGES.rst`` is updated for each merge commit, in practice it is
   only necessary to change the date of the release you are working on from
   "unreleased" to the current date.
-- **Add authors and contributors to** ``AUTHORS.rst``.  To list contributors,
-  one can use::
+- **Add authors and contributors to** ``AUTHORS.rst`` and ``.zenodo.json``.
+  To list contributors, one can use::
 
       git shortlog -n -s -e
 
