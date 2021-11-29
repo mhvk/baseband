@@ -204,8 +204,17 @@ class VDIFFrameSet:
 
         frames = {}
         header = header0
-        while header['frame_nr'] == frame_nr:
+        while True:
             thread_id = header['thread_id']
+            if header['frame_nr'] != frame_nr or thread_id in frames:
+                # Exit if we got to the next frame, moving offset back to
+                # before the header that belongs to the next frame.
+                # Note that a duplicate thread can happen for a frame_rate
+                # of 1/s (see gh-485) or perhaps an unfortunate gap.
+                # Sadly, it seems we cannot always rely on header['seconds'].
+                fh.seek(-header.nbytes, 1)
+                break
+
             if thread_ids is None or thread_id in thread_ids:
                 payload = VDIFPayload.fromfile(fh, header=header)
                 # Since header was (optionally) verified, and payload was
@@ -221,9 +230,6 @@ class VDIFFrameSet:
                     break
                 else:
                     raise
-
-        else:  # Move back to before header that had incorrect frame_nr.
-            fh.seek(-header.nbytes, 1)
 
         if thread_ids and len(frames) < len(thread_ids):
             raise OSError("could not find all requested frames.")

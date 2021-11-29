@@ -1663,3 +1663,20 @@ def test_edf3_vdif_payload_size(tmpdir):
         assert header2.payload_nbytes == 1000
         assert header2.samples_per_frame == 4000
         assert np.all(data2 == data1)
+
+
+def test_one_frame_per_second(tmpdir):
+    testfile = str(tmpdir.join('test.vdif'))
+    with vdif.open(SAMPLE_FILE, 'rs') as fh:
+        header1 = fh.header0.copy()
+        header1.frame_rate = 1 * u.Hz
+        data1 = fh.read()
+        with vdif.open(testfile, 'ws', header0=header1, nthread=8) as fw:
+            fw.write(data1)
+            stop_time = fw.time
+
+    with vdif.open(testfile, 'rs') as fc:
+        assert fc._frame_rate == 1 * u.Hz
+        assert abs(fc.stop_time - stop_time) < 1 * u.ns
+        data2 = fc.read()
+        assert np.all(data2 == data1)
