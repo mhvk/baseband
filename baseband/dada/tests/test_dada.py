@@ -780,3 +780,20 @@ class TestDADAFileNameSequencer:
         fns = DADAFileNameSequencer(template, self.header)
         assert fns[0] == '2013-07-02-01:37:40_0000006400000000.000000.dada'
         assert fns[100] == '2013-07-02-01:37:40_0000006406400000.000000.dada'
+
+
+def test_one_frame_per_second(tmpdir):
+    testfile = str(tmpdir.join('test.dada'))
+    with dada.open(SAMPLE_FILE, 'rs') as fh:
+        header1 = fh.header0.copy()
+        header1.sample_rate = 1 * u.Hz * header1.samples_per_frame
+        data1 = fh.read()
+        with dada.open(testfile, 'ws', header0=header1) as fw:
+            fw.write(data1)
+            stop_time = fw.time
+
+    with dada.open(testfile, 'rs') as fc:
+        assert fc._frame_rate == 1 * u.Hz
+        assert abs(fc.stop_time - stop_time) < 1 * u.ns
+        data2 = fc.read()
+        assert np.all(data2 == data1)

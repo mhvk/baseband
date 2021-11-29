@@ -9,6 +9,11 @@ API Changes
 
 - The deprecated ``vlbi_base`` module has been removed. [#484]
 
+Bug Fixes
+---------
+
+- Ensure that vdif files with 1 frame per second can be read. [#488]
+
 Other Changes and Additions
 ---------------------------
 
