@@ -1,3 +1,19 @@
+4.2 (unreleased)
+================
+
+New Features
+------------
+
+API Changes
+-----------
+
+Bug Fixes
+---------
+
+Other Changes and Additions
+---------------------------
+
+
 4.1 (2021-11-30)
 ================
 
