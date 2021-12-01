@@ -353,12 +353,20 @@ class VLBIFileReaderBase(FileBase):
         AssertionError
             If the header did not pass verification.
         """
-        locations = self.locate_frames(*args, **kwargs)
-        if not locations:
+        for location in self.locate_frames(*args, **kwargs):
+            with self.temporary_offset(location):
+                try:
+                    header = self.read_header()
+                except Exception:
+                    continue
+                else:
+                    break
+
+        else:
             raise HeaderNotFoundError('could not locate a a nearby frame.')
-        self.seek(locations[0])
-        with self.temporary_offset():
-            return self.read_header()
+
+        self.seek(location)
+        return header
 
     def get_frame_rate(self, offset=0):
         """Determine the number of frames per second.
