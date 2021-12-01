@@ -247,6 +247,7 @@ class TestMark5B:
             info = fh.info
 
         expected = {'format': 'mark5b',
+                    'offset0': 0,
                     'number_of_frames': number_of_frames,
                     'frame_rate': frame_rate,
                     'sample_rate': 32 * u.MHz,

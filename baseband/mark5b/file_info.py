@@ -20,6 +20,10 @@ class Mark5BFileReaderInfo(FileReaderInfo):
         "needed to determine sample shape, frame rate, decode data."))
     complex_data = info_item(needs='header0', doc=(
         'Whether the data are complex.'))
+    attr_names = (FileReaderInfo.attr_names[:-4]
+                  + ('offset0',)
+                  + FileReaderInfo.attr_names[-4:])
+    """Attributes that the container provides."""
 
     @info_item
     def time_info(self):
@@ -31,6 +35,23 @@ class Mark5BFileReaderInfo(FileReaderInfo):
             return None
 
         return time_info
+
+    @info_item
+    def offset0(self):
+        """Offset in bytes to the location of the first header."""
+        with self._parent.temporary_offset(0) as fh:
+            return fh.locate_frames()[0]
+
+    @info_item(needs='offset0')
+    def header0(self):
+        with self._parent.temporary_offset(self.offset0) as fh:
+            return fh.read_header()
+
+    @info_item(needs=('header0', 'bps', 'nchan'))
+    def frame0(self):
+        """First frame from the file."""
+        with self._parent.temporary_offset(self.offset0) as fh:
+            return fh.read_frame()
 
     @info_item(needs=('header0', 'frame_rate', 'time_info'))
     def start_time(self):
@@ -54,7 +75,6 @@ class Mark5BFileReaderInfo(FileReaderInfo):
         with self._parent.temporary_offset(0):
             return 'mark5b' if self._parent.locate_frames() else None
 
-    @info_item(needs=('header0', 'bps', 'nchan'))
-    def frame0(self):
-        """First frame from the file."""
-        return super().frame0
+    def __repr__(self):
+        return '\n'.join([r for r in super().__repr__().split('\n')
+                          if 'offset0 = 0' not in r])

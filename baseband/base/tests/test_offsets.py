@@ -55,6 +55,8 @@ class TestRawOffsets:
         assert len(ro) == 2
         assert ro.frame_nr == [10, 14]
         assert ro.offset == [1, 10]
+        ro[0] = 0
+        assert len(ro) == 2
         # Though if it precedes a frame with the same offset, we move.
         ro[8] = 1 + 8*frame_nbytes
         assert ro.frame_nr == [8, 14]
