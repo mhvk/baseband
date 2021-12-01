@@ -112,7 +112,7 @@ class RawOffsets:
         # frame number to our value.
         if index < len(self) and self.offset[index] == offset:
             self.frame_nr[index] = frame_nr
-        elif index == 0 or self.offset[index-1] != offset:
+        elif offset != (self.offset[index-1] if index > 0 else 0):
             # Otherwise, if we add new information, insert ourserlves.
             self.frame_nr.insert(index, frame_nr)
             self.offset.insert(index, offset)

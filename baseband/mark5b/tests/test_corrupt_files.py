@@ -82,7 +82,8 @@ class TestCorruptSampleCopy:
                     fr.find_header(forward=True, maximum=40000,
                                    check=1)
 
-    # Have to keep frame 0 intact, as well as header of frame 1.
+    # In principle, code can deal with a broken frame 0, as is tested below.
+    # Here, have to keep frame 0 intact, as well as header of frame 1.
     @pytest.mark.parametrize('missing', [
         slice(20032, 20033),  # First byte of header of frame 2.
         slice(20096, 20100),  # Part of payload of frame 2.
@@ -197,6 +198,24 @@ class TestCorruptFile:
         assert np.all(data[:frame_nr.start].astype(int) == self.data)
         assert np.all(data[frame_nr.stop:].astype(int) == self.data)
         assert np.all(data[frame_nr] == 0.)
+
+    @pytest.mark.parametrize('missing_bytes', [
+        slice(0, 8),  # Part of header
+        slice(0, 9000),  # Most of frame
+        slice(0, 10012),  # Most of frame
+        slice(8, 10016),  # All of first frame
+    ])
+    def test_missing_start(self, missing_bytes, tmpdir):
+        # In all these cases, the data read should just be short.
+        fake_file = self.fake_file(tmpdir)
+        corrupt_file = self.corrupt_copy(fake_file, missing_bytes)
+        # We should always skip the first frame if part of it is missing.
+        with mark5b.open(corrupt_file, 'rs', **self.kwargs) as fr:
+            assert fr.size == 15 * self.data.size
+            data = fr.read()
+
+        data = data.reshape((-1,) + self.data.shape)
+        assert np.all(data.astype(int) == self.data)
 
     @pytest.mark.parametrize('missing_bytes', [
         slice(0, 10016),  # Remove whole last frame set.

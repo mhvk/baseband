@@ -360,12 +360,18 @@ class VLBIFileReaderBase(FileBase):
         with self.temporary_offset():
             return self.read_header()
 
-    def get_frame_rate(self):
+    def get_frame_rate(self, offset=0):
         """Determine the number of frames per second.
 
         The method cycles through headers, starting from the start of the file,
         finding the largest frame number before it jumps back to 0 for a new
         second.
+
+        Parameters
+        ----------
+        offset : int or None, optional
+            Offset at which to start searching.  Default is 0, i.e., the start
+            of the file. Use `None` to start at the current position.
 
         Returns
         -------
@@ -377,7 +383,7 @@ class VLBIFileReaderBase(FileBase):
         `EOFError`
             If the file contains less than one second of data.
         """
-        with self.temporary_offset(0):
+        with self.temporary_offset(offset):
             header = header0 = self.read_header()
             frame_nr0 = header0['frame_nr']
             while header['frame_nr'] == frame_nr0:

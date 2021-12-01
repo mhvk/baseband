@@ -98,13 +98,13 @@ class Mark5BFileReader(VLBIFileReaderBase):
         frame_rate : `~astropy.units.Quantity`
             Frames per second.
         """
-        try:
-            return super().get_frame_rate()
-        except Exception as exc:
-            with self.temporary_offset(0):
+        with self.temporary_offset(0):
+            header0 = self.find_header()
+            try:
+                return super().get_frame_rate(offset=None)
+            except Exception as exc:
                 try:
-                    header0 = self.read_header()
-                    self.seek(header0.payload_nbytes, 1)
+                    self.seek(header0.frame_nbytes, 1)
                     header1 = self.read_header()
                     tdelta = header1.fraction - header0.fraction
                     if tdelta == 0.:
@@ -114,7 +114,7 @@ class Mark5BFileReader(VLBIFileReaderBase):
                     return u.Quantity(1 / tdelta, u.Hz).round()
                 except Exception:
                     pass
-            raise exc
+                raise exc
 
     def locate_frames(self, pattern=None, **kwargs):
         """Use a pattern to locate frame starts near the current position.
@@ -260,6 +260,7 @@ class Mark5BStreamReader(Mark5BStreamBase, VLBIStreamReaderBase):
             sample_shape=(nchan,), bps=bps,
             squeeze=squeeze, subset=subset, fill_value=fill_value,
             verify=verify)
+        self._raw_offsets[0] = fh_raw.tell()
         # Use ref_time in preference to kday so we can handle files that
         # span a change in 1000s of MJD.
         self.fh_raw.kday = None

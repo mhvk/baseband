@@ -1,3 +1,13 @@
+4.1.1 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- Ensure that Mark 5B files with extra bytes at the start (i.e., with a
+  first frame that starts later) can be read. [#489]
+
+
 4.1 (2021-11-30)
 ================
 
