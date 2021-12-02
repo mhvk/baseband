@@ -411,11 +411,14 @@ class TestMark4:
             assert abs(info2.frame_rate
                        - 32 * u.MHz / info2.samples_per_frame) < 1 * u.nHz
 
-        with mark4.open(SAMPLE_FILE, 'rb', decade='2010') as fh3:
+        with mark4.open(SAMPLE_FILE, 'rb', decade=20100) as fh3:
             info3 = fh3.info
             assert info3.format == 'mark4'
             assert info3.offset0 == 0xa88
             assert 'header0' in info3.errors
+
+        with pytest.raises(TypeError):
+            mark4.open(SAMPLE_FILE, 'rb', decade='2010')
 
     def test_frame(self, tmpdir):
         with mark4.open(SAMPLE_FILE, 'rb', decade=2010, ntrack=64) as fh:

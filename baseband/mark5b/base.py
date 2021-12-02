@@ -1,7 +1,10 @@
 
 # Licensed under the GPLv3 - see LICENSE
+import operator
+
 import numpy as np
 import astropy.units as u
+from astropy.time import Time
 from astropy.utils import lazyproperty
 
 from ..base.base import (
@@ -42,10 +45,10 @@ class Mark5BFileReader(VLBIFileReaderBase):
     """
 
     def __init__(self, fh_raw, kday=None, ref_time=None, nchan=None, bps=2):
-        self.kday = kday
-        self.ref_time = ref_time
-        self.nchan = nchan
-        self.bps = bps
+        self.kday = operator.index(kday) if kday is not None else None
+        self.ref_time = Time(ref_time) if ref_time is not None else None
+        self.nchan = operator.index(nchan) if nchan is not None else None
+        self.bps = operator.index(bps)
         super().__init__(fh_raw)
 
     def __repr__(self):

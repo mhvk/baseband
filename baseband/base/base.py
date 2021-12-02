@@ -1393,7 +1393,14 @@ class FileInfo:
             used_kwargs = {key: kwargs[key] for key in info.missing
                            if key in kwargs}
             if used_kwargs:
-                info = self._get_info(name, mode='rb', **used_kwargs)
+                info2 = self._get_info(name, mode='rb', **used_kwargs)
+                if self.is_ok(info2):
+                    info = info2
+                else:
+                    # An exception due to the arguments must have occurred.
+                    info.missing = {k: v for (k, v) in kwargs.items()
+                                    if k not in used_kwargs}
+                    info.errors[f"kwargs={kwargs}"] = info2
 
             info.used_kwargs = used_kwargs
 

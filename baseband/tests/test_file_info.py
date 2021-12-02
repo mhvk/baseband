@@ -48,8 +48,19 @@ def test_info_missing_args(sample, missing):
 @pytest.mark.parametrize(
     ('sample', 'format', 'wrong'),
     [(SAMPLE_M4, 'mark4', dict(decade='2010')),
-     (SAMPLE_M5B, 'mark5b', dict(ref_time='56000', nchan=8))])
-def test_info_wrong_args(sample, format, wrong):
+     (SAMPLE_M5B, 'mark5b', dict(ref_time=56000, nchan=8))])
+def test_info_wrong_type_args(sample, format, wrong):
+    info = file_info(sample, **wrong)
+    assert info.format == format
+    assert not info.missing
+    assert any(key.startswith('kwargs') for key in info.errors)
+
+
+@pytest.mark.parametrize(
+    ('sample', 'format', 'wrong'),
+    [(SAMPLE_M4, 'mark4', dict(decade=20100)),
+     (SAMPLE_M5B, 'mark5b', dict(kday=2456000, nchan=8))])
+def test_info_wrong_value_args(sample, format, wrong):
     info = file_info(sample, **wrong)
     assert info.format == format
     assert not info.missing
