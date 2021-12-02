@@ -14,7 +14,7 @@ Other Changes and Additions
 ---------------------------
 
 
-4.1.1 (unreleased)
+4.1.1 (2021-12-02)
 ==================
 
 Bug Fixes
