@@ -1,7 +1,10 @@
 # Licensed under the GPLv3 - see LICENSE
+import operator
+
 import numpy as np
-from astropy.utils import lazyproperty
+from astropy.time import Time
 import astropy.units as u
+from astropy.utils import lazyproperty
 
 
 from ..base.base import (
@@ -45,9 +48,9 @@ class Mark4FileReader(VLBIFileReaderBase):
     """
 
     def __init__(self, fh_raw, ntrack=None, decade=None, ref_time=None):
-        self.ntrack = ntrack
-        self.decade = decade
-        self.ref_time = ref_time
+        self.ntrack = operator.index(ntrack) if ntrack is not None else None
+        self.decade = operator.index(decade) if decade is not None else None
+        self.ref_time = Time(ref_time) if ref_time is not None else None
         super().__init__(fh_raw)
 
     def __repr__(self):
