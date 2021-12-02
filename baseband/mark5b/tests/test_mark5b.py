@@ -336,17 +336,23 @@ class TestMark5B:
         assert info() == stream_expected
 
     def test_binary_file_info_invalid_data(self):
-        with mark5b.open(SAMPLE_FILE, 'rb', kday='56000') as fh:
+        with mark5b.open(SAMPLE_FILE, 'rb', kday=5600000) as fh:
             info = fh.info
             assert info.format == 'mark5b'
             assert set(info.missing) == {'nchan'}
             assert 'header0' in info.errors
 
-        with mark5b.open(SAMPLE_FILE, 'rb', ref_time='56000', nchan=8) as fh:
+        with mark5b.open(SAMPLE_FILE, 'rb', kday=5600000, nchan=8) as fh:
             info = fh.info
             assert info.format == 'mark5b'
             assert not info.missing
             assert 'header0' in info.errors
+
+        with pytest.raises(TypeError):
+            mark5b.open(SAMPLE_FILE, 'rb', kday='56000', nchan=8)
+
+        with pytest.raises(ValueError):
+            mark5b.open(SAMPLE_FILE, 'rb', ref_time='56000', nchan=8)
 
     def test_frame(self, tmpdir):
         with mark5b.open(SAMPLE_FILE, 'rb', kday=56000, nchan=8, bps=2) as fh:

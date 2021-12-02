@@ -84,16 +84,21 @@ class TestCorruptSampleCopy:
 
     # In principle, code can deal with a broken frame 0, as is tested below.
     # Here, have to keep frame 0 intact, as well as header of frame 1.
-    @pytest.mark.parametrize('missing', [
-        slice(20032, 20033),  # First byte of header of frame 2.
-        slice(20096, 20100),  # Part of payload of frame 2.
-        slice(12000, 22000),  # Parts of 1-2.
-        slice(30060, 30070),  # Part of header of frame 3.
-        slice(40063, 40064)])  # Last byte of last frame.
-    def test_missing_bytes(self, missing, tmpdir):
-        corrupted = (self.sample_bytes[:missing.start]
-                     + self.sample_bytes[missing.stop:])
-        bad_start, bad_stop = self.expected_bad_frames(missing)
+    @pytest.mark.parametrize('affected, replacement', [
+        (slice(20032, 20033), b''),  # Missing first byte of header of frame 2.
+        (slice(20096, 20100), b''),  # Missing part of payload of frame 2.
+        (slice(12000, 22000), b''),  # Missing parts of 1-2.
+        (slice(30060, 30070), b''),  # Missing part of header of frame 3.
+        (slice(40063, 40064), b''),  # Missing last byte of last frame.
+        (slice(20032, 20033), b'\xff'),  # Corrupt sync pattern of header 2.
+        (slice(20032, 20036), b'\xff'),  # Corrupt sync and wrong length.
+        (slice(20040, 20041), b'\xff'),  # Corrupt first time byte of header 2.
+    ])
+    def test_bad_bytes(self, affected, replacement, tmpdir):
+        corrupted = (self.sample_bytes[:affected.start]
+                     + replacement
+                     + self.sample_bytes[affected.stop:])
+        bad_start, bad_stop = self.expected_bad_frames(affected)
 
         filename = str(tmpdir.join('corrupted.m5b'))
         with open(filename, 'wb') as fw:
@@ -108,23 +113,25 @@ class TestCorruptSampleCopy:
                                               valid=False)
                 frame.tofile(fw)
 
-        # Check that bad frames are found with verify only.
-        with mark5b.open(filename, 'rs', nchan=8, bps=2,
-                         kday=56000, verify=True) as fv:
-            assert not fv.info.readable
-            assert not fv.info.checks['continuous']
-            assert 'continuous' in fv.info.errors
-            expected_msg = 'While reading at {}'.format(
-                bad_start * fv.samples_per_frame)
-            assert expected_msg in fv.info.errors['continuous']
+        if len(corrupted) < len(self.sample_bytes):
+            # For wrong file length, check that info notices that bad frames
+            # are present with verify only.
+            with mark5b.open(filename, 'rs', nchan=8, bps=2,
+                             kday=56000, verify=True) as fv:
+                assert not fv.info.readable
+                assert not fv.info.checks['continuous']
+                assert 'continuous' in fv.info.errors
+                expected_msg = 'While reading at {}'.format(
+                    bad_start * fv.samples_per_frame)
+                assert expected_msg in fv.info.errors['continuous']
 
-            # While only warnings are given when it is fixable.
-            fv.verify = 'fix'
-            assert fv.info.readable
-            assert 'fixable' in fv.info.checks['continuous']
-            assert 'continuous' in fv.info.warnings
-            assert expected_msg in fv.info.warnings['continuous']
-            assert 'problem loading frame' in fv.info.warnings['continuous']
+                # While only warnings are given when it is fixable.
+                fv.verify = 'fix'
+                assert fv.info.readable
+                assert 'fixable' in fv.info.checks['continuous']
+                assert 'continuous' in fv.info.warnings
+                assert expected_msg in fv.info.warnings['continuous']
+                assert 'problem loading' in fv.info.warnings['continuous']
 
         with mark5b.open(filename, 'rs', sample_rate=32*u.MHz,
                          kday=56000, nchan=8, bps=2) as fr:

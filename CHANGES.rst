@@ -23,6 +23,12 @@ Bug Fixes
 - Ensure that Mark 5B files with extra bytes at the start (i.e., with a
   first frame that starts later) can be read. [#489]
 
+- Ensure that Mark 5B frames with corrupted headers are properly recognized
+  and do not lead to exceptions. [#490]
+
+- Add some minimal validation for Mark 4 and Mark 5B ``FileReader``
+  arguments. [#490]
+
 
 4.1 (2021-11-30)
 ================

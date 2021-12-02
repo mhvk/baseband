@@ -353,12 +353,20 @@ class VLBIFileReaderBase(FileBase):
         AssertionError
             If the header did not pass verification.
         """
-        locations = self.locate_frames(*args, **kwargs)
-        if not locations:
+        for location in self.locate_frames(*args, **kwargs):
+            with self.temporary_offset(location):
+                try:
+                    header = self.read_header()
+                except Exception:
+                    continue
+                else:
+                    break
+
+        else:
             raise HeaderNotFoundError('could not locate a a nearby frame.')
-        self.seek(locations[0])
-        with self.temporary_offset():
-            return self.read_header()
+
+        self.seek(location)
+        return header
 
     def get_frame_rate(self, offset=0):
         """Determine the number of frames per second.
@@ -1385,7 +1393,14 @@ class FileInfo:
             used_kwargs = {key: kwargs[key] for key in info.missing
                            if key in kwargs}
             if used_kwargs:
-                info = self._get_info(name, mode='rb', **used_kwargs)
+                info2 = self._get_info(name, mode='rb', **used_kwargs)
+                if self.is_ok(info2):
+                    info = info2
+                else:
+                    # An exception due to the arguments must have occurred.
+                    info.missing = {k: v for (k, v) in kwargs.items()
+                                    if k not in used_kwargs}
+                    info.errors[f"kwargs={kwargs}"] = info2
 
             info.used_kwargs = used_kwargs
 

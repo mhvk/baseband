@@ -1,13 +1,17 @@
+
 # Licensed under the GPLv3 - see LICENSE
+import operator
+
 import numpy as np
 import astropy.units as u
+from astropy.time import Time
 from astropy.utils import lazyproperty
 
 from ..base.base import (
-    FileBase, VLBIFileReaderBase,
+    FileBase, VLBIFileReaderBase, HeaderNotFoundError,
     VLBIStreamReaderBase, StreamWriterBase,
     FileOpener, FileInfo)
-from .header import Mark5BHeader
+from .header import Mark5BHeader, crc16
 from .payload import Mark5BPayload
 from .frame import Mark5BFrame
 from .file_info import Mark5BFileReaderInfo
@@ -41,10 +45,10 @@ class Mark5BFileReader(VLBIFileReaderBase):
     """
 
     def __init__(self, fh_raw, kday=None, ref_time=None, nchan=None, bps=2):
-        self.kday = kday
-        self.ref_time = ref_time
-        self.nchan = nchan
-        self.bps = bps
+        self.kday = operator.index(kday) if kday is not None else None
+        self.ref_time = Time(ref_time) if ref_time is not None else None
+        self.nchan = operator.index(nchan) if nchan is not None else None
+        self.bps = operator.index(bps)
         super().__init__(fh_raw)
 
     def __repr__(self):
@@ -128,6 +132,27 @@ class Mark5BFileReader(VLBIFileReaderBase):
         if pattern is None:
             pattern = Mark5BHeader
         return super().locate_frames(pattern, **kwargs)
+
+    def find_header(self, *args, **kwargs):
+        # Override to do more stringent header verification.
+        # TODO: Do this as an optional check inside read_header
+        # or inside header.verify()?
+        # Or make crc check fast enough that it can always be done.
+        for location in self.locate_frames(*args, **kwargs):
+            with self.temporary_offset(location):
+                try:
+                    header = self.read_header()
+                except Exception:
+                    continue
+                else:
+                    if crc16.check((header.words[2] << 32) | header.words[3]):
+                        break
+
+        else:
+            raise HeaderNotFoundError('could not locate a a nearby frame.')
+
+        self.seek(location)
+        return header
 
 
 class Mark5BFileWriter(FileBase):
