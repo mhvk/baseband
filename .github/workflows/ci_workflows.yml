@@ -47,10 +47,11 @@ jobs:
       matrix:
         include:
 
-          - name: Documentation build
-            python: 3.8
-            toxenv: build_docs
-            apt_packages: graphviz
+          # doc build done on readthedocs.
+          # - name: Documentation build
+          #   python: 3.8
+          #   toxenv: build_docs
+          #   apt_packages: graphviz
 
           - name: Coverage using oldest supported versions
             python: 3.7

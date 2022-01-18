@@ -1,6 +1,9 @@
 4.2 (unreleased)
 ================
 
+- The minimum versions required by baseband are now python 3.7, astropy 4.3,
+  and numpy 1.17.
+
 New Features
 ------------
 
