@@ -17,6 +17,15 @@ Other Changes and Additions
 ---------------------------
 
 
+4.1.1 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- DADA files such as those produced with Meerkat, in which the header ends
+  without an ``# end of header`` comment line can now be read. [#500]
+
 4.1.1 (2021-12-02)
 ==================
 

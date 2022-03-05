@@ -176,7 +176,10 @@ class DADAHeader(OrderedDict):
         start_pos = fh.tell()
         hdr_size = 4096
         lines = []
-        while fh.tell() - start_pos < hdr_size:
+        # Headers are of given length and usually have a comment with
+        # "end of header", but they can also end abruptly, with the
+        # remainder filled with zeros.
+        while fh.tell() - start_pos < hdr_size and fh.peek(1)[:1] != b'\x00':
             line = fh.readline().decode('ascii')
             if line == '':  # empty lines are '\n'
                 raise EOFError
