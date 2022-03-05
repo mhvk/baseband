@@ -26,7 +26,6 @@ class TestExistingIOFormat:
         assert hasattr(bio, 'vdif')
         assert 'vdif' in bio._entries
         assert 'vdif' in bio.FORMATS
-        assert isinstance(bio._entries['vdif'], EntryPoint)
         del bio.vdif
         assert 'vdif' not in bio.__dict__
         assert 'vdif' in bio.FORMATS
