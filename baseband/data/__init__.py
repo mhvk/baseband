@@ -105,6 +105,13 @@ SAMPLE_BPS1_VDIF = _full_path('sample_bps1.vdif')
 SAMPLE_DADA = _full_path('sample.dada')
 """DADA sample from Effelsberg, with header adapted to shortened size."""
 
+SAMPLE_MEERKAT_DADA = _full_path('sample_meerkat.dada')
+"""DADA sample from Meerkat, with header adapted to shortened size.
+
+This sample does not end with a comment "# end of header", but rather
+with many ctrl-0.
+"""
+
 SAMPLE_PUPPI = _full_path('sample_puppi.raw')
 """GUPPI/PUPPI sample, npol=2, nchan=4.
 

@@ -10,7 +10,7 @@ from astropy.time import Time
 from ... import dada
 from ...helpers import sequentialfile as sf
 from ..base import DADAFileNameSequencer
-from ...data import SAMPLE_DADA as SAMPLE_FILE
+from ...data import SAMPLE_DADA as SAMPLE_FILE, SAMPLE_MEERKAT_DADA
 
 
 class TestDADA:
@@ -797,3 +797,16 @@ def test_one_frame_per_second(tmpdir):
         assert abs(fc.stop_time - stop_time) < 1 * u.ns
         data2 = fc.read()
         assert np.all(data2 == data1)
+
+
+def test_meerkat_header():
+    # Main test is success in reading the header.
+    with dada.open(SAMPLE_MEERKAT_DADA, 'rb') as fh:
+        header = fh.read_header()
+    assert header.sample_shape == (2, 1)
+
+
+def test_meerkat_data():
+    with dada.open(SAMPLE_MEERKAT_DADA, 'rs') as fh:
+        data = fh.read()
+    assert data.shape == (16384 - 4096 // 2, 2)
