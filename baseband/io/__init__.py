@@ -61,8 +61,14 @@ def __getattr__(attr):
 
         # Note: again do not presume the entry points exist, since we may
         # be in a pure source checkout.
+
+        if hasattr(entry_points(), 'select'):
+            selected_entry_points = entry_points().select(group='baseband.io')
+        else:
+            selected_entry_points = entry_points().get('baseband.io', [])
+
         _entries.update({entry_point.name: entry_point for entry_point
-                         in entry_points().select(group='baseband.io')})
+                         in selected_entry_points})
         # Need python >= 3.9 to be able to do entry.attr.
         FORMATS.extend([name for name, entry in _entries.items()
                         if not (entry.value.partition(':')[2]

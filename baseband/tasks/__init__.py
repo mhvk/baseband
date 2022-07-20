@@ -36,7 +36,12 @@ def _get_entry_points():
 
     entries = {'_bad_entries': []}
 
-    for entry_point in entry_points().select(group='baseband.tasks'):
+    if hasattr(entry_points(), 'select'):
+        selected_entry_points = entry_points().select(group='baseband.tasks')
+    else:
+        selected_entry_points = entry_points().get('baseband.tasks', [])
+
+    for entry_point in selected_entry_points:
         # Only on python >= 3.9 do .module and .attr exist.
         ep_module, _, ep_attr = entry_point.value.partition(':')
         try:
