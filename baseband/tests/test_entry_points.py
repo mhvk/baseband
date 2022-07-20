@@ -148,7 +148,7 @@ class TestTasks:
         assert (set(entry.name for entry in tasks._bad_entries)
                 == {'utils', 'does_not_exist'})
 
-    @pytest.mark.xfail(entry_points().get('baseband.tasks', []),
+    @pytest.mark.xfail(entry_points().select(group='baseband.tasks'),
                        reason='cannot test for lack of entry points')
     def test_message_on_empty_tasks(self):
         with pytest.raises(AttributeError, match='No.*entry points found'):

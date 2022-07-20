@@ -62,7 +62,7 @@ def __getattr__(attr):
         # Note: again do not presume the entry points exist, since we may
         # be in a pure source checkout.
         _entries.update({entry_point.name: entry_point for entry_point
-                         in entry_points().get('baseband.io', [])})
+                         in entry_points().select(group='baseband.io')})
         # Need python >= 3.9 to be able to do entry.attr.
         FORMATS.extend([name for name, entry in _entries.items()
                         if not (entry.value.partition(':')[2]
