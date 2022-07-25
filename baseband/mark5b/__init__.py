@@ -2,7 +2,7 @@
 """Mark5B VLBI data reader.
 
 Code inspired by Walter Brisken's mark5access.  See
-https://github.com/demorest/mark5access.
+https://github.com/difx/mark5access.
 
 Also, for the Mark5B design, see
 https://www.haystack.mit.edu/tech/vlbi/mark5/mark5_memos/019.pdf
