@@ -42,7 +42,7 @@ def __getattr__(attr):
     """
     if sys.version_info >= (3, 8):
         from importlib.metadata import EntryPoint, entry_points
-    else:
+    else:  # pragma: no cover
         from importlib_metadata import EntryPoint, entry_points
 
     if attr.startswith('_') or attr in _bad_entries:
@@ -62,10 +62,10 @@ def __getattr__(attr):
         # Note: again do not presume the entry points exist, since we may
         # be in a pure source checkout.
 
-        if hasattr(entry_points(), 'select'):
-            selected_entry_points = entry_points().select(group='baseband.io')
-        else:
-            selected_entry_points = entry_points().get('baseband.io', [])
+        try:
+            selected_entry_points = entry_points(group="baseband.io")
+        except TypeError:  # pragma: no cover
+            selected_entry_points = entry_points().get("baseband.io", [])
 
         _entries.update({entry_point.name: entry_point for entry_point
                          in selected_entry_points})

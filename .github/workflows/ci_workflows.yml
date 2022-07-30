@@ -17,20 +17,20 @@ jobs:
       matrix:
         include:
 
-          - name: Test basics on 3.9
-            python: 3.9
-            toxenv: py39-test
+          - name: Test basics and coverage on 3.10
+            python: "3.10"
+            toxenv: py310-test-cov
             toxposargs: --open-files
 
           - name: Code style checks
-            python: 3.x
+            python: "3.x"
             toxenv: codestyle
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python }}
     - name: Install Python dependencies
@@ -53,24 +53,23 @@ jobs:
           #   toxenv: build_docs
           #   apt_packages: graphviz
 
-          - name: Coverage using oldest supported versions
-            python: 3.7
-            toxenv: py37-test-oldestdeps-cov
-            pip_packages: codecov
+          - name: Test oldest supported version
+            python: "3.7"
+            toxenv: py37-test-oldestdeps
 
-          - name: Windows on 3.8
+          - name: Windows on 3.9
             os: windows-latest
-            python: 3.8
-            toxenv: py38-test
+            python: "3.9"
+            toxenv: py39-test
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
     - name: Install system dependencies
       if: matrix.apt_packages
       run: sudo apt-get install ${{ matrix.apt_packages }}
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python }}
     - name: Install Python dependencies
@@ -79,6 +78,7 @@ jobs:
       run: tox ${{ matrix.toxargs }} -e ${{ matrix.toxenv }} -- ${{ matrix.toxposargs }}
     - name: Upload coverage to codecov
       if: ${{ contains(matrix.toxenv,'-cov') }}
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
+        verbose: true

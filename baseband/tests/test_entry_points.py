@@ -11,10 +11,10 @@ import pytest
 
 from .. import io as bio, tasks, vdif, base
 
-if hasattr(entry_points(), 'select'):
-    tasks_entry_points = entry_points().select(group='baseband.tasks')
-else:
-    tasks_entry_points = entry_points().get('baseband.tasks', [])
+try:
+    tasks_entry_points = entry_points(group="baseband.tasks")
+except TypeError:
+    tasks_entry_points = entry_points().get("baseband.tasks", [])
 
 
 class TestExistingIOFormat:
