@@ -715,7 +715,7 @@ class Mark4Header(Mark4TrackHeader):
                'needs to define {2} converters')
         try:
             converter = converters['converter']
-        except(KeyError, ValueError, IndexError):
+        except (KeyError, ValueError, IndexError):
             converter = np.array(converters)
             sb = self['lsb_output'][ta_ch]
             if self.nsb == 2 and len(converter) == len(ta_ch) // 2:
@@ -780,7 +780,7 @@ class Mark4Header(Mark4TrackHeader):
         except IndexError:
             raise IndexError("index {item} is out of bounds.")
 
-        if not(1 <= new_words.ndim <= 2 and new_words.shape[0] == 5):
+        if not (1 <= new_words.ndim <= 2 and new_words.shape[0] == 5):
             raise ValueError("cannot extract {0} from {1} instance."
                              .format(item, type(self)))
 

@@ -11,6 +11,11 @@ import pytest
 
 from .. import io as bio, tasks, vdif, base
 
+try:
+    tasks_entry_points = entry_points(group="baseband.tasks")
+except TypeError:
+    tasks_entry_points = entry_points().get("baseband.tasks", [])
+
 
 class TestExistingIOFormat:
     def setup_method(self):
@@ -148,7 +153,7 @@ class TestTasks:
         assert (set(entry.name for entry in tasks._bad_entries)
                 == {'utils', 'does_not_exist'})
 
-    @pytest.mark.xfail(entry_points().get('baseband.tasks', []),
+    @pytest.mark.xfail(tasks_entry_points,
                        reason='cannot test for lack of entry points')
     def test_message_on_empty_tasks(self):
         with pytest.raises(AttributeError, match='No.*entry points found'):

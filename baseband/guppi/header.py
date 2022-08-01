@@ -407,5 +407,5 @@ class GUPPIHeader(fits.Header):
     def __repr__(self):
         name = self.__class__.__name__
         vals = super().__repr__()
-        return('<{0} {1}>'.format(name, ("\n  " + len(name) * " ").join(
+        return ('<{0} {1}>'.format(name, ("\n  " + len(name) * " ").join(
             [v.rstrip() for v in vals.split('\n')])))

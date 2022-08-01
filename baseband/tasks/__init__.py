@@ -31,12 +31,17 @@ def _get_entry_points():
     import sys
     if sys.version_info >= (3, 8):
         from importlib.metadata import entry_points
-    else:
+    else:  # pragma: no cover
         from importlib_metadata import entry_points
 
     entries = {'_bad_entries': []}
 
-    for entry_point in entry_points().get('baseband.tasks', []):
+    try:
+        selected_entry_points = entry_points(group="baseband.tasks")
+    except TypeError:  # pragma: no cover
+        selected_entry_points = entry_points().get("baseband.tasks", [])
+
+    for entry_point in selected_entry_points:
         # Only on python >= 3.9 do .module and .attr exist.
         ep_module, _, ep_attr = entry_point.value.partition(':')
         try:

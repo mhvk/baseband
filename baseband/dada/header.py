@@ -458,6 +458,6 @@ class DADAHeader(OrderedDict):
                      == float(other.get('MJD_START', 0.))))
 
     def __repr__(self):
-        return('{0}("""'.format(self.__class__.__name__)
-               + '\n'.join(self._tolines())
-               + '""")')
+        return ('{0}("""'.format(self.__class__.__name__)
+                + '\n'.join(self._tolines())
+                + '""")')
