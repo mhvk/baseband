@@ -462,7 +462,7 @@ class ParsedHeaderBase:
         except KeyError:
             raise KeyError("{0} header does not contain {1}"
                            .format(self.__class__.__name__, item))
-        except(TypeError, ValueError):
+        except (TypeError, ValueError):
             if not self.mutable:
                 raise TypeError("header is immutable. Set '.mutable` attribute"
                                 " or make a copy.")
