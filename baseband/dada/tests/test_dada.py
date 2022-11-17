@@ -753,7 +753,7 @@ class TestDADA:
 
 
 class TestDADAFileNameSequencer:
-    def setup(self):
+    def setup_class(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = dada.DADAHeader.fromfile(fh)
 

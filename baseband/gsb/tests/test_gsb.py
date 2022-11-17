@@ -18,7 +18,7 @@ from ...data import (SAMPLE_GSB_RAWDUMP_HEADER as SAMPLE_RAWDUMP_HEADER,
 
 class TestGSB:
 
-    def setup(self):
+    def setup_class(self):
         # For all sample files, each frame spans 0.25165824 sec.
         self.frame_rate = (1e8 / 3) / 2**23 * u.Hz
         # Payload size for all sample files is 2**12 bytes.
