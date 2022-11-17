@@ -162,8 +162,9 @@ class PayloadBase:
         if header:
             bps = header.bps
             if header.sample_shape != sample_shape:
-                raise ValueError(f"header is for sample_shape={header.sample_shape} "
-                                 f"but data has {sample_shape}")
+                raise ValueError(
+                    f"header is for sample_shape={header.sample_shape} "
+                    f"but data has {sample_shape}")
             if header.complex_data != complex_data:
                 raise ValueError("header is for {0} data but data are {1}"
                                  .format(*(('complex' if c else 'real') for c
