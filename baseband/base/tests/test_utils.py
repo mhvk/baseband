@@ -51,7 +51,7 @@ class TestCRC12:
 
         return result
 
-    def setup(self):
+    def setup_class(self):
         # Test example from page 4 of
         # https://www.haystack.mit.edu/tech/vlbi/mark5/docs/230.3.pdf
         stream_hex = '0000 002D 0330 0000' + 'FFFF FFFF' + '4053 2143 3805 5'

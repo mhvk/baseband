@@ -153,7 +153,7 @@ class TestCorruptSampleCopy:
 
 
 class TestCorruptFile:
-    def setup(self):
+    def setup_class(self):
         time = Time('2010-11-12T13:14:15')
         self.header0 = mark5b.Mark5BHeader.fromvalues(time=time)
         self.data = np.repeat([[-1, 1], [-3, 3]], 10000, axis=0)

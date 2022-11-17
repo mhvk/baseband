@@ -570,7 +570,7 @@ class TestBase:
 
 
 class TestSqueezeAndSubset:
-    def setup(self):
+    def setup_class(self):
         self.sample_shape_maker = namedtuple('SampleShape',
                                              'n0, n1, n2, n3, n4')
         self.unsliced_shape = (1, 21, 33, 1, 2)
