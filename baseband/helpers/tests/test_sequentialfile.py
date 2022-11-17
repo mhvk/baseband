@@ -362,7 +362,7 @@ class TestSequentialFileWriter:
 
 
 class TestFileNameSequencer:
-    def setup(self):
+    def setup_class(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             self.header = vdif.VDIFHeader.fromfile(fh)
 
