@@ -9,7 +9,7 @@ else:
 
 import pytest
 
-from .. import io as bio, tasks, vdif, base
+from .. import io as bio, vdif, base
 
 try:
     tasks_entry_points = entry_points(group="baseband.tasks")
@@ -102,13 +102,12 @@ class TestNewIOFormats:
 
 class TestTasks:
     def setup_method(self):
-        self.tasks_dict = tasks.__dict__.copy()
-
-    def teardown_method(self):
-        tasks.__dict__.clear()
-        tasks.__dict__.update(self.tasks_dict)
+        """Remove baseband.tasks so we can reload and find test entry point."""
+        # Also ensures that stuff we add gets removed.
+        sys.modules.pop('baseband.tasks', None)
 
     def test_first(self):
+        import baseband.tasks as tasks
         assert 'vdif_payload_module' not in dir(tasks)
 
     def test_task_discovery(self, tmpdir, monkeypatch):
@@ -119,6 +118,8 @@ class TestTasks:
                      'vdif_header_all = baseband.vdif.header:__all__\n'
                      '_nomod = baseband.base.utils:__all__\n')
         monkeypatch.syspath_prepend(str(tmpdir))
+        # Now (re-)import tasks
+        import baseband.tasks as tasks
         # We loaded just the vdif module.
         assert 'vdif_payload_module' in dir(tasks)
         assert 'vdif' not in dir(tasks)
@@ -145,6 +146,7 @@ class TestTasks:
                      'does_not_exist = baseband.does_not_exist\n')
 
         monkeypatch.syspath_prepend(str(tmpdir))
+        import baseband.tasks as tasks
         assert tasks.vdif_payload_module is vdif.payload
         assert not hasattr(tasks, 'utils')
         assert 'utils' not in dir(tasks)
@@ -156,8 +158,10 @@ class TestTasks:
     @pytest.mark.xfail(tasks_entry_points,
                        reason='cannot test for lack of entry points')
     def test_message_on_empty_tasks(self):
+        import baseband.tasks as tasks
         with pytest.raises(AttributeError, match='No.*entry points found'):
             tasks.does_not_exist
 
     def test_last(self):
+        import baseband.tasks as tasks
         assert 'vdif_payload_module' not in dir(tasks)

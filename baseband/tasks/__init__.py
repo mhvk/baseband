@@ -24,11 +24,12 @@ Sample entry point entries::
 def _get_entry_points():
     """Get baseband.tasks entry point.
 
-    A list of entries where loading raised an exception are store inside
+    A list of entries where loading raised an exception are stored inside
     the result under '_bad_entries'.
     """
     from importlib import import_module
     import sys
+    import types
     if sys.version_info >= (3, 8):
         from importlib.metadata import entry_points
     else:  # pragma: no cover
@@ -52,30 +53,24 @@ def _get_entry_points():
                                 if not name.startswith('_')})
                 # Possibly load module too, depending on entry point name.
                 loaded = module
-
-            if not entry_point.name.startswith('_'):
-                entries[entry_point.name] = loaded
         except Exception:
             entries['_bad_entries'].append(entry_point)
+        else:
+            if not entry_point.name.startswith('_'):
+                entries[entry_point.name] = loaded
+                if isinstance(loaded, types.ModuleType):
+                    sys.modules[f"baseband.tasks.{entry_point.name}"] = loaded
 
     return entries
 
 
+globals().update(_get_entry_points())
+
+
 def __getattr__(attr):
     msg = f"module {__name__!r} has no attribute {attr!r}."
-    if not attr.startswith('_'):
-        entries = _get_entry_points()
-        globals().update(entries)
-        if attr in globals():
-            return globals()[attr]
-
-        if set(entries) == {'_bad_entries'}:
-            msg += ('\nNo baseband.tasks entry points found. '
-                    'Maybe baseband-tasks is not installed?')
+    if not attr.startswith('_') and 'Task' not in globals():
+        msg += ('\nNo baseband.tasks entry points found. '
+                'Maybe baseband-tasks is not installed?')
 
     raise AttributeError(msg)
-
-
-def __dir__():
-    globals().update(_get_entry_points())
-    return sorted(globals())
