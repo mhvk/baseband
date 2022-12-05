@@ -1,4 +1,4 @@
-4.1.1 (unreleased)
+4.1.2 (unreleased)
 ==================
 
 Bug Fixes
@@ -6,6 +6,9 @@ Bug Fixes
 
 - DADA files such as those produced with Meerkat, in which the header ends
   without an ``# end of header`` comment line can now be read. [#500]
+
+- Modules of tasks are now properly accessible.  E.g., with ``baseband-tasks``
+  available, ``from baseband.tasks.dm import DispersionMeasure`` works. [#508]
 
 
 4.1.1 (2021-12-02)
