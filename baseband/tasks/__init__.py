@@ -30,16 +30,13 @@ def _get_entry_points():
     from importlib import import_module
     import sys
     import types
-    if sys.version_info >= (3, 8):
-        from importlib.metadata import entry_points
-    else:  # pragma: no cover
-        from importlib_metadata import entry_points
+    from importlib.metadata import entry_points
 
     entries = {'_bad_entries': []}
 
-    try:
+    if sys.version_info >= (3, 10):
         selected_entry_points = entry_points(group="baseband.tasks")
-    except TypeError:  # pragma: no cover
+    else:
         selected_entry_points = entry_points().get("baseband.tasks", [])
 
     for entry_point in selected_entry_points:

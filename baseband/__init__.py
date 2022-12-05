@@ -8,9 +8,9 @@ from ._astropy_init import *   # noqa
 # ----------------------------------------------------------------------------
 
 # Define minima for the documentation, but do not bother to explicitly check.
-__minimum_python_version__ = '3.7'
-__minimum_astropy_version__ = '4.0'
-__minimum_numpy_version__ = '1.17'
+__minimum_python_version__ = '3.8'
+__minimum_astropy_version__ = '5.0'
+__minimum_numpy_version__ = '1.18'
 
 if not _ASTROPY_SETUP_:   # noqa
     # For egg_info test builds to pass, put package imports here.

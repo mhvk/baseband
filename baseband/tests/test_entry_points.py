@@ -1,20 +1,11 @@
 # Licensed under the GPLv3 - see LICENSE
 import sys
 from importlib import reload
-
-if sys.version_info >= (3, 8):
-    from importlib.metadata import EntryPoint, entry_points
-else:
-    from importlib_metadata import EntryPoint, entry_points
+from importlib.metadata import EntryPoint, entry_points
 
 import pytest
 
 from .. import io as bio, vdif, base
-
-try:
-    tasks_entry_points = entry_points(group="baseband.tasks")
-except TypeError:
-    tasks_entry_points = entry_points().get("baseband.tasks", [])
 
 
 class TestExistingIOFormat:
@@ -155,7 +146,9 @@ class TestTasks:
         assert (set(entry.name for entry in tasks._bad_entries)
                 == {'utils', 'does_not_exist'})
 
-    @pytest.mark.xfail(tasks_entry_points,
+    @pytest.mark.xfail(entry_points(group="baseband.tasks")
+                       if sys.version_info >= (3, 10) else
+                       entry_points().get("baseband.tasks", []),
                        reason='cannot test for lack of entry points')
     def test_message_on_empty_tasks(self):
         import baseband.tasks as tasks
