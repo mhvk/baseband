@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
 
-          - name: Test basics and coverage on 3.10
+          - name: Test basics and coverage
             python: "3.10"
             toxenv: py310-test-cov
             toxposargs: --open-files
@@ -57,7 +57,7 @@ jobs:
             python: "3.8"
             toxenv: py38-test-oldestdeps
 
-          - name: Windows on 3.11
+          - name: Windows
             os: windows-latest
             python: "3.11"
             toxenv: py311-test
