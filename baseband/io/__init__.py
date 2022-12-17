@@ -40,10 +40,7 @@ def __getattr__(attr):
     and, if found, tries loading the entry.  If that fails, the entry
     is added to _bad_entries to ensure it does not recur.
     """
-    if sys.version_info >= (3, 8):
-        from importlib.metadata import EntryPoint, entry_points
-    else:  # pragma: no cover
-        from importlib_metadata import EntryPoint, entry_points
+    from importlib.metadata import EntryPoint, entry_points
 
     if attr.startswith('_') or attr in _bad_entries:
         raise AttributeError(f"module {__name__!r} has no attribute {attr!r}")
@@ -62,9 +59,9 @@ def __getattr__(attr):
         # Note: again do not presume the entry points exist, since we may
         # be in a pure source checkout.
 
-        try:
+        if sys.version_info >= (3, 10):
             selected_entry_points = entry_points(group="baseband.io")
-        except TypeError:  # pragma: no cover
+        else:
             selected_entry_points = entry_points().get("baseband.io", [])
 
         _entries.update({entry_point.name: entry_point for entry_point

@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
 
-          - name: Test basics and coverage on 3.10
+          - name: Test basics and coverage
             python: "3.10"
             toxenv: py310-test-cov
             toxposargs: --open-files
@@ -54,13 +54,13 @@ jobs:
           #   apt_packages: graphviz
 
           - name: Test oldest supported version
-            python: "3.7"
-            toxenv: py37-test-oldestdeps
+            python: "3.8"
+            toxenv: py38-test-oldestdeps
 
-          - name: Windows on 3.9
+          - name: Windows
             os: windows-latest
-            python: "3.9"
-            toxenv: py39-test
+            python: "3.11"
+            toxenv: py311-test
 
     steps:
     - uses: actions/checkout@v3
