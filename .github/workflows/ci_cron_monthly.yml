@@ -4,6 +4,12 @@ on:
   schedule:
     # run every 19th of the month at 4am UTC
     - cron: '0 4 19 * *'
+  pull_request:
+    # We also want this workflow triggered if the 'Extra CI' label is added
+    # or present when PR is updated
+    types:
+      - synchronize
+      - labeled
 
 jobs:
   test_more_architectures:
@@ -14,7 +20,7 @@ jobs:
 
     name: Test on ${{ matrix.arch }}
     # Don't run on forks of the repository.
-    if: startsWith(github.repository, 'mhvk')
+    if: (github.repository == 'mhvk/baseband' && (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'Extra CI')))
     runs-on: ubuntu-20.04
     env:
       apt_packages: git python3-astropy python3-pip
@@ -50,8 +56,8 @@ jobs:
 
   test_with_apt:
     name: Test using apt
-    runs-on: ubuntu-20.04
-    if: startsWith(github.repository, 'mhvk')
+    runs-on: ubuntu-latest
+    if: (github.repository == 'mhvk/baseband' && (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'Extra CI')))
     env:
       apt_packages: git python3-astropy python3-pip
 
@@ -70,7 +76,7 @@ jobs:
   test_other_os:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    if: startsWith(github.repository, 'mhvk')
+    if: (github.repository == 'mhvk/baseband' && (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'Extra CI')))
     strategy:
       fail-fast: false
       matrix:
