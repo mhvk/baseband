@@ -349,7 +349,8 @@ class GUPPIHeader(fits.Header):
 
     @offset.setter
     def offset(self, offset):
-        self['PKTIDX'] = int((offset / (float(self['TBIN']) * u.s) / self['PKTSIZE']
+        self['PKTIDX'] = int((offset / (float(self['TBIN']) * u.s)
+                              / self['PKTSIZE']
                               * ((self._bpcs + 7) // 8)).to(u.one).round())
 
     @property
