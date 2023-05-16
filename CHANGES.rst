@@ -1,3 +1,13 @@
+4.1.3 (2023-05-16)
+==================
+
+Bug Fixes
+---------
+
+- GUPPI files written by the VEGAS backend, which, oddly, writes
+  numbers as strings with quotes around them, can now be read. [#515]
+
+
 4.1.2 (2022-12-20)
 ==================
 
