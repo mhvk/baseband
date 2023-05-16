@@ -24,7 +24,6 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       apt_packages: git python3-astropy python3-pip
-      distro: ubuntu20.04
 
     strategy:
       fail-fast: false
@@ -32,18 +31,18 @@ jobs:
         include:
           - arch: s390x
           - arch: aarch64
-          # ppc64le seems to have problems with numpy or so.
+          - arch: ppc64le
 
     steps:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - uses: uraimo/run-on-arch-action@v2.0.5
+      - uses: uraimo/run-on-arch-action@v2
         name: Run tests
         id: build
         with:
           arch: ${{ matrix.arch }}
-          distro: ${{ env.distro }}
+          distro: ubuntu_latest
           # Speeds up builds by storing container images in a GitHub package registry.
           githubToken: ${{ github.token }}
           shell: /bin/bash
