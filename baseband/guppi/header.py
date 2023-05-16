@@ -215,7 +215,7 @@ class GUPPIHeader(fits.Header):
     @property
     def payload_nbytes(self):
         """Size of the payload in bytes."""
-        return self['BLOCSIZE']
+        return int(self['BLOCSIZE'])
 
     @payload_nbytes.setter
     def payload_nbytes(self, payloadsize):
@@ -233,7 +233,7 @@ class GUPPIHeader(fits.Header):
     @property
     def bps(self):
         """Bits per elementary sample."""
-        return self['NBITS']
+        return int(self['NBITS'])
 
     @bps.setter
     def bps(self, bps):
@@ -242,12 +242,12 @@ class GUPPIHeader(fits.Header):
     @property
     def complex_data(self):
         """Whether the data are complex."""
-        return self['OBSNCHAN'] != 1
+        return int(self['OBSNCHAN']) != 1
 
     @property
     def npol(self):
         """Number of polarisations."""
-        return self['NPOL'] // (2 if self.complex_data else 1)
+        return int(self['NPOL']) // (2 if self.complex_data else 1)
 
     @npol.setter
     def npol(self, npol):
@@ -256,7 +256,7 @@ class GUPPIHeader(fits.Header):
     @property
     def nchan(self):
         """Number of channels."""
-        return self['OBSNCHAN']
+        return int(self['OBSNCHAN'])
 
     @nchan.setter
     def nchan(self, nchan):
@@ -278,7 +278,7 @@ class GUPPIHeader(fits.Header):
     def _bpcs(self):
         """Bits per complete sample."""
         # NPOL includes factor of 2 for real/complex components.
-        return self['OBSNCHAN'] * self['NPOL'] * self.bps
+        return int(self['OBSNCHAN']) * int(self['NPOL']) * self.bps
 
     @property
     def sample_rate(self):
@@ -287,19 +287,19 @@ class GUPPIHeader(fits.Header):
         Can be set with a negative quantity to set `sideband`.  Overlap samples
         are not included in the rate.
         """
-        return (1. / self['TBIN']) * u.Hz
+        return (1. / float(self['TBIN'])) * u.Hz
 
     @sample_rate.setter
     def sample_rate(self, sample_rate):
         self['TBIN'] = 1. / abs(sample_rate.to_value(u.Hz))
-        bw = (sample_rate.to_value(u.MHz) * self['OBSNCHAN']
+        bw = (sample_rate.to_value(u.MHz) * int(self['OBSNCHAN'])
               / (1 if self.complex_data else 2))
         self['OBSBW'] = bw
 
     @property
     def sideband(self):
         """True if upper sideband."""
-        return self['OBSBW'] > 0
+        return float(self['OBSBW']) > 0
 
     @sideband.setter
     def sideband(self, sideband):
@@ -334,7 +334,7 @@ class GUPPIHeader(fits.Header):
     @property
     def overlap(self):
         """Number of complete samples that overlap with the next frame."""
-        return self['OVERLAP']
+        return int(self['OVERLAP'])
 
     @overlap.setter
     def overlap(self, overlap):
@@ -345,11 +345,12 @@ class GUPPIHeader(fits.Header):
         """Offset from start of observation in units of time."""
         # PKTIDX only counts valid packets, not overlap ones.
         return ((self['PKTIDX'] * self['PKTSIZE'] * 8 // self._bpcs)
-                * self['TBIN']) * u.s
+                * float(self['TBIN'])) * u.s
 
     @offset.setter
     def offset(self, offset):
-        self['PKTIDX'] = int((offset / (self['TBIN'] * u.s) / self['PKTSIZE']
+        self['PKTIDX'] = int((offset / (float(self['TBIN']) * u.s)
+                              / self['PKTSIZE']
                               * ((self._bpcs + 7) // 8)).to(u.one).round())
 
     @property

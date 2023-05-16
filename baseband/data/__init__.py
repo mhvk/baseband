@@ -120,6 +120,15 @@ J1810+1744, with payload shortened to 8192 samples (with 512 overlap),
 equivalent to 1024 complete samples (with 64 overlap).
 """
 
+SAMPLE_VEGAS = _full_path('sample_vegas.raw')
+r"""VEGAS sample, npol=2, obsnchan=32.
+
+Created from a Green Bank Telescope observation of TOI 1898
+dd if=vegas_59332_80137_Jade_1898_1_0001.0000.raw \
+   of=sample_vegas.raw bs=80 count=178
+Initial frame is >50 MB and truncated.  For tests of header functionality only.
+"""
+
 SAMPLE_GSB_RAWDUMP_HEADER = _full_path('gsb/sample_gsb_rawdump.timestamp')
 """GSB rawdump header sample.
 

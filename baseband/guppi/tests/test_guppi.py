@@ -10,7 +10,7 @@ from astropy.time import Time
 from ... import guppi
 from ...helpers import sequentialfile as sf
 from ..base import GUPPIFileNameSequencer
-from ...data import SAMPLE_PUPPI as SAMPLE_FILE
+from ...data import SAMPLE_PUPPI as SAMPLE_FILE, SAMPLE_VEGAS
 
 
 class TestGUPPI:
@@ -827,3 +827,16 @@ class TestGUPPIFileNameSequencer:
         fns = GUPPIFileNameSequencer(template, self.header)
         assert fns[0] == 'puppi_58132_J1810+1744_2176.0000.raw'
         assert fns[29] == 'puppi_58132_J1810+1744_2176.0029.raw'
+
+
+def test_vegas_header_keywords():
+    with guppi.open(SAMPLE_VEGAS, 'rs') as fh:
+        assert fh.header0.payload_nbytes == 132186112
+        assert fh.header0.bps == 8
+        assert fh.header0.complex_data
+        assert fh.header0.npol == 2
+        assert fh.header0.nchan == 32
+        assert fh.header0.sample_rate == 3125000.0 * u.Hz
+        assert not fh.header0.sideband
+        assert fh.header0.overlap == 512
+        assert fh.header0.offset == 0.
