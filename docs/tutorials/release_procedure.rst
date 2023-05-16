@@ -160,13 +160,13 @@ To create the environments::
 Now, for each environment, activate it, navigate to the Baseband root
 directory, and run the tests::
 
-    source <name_of_virtualenv>/bin/activate
-    cd <baseband_directory>
-    pip install dist/baseband-<version>.tar.gz
+    source test_release/bin/activate
+    pip install dist/baseband-*.tar.gz
     pip install pytest-astropy
     cd ~/
     python -c 'import baseband; baseband.test()'
     deactivate
+    cd -
 
 If the test suite raises any errors (at this point, likely dependency issues),
 delete the release tag::
@@ -187,7 +187,7 @@ above following the tests::
 
 You may optionally sign the source as well::
 
-    gpg --detach-sign -a dist/baseband-<version>.tar.gz
+    gpg --detach-sign -a dist/baseband-*.tar.gz
 
 5. Publish the release on GitHub
 --------------------------------
@@ -202,27 +202,25 @@ Push the tag to GitHub as well::
     git push upstream v<version>
 
 Go to the ``mhvk/baseband`` `Releases section
-<https://github.com/mhvk/baseband/releases>`_.  Here, published releases are in
-shown in blue, and unpublished tags in grey and in a much smaller font.  To
-publish a release, click on the ``v<version>`` tag you just pushed, then click
-"Edit tag" (on the upper right).  This takes you to a form where you can
-customize the release title and description.  Leave the title blank, in
-which case it is set to "v<version>"; you can leave the description blank as well
-if you wish. Finally, click on "Publish release".  This takes you back to
-Releases, where you should see our new release in blue.
+<https://github.com/mhvk/baseband/releases>`_ and check the Tags part.  To
+publish a release, click on the ``...`` on the right for the tag you just pushed.
+This takes you to a form where you can customize the release title and description.
+Leave the title blank, in which case it is set to "v<version>"; for
+the description, paste in the relevant parts of ``CHANGES.rst``.
+Finally, click on "Publish release".  This takes you back to Releases.
 
 The Baseband GitHub repo `automatically updates
 <https://guides.github.com/activities/citable-code/>`_ Baseband's `Zenodo
-<https://zenodo.org/record/1322808>`_ repository for each published release.
+<https://doi.org/10.5281/zenodo.1214268>`_ repository for each published release.
 Check if your release has made it to Zenodo by clicking the badge in
-``Readme.rst``.
+``README.rst``.
 
 6. Build the release wheel for PyPI
 -----------------------------------
 
 To build the release::
 
-    python setup.py bdist_wheel --universal
+    python3 setup.py bdist_wheel --universal
 
 7. (Optional) test uploading the release
 ----------------------------------------
