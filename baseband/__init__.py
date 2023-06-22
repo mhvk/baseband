@@ -12,6 +12,4 @@ __minimum_python_version__ = '3.8'
 __minimum_astropy_version__ = '5.0'
 __minimum_numpy_version__ = '1.18'
 
-if not _ASTROPY_SETUP_:   # noqa
-    # For egg_info test builds to pass, put package imports here.
-    from .io import file_info, open  # noqa
+from .io import file_info, open  # noqa
