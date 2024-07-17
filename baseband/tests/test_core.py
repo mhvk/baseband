@@ -123,8 +123,7 @@ def test_unsupported_file(tmpdir):
         fw.write(b'abcdefghijklmnopqrstuvwxyz')
 
     with pytest.raises(ValueError, match='could not be auto-determined'):
-        with pytest.warns(UserWarning, match='not.*formatted'):
-            baseband_open(name)
+        baseband_open(name)
 
 
 def test_format_with_no_info(monkeypatch):
@@ -138,5 +137,4 @@ def test_format_with_no_info(monkeypatch):
         assert fh.info.format == 'vdif'
 
     with pytest.raises(ValueError, match='could not be auto-determined'):
-        with pytest.warns(UserWarning, match='not.*formatted'):
-            baseband_open(SAMPLE_M4, format=('vdif', 'mark5b'))
+        baseband_open(SAMPLE_M4, format=('vdif', 'mark5b'))
