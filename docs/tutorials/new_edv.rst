@@ -443,8 +443,7 @@ now read frames::
 
     >>> fh2 = vdif.open(SAMPLE_DRAO_CORRUPT, 'rb')
     >>> frame0 = fh2.read_frame()
-    >>> np.all(frame0.data == payload0.data)
-    True
+    >>> assert np.all(frame0.data == payload0.data)
     >>> fh2.close()
     >>> vdif.header.VDIF_HEADER_CLASSES = original_header_classes
 

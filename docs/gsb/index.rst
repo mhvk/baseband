@@ -250,8 +250,7 @@ To write a rawdump file::
     ...                  raw='test_rawdump.dat',
     ...                  sample_rate=rawdump_sample_rate,
     ...                  samples_per_frame=rawdump_samples_per_frame)
-    >>> np.all(dr == fh_rd.read())
-    True
+    >>> assert np.all(dr == fh_rd.read())
     >>> fh_rd.close()
 
 To write a phased file, we need to pass a nested tuple of filenames or
@@ -270,8 +269,7 @@ filehandles::
     ...                  raw=test_phased_bin,
     ...                  sample_rate=phased_sample_rate,
     ...                  samples_per_frame=phased_samples_per_frame)
-    >>> np.all(dp == fh_ph.read())
-    True
+    >>> assert np.all(dp == fh_ph.read())
     >>> fh_ph.close()
 
 Baseband does not use the PC time in the phased header, and, when writing,

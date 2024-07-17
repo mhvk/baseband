@@ -275,8 +275,7 @@ as a second argument::
     >>> fh.seek(-100, 2)    # Second arg is 0 (start of file) by default.
     39900
     >>> d_end = fh.read(100)
-    >>> np.array_equal(d_complete[-100:], d_end)
-    True
+    >>> assert np.array_equal(d_complete[-100:], d_end)
 
 ``-100`` means 100 samples before the end of file, so ``d_end`` is equal to
 the last 100 entries of ``d_complete``.  Baseband only keeps the most recently
@@ -522,8 +521,7 @@ We can check the validity of our new file by re-opening it::
     >>> fh = vdif.open('test_vdif.vdif', 'rs')
     >>> fh.sample_shape
     SampleShape(nchan=8)
-    >>> np.all(fr.read() == fh.read())
-    True
+    >>> assert np.all(fr.read() == fh.read())
     >>> fr.close()
     >>> fh.close()
 
@@ -573,8 +571,7 @@ Lastly, we check our new file::
 
     >>> fr = mark4.open(SAMPLE_MARK4, 'rs', ntrack=64, decade=2010)
     >>> fh = vdif.open('m4convert.vdif', 'rs')
-    >>> np.all(fr.read() == fh.read())
-    True
+    >>> assert np.all(fr.read() == fh.read())
     >>> fr.close()
     >>> fh.close()
 
@@ -637,10 +634,8 @@ We now read the sequence and confirm their contents are identical to those of
 the sample file::
 
     >>> fr = vdif.open(filenames, 'rs', sample_rate=fh.sample_rate)
-    >>> fr.header0.time == fh.header0.time
-    True
-    >>> np.all(fr.read() == d)
-    True
+    >>> assert fr.header0.time == fh.header0.time
+    >>> assert np.all(fr.read() == d)
     >>> fr.close()
 
 When reading, the filename sequence **must be ordered in time**.
@@ -651,10 +646,8 @@ frameset of the sample file::
     >>> fsf = vdif.open(filenames[1], mode='rs', sample_rate=fh.sample_rate)
     >>> fh.seek(fh.shape[0] // 2)    # Seek to start of second frameset.
     20000
-    >>> abs(fsf.header0.time - fh.time) < 1.*u.ns
-    True
-    >>> np.all(fsf.read() == fh.read())
-    True
+    >>> assert abs(fsf.header0.time - fh.time) < 1.*u.ns
+    >>> assert np.all(fsf.read() == fh.read())
     >>> fsf.close()
 
 In situations where the ``file_size`` is known, but not the total number of
@@ -700,10 +693,8 @@ sequencer determines the number of files by finding the largest file available
 that fits the template::
 
     >>> fr = vdif.open(filenames, 'rs', sample_rate=fh.sample_rate)
-    >>> fr.header0.time == fh.header0.time
-    True
-    >>> np.all(fr.read() == d)
-    True
+    >>> assert fr.header0.time == fh.header0.time
+    >>> assert np.all(fr.read() == d)
     >>> fr.close()
     >>> fh.close()  # Close sample file as well.
 

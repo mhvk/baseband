@@ -152,8 +152,7 @@ to pass in the ``decade`` when reading back::
     >>> fw.close()
     >>> fh = mark4.open('sample_mark4_segment.m4', 'rs',
     ...                 sample_rate=32.*u.MHz, decade=2010)
-    >>> np.all(fh.read(80000) == frame.data)
-    True
+    >>> assert np.all(fh.read(80000) == frame.data)
     >>> fh.close()
 
 Note that above we had to pass in the sample rate even when opening

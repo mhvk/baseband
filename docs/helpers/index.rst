@@ -69,10 +69,8 @@ file's, we may again use |open|::
 
     >>> frr = sf.open(filenames, mode='rb')
     >>> fr = vdif.open(frr, 'rs', sample_rate=fh.sample_rate)
-    >>> fr.header0.time == fh.header0.time
-    True
-    >>> np.all(fr.read() == d)
-    True
+    >>> assert fr.header0.time == fh.header0.time
+    >>> assert np.all(fr.read() == d)
     >>> fr.close()
     >>> fh.close()  # Close sample file.
 

@@ -120,8 +120,7 @@ from above and ignore the extra 64 samples we got from the reader)::
     >>> fw.close()
     >>> fr = guppi.open('puppi_test.{file_nr:04d}.raw', 'rs')
     >>> d2 = fr.read()
-    >>> (d2 == d[:-64]).all()
-    True
+    >>> assert (d2 == d[:-64]).all()
     >>> fr.close()
 
 Here we show how to write a sequence of files by passing a string template
