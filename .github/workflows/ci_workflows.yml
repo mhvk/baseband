@@ -18,18 +18,18 @@ jobs:
         include:
 
           - name: Test basics and coverage
-            python: "3.10"
-            toxenv: py310-test-cov
+            python: "3.12"
+            toxenv: py312-test-cov
 
           - name: Code style checks
             python: "3.x"
             toxenv: codestyle
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python }}
     - name: Install Python dependencies
@@ -48,13 +48,13 @@ jobs:
 
           # doc build done on readthedocs.
           # - name: Documentation build
-          #   python: 3.8
+          #   python: 3.x
           #   toxenv: build_docs
           #   apt_packages: graphviz
 
           - name: Test oldest supported version
-            python: "3.8"
-            toxenv: py38-test-oldestdeps
+            python: "3.10"
+            toxenv: py310-test-oldestdeps
 
           - name: Windows
             os: windows-latest
@@ -62,13 +62,13 @@ jobs:
             toxenv: py312-test
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Install system dependencies
       if: matrix.apt_packages
       run: sudo apt-get install ${{ matrix.apt_packages }}
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python }}
     - name: Install Python dependencies
