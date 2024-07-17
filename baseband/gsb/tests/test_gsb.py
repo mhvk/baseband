@@ -915,7 +915,7 @@ class TestGSB:
                       sample_rate=sample_rate,
                       samples_per_frame=(self.payload_nbytes
                                          // nchan)) as fh_r, \
-                open(str(tmpdir.join('test_time.timestamp')), 'w+t') as sh,\
+                open(str(tmpdir.join('test_time.timestamp')), 'w+t') as sh, \
                 open(str(tmpdir.join('test0.dat')), 'w+b') as sp0, \
                 open(str(tmpdir.join('test1.dat')), 'w+b') as sp1, \
                 open(str(tmpdir.join('test2.dat')), 'w+b') as sp2, \
