@@ -76,11 +76,11 @@ class TestCorruptSampleCopy:
         assert np.all(expected == data)
 
     def expected_bad_frames(self, missing):
-        (start_f, start_r), (stop_f, stop_i) = [
+        (start_f, start_r), (stop_f, _) = [
             divmod(s, self.frame_nbytes)
             for s in (missing.start, missing.stop-1)]
 
-        if start_r < 32 and start_f % 8 != 0:
+        if start_r < 32:
             start_f -= 1
 
         return start_f, stop_f+1
@@ -103,6 +103,7 @@ class TestCorruptSampleCopy:
         (slice(5032*26+50, 5032*26+60)),  # Part of payload of frame 26.
         (slice(5032*27+50, 5032*29+700)),  # Parts of 27-29
         (slice(5032*31+10, 5032*31+20)),  # Part of header of frame 31.
+        (slice(5032*32, 5032*32+10)),  # Part of header of frame 32.
         (slice(5032*48-1, 5032*48))])  # Last byte of last frame.
     def test_missing_bytes(self, missing, tmpdir):
         corrupted = (self.sample_bytes[:missing.start]
@@ -121,9 +122,10 @@ class TestCorruptSampleCopy:
             assert not fv.info.readable
             assert not fv.info.checks['continuous']
             assert 'continuous' in fv.info.errors
-            # Reading will fail the frameset *before* the one tested.
+            # Reading will fail the frameset tested as long as its
+            # first frame header is OK.
             expected_msg = 'While reading at {}'.format(
-                (bad_start // 8 - 1) * fv.samples_per_frame)
+                (bad_start // 8) * fv.samples_per_frame)
             assert expected_msg in fv.info.errors['continuous']
 
         # While only warnings are given when it is fixable.
