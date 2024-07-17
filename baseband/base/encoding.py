@@ -86,8 +86,8 @@ def encode_2bit_base(values):
       Input range       Output
       ================= ======
             value < -lv   0
-      -lv < value <  0.   2
-       0. < value <  lv   1
+      -lv < value <  0.   1
+       0. < value <  lv   2
        lv < value         3
       ================= ======
 
