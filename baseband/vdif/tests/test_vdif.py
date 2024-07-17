@@ -1170,11 +1170,11 @@ class TestVDIF:
 
         with vdif.open(testverifyfile, 'rs', verify=True) as fn:
             assert fn.verify
-            # This should fail at the fifth frameset, since its following
-            # one is corrupt.
+            # This should fail at the corrupt sixth frameset (the fifth one
+            # succeeds, since the first header of the sixth is correct).
             with pytest.raises(AssertionError):
                 fn.read()
-            assert fn.tell() == 100000
+            assert fn.tell() == 120000
             fn.verify = False
             assert not fn.verify
             assert np.all(fn.read().reshape(-1, 20000, 8) == data[:20000])

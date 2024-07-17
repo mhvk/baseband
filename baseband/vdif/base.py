@@ -536,11 +536,20 @@ class VDIFStreamReader(VDIFStreamBase, VLBIStreamReaderBase):
     def _bad_frame(self, index, frameset, exc):
         # Duplication of base class, but able to deal with missing
         # frames inside a frame set.
-        if (frameset is not None and self._get_index(frameset) == index
-                and index == self._get_index(self._last_header)):
-            # If we got an exception because we're trying to read beyond the
-            # last frame, the frame is almost certainly OK, so keep it.
-            return frameset
+        # First check whether *this* frameset is actually problematic.
+        if frameset is not None and self._get_index(frameset) == index:
+            # If not, the problem must have been reading the next frame.
+            if index == self._get_index(self._last_header):
+                # If we were getting the last frame, we should be fine.
+                return frameset
+            # And if the next header can be read and belongs to the next frame,
+            # we should be fine too; we'll get to the next one later.
+            try:
+                with self.fh_raw.temporary_offset():
+                    if self._get_index(self.fh_raw.read_header()) == index+1:
+                        return frameset
+            except Exception:
+                pass  # On to error handler
 
         if self.verify != 'fix':
             raise exc

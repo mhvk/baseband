@@ -85,8 +85,7 @@ To set up a file for writing as a stream is possible as well::
      '2013-07-02-01:39:20.0000000000020000.000000.dada']
     >>> fr = dada.open('2013-07-02-01:39:20.{obs_offset:016d}.000000.dada', 'rs')
     >>> d2 = fr.read()
-    >>> (d == d2).all()
-    True
+    >>> assert (d == d2).all()
     >>> fr.close()
 
 Here, we have used an even smaller size of the payload, to show how one can

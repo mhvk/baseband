@@ -17,6 +17,19 @@ Other Changes and Additions
 ---------------------------
 
 
+4.1.4 (unreleased)
+==================
+
+Bug Fixes
+---------
+
+- Ensure header equality tests work with numpy 2.0. [#523]
+
+- Ensure Mark4 header shapes always are a tuple of int (no numpy ints). [#523]
+
+- Avoid duplicated warnings about bad framesets. [#523]
+
+
 4.1.3 (2023-05-16)
 ==================
 

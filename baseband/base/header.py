@@ -482,8 +482,8 @@ class ParsedHeaderBase:
 
     def __eq__(self, other):
         return (type(self) is type(other)
-                and np.all(np.array(self.words, copy=False)
-                           == np.array(other.words, copy=False)))
+                and np.all(np.asanyarray(self.words)
+                           == np.asanyarray(other.words)))
 
     def _repr_value(self, key, value):
         return str(value)

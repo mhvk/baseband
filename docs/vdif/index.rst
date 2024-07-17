@@ -104,8 +104,7 @@ coincidentally, what is given by the reader above suffices::
     >>> fw.close()
     >>> fh = vdif.open('try.vdif', 'rs')
     >>> d2 = fh.read(12)
-    >>> np.all(d[:12] == d2)
-    True
+    >>> assert np.all(d[:12] == d2)
     >>> fh.close()
 
 Copying Parts of Files

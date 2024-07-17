@@ -99,8 +99,7 @@ though time can either be passed explicitly or inferred from the header::
     >>> fw.close()
     >>> fh = mark5b.open('test.m5b', 'rs', sample_rate=32*u.MHz,
     ...                  kday=57000, nchan=8)
-    >>> np.all(fh.read() == d)
-    True
+    >>> assert np.all(fh.read() == d)
     >>> fh.close()
 
 .. _mark5b_api:
