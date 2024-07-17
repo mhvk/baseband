@@ -21,7 +21,7 @@ jobs:
     name: Test on ${{ matrix.arch }}
     # Don't run on forks of the repository.
     if: (github.repository == 'mhvk/baseband' && (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'Extra CI')))
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     env:
       apt_packages: git python3-astropy python3-pip
 
@@ -34,7 +34,7 @@ jobs:
           - arch: ppc64le
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: uraimo/run-on-arch-action@v2
@@ -43,8 +43,6 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           distro: ubuntu_latest
-          # Speeds up builds by storing container images in a GitHub package registry.
-          githubToken: ${{ github.token }}
           shell: /bin/bash
           install: |
             apt-get update -q -y
@@ -61,7 +59,7 @@ jobs:
       apt_packages: git python3-astropy python3-pip
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Install system dependencies
@@ -84,10 +82,10 @@ jobs:
          - os: macos-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v5
       with:
         python-version: 3.x
     - name: Install Python dependencies
