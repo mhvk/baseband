@@ -561,7 +561,7 @@ class Mark4Header(Mark4TrackHeader):
 
         If set, will update 'fan_out' for each track.
         """
-        return np.max(self['fan_out']) + 1
+        return int(np.max(self['fan_out']) + 1)
 
     @fanout.setter
     def fanout(self, fanout):
