@@ -58,8 +58,8 @@ jobs:
 
           - name: Windows
             os: windows-latest
-            python: "3.11"
-            toxenv: py311-test
+            python: "3.12"
+            toxenv: py312-test
 
     steps:
     - uses: actions/checkout@v3
