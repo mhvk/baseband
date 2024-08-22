@@ -181,12 +181,12 @@ class PayloadBase:
         return cls(words, sample_shape=sample_shape, bps=bps,
                    complex_data=complex_data)
 
-    def __array__(self, dtype=None):
+    def __array__(self, dtype=None, copy=None):
         """Interface to arrays."""
-        if dtype is None or dtype == self.dtype:
+        if not copy and (dtype is None or dtype == self.dtype):
             return self.data
         else:
-            return self.data.astype(dtype)
+            return self.data.astype(dtype, copy=True)
 
     @property
     def nbytes(self):

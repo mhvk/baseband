@@ -1,3 +1,12 @@
+4.2.1 (unreleased)
+==================
+
+Bug fixes
+---------
+
+- Avoid numpy>=2.0 deprecation warnings being raised in the ``__array__()``
+  methods of ``Payload`` and ``Frame.__array__()``. [#525]
+
 4.2 (2024-07-17)
 ================
 

@@ -179,12 +179,12 @@ class FrameBase:
     def fill_value(self, fill_value):
         self._fill_value = fill_value
 
-    def __array__(self, dtype=None):
+    def __array__(self, dtype=None, copy=None):
         """Interface to arrays."""
-        if dtype is None or dtype == self.dtype:
+        if not copy and (dtype is None or dtype == self.dtype):
             return self.data
         else:
-            return self.data.astype(dtype)
+            return self.data.astype(dtype, copy=True)
 
     # Header behaves as a dictionary, while Payload can be indexed/sliced.
     # Let frame behave appropriately.
