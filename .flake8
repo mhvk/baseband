@@ -1,0 +1,13 @@
+[flake8]
+ignore=
+    # missing whitespace around arithmetic operator
+    E226,
+    # line break before binary operator (have to choose before or after),
+    W503
+exclude =
+    # part of astropy affilliated package template, not our worry.
+    baseband/conftest.py,baseband/version.py,baseband/__init__.py,
+    docs/conf.py,
+    setup.py,
+    # standard things to ignore
+    __pycache__,build,dist,htmlcov,licenses

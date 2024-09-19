@@ -27,35 +27,23 @@
 
 import os
 import sys
-import datetime
+import tomllib
+import warnings
+from datetime import UTC, datetime
 from importlib import import_module
+from pathlib import Path
 
-import baseband
-
-try:
+with warnings.catch_warnings():
+    # Remove warning about matplotlib - we don't use it.
+    warnings.filterwarnings("ignore", "matplotlib")
     from sphinx_astropy.conf.v1 import *  # noqa
-except ImportError:
-    print('ERROR: the documentation requires the sphinx-astropy package to be installed')
-    sys.exit(1)
 
-# Get configuration information from setup.cfg
-from configparser import ConfigParser
-conf = ConfigParser()
 
-conf.read([os.path.join(os.path.dirname(__file__), '..', 'setup.cfg')])
-setup_cfg = dict(conf.items('metadata'))
+# -- Get user configuration from pyproject.toml -------------------------------
+with (Path(__file__).parents[1] / "pyproject.toml").open("rb") as f:
+    pyproject = tomllib.load(f)
 
 # -- General configuration ----------------------------------------------------
-
-# By default, highlight as Python 3.
-highlight_language = 'python3'
-
-# If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.2'
-
-# To perform a Sphinx version check that needs to be more specific than
-# major.minor, call `check_sphinx_version("x.y.z")` here.
-# check_sphinx_version("1.2.1")
 
 # add any custom intersphinx mappings
 intersphinx_mapping['baseband_tasks'] = (
@@ -64,6 +52,25 @@ intersphinx_mapping['baseband_tasks'] = (
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 exclude_patterns.append('_templates')
+
+# -- Project information ------------------------------------------------------
+
+# This does not *have* to match the package name, but typically does
+project = pyproject["project"]["name"]
+author = " & ".join(auth["name"] for auth in pyproject["project"]["authors"])
+copyright = f"{datetime.now(tz=UTC).year}, {author}"
+
+# The version info for the project you're documenting, acts as replacement for
+# |version| and |release|, also used in various other places throughout the
+# built documents.
+
+import_module(project)
+package = sys.modules[project]
+
+# The short X.Y version.
+version = package.__version__.split('-', 1)[0]
+# The full version, including alpha/beta/rc tags.
+release = package.__version__
 
 # This is added to the end of RST files - a good place to put substitutions to
 # be used globally.
@@ -75,28 +82,7 @@ rst_epilog += """
 .. |minimum_python_version| replace:: {0.__minimum_python_version__}
 .. |minimum_astropy_version| replace:: {0.__minimum_astropy_version__}
 .. |minimum_numpy_version| replace:: {0.__minimum_numpy_version__}
-""".format(baseband)
-
-# -- Project information ------------------------------------------------------
-
-# This does not *have* to match the package name, but typically does
-project = setup_cfg['name']
-author = setup_cfg['author']
-copyright = '{0}, {1}'.format(
-    datetime.datetime.now().year, setup_cfg['author'])
-
-# The version info for the project you're documenting, acts as replacement for
-# |version| and |release|, also used in various other places throughout the
-# built documents.
-
-import_module(setup_cfg['name'])
-package = sys.modules[setup_cfg['name']]
-
-# The short X.Y version.
-version = package.__version__.split('-', 1)[0]
-# The full version, including alpha/beta/rc tags.
-release = package.__version__
-
+""".format(package)
 
 # -- Options for HTML output --------------------------------------------------
 
@@ -167,15 +153,13 @@ man_pages = [('index', project.lower(), project + u' Documentation',
 
 # -- Options for the edit_on_github extension ---------------------------------
 
-if eval(setup_cfg.get('edit_on_github')):
-    extensions += ['sphinx_astropy.ext.edit_on_github']
-    edit_on_github_project = setup_cfg['github_project']
-    edit_on_github_branch = "master"
-    edit_on_github_source_root = ""
-    edit_on_github_doc_root = "docs"
+extensions += ['sphinx_astropy.ext.edit_on_github']
+edit_on_github_project = pyproject["project"]["urls"]["repository"].replace("https://github.com/", "")
+edit_on_github_source_root = ""
+edit_on_github_doc_root = "docs"
 
 # -- Resolving issue number to links in changelog -----------------------------
-github_issues_url = 'https://github.com/{0}/issues/'.format(setup_cfg['github_project'])
+github_issues_url = pyproject["project"]["urls"]["repository"] + "/issues/"
 
 # -- Turn on nitpicky mode for sphinx (to warn about references not found) ----
 #
