@@ -29,7 +29,10 @@ test = [
     "pytest-filter-subpackage",
     "pytest-remotedata",
 ]
-cov = ["coverage"]
+cov = [
+  "coverage",
+  "pytest-cov",
+]
 docs = ["sphinx-astropy"]
 
 [project.urls]
