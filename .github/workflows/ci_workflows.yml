@@ -19,7 +19,7 @@ jobs:
 
           - name: Test basics and coverage
             python: "3.12"
-            toxenv: py312-test-cov
+            toxenv: py312-test-cov-xml
 
           - name: Code style checks
             python: "3.x"

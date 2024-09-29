@@ -20,7 +20,10 @@ test = [
     "pytest-doctestplus",
     "pytest-filter-subpackage",
 ]
-cov = ["coverage"]
+cov = [
+  "coverage",
+  "pytest-cov",
+]
 docs = ["sphinx-astropy"]
 
 [project.urls]
