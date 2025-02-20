@@ -164,7 +164,7 @@ directory, and run the tests::
     pip install dist/baseband-*.tar.gz
     pip install pytest-astropy
     cd ~/
-    python -c 'import baseband; baseband.test()'
+    pytest --pyargs baseband
     deactivate
     cd -
 
@@ -240,7 +240,7 @@ contain recent versions of Astropy)::
     source <name_of_virtualenv>/bin/activate
     pip install pytest-astropy
     pip install --index-url https://test.pypi.org/simple/ baseband
-    python -c 'import baseband; baseband.test()'
+    pytest --pyargs baseband
     deactivate
 
 8. Upload to PyPI
