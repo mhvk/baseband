@@ -1,6 +1,11 @@
 4.2.1 (unreleased)
 ==================
 
+- Remove support for the deprecated ``astropy`` test runner. This means it is
+  no longer possible to test the installed baseband package with
+  ``baseband.test()`` inside python; instead, one should use ``pytest --pyargs
+  baseband`` from the command line.
+
 Bug fixes
 ---------
 

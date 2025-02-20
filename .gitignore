@@ -50,6 +50,7 @@ distribute-*.tar.gz
 # Other
 .cache
 .tox
+.tmp
 .*.sw[op]
 *~
 .project
