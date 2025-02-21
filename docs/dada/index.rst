@@ -91,7 +91,8 @@ To set up a file for writing as a stream is possible as well::
 .. testcleanup::
 
     >>> from pathlib import Path
-    >>> for f in [f for f in sorted(os.listdir('.')) if f.startswith('2013')]:
+    >>> from glob import glob
+    >>> for f in glob("2013-07-02*.dada"):
     ...     Path(f).unlink()
 
 Here, we have used an even smaller size of the payload, to show how one can

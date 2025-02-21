@@ -125,9 +125,12 @@ from above and ignore the extra 64 samples we got from the reader)::
 
 .. testcleanup::
 
+    >>> del d, d2, fw, fr
+    >>> import gc
+    >>> gc.collect()  # doctest: +IGNORE_OUTPUT
     >>> from pathlib import Path
-    >>> for i in range(2):
-    ...     Path(f"puppi_test.{i:04d}.raw").unlink()
+    >>> Path("puppi_test.0000.raw").unlink()
+    >>> Path("puppi_test.0001.raw").unlink()
 
 Here we show how to write a sequence of files by passing a string template
 to `~baseband.guppi.open`, which prompts it to create and use a filename
