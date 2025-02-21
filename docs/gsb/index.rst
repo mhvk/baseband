@@ -253,6 +253,12 @@ To write a rawdump file::
     >>> assert np.all(dr == fh_rd.read())
     >>> fh_rd.close()
 
+.. testcleanup::
+
+   >>> from pathlib import Path
+   >>> Path("test_rawdump.timestamp").unlink()
+   >>> Path("test_rawdump.dat").unlink()
+
 To write a phased file, we need to pass a nested tuple of filenames or
 filehandles::
 
@@ -271,6 +277,13 @@ filehandles::
     ...                  samples_per_frame=phased_samples_per_frame)
     >>> assert np.all(dp == fh_ph.read())
     >>> fh_ph.close()
+
+.. testcleanup::
+
+   >>> import pathlib
+   >>> for file_name in (("test_phased.timestamp",)
+   ...                   + tuple(f for d in test_phased_bin for f in d)):
+   ...     pathlib.Path(file_name).unlink()
 
 Baseband does not use the PC time in the phased header, and, when writing,
 simply uses the same time for both GPS and PC times.  Since the PC time can

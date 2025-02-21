@@ -155,6 +155,11 @@ to pass in the ``decade`` when reading back::
     >>> assert np.all(fh.read(80000) == frame.data)
     >>> fh.close()
 
+.. testcleanup::
+
+    >>> from pathlib import Path
+    >>> Path("sample_mark4_segment.m4").unlink()
+
 Note that above we had to pass in the sample rate even when opening
 the file for reading; this is because there is only a single frame in
 the file, and hence the sample rate cannot be inferred automatically.

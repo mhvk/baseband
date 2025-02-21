@@ -153,7 +153,10 @@ Both examples can be adjusted for copying just some channels::
     ...                    header0=out_header, nthread=2) as fw:
     ...         fw.write(fr.read())
 
+.. testcleanup::
 
+   >>> from pathlib import Path
+   >>> Path("try.vdif").unlink()
 
 .. _vdif_troubleshooting:
 

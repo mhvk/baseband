@@ -92,7 +92,6 @@ we also must provide ``nchan``, ``sample_rate``, and ``ref_time`` or ``kday``::
 When writing to file, we again need to pass in ``sample_rate`` and ``nchan``,
 though time can either be passed explicitly or inferred from the header::
 
-
     >>> fw = mark5b.open('test.m5b', 'ws', header0=header0,
     ...                  sample_rate=32*u.MHz, nchan=8)
     >>> fw.write(d)
@@ -101,6 +100,11 @@ though time can either be passed explicitly or inferred from the header::
     ...                  kday=57000, nchan=8)
     >>> assert np.all(fh.read() == d)
     >>> fh.close()
+
+.. testcleanup::
+
+    >>> from pathlib import Path
+    >>> Path("test.m5b").unlink()
 
 .. _mark5b_api:
 

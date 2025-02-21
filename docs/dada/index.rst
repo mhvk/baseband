@@ -88,6 +88,13 @@ To set up a file for writing as a stream is possible as well::
     >>> assert (d == d2).all()
     >>> fr.close()
 
+.. testcleanup::
+
+    >>> from pathlib import Path
+    >>> from glob import glob
+    >>> for f in glob("2013-07-02*.dada"):
+    ...     Path(f).unlink()
+
 Here, we have used an even smaller size of the payload, to show how one can
 define multiple files.  DADA data are typically stored in sequences of files.
 If one passes a time-ordered list or tuple of filenames to
