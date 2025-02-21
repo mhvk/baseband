@@ -525,6 +525,11 @@ We can check the validity of our new file by re-opening it::
     >>> fr.close()
     >>> fh.close()
 
+.. testcleanup::
+
+    >>> from pathlib import Path
+    >>> Path("test_vdif.vdif").unlink()
+
 .. note:: One can also use the top-level `~baseband.open` function for writing,
           with the file format passed in via its ``format`` argument.
 
@@ -574,6 +579,10 @@ Lastly, we check our new file::
     >>> assert np.all(fr.read() == fh.read())
     >>> fr.close()
     >>> fh.close()
+
+.. testcleanup::
+
+   >>> Path("m4convert.vdif").unlink()
 
 For file format conversion in general, we have to consider how to properly
 scale our data to make the best use of the dynamic range of the new encoded
@@ -650,6 +659,11 @@ frameset of the sample file::
     >>> assert np.all(fsf.read() == fh.read())
     >>> fsf.close()
 
+.. testcleanup::
+
+    >>> for f in filenames:
+    ...     Path(f).unlink()
+
 In situations where the ``file_size`` is known, but not the total number of
 files to write, one may use the `~baseband.helpers.sequentialfile.FileNameSequencer`
 class to create an iterable without a user-defined size.  The class is
@@ -697,6 +711,11 @@ that fits the template::
     >>> assert np.all(fr.read() == d)
     >>> fr.close()
     >>> fh.close()  # Close sample file as well.
+
+.. testcleanup::
+
+   >>> for f in glob.glob("f.edv*.vdif"):
+   ...     Path(f).unlink()
 
 Because DADA and GUPPI data are usually stored in file sequences with names
 derived from header values - eg. 'puppi_58132_J1810+1744_2176.0010.raw',
@@ -794,3 +813,7 @@ missing frames.  Indeed, when one opens the file with the default
     samples_per_frame = 16
     sample_shape = (2, 1)
     >>> fh.close()
+
+.. testcleanup::
+
+    >>> Path("corrupt.vdif").unlink()

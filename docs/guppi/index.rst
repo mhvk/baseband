@@ -123,6 +123,12 @@ from above and ignore the extra 64 samples we got from the reader)::
     >>> assert (d2 == d[:-64]).all()
     >>> fr.close()
 
+.. testcleanup::
+
+    >>> from pathlib import Path
+    >>> for i in range(2):
+    ...     Path(f"puppi_test.{i:04d}.raw").unlink()
+
 Here we show how to write a sequence of files by passing a string template
 to `~baseband.guppi.open`, which prompts it to create and use a filename
 sequencer generated with `~baseband.guppi.GUPPIFileNameSequencer`.  One
