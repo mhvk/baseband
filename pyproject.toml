@@ -1,7 +1,115 @@
+[project]
+name = "baseband"
+description = "A package for radio baseband I/O"
+readme = { file = "README.rst", content-type = "text/x-rst" }
+requires-python = ">=3.10"
+license = { text = "GNU GPL v3+" }
+authors = [
+  { name = "Marten H. van Kerkwijk", email = "mhvk@astro.utoronto.ca"},
+  { name = "Chenchong Zhu" },
+]
+dynamic = ["version"]
+dependencies = [
+    "astropy>=5.1",
+]
+
+[project.optional-dependencies]
+all = ["baseband-tasks[all]"]
+test = [
+    "pytest-astropy-header",
+    "pytest-doctestplus",
+    "pytest-filter-subpackage",
+]
+cov = [
+  "coverage",
+  "pytest-cov",
+]
+docs = ["sphinx-astropy"]
+
+[project.urls]
+repository = "https://github.com/mhvk/baseband"
+documentation = "https://baseband.readthedocs.io"
+
+[project.entry-points."baseband.io"]
+dada = "baseband.dada"
+guppi = "baseband.guppi"
+mark4 = "baseband.mark4"
+mark5b = "baseband.mark5b"
+vdif = "baseband.vdif"
+gsb = "baseband.gsb"
+
 [build-system]
+requires = [
+  "setuptools",
+  "setuptools_scm>=8.0.0",
+]
+build-backend = "setuptools.build_meta"
 
-requires = ["setuptools",
-            "setuptools_scm",
-            "wheel"]
+[tool.setuptools]
+include-package-data = true
+license-files = ["LICENSE", "licenses/*.rst"]
 
-build-backend = 'setuptools.build_meta'
+[tool.setuptools.packages.find]
+include = ["baseband*"]
+
+[tool.setuptools.package-data]
+"*" = ["data/*", "data/gsb/*"]
+
+[tool.setuptools_scm]
+write_to = "baseband/_version.py"
+
+[tool.pytest.ini_options]
+testpaths = [
+  "baseband",
+  "docs",
+]
+astropy_header = true
+astropy_header_packages = [
+  "astropy",
+  "numpy",
+]
+doctest_plus = "enabled"
+text_file_format = "rst"
+addopts = "--color=yes --doctest-rst"  # --doctest-ignore-import-errors?
+filterwarnings = [
+  "error",
+  "ignore:::pytest_doctestplus",
+  "ignore:numpy.ufunc size changed:RuntimeWarning",
+  "ignore:numpy.ndarray size changed:RuntimeWarning",
+]
+
+[tool.coverage.run]
+omit = [
+  "baseband/__init*",
+  "baseband/*setup_package*",
+  "baseband/tests/*",
+  "baseband/*/tests/*",
+  "baseband/_version*",
+  "*/baseband/__init*",
+  "*/baseband/*setup_package*",
+  "*/baseband/tests/*",
+  "*/baseband/*/tests/*",
+  "*/baseband/extern/*",
+  "*/baseband/_version*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  # Have to re-enable the standard pragma
+  "pragma: no cover",
+  # Don't complain about packages we have installed
+  "except ImportError",
+  # Don't complain if tests don't hit assertions
+  "raise AssertionError",
+  "raise NotImplementedError",
+  # Don't complain about script hooks
+  "def main(.*):",
+  # Ignore branches that don't pertain to this version of Python
+  "pragma: py{ignore_python_version}",
+  # Don't complain about IPython completion helper
+  "def _ipython_key_completions_",
+  # typing.TYPE_CHECKING is False at runtime
+  "if TYPE_CHECKING:",
+  # Ignore typing overloads
+  "@overload",
+]

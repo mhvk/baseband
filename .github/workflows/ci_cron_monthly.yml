@@ -10,6 +10,22 @@ on:
     types:
       - synchronize
       - labeled
+  push:
+    # We want this workflow to always run on release branches as well as
+    # all tags since we want to be really sure we don't introduce
+    # regressions on the release branches, and it's also important to run
+    # this on pre-release and release tags.
+    branches:
+    - 'v*'
+    tags:
+    - '*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   test_more_architectures:
@@ -18,53 +34,59 @@ jobs:
     # we include them just in the monthly cron. These also serve as a test
     # of using system libraries and using pytest directly.
 
-    name: Test on ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    name: Python 3.12
     # Don't run on forks of the repository.
     if: (github.repository == 'mhvk/baseband' && (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'Extra CI')))
-    runs-on: ubuntu-latest
     env:
-      apt_packages: git python3-astropy python3-pip
+      # git needed by python3-setuptools-scm (and not a required dependency).
+      apt_packages: python3-astropy python3-pytest-astropy git python3-setuptools-scm
 
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: s390x
-          - arch: aarch64
+          - arch: armv7
           - arch: ppc64le
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
+          persist-credentials: false
           fetch-depth: 0
-      - uses: uraimo/run-on-arch-action@v2
+      - uses: uraimo/run-on-arch-action@5397f9e30a9b62422f302092631c99ae1effcd9e # v2.8.1
         name: Run tests
         id: build
         with:
           arch: ${{ matrix.arch }}
-          distro: ubuntu_latest
+          distro: ubuntu_rolling
+
           shell: /bin/bash
           install: |
             apt-get update -q -y
-            apt-get install -y ${{ env.apt_packages }}
+            apt-get install -q -y --no-install-recommends ${{ env.apt_packages }}
           run: |
+            uname -a
+            echo "LONG_BIT="$(getconf LONG_BIT)
             python3 setup.py egg_info
             python3 -m pytest
 
   test_with_apt:
     name: Test using apt
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # 24.04 does not work (bad python for doctestplus)
     if: (github.repository == 'mhvk/baseband' && (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'Extra CI')))
     env:
-      apt_packages: git python3-astropy python3-pip
+      apt_packages: python3-astropy
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
       with:
+        persist-credentials: false
         fetch-depth: 0
     - name: Install system dependencies
       if: env.apt_packages
-      run: sudo apt-get install ${{ env.apt_packages }}
+      run: sudo apt-get install -y --no-install-recommends ${{ env.apt_packages }}
     - name: Run tests
       run: |
         python3 setup.py egg_info
@@ -82,10 +104,11 @@ jobs:
          - os: macos-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
       with:
         fetch-depth: 0
-    - uses: actions/setup-python@v5
+        persist-credentials: false
+    - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38  # v5.4.0
       with:
         python-version: 3.x
     - name: Install Python dependencies
