@@ -73,8 +73,8 @@ jobs:
             python3 -m pytest
 
   test_with_apt:
-    name: Test using apt
-    runs-on: ubuntu-22.04  # 24.04 does not work (bad python for doctestplus)
+    name: Test using apt on aarch64
+    runs-on: ubuntu-22.04-arm  # 24.04 does not work (bad python for doctestplus)
     if: (github.repository == 'mhvk/baseband' && (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'Extra CI')))
     env:
       apt_packages: python3-astropy
