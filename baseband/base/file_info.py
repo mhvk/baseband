@@ -430,8 +430,6 @@ class StreamReaderInfo(InfoBase):
 
     start_time = info_item(needs='_parent', doc=(
         'Time of the first complete sample.'))
-    stop_time = info_item(needs='_parent', doc=(
-        'Time of the sample just beyond the end of the file.'))
     sample_rate = info_item(needs='_parent', doc=(
         'Complete samples per unit of time.'))
     shape = info_item(needs='_parent', doc=(
@@ -469,7 +467,22 @@ class StreamReaderInfo(InfoBase):
         elif self.continuous is not None:
             return self._parent.__class__.__name__.split('Stream')[0].lower()
 
-    @info_item
+    @info_item(needs='_parent')
+    def last_header(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("default")  # Avoid pytest -W error.
+            last_header = self._parent._last_header
+
+        if w:
+            self.warnings['last_header'] = str(w[-1])
+        return last_header
+
+    @info_item(needs='last_header')
+    def stop_time(self):
+        """Time of the sample just beyond the end of the file."""
+        return self._parent.stop_time
+
+    @info_item(needs='last_header')
     def continuous(self):
         """Check the stream is continuous.
 
@@ -489,7 +502,7 @@ class StreamReaderInfo(InfoBase):
                 warnings.simplefilter('error')
                 good = -1
                 bad = None
-                frame = fh._get_index(fh._last_header)
+                frame = fh._get_index(self.last_header)
                 while frame > good:
                     try:
                         fh.seek(frame * fh.samples_per_frame)

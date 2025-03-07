@@ -778,12 +778,31 @@ class StreamReaderBase(StreamBase):
     def _last_header(self):
         """Header of the last file for this stream."""
         # Base implementation.  Seek forward rather than backward, as last
-        # frame can have missing bytes.
+        # frame can have missing bytes, and, if so, we ignore it.
+        # If a header is not readable, we keep going backward until we find
+        # a good one, but emit a warning.
         with self.fh_raw.temporary_offset() as fh_raw:
             file_size = fh_raw.seek(0, 2)
             nframes, fframe = divmod(file_size, self.header0.frame_nbytes)
-            fh_raw.seek((nframes - 1) * self.header0.frame_nbytes)
-            return fh_raw.read_header()
+            exc = None
+            for i in range(nframes-1, -1, -1):
+                fh_raw.seek(i * self.header0.frame_nbytes)
+                try:
+                    last_header = fh_raw.read_header()
+                except Exception as e:
+                    exc = e
+                    continue
+                else:
+                    break
+            else:
+                raise RuntimeError("could not find last header, not even "
+                                   "at first frame! Please report.") from exc
+            if exc and self.verify:
+                warnings.warn(
+                    "last {} unreadable and skipped; error message: {}".format(
+                        ("frame was" if (n := nframes-i-1) == 1
+                         else f"{n} frames were"), exc))
+            return last_header
 
     # Override the following so we can refer to stop_time in the docstring.
     @property
