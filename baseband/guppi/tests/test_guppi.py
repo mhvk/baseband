@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 from astropy import units as u
 from astropy.time import Time
+from numpy.testing import assert_array_equal
 
 from ... import guppi
 from ...helpers import sequentialfile as sf
@@ -840,3 +841,40 @@ def test_vegas_header_keywords():
         assert not fh.header0.sideband
         assert fh.header0.overlap == 512
         assert fh.header0.offset == 0.
+
+
+def test_fake_breakthrough_listen_header(tmpdir):
+    with guppi.open(SAMPLE_FILE, 'rs') as fh:
+        header = fh.header0.copy()
+        data = fh.read(1024)
+    header['DIRECTIO'] = 0
+    header['OVERLAP'] = 0
+    assert header.nbytes == 6480
+    filename = tmpdir.join('test_no_dio.raw')
+    with guppi.open(filename, 'ws', header0=header) as fw:
+        fw.write(data)
+
+    with guppi.open(filename, 'rs') as fr:
+        assert fr.header0.nbytes == header.nbytes
+        assert fr.header0 == header
+        check = fr.read()
+        assert_array_equal(check, data)
+
+    dio_header = header.copy()
+    dio_header['DIRECTIO'] = 1
+    assert dio_header.nbytes == ((6480 + 511) // 512) * 512
+    filename = tmpdir.join('test_dio.raw')
+    with guppi.open(filename, 'ws', header0=dio_header) as fw:
+        fw.write(data)
+
+    with open(filename, 'rb') as fr:
+        check = guppi.GUPPIHeader.fromfile(fr)
+        assert check.nbytes == dio_header.nbytes
+        assert check == dio_header
+        assert fr.tell() == dio_header.nbytes
+
+    with guppi.open(filename, 'rs') as fr:
+        assert fr.header0.nbytes == dio_header.nbytes
+        assert fr.header0 == dio_header
+        check = fr.read()
+        assert_array_equal(check, data)
