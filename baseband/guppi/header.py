@@ -130,6 +130,8 @@ class GUPPIHeader(fits.Header):
         hdr = fh.read(header_end - header_start).decode('ascii')
         # Create the header using the base class.
         self = cls.fromstring(hdr)
+        # Go to actual end of header (breakthrough listen has extra 00 bytes).
+        fh.seek(header_start + self.nbytes)
         self.mutable = False
         if verify:
             self.verify()
@@ -145,7 +147,11 @@ class GUPPIHeader(fits.Header):
 
         Uses `~astropy.io.fits.Header.tostring`.
         """
-        fh.write(self.tostring(padding=False).encode('ascii'))
+        out = self.tostring(padding=False).encode('ascii')
+        if extra := self.nbytes - len(out):
+            # Pad if needed (breakthrough listen - see nbytes).
+            out += extra * b'\x00'
+        fh.write(out)
 
     @classmethod
     def fromkeys(cls, *args, verify=True, mutable=True, **kwargs):
@@ -210,7 +216,12 @@ class GUPPIHeader(fits.Header):
     @property
     def nbytes(self):
         """Size of the header in bytes."""
-        return (len(self) + 1) * 80
+        nbytes = (len(self) + 1) * 80
+        if int(self.get('DIRECTIO', '0')) and (extra := nbytes % 512):
+            # Breakthrough listen uses direct I/O and headers are padded
+            # with zeros to the nearest 512 byte boundary.
+            nbytes += 512 - extra
+        return nbytes
 
     @property
     def payload_nbytes(self):

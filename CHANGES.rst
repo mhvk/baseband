@@ -1,3 +1,9 @@
+4.4 (unreleased)
+================
+
+- The guppi reader now supports reading breakthrough listen files
+  (which have a header padded with 00 to a 512 byte boundary).
+
 4.3 (2024-02-20)
 ================
 
