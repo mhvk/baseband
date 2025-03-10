@@ -131,6 +131,17 @@ Created from a Green Bank Telescope observation of TOI 1898 with::
 Initial frame is >50 MB and truncated. For tests of header functionality only.
 """
 
+SAMPLE_BLC = _full_path('sample_blc.raw')
+r"""Breakthrough Listen sample, npol=2, obsnchan=64.
+
+Created from a Breakthrough Listen observation of the Crab with::
+
+    dd if=blc00_guppi_60631_07222_DIAG_MESSIER1_0008.0013.raw \
+       of=sample_blc.raw bs=7168 count=1
+
+Only contains the header, i.e., for tests of header functionality only.
+"""
+
 SAMPLE_GSB_RAWDUMP_HEADER = _full_path('gsb/sample_gsb_rawdump.timestamp')
 """GSB rawdump header sample.
 
