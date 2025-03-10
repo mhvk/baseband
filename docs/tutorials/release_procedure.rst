@@ -142,7 +142,7 @@ and ensure the repository has the proper permissions::
 
 Finally, package the release's source code::
 
-    python3 setup.py build sdist
+    python3 -m build --sdist --outdir dist .
 
 4. Test the release
 -------------------
@@ -153,13 +153,9 @@ environment. Before creating the virtualenvs, we recommend checking if the
 ``$PYTHONPATH`` environmental variable is set.  If it is, set it to a null
 value (in bash, ``PYTHONPATH=``) before proceeding.
 
-To create the environments::
+To create the environments and test in it::
 
     python3 -m venv test_release
-
-Now, for each environment, activate it, navigate to the Baseband root
-directory, and run the tests::
-
     source test_release/bin/activate
     pip install dist/baseband-*.tar.gz
     pip install pytest-astropy
@@ -183,7 +179,7 @@ above following the tests::
     git clean -dfx
     umask 0022
     chmod -R a+Xr .
-    python3 setup.py build sdist
+    python3 -m build --sdist --outdir dist .
 
 You may optionally sign the source as well::
 
@@ -215,14 +211,7 @@ The Baseband GitHub repo `automatically updates
 Check if your release has made it to Zenodo by clicking the badge in
 ``README.rst``.
 
-6. Build the release wheel for PyPI
------------------------------------
-
-To build the release::
-
-    python3 setup.py bdist_wheel --universal
-
-7. (Optional) test uploading the release
+6. (Optional) test uploading the release
 ----------------------------------------
 
 PyPI provides a test environment to safely try uploading new releases.  To take
@@ -243,21 +232,21 @@ contain recent versions of Astropy)::
     pytest --pyargs baseband
     deactivate
 
-8. Upload to PyPI
+7. Upload to PyPI
 -----------------
 
 Finally, upload the package to PyPI::
 
     twine upload dist/baseband-<version>*
 
-9. Check if Readthedocs has updated
+8. Check if Readthedocs has updated
 -----------------------------------
 
 Go to `Read the Docs <https://readthedocs.org/>`_ and check that the
 ``stable`` version points to the latest stable release.  Each minor release has
 its own version as well, which should be pointing to its latest patch release.
 
-10m. Clean up master
+9m. Clean up master
 --------------------
 
 In the main development branch, add the next major/minor release to
@@ -267,7 +256,7 @@ In the main development branch, add the next major/minor release to
 
 Then submit a pull request to master.
 
-10p. Update CHANGES.rst on master
+9p. Update CHANGES.rst on master
 ---------------------------------
 
 Change the release date of the patch release in ``CHANGES.rst`` on master to
