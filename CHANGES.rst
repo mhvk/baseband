@@ -1,11 +1,15 @@
-4.4 (unreleased)
+4.3.1 (unreleased)
+==================
+
+Bug fixes
+---------
+
+
+4.3 (2025-03-10)
 ================
 
 - The guppi reader now supports reading breakthrough listen files
   (which have a header padded with 00 to a 512 byte boundary).
-
-4.3 (2024-02-20)
-================
 
 - Remove support for the deprecated ``astropy`` test runner. This means it is
   no longer possible to test the installed baseband package with
