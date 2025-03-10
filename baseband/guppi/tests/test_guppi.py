@@ -11,7 +11,7 @@ from numpy.testing import assert_array_equal
 from ... import guppi
 from ...helpers import sequentialfile as sf
 from ..base import GUPPIFileNameSequencer
-from ...data import SAMPLE_PUPPI as SAMPLE_FILE, SAMPLE_VEGAS
+from ...data import SAMPLE_PUPPI as SAMPLE_FILE, SAMPLE_VEGAS, SAMPLE_BLC
 
 
 class TestGUPPI:
@@ -843,7 +843,18 @@ def test_vegas_header_keywords():
         assert fh.header0.offset == 0.
 
 
-def test_fake_breakthrough_listen_header(tmpdir):
+def test_breakthrough_listen_header():
+    with guppi.open(SAMPLE_BLC, 'rs') as fh:
+        assert fh.header0.nbytes == 7168
+        assert fh.header0.bps == 8
+        assert fh.header0.complex_data
+        assert fh.header0.npol == 2
+        assert fh.header0.nchan == 64
+        assert fh.header0.samples_per_frame == 524288
+
+
+def test_create_fake_breakthrough_listen_header(tmpdir):
+    # This really tests that one can use the DIRECTIO header entry.
     with guppi.open(SAMPLE_FILE, 'rs') as fh:
         header = fh.header0.copy()
         data = fh.read(1024)
