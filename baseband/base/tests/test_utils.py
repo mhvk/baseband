@@ -92,7 +92,7 @@ class TestCRC12:
     def test_crc_array(self):
         scalar = 0x12345678
         expected = self.crc12(scalar)
-        array = (scalar * np.ones(10, dtype=int)).astype('u8')
+        array = scalar * np.ones(10, dtype='u8')
         crc = self.crc12(array)
         assert crc.shape == array.shape
         assert np.all(crc == expected)
@@ -100,7 +100,7 @@ class TestCRC12:
     def test_check_crc_array(self):
         scalar = 0x12345678
         scalar = (scalar << len(self.crc12)) + self.crc12(scalar)
-        array = (scalar * np.ones(10, dtype=int)).astype('u8')
+        array = scalar * np.ones(10, dtype='u8')
         check = self.crc12.check(array)
         assert check.shape == array.shape
         assert np.all(check)
