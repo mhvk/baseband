@@ -670,10 +670,10 @@ class TestVDIF:
         frameset2['frame_nr'] = 25
         assert all(f.header['frame_nr'] == 25 for f in frameset2.frames)
         assert frameset2['frame_nr'] == 25
-        frameset2['thread_id'] = np.arange(10, 18)
+        frameset2['thread_id'] = list(range(10, 18))
         assert all(f.header['thread_id'] == v
-                   for f, v in zip(frameset2.frames, np.arange(10, 18)))
-        assert all(frameset2['thread_id'] == np.arange(10, 18))
+                   for f, v in zip(frameset2.frames, range(10, 18)))
+        assert all(frameset2['thread_id'] == list(range(10, 18)))
         with pytest.raises(ValueError):
             frameset2['thread_id'] = 0
         with pytest.raises(ValueError):

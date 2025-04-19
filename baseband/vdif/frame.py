@@ -437,14 +437,22 @@ class VDIFFrameSet:
         if isinstance(item, str):
             # Headers behave as dictionaries; except for thread_id and
             # invalid_data, assume set base properties all to the same value.
-            data = np.broadcast_to(data, (len(self.frames),))
+            if isinstance(data, int):
+                data = [data] * len(self.frames)
+                len_unique = 1
+            elif (isinstance(data, (tuple, list))
+                  and all(isinstance(d, int) for d in data)):
+                len_unique = len(set(data))
+            else:
+                raise ValueError("header items can only be set to integers.")
+
             if item == 'thread_id':
-                if len(np.unique(data)) != len(self.frames):
+                if len_unique != len(self.frames):
                     raise ValueError("all thread ids should be unique.")
             elif (item != 'invalid_data'
-                  and item in VDIFBaseHeader._header_parser.keys()):
-                if data.strides != (0,) and len(np.unique(data)) > 1:
-                    raise ValueError("base header keys should be identical.")
+                  and item in VDIFBaseHeader._header_parser.keys()
+                  and len_unique > 1):
+                raise ValueError("base header keys should be identical.")
 
             for f, value in zip(self.frames, data):
                 f.header[item] = value

@@ -7,8 +7,8 @@ the information therein.
 
 For the VDIF specification, see https://www.vlbi.org/vdif
 """
+import bisect
 
-import numpy as np
 import astropy.units as u
 from astropy.time import Time, TimeDelta
 
@@ -339,12 +339,12 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
 
     @nchan.setter
     def nchan(self, nchan):
-        lg2_nchan = np.log2(nchan)
-        assert lg2_nchan % 1 == 0
+        if nchan <= 0 or (nchan & (nchan - 1)) != 0:
+            raise ValueError("channel numbers have to be powers of two.")
         if nchan != 1 and (self.bps & (self.bps - 1)) != 0:
             raise ValueError("Multi-channel data requires bits per sample "
                              "that is a power of two.")
-        self['lg2_nchan'] = int(lg2_nchan)
+        self['lg2_nchan'] = nchan.bit_length() - 1
 
     @property
     def sample_shape(self):
@@ -408,7 +408,7 @@ class VDIFHeader(VLBIHeaderBase, metaclass=VDIFHeaderMeta):
     @ref_time.setter
     def ref_time(self, ref_time):
         assert ref_time > ref_epochs[0]
-        ref_index = np.searchsorted((ref_epochs - ref_time).sec, 0) - 1
+        ref_index = bisect.bisect(list((ref_epochs - ref_time).sec), 0) - 1
         self['ref_epoch'] = ref_index
 
     def get_time(self, frame_rate=None):
