@@ -56,6 +56,7 @@ troubleshooting help and APIs for each.
    dada/index
    guppi/index
    gsb/index
+   asp/index
 
 .. _core_utilities_toc:
 

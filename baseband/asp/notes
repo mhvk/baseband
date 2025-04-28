@@ -1,0 +1,29 @@
+notes:
+
+General Header Comments:
+	had to manually pad the file header; the numpy alignment doesn't quite work the same way as the c struct alignment
+	changed the read methods to a straight np fromfile due to some complaint from the python read method.
+
+Block Header:
+	We subclass VLBIHeader
+	We define a custom numpy dtype that is a copy of the dspsr block header struct
+	Note that Marten wrote (most of) this class. The 'fromfile' method is the main thing here and we use the numpy 'frombuffer' method to read bytes straight into the header dtype. These headers are pretty simple since our data are 32bit word-aligned.
+	Renamed ASPHeader (became the 'combined' header)
+	Had to override the 'nbytes' method to avoid reference to _struct - should investigate either overriding all references to _struct or implementing it from _dtype.
+
+File Header:
+	basically the same as for the block header; had to define a Fairly extensive dtype but otherwise not much to report.
+	Need to deal with header parser despite the fact that the headers are word aligned.
+
+Combined Header:
+	Created ASPHeader, which is a combined header class that detects position within file object and adjusts accordingly
+	(immediately deprecated)
+
+Payload:
+	define/select encoders (8bit)
+	define dtype_word to be int8
+
+	fromfile:
+		reviewed superclass read method
+		had to get payload_nbytes from block header field
+		consequently, always need a non-null header
