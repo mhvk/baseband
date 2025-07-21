@@ -8,7 +8,9 @@
 Bug fixes
 ---------
 
-- Ensure headers words are never turned into signed 32-bit numpy integers.
+- Ensure headers words are never turned into signed 32- or 64-bit numpy
+  integers. [#538, #540]
+
 
 4.3 (2025-03-10)
 ================
