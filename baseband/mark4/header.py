@@ -218,7 +218,7 @@ class Mark4TrackHeader(VLBIHeaderBase):
             raise ValueError("{0} ms is not a multiple of 1.25 ms"
                              .format(ms))
         self['bcd_fraction'] = bcd_encode(np.floor(ms + 1e-6)
-                                          .astype(np.int32))
+                                          .astype(np.uint32))
 
     def get_time(self):
         """Convert BCD time code to Time object.

@@ -224,6 +224,14 @@ class TestMark4:
         assert header13.ntrack == 53
         assert abs(header13.time - header.time) < 1. * u.ns
 
+    @pytest.mark.parametrize("value", [1, np.int32(1), np.int64(1)])
+    def test_header_word_type(self, value):
+        # Regression test for numpy scalars influencing the type of the words.
+        header = Mark4TrackHeader(words=None)
+        header["converter_id"] = value
+        assert isinstance(header.words, list)
+        assert all(type(w) is int for w in header.words)
+
     def test_invariant_pattern(self):
         with open(SAMPLE_FILE, 'rb') as fh:
             fh.seek(0xa88)

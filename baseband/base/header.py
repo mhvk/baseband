@@ -118,12 +118,18 @@ def make_setter(word_index, bit_index, bit_length, default=None):
                 raise ValueError("no default value so cannot set to 'None'.")
             value = default
         elif value is True:
+            # Special case: may set multiple bits in invariant masks.
             value = bit_mask
-        elif np.any(value & bit_mask != value):
-            raise ValueError("{0} cannot be represented with {1} bits"
-                             .format(value, bit_length))
+        else:
+            if isinstance(value, (np.integer, np.bool_)):
+                # Turn into integer to avoid influencing promotion.
+                value = int(value)
+            if np.any(value & bit_mask != value):
+                raise ValueError("{0} cannot be represented with {1} bits"
+                                 .format(value, bit_length))
+
         if bit_length == 64:
-            word1 = value & (1 << 32) - 1
+            word1 = value & 0xffffffff
             word2 = value >> 32
             words[word_index] = word1
             words[word_index + 1] = word2
