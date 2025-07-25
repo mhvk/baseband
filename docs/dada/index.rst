@@ -11,6 +11,12 @@ single :term:`data frame` consisting of an ASCII :term:`header` of typically
 <http://psrdada.sourceforge.net/manuals/Specification.pdf>`_ and
 actual usage; files are described by an :ref:`ASCII header <dada_header>`.
 
+.. note::
+   Since the specification is also by actual usage, some files are not
+   immediately readable (e.g., in Meerkat's MKBF files, the samples are not
+   stored consecutively, but in heaps).  Please raise an issue if you
+   encounter problems, ideally with links to format definitions.
+
 .. _dada_usage:
 
 Usage

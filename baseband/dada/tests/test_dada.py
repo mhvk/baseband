@@ -839,3 +839,38 @@ class TestMKBF:
         pd = decode_8bit(raw_words).view("c8").reshape(2, 1024, 256)
         check = np.moveaxis(pd, -1, 0).reshape(data.shape)
         assert_array_equal(check, data)
+
+    @pytest.mark.parametrize("nheap", [1, 3, 6])
+    def test_writing(self, nheap, tmpdir):
+        with dada.open(SAMPLE_MKBF_DADA, 'rs') as fh:
+            header = fh.header0
+            data = fh.read()
+        test_file = str(tmpdir.join('test_mkbf.dada'))
+        # swap real and imaginary.
+        other_data = data.view("f4")[..., ::-1].copy().view("c8")
+        assert not np.all(other_data == data)
+        new_header = header.copy()
+        new_header.payload_nbytes *= nheap
+        with dada.open(test_file, "ws", header0=new_header) as fw:
+            fw.write(data)
+            fw.write(other_data)
+            fw.write(other_data[:200])
+            fw.write(data[200:])
+            fw.write(np.concatenate([data, other_data, data]))
+
+        with dada.open(test_file, "rs") as fr:
+            assert fr.header0 == new_header
+            out = fr.read()
+            if nheap == 6:
+                assert fr._last_header == new_header
+            else:
+                assert fr._last_header != new_header
+
+        assert out.shape == (6*256, 2, 1024)
+        assert_array_equal(out[:256], data)
+        assert_array_equal(out[256:512], other_data)
+        assert_array_equal(out[512:712], other_data[:200])
+        assert_array_equal(out[712:768], data[200:])
+        assert_array_equal(out[768:1024], data)
+        assert_array_equal(out[1024:1280], other_data)
+        assert_array_equal(out[1280:], data)

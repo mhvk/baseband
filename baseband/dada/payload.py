@@ -1,6 +1,5 @@
 # Licensed under the GPLv3 - see LICENSE
 """Payload for DADA format."""
-import math
 from collections import namedtuple
 
 import numpy as np
@@ -8,7 +7,7 @@ import numpy as np
 from ..base.payload import PayloadBase
 
 
-__all__ = ['DADAPayload']
+__all__ = ['DADAPayload', "MKBFPayload"]
 
 
 def decode_8bit(words):
@@ -53,32 +52,38 @@ class DADAPayload(PayloadBase):
 
 
 class MKBFPayload(DADAPayload):
+    """Container for decoding and encoding MKBF DADA payloads.
+
+    Subclass of `~baseband.dada.DADAPayload` that takes into account
+    that the samples are organized in heaps of 256 samples, with order
+    (nheap, npol, nchan, nsub=256).
+
+    Some information on the instrument writing it can be found in
+    `Van der Byl et al. 2021 <https://doi.org/10.1117/1.JATIS.8.1.011006>`_
+
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Change view of words to indicate one element containts 256
         # samples for each part of the sample_shape (this also ensures
         # bpw=bits-per-word is correct in _item_to_slices).
-        self.words = self.words.view(
-            [("samples", "u2", self.sample_shape + (256,))]
-        )
+        self._dtype_word = np.dtype(
+            [("heaps",
+              [("real", f"int{self.bps}"), ("imag", f"int{self.bps}")],
+              self.sample_shape + (256,))])
+        self.words = self.words.view(self._dtype_word)
 
-    def _samples_first(self, words):
-        """Reorder words to have samples first."""
-        return np.reshape(
-            np.moveaxis(words["samples"], -1, 1),
-            (-1,) + self.sample_shape, copy=True,
-        )
+    def _decode(self, words, data_slice=()):
+        words = np.moveaxis(words["heaps"], -1, 1).ravel().reshape(
+            -1, *self.sample_shape)[data_slice]
+        return super()._decode(words)
+
+    def _encode(self, data):
+        data = np.moveaxis(data.reshape(-1, 256, *self.sample_shape), 1, -1)
+        return super()._encode(data)
 
     def __getitem__(self, item=()):
-        if item == () or item == slice(None):
-            words= self._samples_first(self.words)
-
-        else:
-            words_slice, data_slice = self._item_to_slices(item)
-            words = self._samples_first(self.words[words_slice])[data_slice]
-
-        data = self._decoders[self._coder](words)
-
-        return data.view(self.dtype) if self.complex_data else data
+        words_slice, data_slice = self._item_to_slices(item)
+        return self._decode(self.words[words_slice], data_slice)
 
     data = property(__getitem__, doc="Full decoded payload.")
