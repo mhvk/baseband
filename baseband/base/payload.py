@@ -143,7 +143,7 @@ class PayloadBase:
         return fh.write(self.words.tobytes())
 
     @classmethod
-    def fromdata(cls, data, header=None, bps=2):
+    def fromdata(cls, data, header=None, bps=2, **kwargs):
         """Encode data as a payload.
 
         Parameters
@@ -156,6 +156,8 @@ class PayloadBase:
         bps : int, optional
             Bits per elementary sample, i.e., per channel and per real or
             imaginary component, used if header is not given.  Default: 2.
+        **kwargs
+            Any other arguments to pass on to the class initializer.
         """
         sample_shape = data.shape[1:]
         complex_data = data.dtype.kind == 'c'
@@ -170,16 +172,20 @@ class PayloadBase:
                                  .format(*(('complex' if c else 'real') for c
                                            in (header.complex_data,
                                                complex_data))))
-        try:
-            encoder = cls._encoders[bps]
-        except KeyError:
-            raise ValueError("{0} cannot encode data with {1} bits"
-                             .format(cls.__name__, bps))
-        if complex_data:
-            data = data.view((data.real.dtype, (2,)))
-        words = encoder(data).ravel().view(cls._dtype_word)
-        return cls(words, sample_shape=sample_shape, bps=bps,
-                   complex_data=complex_data)
+            payload_nbytes = header.payload_nbytes
+            base_kwargs = {"header": header}
+        else:
+            base_kwargs = {
+                "bps": bps,
+                "sample_shape": sample_shape,
+                "complex_data": complex_data,
+            }
+            payload_nbytes = data.size * (2 if complex_data else 1) * bps // 8
+
+        n_words = payload_nbytes // cls._dtype_word.itemsize
+        self = cls(np.empty(n_words, cls._dtype_word), **base_kwargs, **kwargs)
+        self[:] = data
+        return self
 
     def __array__(self, dtype=None, copy=None):
         """Interface to arrays."""
@@ -233,9 +239,8 @@ class PayloadBase:
             Slice such that if one decodes ``ds = self.words[words_slice]``,
             ``ds`` is the smallest possible array that includes all
             of the requested ``item``.
-        data_slice : int or slice
-            Int or slice such that ``decode(ds)[data_slice]`` is the requested
-            ``item``.
+        data_slice : tuple of slice or int
+            Such that ``decode(ds)[data_slice]`` is the requested ``item``.
 
         Notes
         -----
@@ -247,7 +252,7 @@ class PayloadBase:
         """
         if isinstance(item, tuple):
             sample_index = item[1:]
-            item = item[0]
+            item = item[0] if item else slice(None)
         else:
             sample_index = ()
 
@@ -306,45 +311,41 @@ class PayloadBase:
 
         return words_slice, (data_slice,) + sample_index
 
+    def _decode(self, words):
+        return self._decoders[self._coder](words).view(self.dtype)
+
+    def _encode(self, data):
+        try:
+            encoder = self._encoders[self._coder]
+        except KeyError:
+            raise ValueError(f"{self.__class__.__name__} cannot encode data "
+                             f"with {self._coder} bits") from None
+        if data.dtype.kind == 'c':
+            data = data.view((data.real.dtype, (2,)))
+        return encoder(data)
+
     def __getitem__(self, item=()):
-        decoder = self._decoders[self._coder]
-        if item == () or item == slice(None):
-            data = decoder(self.words)
-            if self.complex_data:
-                data = data.view(self.dtype)
-            return data.reshape(self.shape)
-
         words_slice, data_slice = self._item_to_slices(item)
-
-        return (decoder(self.words[words_slice]).view(self.dtype)
+        return (self._decode(self.words[words_slice])
                 .reshape(-1, *self.sample_shape)[data_slice])
 
     def __setitem__(self, item, data):
-        if item == () or item == slice(None):
-            words_slice = data_slice = slice(None)
-        else:
-            words_slice, data_slice = self._item_to_slices(item)
+        words_slice, data_slice = self._item_to_slices(item)
 
         data = np.asanyarray(data)
         # Check if the new data spans an entire word and is correctly shaped.
         # If so, skip decoding.  If not, decode appropriate words and insert
         # new data.
-        if not (data_slice == slice(None)
+        if not (data_slice == (slice(None),)
                 and data.shape[-len(self.sample_shape):] == self.sample_shape
                 and data.dtype.kind == self.dtype.kind):
-            decoder = self._decoders[self._coder]
-            current_data = decoder(self.words[words_slice])
-            if self.complex_data:
-                current_data = current_data.view(self.dtype)
+            current_data = self._decode(self.words[words_slice])
             current_data.shape = (-1,) + self.sample_shape
             current_data[data_slice] = data
             data = current_data
 
-        if data.dtype.kind == 'c':
-            data = data.view((data.real.dtype, (2,)))
-
-        encoder = self._encoders[self._coder]
-        self.words[words_slice] = encoder(data).ravel().view(self._dtype_word)
+        encoded_words = self._encode(data).ravel().view(self._dtype_word)
+        self.words[words_slice] = encoded_words
 
     data = property(__getitem__, doc="Full decoded payload.")
 
