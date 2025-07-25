@@ -6,11 +6,14 @@ import pickle
 import pytest
 import numpy as np
 import astropy.units as u
+from numpy.testing import assert_array_equal
 from astropy.time import Time
 from ... import dada
 from ...helpers import sequentialfile as sf
 from ..base import DADAFileNameSequencer
-from ...data import SAMPLE_DADA as SAMPLE_FILE, SAMPLE_MEERKAT_DADA
+from ..payload import decode_8bit
+from ...data import (
+    SAMPLE_DADA as SAMPLE_FILE, SAMPLE_MEERKAT_DADA, SAMPLE_MKBF_DADA)
 
 
 class TestDADA:
@@ -810,3 +813,29 @@ def test_meerkat_data():
     with dada.open(SAMPLE_MEERKAT_DADA, 'rs') as fh:
         data = fh.read()
     assert data.shape == (16384 - 4096 // 2, 2)
+
+
+class TestMKBF:
+    def test_header(self):
+        # Check that header can be read and time is correct.
+        with dada.open(SAMPLE_MKBF_DADA, 'rb') as fh:
+            header = fh.read_header()
+        assert header.sample_shape == (2, 1024)
+        assert header["NPOL"] == 2
+        assert header["NCHAN"] == 1024
+        assert header.start_time == Time("2023-07-19T15:24:04")
+
+    def test_data(self):
+        with dada.open(SAMPLE_MKBF_DADA, 'rs') as fh:
+            data = fh.read()
+            fh.seek(10)
+            d10 = fh.read(1)
+        assert_array_equal(d10, data[10:11])
+
+        with open(SAMPLE_MKBF_DADA, 'rb') as fh:
+            fh.seek(4096)
+            raw_words = np.frombuffer(fh.read(-1), dtype="u1")
+
+        pd = decode_8bit(raw_words).view("c8").reshape(2, 1024, 256)
+        check = np.moveaxis(pd, -1, 0).reshape(data.shape)
+        assert_array_equal(check, data)

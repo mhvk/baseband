@@ -1,5 +1,6 @@
 # Licensed under the GPLv3 - see LICENSE
 """Payload for DADA format."""
+import math
 from collections import namedtuple
 
 import numpy as np
@@ -43,3 +44,41 @@ class DADAPayload(PayloadBase):
         8: encode_8bit}
     _memmap = True
     _sample_shape_maker = namedtuple('SampleShape', 'npol, nchan')
+
+    def __new__(cls, words, *, header=None, **kwargs):
+        # Override instrument if header is given.
+        if header is not None and header.get("INSTRUMENT") == "MKBF":
+            cls = MKBFPayload
+        return super().__new__(cls)
+
+
+class MKBFPayload(DADAPayload):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Change view of words to indicate one element containts 256
+        # samples for each part of the sample_shape (this also ensures
+        # bpw=bits-per-word is correct in _item_to_slices).
+        self.words = self.words.view(
+            [("samples", "u2", self.sample_shape + (256,))]
+        )
+
+    def _samples_first(self, words):
+        """Reorder words to have samples first."""
+        return np.reshape(
+            np.moveaxis(words["samples"], -1, 1),
+            (-1,) + self.sample_shape, copy=True,
+        )
+
+    def __getitem__(self, item=()):
+        if item == () or item == slice(None):
+            words= self._samples_first(self.words)
+
+        else:
+            words_slice, data_slice = self._item_to_slices(item)
+            words = self._samples_first(self.words[words_slice])[data_slice]
+
+        data = self._decoders[self._coder](words)
+
+        return data.view(self.dtype) if self.complex_data else data
+
+    data = property(__getitem__, doc="Full decoded payload.")
