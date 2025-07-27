@@ -62,46 +62,45 @@ class DADAHeader(OrderedDict):
                    'time')
     """Properties accessible/usable in initialisation for all headers."""
 
-    _defaults = [('HEADER', 'DADA'),
-                 ('HDR_VERSION', '1.0'),
-                 ('HDR_SIZE', 4096),
-                 ('DADA_VERSION', '1.0'),
-                 ('OBS_ID', 'unset'),
-                 ('PRIMARY', 'unset'),
-                 ('SECONDARY', 'unset'),
-                 ('FILE_NAME', 'unset'),
-                 ('FILE_NUMBER', 0),
-                 ('FILE_SIZE', 0),
-                 ('OBS_OFFSET', 0),
-                 ('OBS_OVERLAP', 0),
-                 ('SOURCE', 'unset'),
-                 ('TELESCOPE', 'unset'),
-                 ('INSTRUMENT', 'unset'),
-                 ('RECEIVER', 'unset'),
-                 ('NBIT', 8),
-                 ('NDIM', 1),
-                 ('NPOL', 1),
-                 ('NCHAN', 1),
-                 ('RESOLUTION', 1),
-                 ('DSB', 1)]
+    _defaults = {
+        'HEADER': 'DADA',
+        'HDR_VERSION': '1.0',
+        'HDR_SIZE': 4096,
+        'DADA_VERSION': '1.0',
+        'OBS_ID': 'unset',
+        'PRIMARY': 'unset',
+        'SECONDARY': 'unset',
+        'FILE_NAME': 'unset',
+        'FILE_NUMBER': 0,
+        'FILE_SIZE': 0,
+        'OBS_OFFSET': 0,
+        'OBS_OVERLAP': 0,
+        'SOURCE': 'unset',
+        'TELESCOPE': 'unset',
+        'INSTRUMENT': 'unset',
+        'RECEIVER': 'unset',
+        'NBIT': 8,
+        'NDIM': 1,
+        'NPOL': 1,
+        'NCHAN': 1,
+        'RESOLUTION': 1,
+        'DSB': 1,
+    }
 
     def __init__(self, *args, verify=True, mutable=True, **kwargs):
         self.mutable = True
         self.comments = {}
         if len(args) == 1 and isinstance(args[0], str):
-            args = (self._fromlines(args[0].split('\n')),)
-
-        super().__init__(*args, **kwargs)
+            super().__init__(**self._fromlines(args[0].split('\n')), **kwargs)
+        else:
+            super().__init__(*args, **kwargs)
         self.mutable = mutable
         if verify and (args or kwargs):
             self.verify()
 
     def verify(self):
         """Basic check of integrity."""
-        assert self['HEADER'] == 'DADA'
-        assert all(key in self for key in ('HDR_VERSION',
-                                           'HDR_SIZE',
-                                           'DADA_VERSION'))
+        assert len(set(self.keys()).intersection(self._defaults.keys())) > 10
 
     def copy(self):
         """Create a mutable and independent copy of the header."""
@@ -118,7 +117,7 @@ class DADAHeader(OrderedDict):
     @staticmethod
     def _fromlines(lines):
         """Interpret a list of lines as a header, converting its values."""
-        args = []
+        kwargs = {}
         for line_no, line in enumerate(lines):
             split = line.strip().split('#')
             comment = split[1].strip() if (len(split) > 1
@@ -135,9 +134,9 @@ class DADAHeader(OrderedDict):
             elif key in ('FREQ', 'BW', 'TSAMP'):
                 value = float(value)
 
-            args.append((key, (value, comment)))
+            kwargs[key] = (value, comment)
 
-        return args
+        return kwargs
 
     def _tolines(self):
         """Write header to a list of strings."""
@@ -198,7 +197,7 @@ class DADAHeader(OrderedDict):
         else:
             fh.seek(start_pos + hdr_size)
 
-        return cls(cls._fromlines(lines), verify=verify, mutable=False)
+        return cls(**cls._fromlines(lines), verify=verify, mutable=False)
 
     def tofile(self, fh):
         """Write DADA file header to filehandle.
@@ -248,7 +247,7 @@ class DADAHeader(OrderedDict):
 
         Furthermore, some header defaults are set in ``DADAHeader._defaults``.
         """
-        self = cls(cls._defaults, verify=False)
+        self = cls(**cls._defaults, verify=False)
         self.update(**kwargs)
         return self
 
@@ -400,11 +399,16 @@ class DADAHeader(OrderedDict):
     @property
     def start_time(self):
         """Start time of the observation."""
-        mjd_int, frac = self['MJD_START'].split('.')
-        mjd_int = int(mjd_int)
-        frac = float('.' + frac)
-        # replace '-' between date and time with a 'T' and convert to Time
-        return Time(mjd_int, frac, scale='utc', format='mjd')
+        if "MJD_START" in self:
+            mjd_int, frac = self['MJD_START'].split('.')
+            mjd_int = int(mjd_int)
+            frac = float('.' + frac)
+            return Time(mjd_int, frac, scale='utc', format='mjd')
+        else:
+            # replace '-' between date and time with a 'T' and convert to Time
+            t0 = self['UTC_START']
+            t0 = t0[:10] + 'T' + t0[11:]
+            return Time(t0, scale='utc', format='isot')
 
     @start_time.setter
     def start_time(self, start_time):

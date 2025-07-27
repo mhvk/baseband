@@ -1,6 +1,9 @@
 4.4 (unreleased)
 ================
 
+- The dada reader now supports reading Meerkat MKBF files, which store
+  data in heaps of 256 samples each (with the samples along the
+  fastest axis). [#542]
 
 4.3.1 (unreleased)
 ==================

@@ -112,6 +112,13 @@ This sample does not end with a comment "# end of header", but rather
 with many ctrl-0.
 """
 
+SAMPLE_MKBF_DADA = _full_path('sample_mkbf.dada')
+"""DADA sample in custom Meerkat MKBF format, adapted to shortened size.
+
+The sample does not have the standard "HEADER" keyword, and stores data
+in chunks of 256 samples (hardcoded, not inferable from header).
+"""
+
 SAMPLE_PUPPI = _full_path('sample_puppi.raw')
 """GUPPI/PUPPI sample, npol=2, nchan=4.
 
