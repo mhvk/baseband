@@ -73,7 +73,7 @@ class GSBPayload(PayloadBase):
                  8: encode_8bit}
     _decoders = {4: decode_4bit,
                  8: decode_8bit}
-    _dtype_word = np.int8
+    _dtype_word = np.dtype("i1")
 
     _sample_shape_maker_1thread = namedtuple('SampleShape', 'nchan')
     _sample_shape_maker_nthread = namedtuple('SampleShape', 'nthread, nchan')

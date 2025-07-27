@@ -282,8 +282,10 @@ class TestBase:
         payload = self.Payload.fromdata(data + 1j * data, bps=8)
         sel_data = payload.data[item]
         assert np.all(payload[item] == sel_data)
-        payload[item] = 1 - sel_data
+        # Check __setitem__
         check = payload.data
+        payload[item] = 1 - sel_data
+        assert not np.all(payload.data == check)
         check[item] = 1 - sel_data
         assert np.all(payload.data == check)
 
